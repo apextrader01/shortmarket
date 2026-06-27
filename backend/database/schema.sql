@@ -1,0 +1,33 @@
+-- SQLite Schema for Short Market Mock Backend
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    balance REAL NOT NULL DEFAULT 1000000.0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    average_price REAL NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('MARKET', 'LIMIT')),
+    side TEXT NOT NULL CHECK(side IN ('BUY', 'SELL')),
+    quantity INTEGER NOT NULL,
+    price REAL, -- NULL for MARKET orders
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+-- Insert a default mock user if not exists
+INSERT OR IGNORE INTO users (id, username, balance) VALUES (1, 'mock_trader', 1000000.0);
