@@ -49,17 +49,40 @@ export const useStore = create((set, get) => ({
       clearTimeout(timeout);
       if (!res.ok) throw new Error(`Server error: HTTP ${res.status}`);
       const data = await res.json();
-      const candles = Array.isArray(data) ? data : [];
-      set((state) => ({
-        candleData: { ...state.candleData, [symbol]: candles },
-        isLoadingCandles: false,
-        candleError: candles.length === 0 ? 'No historical data available' : null,
-      }));
+      let candles = Array.isArray(data) ? data : [];
+      
+      set((state) => {
+        // Fallback: if no historical data, create one candle from current price so chart renders
+        if (candles.length === 0 && state.prices[symbol]) {
+          const p = state.prices[symbol];
+          const t = p.timestamp ? Math.floor(new Date(p.timestamp).getTime()/1000) : Math.floor(Date.now()/1000);
+          candles = [{ time: t, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
+        }
+        return {
+          candleData: { ...state.candleData, [symbol]: candles },
+          isLoadingCandles: false,
+          candleError: candles.length === 0 ? 'No historical data available' : null,
+        };
+      });
     } catch (err) {
       clearTimeout(timeout);
       const msg = err.name === 'AbortError' ? 'Request timed out — backend may be starting up' : err.message;
       console.error('loadCandleData failed:', msg);
-      set({ isLoadingCandles: false, candleError: msg });
+      
+      // On error, still try to fall back to current price
+      set((state) => {
+        let candles = [];
+        if (state.prices[symbol]) {
+          const p = state.prices[symbol];
+          const t = p.timestamp ? Math.floor(new Date(p.timestamp).getTime()/1000) : Math.floor(Date.now()/1000);
+          candles = [{ time: t, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
+        }
+        return {
+          candleData: { ...state.candleData, [symbol]: candles },
+          isLoadingCandles: false, 
+          candleError: msg 
+        };
+      });
     }
   },
 

@@ -29,6 +29,15 @@ app.get('/api/prices', (req, res) => {
   res.json(priceCache);
 });
 
+// ─── Stocks (full instrument master) ──────────────────────────────────────
+app.get('/api/stocks', (req, res) => {
+  const { STOCK_MASTER } = require('./services/angelOne');
+  const stocks = Object.entries(STOCK_MASTER).map(([token, info]) => ({
+    token, symbol: info.symbol, name: info.name, exchange: info.exchange
+  }));
+  res.json(stocks);
+});
+
 // ─── User ─────────────────────────────────────────────────────────────────
 app.get('/api/user/:id', (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
@@ -74,16 +83,6 @@ app.post('/api/order/:id/cancel', (req, res) => {
   res.json({ success: true });
 });
 
-// ─── Stock List ───────────────────────────────────────────────────────────
-app.get('/api/stocks', (req, res) => {
-  const { STOCK_MASTER } = require('./services/angelOne');
-  const stocks = Object.values(STOCK_MASTER).map(s => ({
-    symbol: s.symbol,
-    name: s.name,
-    exchange: s.exchange
-  }));
-  res.json(stocks);
-});
 
 // ─── Candle Data ──────────────────────────────────────────────────────────
 app.get('/api/candles/:symbol', async (req, res) => {
