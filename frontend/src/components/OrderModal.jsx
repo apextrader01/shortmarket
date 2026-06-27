@@ -32,7 +32,8 @@ export default function OrderModal() {
   if (!orderModal.isOpen || !symbol) return null;
 
   const balanceNum = Number(user?.balance) || 0;
-  const requiredMargin = quantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
+  const totalQuantity = quantity * (orderModal.lotsize || 1);
+  const requiredMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
   const isInsufficient = balanceNum < requiredMargin;
 
   const isBuy = side === 'BUY';
@@ -42,7 +43,7 @@ export default function OrderModal() {
       symbol,
       type: orderType,
       side,
-      quantity,
+      quantity: totalQuantity,
       price: orderType === 'MARKET' ? null : parseFloat(price),
       sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
       tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
@@ -126,10 +127,24 @@ export default function OrderModal() {
               </div>
             </div>
 
-            {/* Quantity */}
+            {/* Quantity / Lots */}
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
-              <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                {orderModal.lotsize > 1 ? 'Lots' : 'Quantity'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="number" 
+                  value={quantity} 
+                  onChange={e => setQuantity(Math.max(1, Number(e.target.value)))} 
+                  style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                />
+              </div>
+              {orderModal.lotsize > 1 && (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  1 Lot = {orderModal.lotsize} Qty (Total: {quantity * orderModal.lotsize})
+                </div>
+              )}
             </div>
 
             {/* Price */}

@@ -66,9 +66,7 @@ const OptionChainView = () => {
 
   const handleTrade = (opt, type) => {
     if (!opt) return;
-    const orderSymbol = opt.symbol; // The unique symbol is just the contract symbol since we inject it dynamically
-    // The OrderModal uses selectedSymbol from store, but we can just pass the string to openOrderModal
-    openOrderModal(orderSymbol, type);
+    openOrderModal(opt.symbol, type === 'B' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
   };
 
   if (loading) {

@@ -193,10 +193,10 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Order Modal ─────────────────────────────────────────────────────────────
-  orderModal: { isOpen: false, symbol: null, type: 'BUY' },
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1 },
 
-  openOrderModal:  (symbol, type = 'BUY') => set({ orderModal: { isOpen: true, symbol, type } }),
-  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY' } }),
+  openOrderModal:  (symbol, type = 'BUY', lotsize = 1) => set({ orderModal: { isOpen: true, symbol, type, lotsize } }),
+  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1 } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
