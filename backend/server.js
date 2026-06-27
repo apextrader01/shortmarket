@@ -122,6 +122,84 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: errorMsg || 'Unknown error occurred during login' });
   }
 });
+// ─── Forgot Password ────────────────────────────────────────────────────────
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(404).json({ error: 'No account found with this email' });
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60000); // 15 minutes
+
+    await db('users').where({ id: user.id }).update({
+      reset_otp: otp,
+      reset_otp_expires: expires
+    });
+
+    // Send via EmailJS REST API
+    const emailData = {
+      service_id: 'service_apextrade',
+      template_id: 'template_qfe0n8c',
+      user_id: 'C-D1EFjOx7iG0bKbs',
+      accessToken: 'VLAn_66xO-8a3HPJgY5FW',
+      template_params: {
+        otp: otp
+      }
+    };
+
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(emailData)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('EmailJS Error:', errText);
+      return res.status(500).json({ error: 'Failed to send email' });
+    }
+
+    res.json({ success: true, message: 'OTP sent to email' });
+  } catch (error) {
+    console.error('Forgot Password Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Reset Password ─────────────────────────────────────────────────────────
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
+
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.reset_otp !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+    
+    if (new Date() > new Date(user.reset_otp_expires)) {
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+    await db('users').where({ id: user.id }).update({
+      password_hash,
+      reset_otp: null,
+      reset_otp_expires: null
+    });
+
+    res.json({ success: true, message: 'Password has been reset' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // ─── User ─────────────────────────────────────────────────────────────────
 app.get('/api/user', authenticateToken, async (req, res) => {

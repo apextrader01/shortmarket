@@ -26,9 +26,21 @@ async function initSchema() {
         table.string('password_hash').notNullable();
         table.decimal('balance', 14, 2).notNullable().defaultTo(1000000.0);
         table.json('watchlists'); // For syncing watchlists
+        table.string('reset_otp');
+        table.datetime('reset_otp_expires');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
+    } else {
+      // Add columns if table already exists
+      const hasResetOtp = await db.schema.hasColumn('users', 'reset_otp');
+      if (!hasResetOtp) {
+        await db.schema.alterTable('users', table => {
+          table.string('reset_otp');
+          table.datetime('reset_otp_expires');
+        });
+        console.log('Added reset OTP columns to users table');
+      }
     }
 
     // 2. Positions Table
