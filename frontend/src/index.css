@@ -18,6 +18,14 @@
   --border-color: rgba(255, 255, 255, 0.1);
   --border-highlight: rgba(255, 255, 255, 0.2);
   
+  /* Accent */
+  --color-blue: #3B82F6;
+  --color-blue-light: #60A5FA;
+  --color-yellow: #EAB308;
+
+  /* Dark surfaces */
+  --bg-dark: #060D1A;
+
   /* Utilities */
   --radius-sm: 6px;
   --radius-md: 12px;
