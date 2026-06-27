@@ -168,6 +168,46 @@ export const useStore = create(persist((set, get) => ({
   openOrderModal:  (symbol, type = 'BUY') => set({ orderModal: { isOpen: true, symbol, type } }),
   closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY' } }),
 
+  editOrderModal: { isOpen: false, order: null },
+  openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
+  closeEditOrderModal: () => set({ editOrderModal: { isOpen: false, order: null } }),
+
+  cancelOrder: async (id) => {
+    try {
+      const res = await fetch(`${API}/api/order/${id}/cancel`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${get().token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await get().fetchUserData();
+      return true;
+    } catch (err) {
+      set({ authError: err.message });
+      return false;
+    }
+  },
+
+  updateOrder: async (id, quantity, price) => {
+    try {
+      const res = await fetch(`${API}/api/order/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${get().token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ quantity, price })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await get().fetchUserData();
+      return true;
+    } catch (err) {
+      set({ authError: err.message });
+      return false;
+    }
+  },
+
   // ── Market Data ─────────────────────────────────────────────────────────────
   prices:         {},
   stocks:         [],

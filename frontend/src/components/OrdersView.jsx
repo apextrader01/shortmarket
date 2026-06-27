@@ -72,6 +72,7 @@ export default function OrdersView() {
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
+                  {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -89,6 +90,28 @@ export default function OrdersView() {
                     <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                       {order.status}
                     </td>
+                    {activeTab === 'Open Orders' && (
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button 
+                            onClick={() => useStore.getState().openEditOrderModal(order)}
+                            style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            EDIT
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to cancel this order?')) {
+                                useStore.getState().cancelOrder(order.id);
+                              }
+                            }}
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            CANCEL
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

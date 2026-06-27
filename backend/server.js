@@ -198,12 +198,64 @@ app.post('/api/order', authenticateToken, async (req, res) => {
 // ─── Cancel Order ─────────────────────────────────────────────────────────
 app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
   try {
-    const order = await db('orders').where({ id: req.params.id, user_id: req.user.id }).first();
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
-    
-    await db('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
-    res.json({ success: true });
+    await db.transaction(async (trx) => {
+      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
+      
+      // Update status
+      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
+      
+      // Refund Margin
+      const refundAmount = order.quantity * parseFloat(order.price || 0);
+      if (refundAmount > 0) {
+          const user = await trx('users').where({ id: req.user.id }).first();
+          await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
+      }
+      
+      res.json({ success: true });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Edit Order ─────────────────────────────────────────────────────────
+app.put('/api/order/:id', authenticateToken, async (req, res) => {
+  const { quantity, price } = req.body;
+  if (!quantity || !price) {
+    return res.status(400).json({ error: 'Missing quantity or price' });
+  }
+
+  try {
+    await db.transaction(async (trx) => {
+      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be modified' });
+      
+      const oldMargin = order.quantity * parseFloat(order.price || 0);
+      const newMargin = Number(quantity) * parseFloat(price);
+      const marginDifference = newMargin - oldMargin;
+      
+      // Check if user has enough balance if margin increases
+      const user = await trx('users').where({ id: req.user.id }).first();
+      if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
+         return res.status(400).json({ error: 'Insufficient balance to increase order size' });
+      }
+
+      // Update Order
+      await trx('orders').where({ id: req.params.id }).update({ 
+          quantity: Number(quantity), 
+          price: parseFloat(price) 
+      });
+      
+      // Update Balance (deduct difference if positive, refund if negative)
+      if (marginDifference !== 0) {
+          await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+      }
+      
+      res.json({ success: true });
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
