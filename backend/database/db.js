@@ -7,7 +7,9 @@ const isProduction = !!process.env.DATABASE_URL;
 // Configure Knex based on environment
 const dbConfig = isProduction ? {
   client: 'pg',
-  connection: process.env.DATABASE_URL,
+  connection: process.env.DATABASE_URL.includes('sslmode=disable') 
+    ? process.env.DATABASE_URL 
+    : { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } },
   pool: { min: 2, max: 10 }
 } : {
   client: 'sqlite3',
