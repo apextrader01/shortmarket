@@ -239,6 +239,9 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
   }
 });
 // ─── Option Chain ───────────────────────────────────────────────────────────
+let cachedOptionsData = null;
+let lastOptionsReadTime = 0;
+
 app.get('/api/options/chain/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   const optionsPath = path.join(__dirname, 'database', 'options.json');
@@ -248,14 +251,18 @@ app.get('/api/options/chain/:symbol', async (req, res) => {
   }
 
   try {
-    const rawData = fs.readFileSync(optionsPath, 'utf8');
-    const optionsData = JSON.parse(rawData);
+    const stat = fs.statSync(optionsPath);
+    if (!cachedOptionsData || stat.mtimeMs > lastOptionsReadTime) {
+      const rawData = fs.readFileSync(optionsPath, 'utf8');
+      cachedOptionsData = JSON.parse(rawData);
+      lastOptionsReadTime = stat.mtimeMs;
+    }
 
-    if (!optionsData[symbol]) {
+    if (!cachedOptionsData[symbol]) {
       return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
     }
 
-    res.json(optionsData[symbol]);
+    res.json(cachedOptionsData[symbol]);
   } catch (err) {
     console.error('Error fetching option chain:', err);
     res.status(500).json({ error: 'Internal server error' });
