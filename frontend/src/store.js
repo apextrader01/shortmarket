@@ -122,6 +122,16 @@ export const useStore = create((set, get) => ({
     } catch (_) {}
   },
 
+  fetchBatchPrices: async (symbols) => {
+    try {
+      const res = await fetch(`${API}/api/prices/batch?symbols=${symbols.join(',')}`);
+      const snapshot = await res.json();
+      if (snapshot && Object.keys(snapshot).length > 0) {
+        set((state) => ({ prices: applySnapshot(snapshot, state) }));
+      }
+    } catch (_) {}
+  },
+
   loadStocks: async () => {
     try {
       const res = await fetch(`${API}/api/stocks`);

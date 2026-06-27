@@ -334,6 +334,47 @@ async function addSubscription(uniqueSymbol, io, priceCache) {
     }
 }
 
+// ─── Fetch specific LTPs on demand (for search results) ──────────────────────
+async function fetchBatchLTPs(uniqueSymbols) {
+    const exchangeMap = { NSE: [], BSE: [] };
+    const tokensRequested = [];
+    
+    uniqueSymbols.slice(0, 50).forEach(sym => {
+        const token = symbolToToken[sym];
+        if (token) {
+            const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+            exchangeMap[exch].push(token);
+            tokensRequested.push(token);
+        }
+    });
+    
+    const result = {};
+    if (tokensRequested.length === 0) return result;
+
+    try {
+        const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: exchangeMap });
+        if (res?.status && res.data?.fetched) {
+            for (const item of res.data.fetched) {
+                const info = STOCK_MASTER[item.symbolToken];
+                if (info && item.ltp) {
+                    result[info.uniqueSymbol] = {
+                        symbol: info.uniqueSymbol,
+                        ltp: item.ltp,
+                        open: item.open || item.ltp,
+                        high: item.high || item.ltp,
+                        low: item.low || item.ltp,
+                        close: item.close || item.ltp,
+                        change: item.netChange || 0,
+                        pct: item.percentChange || 0,
+                        timestamp: new Date().toISOString()
+                    };
+                }
+            }
+        }
+    } catch (e) { console.error('fetchBatchLTPs error', e.message); }
+    return result;
+}
+
 // ─── Fetch LTPs in batches (API limit ~50 tokens per call) ───────────────────
 async function fetchAllLTPs() {
     const BATCH_SIZE = 50;
@@ -586,5 +627,6 @@ module.exports = {
     get STOCK_MASTER() { return STOCK_MASTER; },
     get symbolToToken() { return symbolToToken; },
     addSubscription,
+    fetchBatchLTPs,
     smart_api
 };

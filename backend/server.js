@@ -31,6 +31,20 @@ app.get('/api/prices', (req, res) => {
   res.json(priceCache);
 });
 
+app.get('/api/prices/batch', async (req, res) => {
+  const symbols = req.query.symbols?.split(',') || [];
+  if (symbols.length === 0) return res.json({});
+  
+  const { fetchBatchLTPs } = require('./services/angelOne');
+  if (fetchBatchLTPs) {
+    const prices = await fetchBatchLTPs(symbols);
+    Object.assign(priceCache, prices);
+    res.json(prices);
+  } else {
+    res.json({});
+  }
+});
+
 // ─── Stocks (full instrument master) ──────────────────────────────────────
 let cachedStocksArray = null;
 app.get('/api/stocks', (req, res) => {

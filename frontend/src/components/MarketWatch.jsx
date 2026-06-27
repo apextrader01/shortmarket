@@ -3,13 +3,29 @@ import { useStore } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search } from 'lucide-react';
 
 export default function MarketWatch() {
-  const { prices, stocks, selectedSymbol, setSelectedSymbol } = useStore();
+  const { prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredStocks = stocks.filter(s =>
     s.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   ).slice(0, 100);
+
+  React.useEffect(() => {
+    if (searchQuery.trim().length > 0 && filteredStocks.length > 0) {
+      const timer = setTimeout(() => {
+        const missingSymbols = filteredStocks
+          .filter(s => !prices[s.uniqueSymbol])
+          .map(s => s.uniqueSymbol)
+          .slice(0, 50);
+        
+        if (missingSymbols.length > 0 && fetchBatchPrices) {
+          fetchBatchPrices(missingSymbols);
+        }
+      }, 400); // Wait for user to stop typing before fetching prices
+      return () => clearTimeout(timer);
+    }
+  }, [searchQuery]); // Run when search query changes
 
   return (
     <div className="sidebar">
