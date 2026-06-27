@@ -143,7 +143,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     // Send via EmailJS REST API
     const emailData = {
       service_id: 'service_apextrade',
-      template_id: 'kjl8rfj',
+      template_id: 'template_qfe0n8c',
       user_id: '5l4SSMcquuPO_XGId',
       accessToken: 'f0eGuMIvDNCxPoAf5CeZD',
       template_params: {
