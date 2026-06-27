@@ -22,7 +22,11 @@ export default function LoginView() {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+    <div style={{ 
+      width: '100%', minHeight: '100vh', 
+      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+      background: 'var(--bg-primary)' 
+    }}>
       <div style={{ width: '100%', maxWidth: '400px', padding: '40px', background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
         
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
