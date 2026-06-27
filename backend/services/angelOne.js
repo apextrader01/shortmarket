@@ -10,6 +10,7 @@ const smart_api = new SmartAPI({
 // ─── Price Cache (injected from server.js to ensure same reference) ──────────
 let sharedPriceCache = null;
 
+function setPriceCache(pc) { sharedPriceCache = pc; }
 function getPriceCache() { return sharedPriceCache; }
 
 let jwtToken = '';
@@ -725,6 +726,7 @@ module.exports = {
     fetchCandleData,
     fetchAllLTPs,
     getPriceCache,
+    setPriceCache,
     get STOCK_MASTER() { return STOCK_MASTER; },
     get symbolToToken() { return symbolToToken; },
     addSubscription,

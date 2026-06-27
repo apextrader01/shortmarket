@@ -426,7 +426,9 @@ app.use((req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────
-const { loginAngelOne } = require('./services/angelOne');
+const { loginAngelOne, setPriceCache } = require('./services/angelOne');
+setPriceCache(priceCache);
+
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
