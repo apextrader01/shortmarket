@@ -148,6 +148,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       accessToken: 'VLAn_66xO-8a3HPJgY5FW',
       template_params: {
         otp: otp,
+        otp_code: otp,
         to_email: email,
         user_email: email,
         email: email
