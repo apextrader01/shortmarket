@@ -174,30 +174,12 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
   try {
     await db.transaction(async (trx) => {
-      let execStatus = type === 'MARKET' ? 'EXECUTED' : 'PENDING';
-      const execPrice = price || 0;
-
       // 1. Insert Order
       const [id] = await trx('orders').insert({
-        user_id: req.user.id, symbol, type, side, quantity, price: execPrice, status: execStatus,
+        user_id: req.user.id, symbol, type, side, quantity, price: price || null,
         sl_price: sl_price || null, tgt_price: tgt_price || null
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
-
-      // 2. Update Positions if EXECUTED
-      if (execStatus === 'EXECUTED') {
-         const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
-         if (existingPos) {
-            const newQty = side === 'BUY' ? existingPos.quantity + quantity : existingPos.quantity - quantity;
-            let newAvg = existingPos.average_price;
-            if (side === 'BUY' && newQty > 0) {
-               newAvg = ((existingPos.quantity * existingPos.average_price) + (quantity * execPrice)) / newQty;
-            }
-            await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvg });
-         } else {
-            await trx('positions').insert({ user_id: req.user.id, symbol, quantity: side === 'BUY' ? quantity : -quantity, average_price: execPrice });
-         }
-      }
 
       // 2. Deduct Margin from User Balance
       if (margin && Number(margin) > 0) {

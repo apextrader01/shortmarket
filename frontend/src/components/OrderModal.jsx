@@ -43,7 +43,7 @@ export default function OrderModal() {
       type: orderType,
       side,
       quantity,
-      price: orderType === 'MARKET' ? livePrice : parseFloat(price),
+      price: orderType === 'MARKET' ? null : parseFloat(price),
       sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
       tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin // Backend will deduct this
