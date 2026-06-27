@@ -237,8 +237,31 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ─── Option Chain ───────────────────────────────────────────────────────────
+app.get('/api/options/chain/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  const optionsPath = path.join(__dirname, 'database', 'options.json');
+  
+  if (!fs.existsSync(optionsPath)) {
+    return res.status(503).json({ error: 'Options database is currently being built. Please try again in a minute.' });
+  }
 
-// ─── Orders ───────────────────────────────────────────────────────────────
+  try {
+    const rawData = fs.readFileSync(optionsPath, 'utf8');
+    const optionsData = JSON.parse(rawData);
+
+    if (!optionsData[symbol]) {
+      return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
+    }
+
+    res.json(optionsData[symbol]);
+  } catch (err) {
+    console.error('Error fetching option chain:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
     const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc');
@@ -365,13 +388,15 @@ io.on('connection', (socket) => {
     socket.emit('price_snapshot', priceCache);
   }
 
-  socket.on('subscribe', (symbol) => {
+  socket.on('subscribe', (data) => {
+    let symbol = typeof data === 'string' ? data : data.symbol;
     socket.join(symbol);
     const { addSubscription } = require('./services/angelOne');
-    if (addSubscription) addSubscription(symbol, io, priceCache);
+    if (addSubscription) addSubscription(data, io, priceCache);
   });
 
-  socket.on('unsubscribe', (symbol) => {
+  socket.on('unsubscribe', (data) => {
+    let symbol = typeof data === 'string' ? data : data.symbol;
     socket.leave(symbol);
   });
 
@@ -388,10 +413,15 @@ app.use((req, res) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────
 const { loginAngelOne } = require('./services/angelOne');
+const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
+  
+  // Update options master in background
+  updateOptionsMaster().catch(e => console.error(e));
+
   if (!process.env.ANGEL_TOTP_SECRET) {
       console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
   } else {

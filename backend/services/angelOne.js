@@ -290,26 +290,43 @@ function fmtDate(d) {
 let global_web_socket = null;
 const clientSubscriptions = new Set();
 
-async function addSubscription(uniqueSymbol, io, priceCache) {
-    if (symbolToToken[uniqueSymbol]) {
-        const token = symbolToToken[uniqueSymbol];
-        if (!clientSubscriptions.has(token)) {
-            clientSubscriptions.add(token);
-            // If websocket is running, dynamically subscribe to the new token
-            if (global_web_socket) {
-                const exch = STOCK_MASTER[token]?.exchange === 'BSE' ? 3 : 1;
-                global_web_socket.fetchData({
-                    correlationID: `short_market_dyn_${Date.now()}`,
-                    action: 1, mode: 1, exchangeType: exch, tokens: [token]
-                });
-            }
+async function addSubscription(data, io, priceCache) {
+    let token, exchangeCode, uniqueSymbol, exchStr;
 
-            // Immediately fetch the price via REST to remove the 10-second delay
-            try {
-                const exchangeMap = { NSE: [], BSE: [] };
-                const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-                exchangeMap[exch].push(token);
-                
+    if (typeof data === 'string') {
+        uniqueSymbol = data;
+        if (!symbolToToken[uniqueSymbol]) return;
+        token = symbolToToken[uniqueSymbol];
+        exchStr = STOCK_MASTER[token]?.exchange || 'NSE';
+        exchangeCode = exchStr === 'BSE' ? 3 : 1;
+    } else {
+        token = data.token;
+        uniqueSymbol = data.symbol;
+        exchStr = data.exchange || 'NFO'; // e.g. 'NFO'
+        exchangeCode = (exchStr === 'BSE' || exchStr === 'BFO') ? 3 : (exchStr === 'MCX' ? 5 : (exchStr === 'NFO' ? 2 : 1));
+        
+        // Dynamically add to STOCK_MASTER so processTick works
+        if (!STOCK_MASTER[token]) {
+            STOCK_MASTER[token] = { symbol: data.symbol, uniqueSymbol: data.symbol, name: data.name || data.symbol, exchange: exchStr };
+        }
+    }
+
+    if (!clientSubscriptions.has(token)) {
+        clientSubscriptions.add(token);
+        
+        // If websocket is running, dynamically subscribe to the new token
+        if (global_web_socket) {
+            global_web_socket.fetchData({
+                correlationID: `dynamic_sub_${token}`,
+                action: 1, mode: 1, exchangeType: exchangeCode, tokens: [token]
+            });
+        }
+
+        // Immediately fetch the price via REST to remove the 10-second delay
+        try {
+            const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
+            if (exchangeMap[exchStr]) {
+                exchangeMap[exchStr].push(token);
                 const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: exchangeMap });
                 if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
                     const item = res.data.fetched[0];
@@ -329,22 +346,24 @@ async function addSubscription(uniqueSymbol, io, priceCache) {
                         if (io) io.to(uniqueSymbol).emit('market_data', ltpData);
                     }
                 }
-            } catch (e) {} // silent on fail
-        }
+            }
+        } catch (e) {} // silent on fail
     }
 }
 
 // ─── Fetch specific LTPs on demand (for search results) ──────────────────────
 async function fetchBatchLTPs(uniqueSymbols) {
-    const exchangeMap = { NSE: [], BSE: [] };
+    const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
     const tokensRequested = [];
     
     uniqueSymbols.slice(0, 50).forEach(sym => {
         const token = symbolToToken[sym];
         if (token) {
             const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-            exchangeMap[exch].push(token);
-            tokensRequested.push(token);
+            if (exchangeMap[exch]) {
+                exchangeMap[exch].push(token);
+                tokensRequested.push(token);
+            }
         }
     });
     

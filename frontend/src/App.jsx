@@ -4,6 +4,7 @@ import ChartWidget from './components/ChartWidget';
 import PositionsView from './components/PositionsView';
 import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
+import OptionChainView from './components/OptionChainView';
 import OrderModal from './components/OrderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
@@ -118,7 +119,7 @@ function App() {
               display: 'flex', alignItems: 'center', gap: '12px',
               fontSize: '13px', fontWeight: '600', marginRight: '10px',
             }}>
-              {['Markets', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
+              {['Markets', 'Options', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
                 <div
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -198,6 +199,11 @@ function App() {
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ChartWidget />
               </div>
+            </div>
+          )}
+          {activeTab === 'Options' && (
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
+              <OptionChainView />
             </div>
           )}
           {activeTab === 'Portfolio'  && <PortfolioView />}
