@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
@@ -18,6 +19,7 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+app.use(compression()); // Compress all API responses to fix frontend loading lag
 
 // ─── Health ────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -30,12 +32,17 @@ app.get('/api/prices', (req, res) => {
 });
 
 // ─── Stocks (full instrument master) ──────────────────────────────────────
+let cachedStocksArray = null;
 app.get('/api/stocks', (req, res) => {
+  if (cachedStocksArray) return res.json(cachedStocksArray);
+  
   const { STOCK_MASTER } = require('./services/angelOne');
-  const stocks = Object.entries(STOCK_MASTER).map(([token, info]) => ({
+  if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
+  
+  cachedStocksArray = Object.entries(STOCK_MASTER).map(([token, info]) => ({
     token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
   }));
-  res.json(stocks);
+  res.json(cachedStocksArray);
 });
 
 // ─── User ─────────────────────────────────────────────────────────────────
