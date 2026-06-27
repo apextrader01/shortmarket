@@ -115,8 +115,8 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexShrink: 0 }}>
             {/* Tab Navigation */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '20px',
-              fontSize: '13px', fontWeight: '600', marginRight: '20px',
+              display: 'flex', alignItems: 'center', gap: '12px',
+              fontSize: '13px', fontWeight: '600', marginRight: '10px',
             }}>
               {['Markets', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
                 <div
@@ -140,7 +140,7 @@ function App() {
             </div>
 
             {/* Margin */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Wallet size={16} style={{ color: 'var(--text-secondary)' }} />
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -152,10 +152,10 @@ function App() {
               </div>
             </div>
 
-            <div style={{ width: '1px', height: '32px', background: 'var(--border-color)' }} />
+            <div className="hide-on-mobile" style={{ width: '1px', height: '32px', background: 'var(--border-color)' }} />
 
             {/* User avatar + logout */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 width:          '34px',
                 height:         '34px',
@@ -169,7 +169,7 @@ function App() {
               }}>
                 {user.username?.[0]?.toUpperCase()}
               </div>
-              <div>
+              <div className="hide-on-mobile">
                 <div style={{ fontWeight: '700', fontSize: '13px' }}>{user.username}</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-green-light)' }}>● Active</div>
               </div>
