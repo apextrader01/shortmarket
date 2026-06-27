@@ -22,13 +22,8 @@ app.use(express.json());
 app.use(compression()); // Compress all API responses to fix frontend loading lag
 
 // ─── Health ────────────────────────────────────────────────────────────────
-app.get('/api/health', async (req, res) => {
-  try {
-    await db.raw('SELECT 1');
-    res.json({ status: 'ok', symbols: Object.keys(priceCache).length });
-  } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
-  }
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', symbols: Object.keys(priceCache).length });
 });
 
 // ─── Prices (all cached LTPs) ─────────────────────────────────────────────
