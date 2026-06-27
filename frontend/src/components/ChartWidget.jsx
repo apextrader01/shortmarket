@@ -114,6 +114,7 @@ export default function ChartWidget() {
   useEffect(() => {
     mountedRef.current = true;
     const cleanup = buildChart();
+    loadCandleData(selectedSymbol, chartInterval);
     return () => {
       mountedRef.current = false;
       if (cleanup) cleanup();
