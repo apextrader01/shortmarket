@@ -376,10 +376,10 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
             return [];
         }
         
-        // Angel One returns timestamps as IST strings ("YYYY-MM-DD HH:MM")
-        // Append +05:30 so JS parses them correctly as IST instead of UTC
+        // Angel One returns timestamps as IST strings ("2024-02-08T09:15:00+05:30")
+        // Just parse it natively.
         return res.data.map(c => ({
-            time: Math.floor(new Date(c[0].replace(' ', 'T') + '+05:30').getTime() / 1000),
+            time: Math.floor(new Date(c[0]).getTime() / 1000),
             open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5]
         }));
     } catch (e) {
