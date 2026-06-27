@@ -22,9 +22,25 @@ export const useStore = create(persist((set, get) => ({
   watchlists: [{ id: 1, name: 'Watchlist 1', symbols: [] }],
   activeWatchlistId: 1,
 
-  createWatchlist: (name) => set((state) => ({
-    watchlists: [...state.watchlists, { id: Date.now(), name, symbols: [] }]
-  })),
+  createWatchlist: (name) => set((state) => {
+    if (state.watchlists.some(w => w.name.toLowerCase() === name.toLowerCase())) {
+      alert(`Watchlist "${name}" already exists!`);
+      return state;
+    }
+    return { watchlists: [...state.watchlists, { id: Date.now(), name, symbols: [] }] };
+  }),
+
+  renameWatchlist: (id, newName) => set((state) => {
+    if (state.watchlists.some(w => w.id !== id && w.name.toLowerCase() === newName.toLowerCase())) {
+      alert(`Watchlist "${newName}" already exists!`);
+      return state;
+    }
+    return {
+      watchlists: state.watchlists.map(w => 
+        w.id === id ? { ...w, name: newName } : w
+      )
+    };
+  }),
 
   deleteWatchlist: (id) => set((state) => {
     const newWatchlists = state.watchlists.filter(w => w.id !== id);

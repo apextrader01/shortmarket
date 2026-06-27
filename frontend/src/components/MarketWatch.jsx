@@ -6,7 +6,7 @@ export default function MarketWatch() {
   const { 
     prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices,
     watchlists, activeWatchlistId, setActiveWatchlist, 
-    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist 
+    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist 
   } = useStore();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,6 +55,11 @@ export default function MarketWatch() {
           <div
             key={w.id}
             onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); }}
+            onDoubleClick={() => { 
+              const newName = prompt('Rename watchlist:', w.name); 
+              if (newName && newName.trim()) renameWatchlist(w.id, newName.trim()); 
+            }}
+            title="Double-click to rename"
             style={{
               padding: '12px 14px',
               fontSize: '12px',
@@ -77,7 +82,7 @@ export default function MarketWatch() {
           </div>
         ))}
         <div 
-          onClick={() => { const name = prompt('Enter watchlist name:'); if (name) createWatchlist(name); }}
+          onClick={() => { const name = prompt('Enter watchlist name:'); if (name && name.trim()) createWatchlist(name.trim()); }}
           style={{ padding: '12px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}
           onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
           onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
