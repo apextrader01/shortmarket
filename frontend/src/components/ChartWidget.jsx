@@ -150,7 +150,7 @@ export default function ChartWidget() {
     if (!mountedRef.current || !price || !liveLineRef.current) return;
     try {
       const t = price.timestamp ? Math.floor(new Date(price.timestamp).getTime() / 1000) : 0;
-      if (t > 0) liveLineRef.current.update({ time: t, value: price.ltp });
+      if (t > 0) liveLineRef.current.update({ time: t + 19800, value: price.ltp });
     } catch (_) {}
   }, [prices, selectedSymbol]);
 

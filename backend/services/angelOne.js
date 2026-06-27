@@ -377,11 +377,14 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
         }
         
         // Angel One returns timestamps as IST strings ("2024-02-08T09:15:00+05:30")
-        // Just parse it natively.
-        return res.data.map(c => ({
-            time: Math.floor(new Date(c[0]).getTime() / 1000),
-            open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5]
-        }));
+        // Shift by 19800 seconds (5h 30m) so Lightweight Charts displays it correctly in IST
+        return res.data.map(c => {
+            const utcSeconds = Math.floor(new Date(c[0]).getTime() / 1000);
+            return {
+                time: utcSeconds + 19800,
+                open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5]
+            };
+        });
     } catch (e) {
         console.error(`fetchCandleData exception for ${symbol}:`, e.message);
         return [];

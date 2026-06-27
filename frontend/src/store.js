@@ -56,7 +56,7 @@ export const useStore = create((set, get) => ({
         if (candles.length === 0 && state.prices[symbol]) {
           const p = state.prices[symbol];
           const t = p.timestamp ? Math.floor(new Date(p.timestamp).getTime()/1000) : Math.floor(Date.now()/1000);
-          candles = [{ time: t, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
+          candles = [{ time: t + 19800, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
         }
         return {
           candleData: { ...state.candleData, [symbol]: candles },
@@ -75,7 +75,7 @@ export const useStore = create((set, get) => ({
         if (state.prices[symbol]) {
           const p = state.prices[symbol];
           const t = p.timestamp ? Math.floor(new Date(p.timestamp).getTime()/1000) : Math.floor(Date.now()/1000);
-          candles = [{ time: t, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
+          candles = [{ time: t + 19800, open: p.open || p.ltp, high: p.high || p.ltp, low: p.low || p.ltp, close: p.ltp, volume: 0 }];
         }
         return {
           candleData: { ...state.candleData, [symbol]: candles },
