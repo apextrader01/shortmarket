@@ -9,7 +9,7 @@ export default function MarketWatch() {
   const filteredStocks = stocks.filter(s =>
     s.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ).slice(0, 100);
 
   return (
     <div className="sidebar">

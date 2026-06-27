@@ -291,9 +291,12 @@ function fmtDate(d) {
 async function fetchAllLTPs() {
     const BATCH_SIZE = 50;
     const result = {};
+    
+    // Only poll the top 300 tokens (Indices + top stocks) to avoid rate limits
+    const tokensToFetch = allTokens.slice(0, 300);
 
-    for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
-        const batch = allTokens.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
+        const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
         const exchangeMap = { NSE: [], BSE: [] };
         
         batch.forEach(token => {
@@ -478,15 +481,26 @@ function startLiveWebSocket(io) {
     web_socket.connect().then(() => {
         console.log('🔌 WebSocket Connected!');
 
-        // Subscribe in batches
-        for (let i = 0; i < allTokens.length; i += BATCH) {
-            web_socket.fetchData({
-                correlationID: `short_market_${i}`,
-                action: 1,
-                mode: 1,
-                exchangeType: 1,
-                tokens: allTokens.slice(i, i + BATCH)
-            });
+        // Subscribe in batches of 50, but max 300 total to avoid websocket overload
+        const tokensToSubscribe = allTokens.slice(0, 300);
+        for (let i = 0; i < tokensToSubscribe.length; i += BATCH) {
+            const batch = tokensToSubscribe.slice(i, i + BATCH);
+            // Split into NSE and BSE
+            const nseBatch = batch.filter(t => STOCK_MASTER[t]?.exchange !== 'BSE');
+            const bseBatch = batch.filter(t => STOCK_MASTER[t]?.exchange === 'BSE');
+
+            if (nseBatch.length > 0) {
+                web_socket.fetchData({
+                    correlationID: `short_market_nse_${i}`,
+                    action: 1, mode: 1, exchangeType: 1, tokens: nseBatch
+                });
+            }
+            if (bseBatch.length > 0) {
+                web_socket.fetchData({
+                    correlationID: `short_market_bse_${i}`,
+                    action: 1, mode: 1, exchangeType: 3, tokens: bseBatch
+                });
+            }
         }
 
         web_socket.on('tick', (receiveData) => {
