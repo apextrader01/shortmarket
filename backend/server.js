@@ -143,7 +143,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     // Send via EmailJS REST API
     const emailData = {
       service_id: 'service_apextrade',
-      template_id: 'template_qfe0n8c',
+      template_id: 'kjl8rfj',
       user_id: '5I4SSMcquuPO_XGId',
       accessToken: 'f0eGuMIvDNCxPoAf5CeZD',
       template_params: {
@@ -164,7 +164,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('EmailJS Error:', errText);
-      return res.status(500).json({ error: 'Failed to send email' });
+      return res.status(500).json({ error: `Failed to send email: ${errText}` });
     }
 
     res.json({ success: true, message: 'OTP sent to email' });
