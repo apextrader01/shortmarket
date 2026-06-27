@@ -1,4 +1,14 @@
 require('dotenv').config();
+
+// Ultimate Crash Reporter
+process.on('uncaughtException', err => {
+  console.error('FATAL UNCAUGHT EXCEPTION:', err);
+  // Do not exit, just log it so Railway doesn't crash
+});
+process.on('unhandledRejection', err => {
+  console.error('FATAL UNHANDLED REJECTION:', err);
+});
+
 const express = require('express');
 const compression = require('compression');
 const http = require('http');

@@ -4,17 +4,11 @@ const path = require('path');
 // Determine environment
 const isProduction = !!process.env.DATABASE_URL;
 
-// Configure Knex based on environment
-const dbConfig = isProduction ? {
+// Configure Knex
+const dbConfig = {
   client: 'pg',
-  connection: process.env.DATABASE_URL,
+  connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
   pool: { min: 2, max: 10 }
-} : {
-  client: 'sqlite3',
-  connection: {
-    filename: path.join(__dirname, 'shortmarket.db')
-  },
-  useNullAsDefault: true
 };
 
 const db = knex(dbConfig);
