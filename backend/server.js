@@ -144,7 +144,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const emailData = {
       service_id: 'service_apextrade',
       template_id: 'kjl8rfj',
-      user_id: '5I4SSMcquuPO_XGId',
+      user_id: '5l4SSMcquuPO_XGId',
       accessToken: 'f0eGuMIvDNCxPoAf5CeZD',
       template_params: {
         otp: otp,
