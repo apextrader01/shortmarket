@@ -129,10 +129,13 @@ app.use((req, res) => {
 const { loginAngelOne } = require('./services/angelOne');
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
-  // Pass priceCache and io so angelOne.js can populate it directly
-  await loginAngelOne(io, priceCache);
+  if (!process.env.ANGEL_TOTP_SECRET) {
+      console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
+  } else {
+      await loginAngelOne(io, priceCache);
+  }
 });
 
 module.exports = { io, priceCache };
