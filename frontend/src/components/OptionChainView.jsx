@@ -51,21 +51,15 @@ const OptionChainView = () => {
       if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
     });
 
-    tokensToSub.forEach(opt => subscribeToOption(opt));
-    
-    // Fetch initial prices via REST for instant loading (delayed to allow sockets to register)
-    const symbols = tokensToSub.map(opt => opt.symbol);
-    const timeout = setTimeout(() => {
-      for (let i = 0; i < symbols.length; i += 50) {
-        fetchBatchPrices(symbols.slice(i, i + 50));
-      }
-    }, 500);
+    const subscribeToOptionBatch = useStore.getState().subscribeToOptionBatch;
+    const unsubscribeFromOptionBatch = useStore.getState().unsubscribeFromOptionBatch;
+
+    subscribeToOptionBatch(tokensToSub);
 
     return () => {
-      clearTimeout(timeout);
-      tokensToSub.forEach(opt => unsubscribeFromOption(opt));
+      unsubscribeFromOptionBatch(tokensToSub);
     };
-  }, [expiry, optionsData, symbol, subscribeToOption, unsubscribeFromOption, fetchBatchPrices]);
+  }, [expiry, optionsData, symbol]);
 
   const handleTrade = (opt, type) => {
     if (!opt) return;

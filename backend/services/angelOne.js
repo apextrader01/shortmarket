@@ -354,6 +354,85 @@ async function addSubscription(data, io, priceCache) {
     }
 }
 
+function addSubscriptionBatch(dataArray, io, priceCache, socket) {
+    const tokensByExchange = { 1: [], 2: [], 3: [], 5: [] };
+    const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
+
+    for (const data of dataArray) {
+        if (!data || !data.token) continue;
+        const token = data.token;
+        const uniqueSymbol = data.symbol;
+        const exchStr = data.exchange || 'NFO';
+        const exchangeCode = (exchStr === 'BSE' || exchStr === 'BFO') ? 3 : (exchStr === 'MCX' ? 5 : (exchStr === 'NFO' ? 2 : 1));
+
+        if (!STOCK_MASTER[token]) {
+            STOCK_MASTER[token] = { symbol: data.symbol, uniqueSymbol: data.symbol, name: data.name || data.symbol, exchange: exchStr };
+            symbolToToken[uniqueSymbol] = token;
+        }
+
+        if (socket) socket.join(uniqueSymbol);
+
+        if (!clientSubscriptions.has(token)) {
+            clientSubscriptions.add(token);
+            tokensByExchange[exchangeCode].push(token);
+        }
+        if (exchangeMap[exchStr]) exchangeMap[exchStr].push(token);
+    }
+
+    if (global_web_socket) {
+        for (const [exchCode, tokens] of Object.entries(tokensByExchange)) {
+            if (tokens.length > 0) {
+                for (let i = 0; i < tokens.length; i += 50) {
+                    global_web_socket.fetchData({
+                        correlationID: `batch_sub_${Date.now()}_${i}`,
+                        action: 1, mode: 1, exchangeType: parseInt(exchCode), tokens: tokens.slice(i, i + 50)
+                    });
+                }
+            }
+        }
+    }
+
+    // Immediately fetch price chunks via REST to remove wait time
+    (async () => {
+        let chunkIndex = 0;
+        for (const exch of Object.keys(exchangeMap)) {
+            const tokens = exchangeMap[exch];
+            for (let i = 0; i < tokens.length; i += 50) {
+                const chunk = tokens.slice(i, i + 50);
+                setTimeout(async () => {
+                    try {
+                        const reqMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
+                        reqMap[exch] = chunk;
+                        const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: reqMap });
+                        if (res?.status && res.data?.fetched) {
+                            for (const item of res.data.fetched) {
+                                const info = STOCK_MASTER[item.symbolToken];
+                                if (info && item.ltp && priceCache) {
+                                    const unique = info.uniqueSymbol;
+                                    const ltpData = {
+                                        symbol: unique,
+                                        ltp: item.ltp,
+                                        open: item.open || item.ltp,
+                                        high: item.high || item.ltp,
+                                        low: item.low || item.ltp,
+                                        close: item.close || item.ltp,
+                                        change: item.netChange || 0,
+                                        pct: item.percentChange || 0,
+                                        timestamp: new Date().toISOString()
+                                    };
+                                    priceCache[unique] = ltpData;
+                                    if (io) io.to(unique).emit('market_data', ltpData);
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }, chunkIndex * 350); // 350ms delay keeps it safely under 3 req/sec limit
+                chunkIndex++;
+            }
+        }
+    })();
+}
+
 // ─── Fetch specific LTPs on demand (for search results) ──────────────────────
 async function fetchBatchLTPs(uniqueSymbols) {
     const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
@@ -649,6 +728,7 @@ module.exports = {
     get STOCK_MASTER() { return STOCK_MASTER; },
     get symbolToToken() { return symbolToToken; },
     addSubscription,
+    addSubscriptionBatch,
     fetchBatchLTPs,
     smart_api
 };

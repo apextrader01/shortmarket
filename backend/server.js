@@ -403,6 +403,12 @@ io.on('connection', (socket) => {
     if (addSubscription) addSubscription(data, io, priceCache);
   });
 
+  socket.on('subscribe_batch', (dataArray) => {
+    if (!Array.isArray(dataArray)) return;
+    const { addSubscriptionBatch } = require('./services/angelOne');
+    if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
+  });
+
   socket.on('unsubscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
     socket.leave(symbol);

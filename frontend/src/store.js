@@ -251,7 +251,13 @@ export const useStore = create(persist((set, get) => ({
   },
 
   subscribeToOption: (data) => socket.emit('subscribe', data),
+  subscribeToOptionBatch: (dataArray) => socket.emit('subscribe_batch', dataArray),
   unsubscribeFromOption: (data) => socket.emit('unsubscribe', data),
+  unsubscribeFromOptionBatch: (dataArray) => {
+    if(Array.isArray(dataArray)) {
+      dataArray.forEach(data => socket.emit('unsubscribe', data));
+    }
+  },
 
   // ── Chart / Candle State (used by ChartWidget.jsx) ──────────────────────────
   candleData:       {},   // { [symbol]: CandleBar[] }
