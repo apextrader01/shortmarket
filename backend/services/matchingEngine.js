@@ -3,71 +3,86 @@ const db = require('../database/db');
 // In a real application, you'd maintain a memory state of order book and execute against ticks.
 // For this mock app, we'll simply look for pending orders and if the LTP crosses their price, execute them.
 
-function processTick(symbol, ltp) {
-    // 1. Get all pending limit/market orders for this symbol
-    const pendingOrders = db.prepare(`SELECT * FROM orders WHERE status = 'PENDING' AND symbol = ?`).all(symbol);
-    
-    pendingOrders.forEach(order => {
-        let shouldExecute = false;
+async function processTick(symbol, ltp) {
+    try {
+        // 1. Get all pending limit/market orders for this symbol
+        const pendingOrders = await db('orders').where({ status: 'PENDING', symbol });
         
-        if (order.type === 'MARKET') {
-            shouldExecute = true;
-            order.price = ltp; // Market order executes at LTP
-        } else if (order.type === 'LIMIT') {
-            if (order.side === 'BUY' && ltp <= order.price) {
+        for (const order of pendingOrders) {
+            let shouldExecute = false;
+            let executionPrice = ltp;
+            
+            if (order.type === 'MARKET') {
                 shouldExecute = true;
-            } else if (order.side === 'SELL' && ltp >= order.price) {
-                shouldExecute = true;
+            } else if (order.type === 'LIMIT') {
+                const limitPrice = parseFloat(order.price);
+                if (order.side === 'BUY' && ltp <= limitPrice) {
+                    shouldExecute = true;
+                    executionPrice = limitPrice; // Usually executes at limit price or better
+                } else if (order.side === 'SELL' && ltp >= limitPrice) {
+                    shouldExecute = true;
+                    executionPrice = limitPrice;
+                }
+            }
+
+            if (shouldExecute) {
+                await executeOrder(order, executionPrice);
             }
         }
-
-        if (shouldExecute) {
-            executeOrder(order, ltp);
-        }
-    });
+    } catch (err) {
+        console.error(`Tick processing error for ${symbol}:`, err);
+    }
 }
 
-function executeOrder(order, executionPrice) {
-    const transaction = db.transaction(() => {
-        // Update order status
-        db.prepare(`UPDATE orders SET status = 'EXECUTED', price = ? WHERE id = ?`).run(executionPrice, order.id);
-
-        const totalCost = executionPrice * order.quantity;
-        
-        // Update user balance
-        if (order.side === 'BUY') {
-            db.prepare(`UPDATE users SET balance = balance - ? WHERE id = ?`).run(totalCost, order.user_id);
-            
-            // Add or update position
-            const position = db.prepare(`SELECT * FROM positions WHERE user_id = ? AND symbol = ?`).get(order.user_id, order.symbol);
-            if (position) {
-                const newQuantity = position.quantity + order.quantity;
-                const newAvgPrice = ((position.quantity * position.average_price) + totalCost) / newQuantity;
-                db.prepare(`UPDATE positions SET quantity = ?, average_price = ? WHERE id = ?`).run(newQuantity, newAvgPrice, position.id);
-            } else {
-                db.prepare(`INSERT INTO positions (user_id, symbol, quantity, average_price) VALUES (?, ?, ?, ?)`).run(order.user_id, order.symbol, order.quantity, executionPrice);
-            }
-        } else if (order.side === 'SELL') {
-            db.prepare(`UPDATE users SET balance = balance + ? WHERE id = ?`).run(totalCost, order.user_id);
-            
-            const position = db.prepare(`SELECT * FROM positions WHERE user_id = ? AND symbol = ?`).get(order.user_id, order.symbol);
-            if (position) {
-                const newQuantity = position.quantity - order.quantity;
-                if (newQuantity <= 0) {
-                    db.prepare(`DELETE FROM positions WHERE id = ?`).run(position.id);
-                } else {
-                    db.prepare(`UPDATE positions SET quantity = ? WHERE id = ?`).run(newQuantity, position.id);
-                }
-            } else {
-                // Short selling mock: insert negative position
-                db.prepare(`INSERT INTO positions (user_id, symbol, quantity, average_price) VALUES (?, ?, ?, ?)`).run(order.user_id, order.symbol, -order.quantity, executionPrice);
-            }
-        }
-    });
-
+async function executeOrder(order, executionPrice) {
     try {
-        transaction();
-        console.log(`Order ${order.id} executed successfully at ${executionPrice}`);
+        await db.transaction(async (trx) => {
+            // Update order status
+            await trx('orders').where({ id: order.id }).update({ status: 'EXECUTED', price: executionPrice });
+
+            const totalCost = executionPrice * order.quantity;
+            
+            // Note: Since we already deduct margin when the order is placed for both BUY and SELL (in server.js), 
+            // we don't need to deduct the balance AGAIN here when the order executes.
+            // If it's a SELL order, it means they are closing a long position or shorting.
+            // For a complete paper trading system, we would calculate realized PnL when closing positions.
+            // For now, we just update the positions table.
+            
+            if (order.side === 'BUY') {
+                const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol }).first();
+                if (position) {
+                    const newQuantity = position.quantity + order.quantity;
+                    const newAvgPrice = ((position.quantity * parseFloat(position.average_price)) + totalCost) / newQuantity;
+                    await trx('positions').where({ id: position.id }).update({ quantity: newQuantity, average_price: newAvgPrice });
+                } else {
+                    await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, quantity: order.quantity, average_price: executionPrice });
+                }
+            } else if (order.side === 'SELL') {
+                const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol }).first();
+                if (position) {
+                    const newQuantity = position.quantity - order.quantity;
+                    if (newQuantity === 0) {
+                        await trx('positions').where({ id: position.id }).del();
+                    } else {
+                        await trx('positions').where({ id: position.id }).update({ quantity: newQuantity });
+                    }
+                    
+                    // Add profit/loss back to balance when position is closed (simple PnL)
+                    const entryCost = parseFloat(position.average_price) * order.quantity;
+                    const exitValue = executionPrice * order.quantity;
+                    const pnl = exitValue - entryCost;
+                    
+                    // Add the freed up margin + profit back to balance
+                    const user = await trx('users').where({ id: order.user_id }).first();
+                    const marginToReturn = (order.quantity * parseFloat(position.average_price)) + pnl;
+                    await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + marginToReturn });
+                } else {
+                    // Short selling mock: insert negative position
+                    await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, quantity: -order.quantity, average_price: executionPrice });
+                }
+            }
+        });
+        console.log(`✅ Order ${order.id} (${order.side} ${order.quantity} ${order.symbol}) EXECUTED successfully at ₹${executionPrice}`);
     } catch (err) {
         console.error(`Failed to execute order ${order.id}:`, err);
     }
