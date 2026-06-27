@@ -23,75 +23,48 @@ let allTokens = [];
 // ─── Load all NSE stocks from Angel One master file ──────────────────────────
 async function loadInstrumentMaster() {
     return new Promise((resolve) => {
-        console.log('📥 Downloading Angel One instruments master...');
-        const url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
+        try {
+            console.log('📥 Loading Angel One instruments master from local cache...');
+            const fs = require('fs');
+            const path = require('path');
+            const data = fs.readFileSync(path.join(__dirname, '../database/stocks.json'), 'utf8');
+            const nseStocks = JSON.parse(data);
 
-        const req = https.get(url, { timeout: 30000 }, (res) => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const arr = JSON.parse(data);
+            // Add indices manually (not in EQ segment)
+            const indices = {
+                "99926000": { symbol: "NIFTY",     name: "Nifty 50",   exchange: "NSE" },
+                "99926009": { symbol: "BANKNIFTY", name: "Bank Nifty",  exchange: "NSE" },
+                "99926037": { symbol: "MIDCPNIFTY",name: "MidCap Nifty",exchange: "NSE" },
+                "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
+            };
 
-                    // Add indices manually (not in EQ segment)
-                    const indices = {
-                        "99926000": { symbol: "NIFTY",     name: "Nifty 50",   exchange: "NSE" },
-                        "99926009": { symbol: "BANKNIFTY", name: "Bank Nifty",  exchange: "NSE" },
-                        "99926037": { symbol: "MIDCPNIFTY",name: "MidCap Nifty",exchange: "NSE" },
-                        "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
-                    };
+            STOCK_MASTER = { ...indices };
+            symbolToToken = {};
 
-                    // Filter NSE equity stocks only
-                    const nseStocks = arr.filter(s =>
-                        s.exch_seg === 'NSE' &&
-                        s.symbol &&
-                        s.symbol.endsWith('-EQ') &&
-                        parseFloat(s.lotsize) === 1 &&
-                        s.token
-                    );
+            // Add indices to reverse map
+            for (const [token, info] of Object.entries(indices)) {
+                symbolToToken[info.symbol] = token;
+            }
 
-                    STOCK_MASTER = { ...indices };
-                    symbolToToken = {};
+            // Add all NSE-EQ stocks
+            for (const stock of nseStocks) {
+                const rawSymbol = stock.symbol.replace('-EQ', '');
+                STOCK_MASTER[stock.token] = {
+                    symbol: rawSymbol,
+                    name: stock.name,
+                    exchange: 'NSE'
+                };
+                symbolToToken[rawSymbol] = stock.token;
+            }
 
-                    // Add indices to reverse map
-                    for (const [token, info] of Object.entries(indices)) {
-                        symbolToToken[info.symbol] = token;
-                    }
-
-                    // Add all NSE-EQ stocks
-                    for (const stock of nseStocks) {
-                        const rawSymbol = stock.symbol.replace('-EQ', '');
-                        STOCK_MASTER[stock.token] = {
-                            symbol: rawSymbol,
-                            name: stock.name,
-                            exchange: 'NSE'
-                        };
-                        symbolToToken[rawSymbol] = stock.token;
-                    }
-
-                    allTokens = Object.keys(STOCK_MASTER);
-                    console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} stocks + ${Object.keys(indices).length} indices)`);
-                    resolve();
-                } catch (e) {
-                    console.error('Failed to parse instrument master:', e.message);
-                    loadFallbackMaster();
-                    resolve();
-                }
-            });
-        });
-
-        req.on('timeout', () => {
-            console.error('Instrument master download timed out, using fallback');
-            req.destroy();
+            allTokens = Object.keys(STOCK_MASTER);
+            console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} stocks + ${Object.keys(indices).length} indices)`);
+            resolve();
+        } catch (e) {
+            console.error('Failed to load local instrument master:', e.message);
             loadFallbackMaster();
             resolve();
-        });
-
-        req.on('error', (e) => {
-            console.error('Failed to download instrument master:', e.message);
-            loadFallbackMaster();
-            resolve();
-        });
+        }
     });
 }
 
