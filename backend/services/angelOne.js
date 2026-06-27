@@ -385,7 +385,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             todate: fmtDate(now)
         };
         
-        console.log(`Fetching candles for ${symbol} with payload:`, payload);
+        console.log(`Fetching candles for ${uniqueSymbol} with payload:`, payload);
 
         // Bypass SDK to ensure no token/header dropping bugs
         const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
