@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
 const API = ''; // Empty string means use relative path, works for both API and Socket.IO
@@ -16,7 +17,48 @@ function applySnapshot(snapshot, state) {
   return newPrices;
 }
 
-export const useStore = create((set, get) => ({
+export const useStore = create(persist((set, get) => ({
+  // Watchlist State
+  watchlists: [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+  activeWatchlistId: 1,
+
+  createWatchlist: (name) => set((state) => ({
+    watchlists: [...state.watchlists, { id: Date.now(), name, symbols: [] }]
+  })),
+
+  deleteWatchlist: (id) => set((state) => {
+    const newWatchlists = state.watchlists.filter(w => w.id !== id);
+    if (newWatchlists.length === 0) newWatchlists.push({ id: 1, name: 'Watchlist 1', symbols: [] });
+    return {
+      watchlists: newWatchlists,
+      activeWatchlistId: state.activeWatchlistId === id ? newWatchlists[0].id : state.activeWatchlistId
+    };
+  }),
+
+  setActiveWatchlist: (id) => {
+    set({ activeWatchlistId: id });
+    // Fetch prices for the newly selected watchlist instantly
+    const list = get().watchlists.find(w => w.id === id);
+    if (list && list.symbols.length > 0) {
+      get().fetchBatchPrices(list.symbols.slice(0, 50));
+    }
+  },
+
+  addStockToWatchlist: (watchlistId, symbol) => set((state) => ({
+    watchlists: state.watchlists.map(w => 
+      w.id === watchlistId && !w.symbols.includes(symbol)
+        ? { ...w, symbols: [...w.symbols, symbol] }
+        : w
+    )
+  })),
+
+  removeStockFromWatchlist: (watchlistId, symbol) => set((state) => ({
+    watchlists: state.watchlists.map(w => 
+      w.id === watchlistId
+        ? { ...w, symbols: w.symbols.filter(s => s !== symbol) }
+        : w
+    )
+  })),
   user: { id: 1, username: 'mock_trader', balance: 1000000.0 },
   prices: {},
   positions: [],
@@ -182,4 +224,10 @@ export const useStore = create((set, get) => ({
       return false;
     } catch (err) { return false; }
   }
+}), {
+  name: 'shortmarket-storage',
+  partialize: (state) => ({ 
+    watchlists: state.watchlists, 
+    activeWatchlistId: state.activeWatchlistId 
+  })
 }));
