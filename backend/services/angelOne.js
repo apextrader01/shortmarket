@@ -324,27 +324,58 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     const now = new Date();
     // Adjust lookback per Angel One API limits & usefulness
     const LOOKBACK = {
-        'ONE_MINUTE':     5,    // 5 days of 1M candles
+        'ONE_MINUTE':     5,    
         'THREE_MINUTE':   15,
         'FIVE_MINUTE':    30,
         'TEN_MINUTE':     60,
         'FIFTEEN_MINUTE': 60,
         'THIRTY_MINUTE':  100,
         'ONE_HOUR':       200,
-        'ONE_DAY':        730,  // 2 years of daily
+        'ONE_DAY':        730,  
     };
     const lookbackDays = LOOKBACK[interval] || 60;
     const from = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
     
     try {
-        const res = await smart_api.getCandleData({
+        const payload = {
             exchange: 'NSE',
             symboltoken: token,
             interval: interval,
             fromdate: fmtDate(from),
             todate: fmtDate(now)
+        };
+        
+        console.log(`Fetching candles for ${symbol} with payload:`, payload);
+
+        // Bypass SDK to ensure no token/header dropping bugs
+        const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${smart_api.access_token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-PrivateKey': process.env.ANGEL_API_KEY,
+                'X-ClientLocalIP': '127.0.0.1',
+                'X-ClientPublicIP': '127.0.0.1',
+                'X-MACAddress': '00-00-00-00-00-00',
+                'X-UserType': 'USER',
+                'X-SourceID': 'WEB'
+            },
+            body: JSON.stringify(payload)
         });
-        if (!res?.status || !res.data) return [];
+
+        const res = await response.json();
+        
+        if (!res) {
+            console.error(`fetchCandleData returned empty for ${symbol}`);
+            return [];
+        }
+        
+        if (!res.status || !res.data) {
+            console.error(`Angel One historical API error for ${symbol}:`, res);
+            return [];
+        }
+        
         // Angel One returns timestamps as IST strings ("YYYY-MM-DD HH:MM")
         // Append +05:30 so JS parses them correctly as IST instead of UTC
         return res.data.map(c => ({
@@ -352,7 +383,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
             open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5]
         }));
     } catch (e) {
-        console.error('fetchCandleData error:', e.message);
+        console.error(`fetchCandleData exception for ${symbol}:`, e.message);
         return [];
     }
 }
