@@ -31,8 +31,9 @@ export default function OrderModal() {
 
   if (!orderModal.isOpen || !symbol) return null;
 
+  const balanceNum = Number(user?.balance) || 0;
   const requiredMargin = quantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
-  const isInsufficient = user.balance < requiredMargin;
+  const isInsufficient = balanceNum < requiredMargin;
 
   const isBuy = side === 'BUY';
 
@@ -167,7 +168,7 @@ export default function OrderModal() {
                 <div style={{ background: 'var(--color-yellow)', color: '#000', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>!</div>
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '14px', color: '#fef08a' }}>Insufficient margin!</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To buy {quantity} Share, please add ₹{(requiredMargin - user.balance).toFixed(2)}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To buy {quantity} Share, please add ₹{(requiredMargin - balanceNum).toFixed(2)}</div>
                 </div>
               </div>
               <button style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
@@ -181,7 +182,7 @@ export default function OrderModal() {
           <div style={{ display: 'flex', gap: '24px' }}>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Available</div>
-              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{user.balance.toFixed(2)}</div>
+              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{balanceNum.toFixed(2)}</div>
             </div>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Required</div>
