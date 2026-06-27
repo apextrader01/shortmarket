@@ -53,13 +53,16 @@ const OptionChainView = () => {
 
     tokensToSub.forEach(opt => subscribeToOption(opt));
     
-    // Fetch initial prices via REST for instant loading
+    // Fetch initial prices via REST for instant loading (delayed to allow sockets to register)
     const symbols = tokensToSub.map(opt => opt.symbol);
-    for (let i = 0; i < symbols.length; i += 50) {
-      fetchBatchPrices(symbols.slice(i, i + 50));
-    }
+    const timeout = setTimeout(() => {
+      for (let i = 0; i < symbols.length; i += 50) {
+        fetchBatchPrices(symbols.slice(i, i + 50));
+      }
+    }, 500);
 
     return () => {
+      clearTimeout(timeout);
       tokensToSub.forEach(opt => unsubscribeFromOption(opt));
     };
   }, [expiry, optionsData, symbol, subscribeToOption, unsubscribeFromOption, fetchBatchPrices]);
