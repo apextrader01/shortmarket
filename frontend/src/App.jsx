@@ -1,19 +1,21 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import MarketWatch from './components/MarketWatch';
 import ChartWidget from './components/ChartWidget';
 import PositionsView from './components/PositionsView';
 import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
 import OrderModal from './components/OrderModal';
+import LoginView from './components/LoginView';
 import { useStore } from './store';
-import { User, Wallet, TrendingUp } from 'lucide-react';
+import { User, Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
 
 function App() {
   const { 
     initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, 
-    user, selectedSymbol, prices, stocks, fetchBatchPrices,
-    activeTab, setActiveTab, orderModal
+    user, token, logout, selectedSymbol, prices, stocks, fetchBatchPrices
   } = useStore();
+  
+  const [activeTab, setActiveTab] = useState('Markets');
 
   const topIndices = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE', 'FINNIFTY-NSE'];
 
@@ -23,18 +25,14 @@ function App() {
 
   useEffect(() => {
     initSocket();
-    fetchUserData();
-    loadCandleData('NIFTY');
+    if (token) fetchUserData();
 
-    // Keep retrying loadStocks every 3s until backend is ready
     let stockRetry = null;
     const tryLoadStocks = async () => {
       await loadStocks();
-      // If still no stocks, retry in 3s
       if (useStore.getState().stocks.length === 0) {
         stockRetry = setTimeout(tryLoadStocks, 3000);
       } else {
-        // Stocks loaded — also fetch prices immediately
         refreshPrices();
       }
     };
@@ -42,14 +40,16 @@ function App() {
 
     // Refresh user data and prices periodically
     const interval = setInterval(() => {
-      fetchUserData();
+      if (token) fetchUserData();
       refreshPrices();
     }, 10000);
     return () => {
       clearInterval(interval);
       if (stockRetry) clearTimeout(stockRetry);
     };
-  }, []);
+  }, [initSocket, fetchUserData, loadStocks, refreshPrices, token]);
+
+  if (!user || !token) return <LoginView />;
 
   // Load candle data when symbol changes (handled in setSelectedSymbol but also on first render)
   useEffect(() => {
@@ -121,7 +121,7 @@ function App() {
 
             <div style={{ width: '1px', height: '32px', background: 'var(--border-color)' }} />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{
                 width: '34px', height: '34px', borderRadius: '50%',
                 background: 'linear-gradient(135deg, var(--color-red), var(--color-navy-light))',
@@ -132,6 +132,13 @@ function App() {
               <div>
                 <div style={{ fontWeight: '700', fontSize: '13px' }}>{user.username}</div>
                 <div style={{ fontSize: '11px', color: 'var(--color-green-light)' }}>● Active</div>
+              </div>
+              <div 
+                onClick={logout}
+                style={{ marginLeft: '8px', cursor: 'pointer', padding: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', display: 'flex', alignItems: 'center' }}
+                title="Log out"
+              >
+                <LogOut size={14} color="var(--text-secondary)" />
               </div>
             </div>
           </div>

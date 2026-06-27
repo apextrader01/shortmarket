@@ -59,49 +59,121 @@ app.get('/api/stocks', (req, res) => {
   res.json(cachedStocksArray);
 });
 
+// ─── Auth ───────────────────────────────────────────────────────────────────
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
+
+app.post('/api/auth/register', async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const password_hash = await bcrypt.hash(password, 10);
+    const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
+    
+    const [id] = await db('users').insert({ 
+      username, email, password_hash, watchlists: defaultWatchlist 
+    }).returning('id');
+    
+    // Some db engines return an object from returning(), handle both
+    const userId = typeof id === 'object' ? id.id : id;
+    const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
+  } catch (err) {
+    if (err.message.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+    
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance, watchlists: typeof user.watchlists === 'string' ? JSON.parse(user.watchlists) : user.watchlists } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── User ─────────────────────────────────────────────────────────────────
-app.get('/api/user/:id', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json(user);
+app.get('/api/user', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    delete user.password_hash;
+    if (typeof user.watchlists === 'string') user.watchlists = JSON.parse(user.watchlists);
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
+  try {
+    const { watchlists } = req.body;
+    await db('users').where({ id: req.user.id }).update({ watchlists: JSON.stringify(watchlists) });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Positions ────────────────────────────────────────────────────────────
-app.get('/api/positions/:userId', (req, res) => {
-  const positions = db.prepare('SELECT * FROM positions WHERE user_id = ?').all(req.params.userId);
-  res.json(positions);
+app.get('/api/positions', authenticateToken, async (req, res) => {
+  try {
+    const positions = await db('positions').where({ user_id: req.user.id });
+    res.json(positions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Orders ───────────────────────────────────────────────────────────────
-app.get('/api/orders/:userId', (req, res) => {
-  const orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.params.userId);
-  res.json(orders);
+app.get('/api/orders', authenticateToken, async (req, res) => {
+  try {
+    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc');
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Place Order ─────────────────────────────────────────────────────────
-app.post('/api/order', (req, res) => {
-  const { userId, symbol, type, side, quantity, price } = req.body;
-  if (!userId || !symbol || !type || !side || !quantity) {
+app.post('/api/order', authenticateToken, async (req, res) => {
+  const { symbol, type, side, quantity, price, sl_price, tgt_price } = req.body;
+  if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
-    const result = db.prepare(`
-      INSERT INTO orders (user_id, symbol, type, side, quantity, price)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(userId, symbol, type, side, quantity, price || null);
-    res.json({ success: true, orderId: result.lastInsertRowid });
+    const [id] = await db('orders').insert({
+      user_id: req.user.id, symbol, type, side, quantity, price: price || null,
+      sl_price: sl_price || null, tgt_price: tgt_price || null
+    }).returning('id');
+    const orderId = typeof id === 'object' ? id.id : id;
+    res.json({ success: true, orderId });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // ─── Cancel Order ─────────────────────────────────────────────────────────
-app.post('/api/order/:id/cancel', (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Order not found' });
-  if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
-  db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE id = ?").run(req.params.id);
-  res.json({ success: true });
+app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
+  try {
+    const order = await db('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
+    
+    await db('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
