@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import useStore from '../store';
-import { API } from '../store';
+import { useStore } from '../store';
+
+const API = '';
 
 const OptionChainView = () => {
   const [symbol, setSymbol] = useState('NIFTY');
