@@ -290,7 +290,7 @@ function fmtDate(d) {
 let global_web_socket = null;
 const clientSubscriptions = new Set();
 
-function addSubscription(uniqueSymbol) {
+async function addSubscription(uniqueSymbol, io, priceCache) {
     if (symbolToToken[uniqueSymbol]) {
         const token = symbolToToken[uniqueSymbol];
         if (!clientSubscriptions.has(token)) {
@@ -303,6 +303,33 @@ function addSubscription(uniqueSymbol) {
                     action: 1, mode: 1, exchangeType: exch, tokens: [token]
                 });
             }
+
+            // Immediately fetch the price via REST to remove the 10-second delay
+            try {
+                const exchangeMap = { NSE: [], BSE: [] };
+                const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+                exchangeMap[exch].push(token);
+                
+                const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: exchangeMap });
+                if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
+                    const item = res.data.fetched[0];
+                    if (item.ltp && priceCache) {
+                        const ltpData = {
+                            symbol: uniqueSymbol,
+                            ltp: item.ltp,
+                            open: item.open || item.ltp,
+                            high: item.high || item.ltp,
+                            low: item.low || item.ltp,
+                            close: item.close || item.ltp,
+                            change: item.netChange || 0,
+                            pct: item.percentChange || 0,
+                            timestamp: new Date().toISOString()
+                        };
+                        priceCache[uniqueSymbol] = ltpData;
+                        if (io) io.to(uniqueSymbol).emit('market_data', ltpData);
+                    }
+                }
+            } catch (e) {} // silent on fail
         }
     }
 }

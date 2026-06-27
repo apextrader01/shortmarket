@@ -115,7 +115,7 @@ io.on('connection', (socket) => {
   socket.on('subscribe', (symbol) => {
     socket.join(symbol);
     const { addSubscription } = require('./services/angelOne');
-    if (addSubscription) addSubscription(symbol);
+    if (addSubscription) addSubscription(symbol, io, priceCache);
   });
 
   socket.on('unsubscribe', (symbol) => {
