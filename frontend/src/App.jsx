@@ -11,7 +11,7 @@ import { Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
 
 function App() {
   const { 
-    initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, 
+    initSocket, fetchUserData, loadStocks, refreshPrices, 
     user, token, logout, selectedSymbol, prices, fetchBatchPrices
   } = useStore();
   
@@ -48,10 +48,6 @@ function App() {
       if (stockRetry) clearTimeout(stockRetry);
     };
   }, [token]);
-
-  useEffect(() => {
-    if (selectedSymbol) loadCandleData(selectedSymbol);
-  }, [selectedSymbol]);
 
   // Now safe to do conditional render AFTER all hooks
   if (!user || !token) {
