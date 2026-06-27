@@ -90,8 +90,15 @@ app.post('/api/auth/register', async (req, res) => {
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
   } catch (err) {
-    if (err.message.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
-    res.status(500).json({ error: err.message });
+    const errorMsg = err.message || String(err);
+    if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
+    
+    // If it's a database connection error (like ECONNREFUSED from a missing DATABASE_URL)
+    if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
+      return res.status(500).json({ error: 'Database not connected. Please add a PostgreSQL database in Railway.' });
+    }
+    
+    res.status(500).json({ error: errorMsg || 'Unknown error occurred during registration' });
   }
 });
 
@@ -101,13 +108,18 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
     
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance, watchlists: typeof user.watchlists === 'string' ? JSON.parse(user.watchlists) : user.watchlists } });
+    const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, watchlists } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const errorMsg = err.message || String(err);
+    if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
+      return res.status(500).json({ error: 'Database not connected. Please add a PostgreSQL database in Railway.' });
+    }
+    res.status(500).json({ error: errorMsg || 'Unknown error occurred during login' });
   }
 });
 
