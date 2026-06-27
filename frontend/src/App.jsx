@@ -112,7 +112,7 @@ function App() {
           </div>
 
           {/* Right: nav tabs + user info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexShrink: 0 }}>
             {/* Tab Navigation */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '20px',
