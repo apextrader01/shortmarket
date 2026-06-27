@@ -74,7 +74,7 @@ function App() {
               DASHBOARD
             </h2>
 
-            <div style={{ display: 'flex', gap: '12px', marginLeft: '12px' }}>
+            <div className="hide-on-tablet" style={{ display: 'flex', gap: '12px', marginLeft: '12px' }}>
               {TOP_INDICES.map((idx) => {
                 const p      = prices[idx];
                 const isUp   = p?.pct >= 0;

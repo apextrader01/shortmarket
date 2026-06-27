@@ -115,6 +115,12 @@ h1, h2, h3, h4, h5, h6 {
   overflow-y: auto;
 }
 
+@media (max-width: 1400px) {
+  .hide-on-tablet {
+    display: none !important;
+  }
+}
+
 /* Typography Utilities */
 .text-green { color: var(--color-green-light); }
 .text-red { color: var(--color-red-light); }
