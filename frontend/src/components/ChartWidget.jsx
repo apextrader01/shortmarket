@@ -166,7 +166,7 @@ export default function ChartWidget() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
           <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px' }}>
-            {selectedSymbol}
+            {selectedSymbol.replace('-', ' (')} {selectedSymbol.includes('-') ? ')' : ''}
           </h3>
           {price ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>

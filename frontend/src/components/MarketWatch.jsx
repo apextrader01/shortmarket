@@ -43,15 +43,15 @@ export default function MarketWatch() {
             No stocks found for "{searchQuery}"
           </div>
         ) : filteredStocks.map(stock => {
-          const data = prices[stock.symbol];
-          const isSelected = selectedSymbol === stock.symbol;
+          const data = prices[stock.uniqueSymbol];
+          const isSelected = selectedSymbol === stock.uniqueSymbol;
           const isUp = data?.pct > 0;
           const isDown = data?.pct < 0;
 
           return (
             <div
-              key={stock.symbol}
-              onClick={() => setSelectedSymbol(stock.symbol)}
+              key={stock.uniqueSymbol}
+              onClick={() => setSelectedSymbol(stock.uniqueSymbol)}
               style={{
                 padding: '10px 16px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -65,7 +65,12 @@ export default function MarketWatch() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: '700', fontSize: '13px', letterSpacing: '0.3px' }}>{stock.symbol}</div>
+                <div style={{ fontWeight: '700', fontSize: '13px', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {stock.symbol}
+                  <span style={{ fontSize: '9px', padding: '1px 4px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', color: 'var(--text-secondary)' }}>
+                    {stock.exchange}
+                  </span>
+                </div>
                 <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '110px' }}>{stock.name}</div>
               </div>
 

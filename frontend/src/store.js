@@ -22,7 +22,7 @@ export const useStore = create((set, get) => ({
   positions: [],
   orders: [],
   stocks: [],
-  selectedSymbol: 'NIFTY',
+  selectedSymbol: 'KOTAKBANK-NSE',
   chartInterval: 'ONE_DAY', // default interval
   candleData: {},
   candleError: null,

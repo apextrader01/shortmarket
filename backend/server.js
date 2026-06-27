@@ -33,7 +33,7 @@ app.get('/api/prices', (req, res) => {
 app.get('/api/stocks', (req, res) => {
   const { STOCK_MASTER } = require('./services/angelOne');
   const stocks = Object.entries(STOCK_MASTER).map(([token, info]) => ({
-    token, symbol: info.symbol, name: info.name, exchange: info.exchange
+    token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
   }));
   res.json(stocks);
 });

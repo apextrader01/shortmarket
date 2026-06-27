@@ -43,22 +43,28 @@ async function loadInstrumentMaster() {
 
             // Add indices to reverse map
             for (const [token, info] of Object.entries(indices)) {
-                symbolToToken[info.symbol] = token;
+                const uniqueSymbol = `${info.symbol}-${info.exchange}`;
+                info.uniqueSymbol = uniqueSymbol;
+                symbolToToken[uniqueSymbol] = token;
             }
 
-            // Add all NSE-EQ stocks
+            // Add all stocks (NSE and BSE)
             for (const stock of nseStocks) {
-                const rawSymbol = stock.symbol.replace('-EQ', '');
+                // If the symbol ends with -EQ (NSE), strip it for cleanliness
+                const rawSymbol = stock.symbol.endsWith('-EQ') ? stock.symbol.replace('-EQ', '') : stock.symbol;
+                const uniqueSymbol = `${rawSymbol}-${stock.exchange}`;
+                
                 STOCK_MASTER[stock.token] = {
                     symbol: rawSymbol,
                     name: stock.name,
-                    exchange: 'NSE'
+                    exchange: stock.exchange,
+                    uniqueSymbol
                 };
-                symbolToToken[rawSymbol] = stock.token;
+                symbolToToken[uniqueSymbol] = stock.token;
             }
 
             allTokens = Object.keys(STOCK_MASTER);
-            console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} stocks + ${Object.keys(indices).length} indices)`);
+            console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} total stocks)`);
             resolve();
         } catch (e) {
             console.error('Failed to load local instrument master:', e.message);
@@ -288,16 +294,23 @@ async function fetchAllLTPs() {
 
     for (let i = 0; i < allTokens.length; i += BATCH_SIZE) {
         const batch = allTokens.slice(i, i + BATCH_SIZE);
+        const exchangeMap = { NSE: [], BSE: [] };
+        
+        batch.forEach(token => {
+            const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+            if (exchangeMap[exch]) exchangeMap[exch].push(token);
+        });
+
         try {
             const res = await smart_api.marketData({
                 mode: 'LTP',
-                exchangeTokens: { NSE: batch }
+                exchangeTokens: exchangeMap
             });
             if (res?.status && res.data?.fetched) {
                 for (const item of res.data.fetched) {
                     const info = STOCK_MASTER[item.symbolToken];
                     if (info && item.ltp) {
-                        result[info.symbol] = {
+                        result[info.uniqueSymbol] = {
                             ltp: item.ltp,
                             open: item.open || item.ltp,
                             high: item.high || item.ltp,
@@ -317,9 +330,12 @@ async function fetchAllLTPs() {
 }
 
 // ─── Fetch candle data for a symbol ──────────────────────────────────────────
-async function fetchCandleData(symbol, interval = 'ONE_DAY') {
-    const token = symbolToToken[symbol];
+async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
+    const token = symbolToToken[uniqueSymbol];
     if (!token) return [];
+    
+    const stockInfo = STOCK_MASTER[token];
+    const exchange = stockInfo ? stockInfo.exchange : 'NSE';
     
     const now = new Date();
     // Adjust lookback per Angel One API limits & usefulness
@@ -338,7 +354,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     
     try {
         const payload = {
-            exchange: 'NSE',
+            exchange: exchange,
             symboltoken: token,
             interval: interval,
             fromdate: fmtDate(from),
@@ -397,13 +413,13 @@ async function broadcastLTPs(io) {
     const ltps = await fetchAllLTPs();
     const ts = new Date().toISOString();
     
-    for (const [symbol, data] of Object.entries(ltps)) {
-        const entry = { symbol, ...data, timestamp: ts };
+    for (const [uniqueSymbol, data] of Object.entries(ltps)) {
+        const entry = { symbol: uniqueSymbol, ...data, timestamp: ts };
         // Update the shared cache
-        sharedPriceCache[symbol] = entry;
-        processTick(symbol, data.ltp);
+        sharedPriceCache[uniqueSymbol] = entry;
+        processTick(uniqueSymbol, data.ltp);
         // Emit to subscribers (socket rooms)
-        io.to(symbol).emit('market_data', entry);
+        io.to(uniqueSymbol).emit('market_data', entry);
     }
     // Also broadcast ALL prices at once so any connected client can receive everything
     io.emit('price_snapshot', sharedPriceCache);
