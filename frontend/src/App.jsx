@@ -7,7 +7,13 @@ import { useStore } from './store';
 import { User, Wallet, TrendingUp } from 'lucide-react';
 
 function App() {
-  const { initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, user, selectedSymbol, prices, stocks } = useStore();
+  const { initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, user, selectedSymbol, prices, stocks, fetchBatchPrices } = useStore();
+
+  const topIndices = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE', 'FINNIFTY-NSE'];
+
+  useEffect(() => {
+    fetchBatchPrices(topIndices);
+  }, []);
 
   useEffect(() => {
     initSocket();
@@ -55,18 +61,24 @@ function App() {
         <header className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <h2 style={{ letterSpacing: '0.5px', fontSize: '18px', fontWeight: '800' }}>DASHBOARD</h2>
-            {price && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)',
-                color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)',
-                padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600'
-              }}>
-                <TrendingUp size={13} />
-                {selectedSymbol} ₹{price.ltp.toFixed(2)}
-                <span style={{ opacity: 0.8 }}>{price.pct > 0 ? '+' : ''}{Number(price.pct || 0).toFixed(2)}%</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '12px', marginLeft: '12px' }}>
+              {topIndices.map(idx => {
+                const p = prices[idx];
+                const isIdxUp = p?.pct >= 0;
+                return (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: p ? (isIdxUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)') : 'rgba(255,255,255,0.05)',
+                    color: p ? (isIdxUp ? 'var(--color-green-light)' : 'var(--color-red-light)') : 'var(--text-secondary)',
+                    padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '600'
+                  }}>
+                    {p && (isIdxUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />)}
+                    {idx.split('-')[0]} {p ? `₹${p.ltp.toFixed(2)}` : '...'}
+                    {p && <span style={{ opacity: 0.8 }}>{p.pct > 0 ? '+' : ''}{Number(p.pct || 0).toFixed(2)}%</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
