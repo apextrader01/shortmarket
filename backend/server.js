@@ -168,17 +168,28 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 
 // ─── Place Order ─────────────────────────────────────────────────────────
 app.post('/api/order', authenticateToken, async (req, res) => {
-  const { symbol, type, side, quantity, price, sl_price, tgt_price } = req.body;
+  const { symbol, type, side, quantity, price, sl_price, tgt_price, margin } = req.body;
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
-    const [id] = await db('orders').insert({
-      user_id: req.user.id, symbol, type, side, quantity, price: price || null,
-      sl_price: sl_price || null, tgt_price: tgt_price || null
-    }).returning('id');
-    const orderId = typeof id === 'object' ? id.id : id;
-    res.json({ success: true, orderId });
+    await db.transaction(async (trx) => {
+      // 1. Insert Order
+      const [id] = await trx('orders').insert({
+        user_id: req.user.id, symbol, type, side, quantity, price: price || null,
+        sl_price: sl_price || null, tgt_price: tgt_price || null
+      }).returning('id');
+      const orderId = typeof id === 'object' ? id.id : id;
+
+      // 2. Deduct Margin from User Balance
+      if (margin && Number(margin) > 0) {
+        const user = await trx('users').where({ id: req.user.id }).first();
+        const newBalance = Number(user.balance) - Number(margin);
+        await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
+      }
+
+      res.json({ success: true, orderId });
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

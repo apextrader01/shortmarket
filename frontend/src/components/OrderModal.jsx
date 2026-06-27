@@ -37,10 +37,24 @@ export default function OrderModal() {
 
   const isBuy = side === 'BUY';
 
-  const handlePlaceOrder = () => {
-    // We will implement API call in next step
-    alert(`Placing ${side} order for ${quantity} ${symbol} @ ${orderType === 'MARKET' ? 'MARKET' : price}`);
-    closeOrderModal();
+  const handlePlaceOrder = async () => {
+    const payload = {
+      symbol,
+      type: orderType,
+      side,
+      quantity,
+      price: orderType === 'MARKET' ? null : parseFloat(price),
+      sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
+      tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
+      margin: requiredMargin // Backend will deduct this
+    };
+
+    const success = await useStore.getState().placeOrder(payload);
+    if (success) {
+      closeOrderModal();
+    } else {
+      alert("Failed to place order. Please try again.");
+    }
   };
 
   return (
