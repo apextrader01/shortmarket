@@ -103,7 +103,7 @@ export default function OrderModal() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 20px', gap: '24px' }}>
-          {['Regular', 'Stop Loss', 'GTT', 'SIP'].map(t => (
+          {['Regular', 'Stop Loss'].map(t => (
             <div key={t} onClick={() => setTab(t)} style={{ 
               padding: '12px 0', fontSize: '13px', fontWeight: tab === t ? '600' : '500', 
               color: tab === t ? 'var(--color-blue)' : 'var(--text-secondary)',

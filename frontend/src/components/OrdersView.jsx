@@ -6,7 +6,7 @@ export default function OrdersView() {
   const { orders } = useStore();
   const [activeTab, setActiveTab] = useState('Open Orders');
 
-  const tabs = ['Open Orders', 'Order History', 'Stock SIP', 'GTT', 'Basket Orders', 'Alerts'];
+  const tabs = ['Open Orders', 'Order History', 'Basket Orders', 'Alerts'];
 
   // Filter orders based on active tab
   const displayOrders = orders.filter(order => {
