@@ -11,6 +11,7 @@ const OptionChainView = () => {
   const [loading, setLoading] = useState(false);
 
   const prices = useStore((state) => state.prices);
+  const fetchBatchPrices = useStore((state) => state.fetchBatchPrices);
   const openOrderModal = useStore((state) => state.openOrderModal);
   const subscribeToOption = useStore((state) => state.subscribeToOption);
   const unsubscribeFromOption = useStore((state) => state.unsubscribeFromOption);
@@ -46,16 +47,22 @@ const OptionChainView = () => {
 
     strikes.forEach((strike) => {
       const data = optionsData[expiry][strike];
-      if (data.CE) tokensToSub.push({ ...data.CE, name: symbol });
-      if (data.PE) tokensToSub.push({ ...data.PE, name: symbol });
+      if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
+      if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
     });
 
     tokensToSub.forEach(opt => subscribeToOption(opt));
+    
+    // Fetch initial prices via REST for instant loading
+    const symbols = tokensToSub.map(opt => opt.symbol);
+    for (let i = 0; i < symbols.length; i += 50) {
+      fetchBatchPrices(symbols.slice(i, i + 50));
+    }
 
     return () => {
       tokensToSub.forEach(opt => unsubscribeFromOption(opt));
     };
-  }, [expiry, optionsData, symbol, subscribeToOption, unsubscribeFromOption]);
+  }, [expiry, optionsData, symbol, subscribeToOption, unsubscribeFromOption, fetchBatchPrices]);
 
   const handleTrade = (opt, type) => {
     if (!opt) return;

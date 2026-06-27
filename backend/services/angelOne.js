@@ -308,6 +308,7 @@ async function addSubscription(data, io, priceCache) {
         // Dynamically add to STOCK_MASTER so processTick works
         if (!STOCK_MASTER[token]) {
             STOCK_MASTER[token] = { symbol: data.symbol, uniqueSymbol: data.symbol, name: data.name || data.symbol, exchange: exchStr };
+            symbolToToken[uniqueSymbol] = token;
         }
     }
 
