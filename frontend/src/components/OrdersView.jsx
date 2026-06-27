@@ -8,6 +8,13 @@ export default function OrdersView() {
 
   const tabs = ['Open Orders', 'Order History', 'Stock SIP', 'GTT', 'Basket Orders', 'Alerts'];
 
+  // Filter orders based on active tab
+  const displayOrders = orders.filter(order => {
+    if (activeTab === 'Open Orders') return order.status === 'PENDING';
+    if (activeTab === 'Order History') return order.status !== 'PENDING';
+    return false;
+  });
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Sub Navigation */}
@@ -32,8 +39,8 @@ export default function OrdersView() {
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        {orders.length === 0 ? (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: displayOrders.length === 0 ? 'center' : 'flex-start' }}>
+        {displayOrders.length === 0 ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{ 
               width: '120px', height: '100px', background: 'var(--bg-panel)', 
@@ -43,7 +50,7 @@ export default function OrdersView() {
               <Box size={40} color="var(--color-green-light)" />
               <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
             </div>
-            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any open orders</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any {activeTab.toLowerCase()}</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Check Angel One's Recommendations</p>
             <button style={{
               background: 'var(--bg-panel)', color: 'var(--color-blue)', padding: '10px 24px', 
@@ -56,7 +63,36 @@ export default function OrdersView() {
         ) : (
           <div style={{ padding: '24px', width: '100%', height: '100%', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>{activeTab}</h2>
-            {/* Orders Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Time</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayOrders.map(order => (
+                  <tr key={order.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '12px 16px' }}>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.symbol.split('-')[0]}</td>
+                    <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
+                      <span style={{ background: order.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                        {order.side}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
+                    <td style={{ padding: '12px 16px' }}>{order.price ? `₹${parseFloat(order.price).toFixed(2)}` : 'MARKET'}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                      {order.status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
