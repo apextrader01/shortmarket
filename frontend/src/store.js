@@ -75,6 +75,14 @@ export const useStore = create(persist((set, get) => ({
         : w
     )
   })),
+
+  activeTab: 'Markets',
+  setActiveTab: (tab) => set({ activeTab: tab }),
+
+  orderModal: { isOpen: false, symbol: null, type: 'BUY' },
+  openOrderModal: (symbol, type = 'BUY') => set({ orderModal: { isOpen: true, symbol, type } }),
+  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY' } }),
+
   user: { id: 1, username: 'mock_trader', balance: 1000000.0 },
   prices: {},
   positions: [],

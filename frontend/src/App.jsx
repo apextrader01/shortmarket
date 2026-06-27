@@ -1,13 +1,19 @@
 import React, { useEffect } from 'react';
 import MarketWatch from './components/MarketWatch';
 import ChartWidget from './components/ChartWidget';
-import OrderPad from './components/OrderPad';
-import PositionsTable from './components/PositionsTable';
+import PositionsView from './components/PositionsView';
+import OrdersView from './components/OrdersView';
+import PortfolioView from './components/PortfolioView';
+import OrderModal from './components/OrderModal';
 import { useStore } from './store';
 import { User, Wallet, TrendingUp } from 'lucide-react';
 
 function App() {
-  const { initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, user, selectedSymbol, prices, stocks, fetchBatchPrices } = useStore();
+  const { 
+    initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, 
+    user, selectedSymbol, prices, stocks, fetchBatchPrices,
+    activeTab, setActiveTab, orderModal
+  } = useStore();
 
   const topIndices = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE', 'FINNIFTY-NSE'];
 
@@ -82,6 +88,27 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            {/* Global Navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px', fontWeight: '600', marginRight: '20px' }}>
+              {['Markets', 'Portfolio', 'Orders', 'Positions'].map(tab => (
+                <div 
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{
+                    color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
+                    padding: '16px 4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  {tab}
+                </div>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Wallet size={16} style={{ color: 'var(--text-secondary)' }} />
               <div>
@@ -110,17 +137,20 @@ function App() {
           </div>
         </header>
 
-        <main className="dashboard-grid">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <ChartWidget />
-            <PositionsTable />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <OrderPad />
-          </div>
+        <main style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {activeTab === 'Markets' && (
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <ChartWidget />
+              </div>
+            </div>
+          )}
+          {activeTab === 'Portfolio' && <PortfolioView />}
+          {activeTab === 'Orders' && <OrdersView />}
+          {activeTab === 'Positions' && <PositionsView />}
         </main>
       </div>
+      <OrderModal />
     </div>
   );
 }

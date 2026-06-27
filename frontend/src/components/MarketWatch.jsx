@@ -6,7 +6,7 @@ export default function MarketWatch() {
   const { 
     prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices,
     watchlists, activeWatchlistId, setActiveWatchlist, 
-    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist 
+    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal 
   } = useStore();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -182,11 +182,25 @@ export default function MarketWatch() {
                       </div>
                     )
                   ) : (
-                    <div 
-                      onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
-                      style={{ padding: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex' }}
-                    >
-                      <Trash2 size={14} color="var(--color-red-light)" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY'); }}
+                        style={{ padding: '2px 8px', background: 'var(--color-blue)', borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
+                      >
+                        B
+                      </div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL'); }}
+                        style={{ padding: '2px 8px', background: 'var(--color-red)', borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
+                      >
+                        S
+                      </div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
+                        style={{ padding: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', marginLeft: '4px' }}
+                      >
+                        <Trash2 size={14} color="var(--color-red-light)" />
+                      </div>
                     </div>
                   )}
                 </div>
