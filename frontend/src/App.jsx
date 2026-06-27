@@ -7,18 +7,18 @@ import PortfolioView from './components/PortfolioView';
 import OrderModal from './components/OrderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
-import { User, Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
 
 function App() {
   const { 
     initSocket, fetchUserData, loadStocks, loadCandleData, refreshPrices, 
-    user, token, logout, selectedSymbol, prices, stocks, fetchBatchPrices
+    user, token, logout, selectedSymbol, prices, fetchBatchPrices
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('Markets');
-
   const topIndices = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE', 'FINNIFTY-NSE'];
 
+  // All useEffects must be at the top level before any conditional return
   useEffect(() => {
     fetchBatchPrices(topIndices);
   }, []);
@@ -38,23 +38,29 @@ function App() {
     };
     tryLoadStocks();
 
-    // Refresh user data and prices periodically
     const interval = setInterval(() => {
       if (token) fetchUserData();
       refreshPrices();
     }, 10000);
+
     return () => {
       clearInterval(interval);
       if (stockRetry) clearTimeout(stockRetry);
     };
-  }, [initSocket, fetchUserData, loadStocks, refreshPrices, token]);
+  }, [token]);
 
-  if (!user || !token) return <LoginView />;
-
-  // Load candle data when symbol changes (handled in setSelectedSymbol but also on first render)
   useEffect(() => {
-    loadCandleData(selectedSymbol);
+    if (selectedSymbol) loadCandleData(selectedSymbol);
   }, [selectedSymbol]);
+
+  // Now safe to do conditional render AFTER all hooks
+  if (!user || !token) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-primary)' }}>
+        <LoginView />
+      </div>
+    );
+  }
 
   const price = prices[selectedSymbol];
   const isUp = price?.pct >= 0;
@@ -114,7 +120,7 @@ function App() {
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Available Margin</div>
                 <div style={{ fontWeight: '700', fontSize: '15px' }}>
-                  ₹{user.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{(user.balance || 1000000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
