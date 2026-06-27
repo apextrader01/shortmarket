@@ -287,13 +287,34 @@ function fmtDate(d) {
     return `${ist.getUTCFullYear()}-${pad(ist.getUTCMonth()+1)}-${pad(ist.getUTCDate())} ${pad(ist.getUTCHours())}:${pad(ist.getUTCMinutes())}`;
 }
 
+let global_web_socket = null;
+const clientSubscriptions = new Set();
+
+function addSubscription(uniqueSymbol) {
+    if (symbolToToken[uniqueSymbol]) {
+        const token = symbolToToken[uniqueSymbol];
+        if (!clientSubscriptions.has(token)) {
+            clientSubscriptions.add(token);
+            // If websocket is running, dynamically subscribe to the new token
+            if (global_web_socket) {
+                const exch = STOCK_MASTER[token]?.exchange === 'BSE' ? 3 : 1;
+                global_web_socket.fetchData({
+                    correlationID: `short_market_dyn_${Date.now()}`,
+                    action: 1, mode: 1, exchangeType: exch, tokens: [token]
+                });
+            }
+        }
+    }
+}
+
 // ─── Fetch LTPs in batches (API limit ~50 tokens per call) ───────────────────
 async function fetchAllLTPs() {
     const BATCH_SIZE = 50;
     const result = {};
     
-    // Only poll the top 300 tokens (Indices + top stocks) to avoid rate limits
-    const tokensToFetch = allTokens.slice(0, 300);
+    // Poll top 300 tokens AND any tokens clients are actively subscribed to
+    const baseTokens = allTokens.slice(0, 300);
+    const tokensToFetch = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
 
     for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
         const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
@@ -471,18 +492,20 @@ function startLiveWebSocket(io) {
     const { processTick } = require('./matchingEngine');
     const BATCH = 50; // WebSocket token limit per subscription
 
-    const web_socket = new WebSocketV2({
+    global_web_socket = new WebSocketV2({
         jwttoken: jwtToken,
         apikey: process.env.ANGEL_API_KEY,
         clientcode: process.env.ANGEL_CLIENT_ID,
         feedtype: feedToken
     });
 
-    web_socket.connect().then(() => {
+    global_web_socket.connect().then(() => {
         console.log('🔌 WebSocket Connected!');
 
-        // Subscribe in batches of 50, but max 300 total to avoid websocket overload
-        const tokensToSubscribe = allTokens.slice(0, 300);
+        // Subscribe in batches of 50, but max 300 base + dynamic client subs to avoid websocket overload
+        const baseTokens = allTokens.slice(0, 300);
+        const tokensToSubscribe = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
+        
         for (let i = 0; i < tokensToSubscribe.length; i += BATCH) {
             const batch = tokensToSubscribe.slice(i, i + BATCH);
             // Split into NSE and BSE
@@ -490,20 +513,20 @@ function startLiveWebSocket(io) {
             const bseBatch = batch.filter(t => STOCK_MASTER[t]?.exchange === 'BSE');
 
             if (nseBatch.length > 0) {
-                web_socket.fetchData({
+                global_web_socket.fetchData({
                     correlationID: `short_market_nse_${i}`,
                     action: 1, mode: 1, exchangeType: 1, tokens: nseBatch
                 });
             }
             if (bseBatch.length > 0) {
-                web_socket.fetchData({
+                global_web_socket.fetchData({
                     correlationID: `short_market_bse_${i}`,
                     action: 1, mode: 1, exchangeType: 3, tokens: bseBatch
                 });
             }
         }
 
-        web_socket.on('tick', (receiveData) => {
+        global_web_socket.on('tick', (receiveData) => {
             const data = Array.isArray(receiveData) ? receiveData[0] : receiveData;
             if (!data?.token) return;
             const info = STOCK_MASTER[data.token];
@@ -517,7 +540,7 @@ function startLiveWebSocket(io) {
             }
         });
 
-        web_socket.on('error', () => {
+        global_web_socket.on('error', () => {
             console.log('⚠️  WS error, falling back to REST polling');
             setInterval(() => broadcastLTPs(io), 10000);
         });
@@ -535,5 +558,6 @@ module.exports = {
     getPriceCache,
     get STOCK_MASTER() { return STOCK_MASTER; },
     get symbolToToken() { return symbolToToken; },
+    addSubscription,
     smart_api
 };

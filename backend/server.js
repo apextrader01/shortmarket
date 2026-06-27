@@ -107,6 +107,8 @@ io.on('connection', (socket) => {
 
   socket.on('subscribe', (symbol) => {
     socket.join(symbol);
+    const { addSubscription } = require('./services/angelOne');
+    if (addSubscription) addSubscription(symbol);
   });
 
   socket.on('unsubscribe', (symbol) => {

@@ -128,9 +128,7 @@ export const useStore = create((set, get) => ({
       const stocks = await res.json();
       if (!Array.isArray(stocks) || stocks.length === 0) return; // Let caller retry
       set({ stocks });
-      // Subscribe to all symbols for live updates
-      stocks.forEach(s => socket.emit('subscribe', s.symbol));
-      // Immediately try to get prices from REST
+      // Immediately try to get prices from REST (for top 300 stocks)
       get().refreshPrices();
     } catch (err) {
       console.error('Failed to load stocks:', err);
