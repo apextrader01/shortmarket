@@ -198,7 +198,7 @@ export const useStore = create(persist((set, get) => ({
     set({ isLoadingCandles: true, candleError: null });
     try {
       const res = await fetch(
-        `${API}/api/candles?symbol=${encodeURIComponent(symbol)}&interval=${resolvedInterval}`
+        `${API}/api/candles/${encodeURIComponent(symbol)}?interval=${resolvedInterval}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const candles = await res.json();
