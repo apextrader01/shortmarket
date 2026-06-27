@@ -16,6 +16,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const db = require('./database/db');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
