@@ -361,24 +361,42 @@ app.get('/api/mf/search', async (req, res) => {
             return res.json([]);
         }
 
-        // Find up to 10 matches
-        const matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query)).slice(0, 10);
+        // Find matches and prioritize Direct and Growth plans
+        let matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
+        
+        matches.sort((a, b) => {
+            const aScore = (a.schemeName.toLowerCase().includes('direct') ? 2 : 0) + (a.schemeName.toLowerCase().includes('growth') ? 1 : 0);
+            const bScore = (b.schemeName.toLowerCase().includes('direct') ? 2 : 0) + (b.schemeName.toLowerCase().includes('growth') ? 1 : 0);
+            return bScore - aScore;
+        });
+
+        // Take top 20 candidates
+        const candidates = matches.slice(0, 20);
+        const enrichedMatches = [];
         
         // Enrich with NAV and returns concurrently
-        const enrichedMatches = await Promise.all(matches.map(async (fund) => {
+        await Promise.all(candidates.map(async (fund) => {
+            if (enrichedMatches.length >= 8) return; // Limit to 8 valid results
+
             const schemeCode = fund.schemeCode;
             let data = null;
 
-            if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
-                data = mfCache[schemeCode].data;
-            } else {
-                const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
-                data = await response.json();
-                mfCache[schemeCode] = { timestamp: Date.now(), data };
+            try {
+                if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
+                    data = mfCache[schemeCode].data;
+                } else {
+                    const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
+                    data = await response.json();
+                    if (data && data.data) {
+                        mfCache[schemeCode] = { timestamp: Date.now(), data };
+                    }
+                }
+            } catch (e) {
+                return; // Ignore fetch failures
             }
 
             if (!data || !data.data || data.data.length === 0) {
-                return null;
+                return;
             }
 
             const historicalData = data.data; // Descending
@@ -396,7 +414,7 @@ app.get('/api/mf/search', async (req, res) => {
             // Extract AMC from first word
             const amc = fund.schemeName.split(' ')[0];
 
-            return {
+            enrichedMatches.push({
                 id: schemeCode,
                 name: fund.schemeName,
                 amc: amc,
@@ -406,10 +424,10 @@ app.get('/api/mf/search', async (req, res) => {
                 return1y: return1y !== null ? return1y : 0,
                 return3y: return3y !== null ? return3y : 0,
                 return5y: return5y !== null ? return5y : 0
-            };
+            });
         }));
 
-        res.json(enrichedMatches.filter(Boolean));
+        res.json(enrichedMatches);
     } catch (err) {
         console.error('MF Search Error:', err.message);
         res.status(500).json({ error: 'Failed to search mutual funds' });
