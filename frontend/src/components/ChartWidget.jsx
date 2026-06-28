@@ -28,6 +28,7 @@ export default function ChartWidget() {
     selectedSymbol, prices, candleData,
     isLoadingCandles, candleError,
     chartInterval, setChartInterval, loadCandleData,
+    openOrderModal
   } = useStore();
 
   const price   = prices[selectedSymbol];
@@ -257,6 +258,41 @@ export default function ChartWidget() {
       {/* ── Chart area (always mounted so createChart never breaks) ── */}
       <div style={{ position: 'relative', width: '100%', height: '400px' }}>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+
+        {/* Quick Order Buttons Overlay */}
+        {price && !isLoadingCandles && (
+          <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 5, display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              onClick={() => openOrderModal(selectedSymbol, 'SELL', 1)}
+              style={{
+                background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
+                padding: '4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', transition: 'background 0.2s',
+                lineHeight: '1.2'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = '#d64530'}
+              onMouseOut={e => e.currentTarget.style.background = '#F0533C'}
+            >
+              <div style={{ fontSize: '13px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.5px' }}>SELL</div>
+            </button>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>0.00</span>
+            <button 
+              onClick={() => openOrderModal(selectedSymbol, 'BUY', 1)}
+              style={{
+                background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
+                padding: '4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', transition: 'background 0.2s',
+                lineHeight: '1.2'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = '#0d9b73'}
+              onMouseOut={e => e.currentTarget.style.background = '#0FB384'}
+            >
+              <div style={{ fontSize: '13px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.5px' }}>BUY</div>
+            </button>
+          </div>
+        )}
 
         {/* Loading overlay */}
         {isLoadingCandles && (
