@@ -70,12 +70,12 @@ function App() {
       <div className="main-content">
         <header className="topbar">
           {/* Left: title + index pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <h2 style={{ letterSpacing: '0.5px', fontSize: '18px', fontWeight: '800' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ letterSpacing: '0.5px', fontSize: '14px', fontWeight: '800', marginRight: '4px' }}>
               DASHBOARD
             </h2>
 
-            <div className="hide-on-tablet" style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
+            <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
               {TOP_INDICES.map((idx) => {
                 const p      = prices[idx];
                 const isUp   = p?.pct >= 0;
@@ -92,13 +92,13 @@ function App() {
                       color: p
                         ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
                         : 'var(--text-secondary)',
-                      padding:      '2px 8px',
-                      borderRadius: '16px',
-                      fontSize:     '11px',
+                      padding:      '2px 6px',
+                      borderRadius: '12px',
+                      fontSize:     '10px',
                       fontWeight:   '700',
                     }}
                   >
-                    {p && (isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />)}
+                    {p && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
                     {idx.split('-')[0]}{' '}
                     {p ? `${p.ltp.toFixed(2)}` : '...'}
                     {p && (
@@ -113,11 +113,11 @@ function App() {
           </div>
 
           {/* Right: nav tabs + user info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             {/* Tab Navigation */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              fontSize: '11px', fontWeight: '700', marginRight: '6px',
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {['Markets', 'Options', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
                 <div
@@ -141,38 +141,38 @@ function App() {
             </div>
 
             {/* Margin */}
-            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Wallet size={16} style={{ color: 'var(--text-secondary)' }} />
+            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Wallet size={12} style={{ color: 'var(--text-secondary)' }} />
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
                   Available Margin
                 </div>
-                <div style={{ fontWeight: '700', fontSize: '15px' }}>
+                <div style={{ fontWeight: '700', fontSize: '11px' }}>
                   ₹{(user.balance || 1000000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
 
-            <div className="hide-on-mobile" style={{ width: '1px', height: '32px', background: 'var(--border-color)' }} />
+            <div className="hide-on-mobile" style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
 
             {/* User avatar + logout */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
-                width:          '34px',
-                height:         '34px',
+                width:          '24px',
+                height:         '24px',
                 borderRadius:   '50%',
                 background:     'linear-gradient(135deg, var(--color-red), var(--color-navy-light))',
                 display:        'flex',
                 alignItems:     'center',
                 justifyContent: 'center',
                 fontWeight:     '800',
-                fontSize:       '14px',
+                fontSize:       '11px',
               }}>
                 {user.username?.[0]?.toUpperCase()}
               </div>
               <div className="hide-on-mobile">
-                <div style={{ fontWeight: '700', fontSize: '13px' }}>{user.username}</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-green-light)' }}>● Active</div>
+                <div style={{ fontWeight: '700', fontSize: '11px' }}>{user.username}</div>
+                <div style={{ fontSize: '9px', color: 'var(--color-green-light)' }}>● Active</div>
               </div>
               <div
                 onClick={logout}
