@@ -131,22 +131,31 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {details.return_stats && details.return_stats.length > 0 && [1, 3, 5].map(year => {
+                                                {details.return_stats && details.return_stats.length > 0 && [
+                                                    { label: '1 Year', fKey: 'return1y', cKey: 'cat_return1y', rKey: 'rank1yr' },
+                                                    { label: '3 Year', fKey: 'return3y', cKey: 'cat_return3y', rKey: 'rank3yr' },
+                                                    { label: '5 Year', fKey: 'return5y', cKey: 'cat_return5y', rKey: 'rank5yr' },
+                                                    { label: '7 Year', fKey: 'return7y', cKey: 'cat_return7y', rKey: 'rank7yr' },
+                                                    { label: '10 Year', fKey: 'return10y', cKey: 'cat_return10y', rKey: 'rank10yr' },
+                                                    { label: 'All Time', fKey: 'return_since_created', cKey: 'cat_return_since_launch', rKey: null },
+                                                ].map(period => {
                                                     const stat = details.return_stats[0];
-                                                    const fundReturn = stat[`return${year}y`];
-                                                    const catReturn = stat[`cat_return${year}y`];
-                                                    const rank = stat[`rank${year}yr`];
+                                                    const fundReturn = stat[period.fKey];
+                                                    const catReturn = stat[period.cKey];
+                                                    const rank = period.rKey ? stat[period.rKey] : null;
                                                     
                                                     if (fundReturn == null) return null;
 
+                                                    const formatRet = (val) => val != null ? `${parseFloat(val).toFixed(2)}%` : '-';
+
                                                     return (
-                                                        <tr key={year} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                            <td style={{ padding: '12px 16px' }}>{year} Year</td>
+                                                        <tr key={period.label} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                            <td style={{ padding: '12px 16px' }}>{period.label}</td>
                                                             <td style={{ padding: '12px 16px', color: fundReturn >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
-                                                                {fundReturn}%
+                                                                {fundReturn >= 0 && fundReturn !== 0 ? '+' : ''}{formatRet(fundReturn)}
                                                             </td>
-                                                            <td style={{ padding: '12px 16px' }}>{catReturn}%</td>
-                                                            <td style={{ padding: '12px 16px' }}>#{rank}</td>
+                                                            <td style={{ padding: '12px 16px' }}>{formatRet(catReturn)}</td>
+                                                            <td style={{ padding: '12px 16px' }}>{rank ? `#${rank}` : '-'}</td>
                                                         </tr>
                                                     );
                                                 })}
