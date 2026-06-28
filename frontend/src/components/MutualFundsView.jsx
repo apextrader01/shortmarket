@@ -89,7 +89,7 @@ export default function MutualFundsView() {
 
       {/* Main Navigation (Explore, Dashboard, etc) */}
       <div style={{ padding: '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '24px', gap: '16px' }}>
             <div style={{ display: 'flex', gap: '32px' }}>
                 {mainTabs.map(tab => (
                   <div

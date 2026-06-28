@@ -76,7 +76,7 @@ export default function PortfolioView() {
 
       <div style={{ padding: '24px', overflowY: 'auto' }}>
         {/* Top Stats Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        <div className="stats-grid">
           {[
             { label: 'Invested Amount', value: `₹ ${totalInvested.toFixed(2)}`, color: 'var(--text-primary)' },
             { label: 'Current Value', value: `₹ ${totalCurrent.toFixed(2)}`, color: 'var(--text-primary)' },
