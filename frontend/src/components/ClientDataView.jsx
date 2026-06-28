@@ -1,9 +1,51 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
+import { storage } from '../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 export default function ClientDataView() {
-  const { user, logout } = useStore();
+  const { user, logout, updateProfilePicture } = useStore();
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select an image file.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `profile_${user.id}_${Date.now()}.${fileExtension}`;
+      const storageRef = ref(storage, `profiles/${fileName}`);
+
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {}, 
+        (error) => {
+          setIsUploading(false);
+          setUploadError(error.message);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await updateProfilePicture(downloadURL);
+          setIsUploading(false);
+        }
+      );
+    } catch (err) {
+      setIsUploading(false);
+      setUploadError(err.message);
+    }
+  };
 
   const Card = ({ title, desc, icon: Icon, color }) => (
     <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
@@ -28,12 +70,45 @@ export default function ClientDataView() {
       {/* Profile Section */}
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-navy-light), var(--color-blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700' }}>
-            {user?.username ? user.username.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'}
+          
+          <div 
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            style={{ 
+              width: '48px', height: '48px', borderRadius: '50%', 
+              background: user?.profile_picture_url ? `url(${user.profile_picture_url}) center/cover` : 'linear-gradient(135deg, var(--color-navy-light), var(--color-blue))', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              fontSize: '18px', fontWeight: '700', cursor: 'pointer',
+              position: 'relative', overflow: 'hidden'
+            }}
+            title="Upload Profile Picture"
+          >
+            {isUploading ? (
+              <Loader2 size={24} className="animate-spin" color="#FFF" />
+            ) : !user?.profile_picture_url ? (
+              user?.username ? user.username.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
+            ) : null}
+            
+            {!isUploading && (
+              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '30%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Upload size={12} color="#FFF" />
+              </div>
+            )}
           </div>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            style={{ display: 'none' }} 
+          />
+
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>Hari Krishnan I Vijayan</div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>
+              {user?.username || 'Hari Krishnan I Vijayan'}
+            </div>
             <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
+            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>

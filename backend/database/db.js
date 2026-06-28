@@ -28,6 +28,7 @@ async function initSchema() {
         table.json('watchlists'); // For syncing watchlists
         table.string('reset_otp');
         table.datetime('reset_otp_expires');
+        table.string('profile_picture_url');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -40,6 +41,14 @@ async function initSchema() {
           table.datetime('reset_otp_expires');
         });
         console.log('Added reset OTP columns to users table');
+      }
+
+      const hasProfilePicture = await db.schema.hasColumn('users', 'profile_picture_url');
+      if (!hasProfilePicture) {
+        await db.schema.alterTable('users', table => {
+          table.string('profile_picture_url');
+        });
+        console.log('Added profile_picture_url to users table');
       }
     }
 

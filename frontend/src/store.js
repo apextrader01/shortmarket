@@ -503,6 +503,24 @@ export const useStore = create(persist((set, get) => ({
       } catch (err) { return { success: false, error: err.message }; }
   },
 
+  updateProfilePicture: async (url) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/profile_picture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ profile_picture_url: url })
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
     const { token } = get();

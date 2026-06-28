@@ -219,6 +219,16 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
+  try {
+    const { profile_picture_url } = req.body;
+    await db('users').where({ id: req.user.id }).update({ profile_picture_url });
+    res.json({ success: true, profile_picture_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;
