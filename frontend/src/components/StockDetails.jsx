@@ -62,6 +62,9 @@ export default function StockDetails({ symbol, price, candles }) {
     const header = details.header || {};
     const profile = details.details || {};
     const holders = details.shareHoldingPattern || {};
+    const fundsInvested = details.fundsInvested || [];
+    const similarAssets = details.similarAssets?.peerList || [];
+    const financials = details.financialStatement || [];
     
     // Fallbacks if price is missing from AngelOne
     const livePrice = price?.ltp || details.priceData?.ltp || 0;
@@ -217,6 +220,72 @@ export default function StockDetails({ symbol, price, candles }) {
                   </div>
                   <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
                     <div style={{ width: `${h.value}%`, height: '100%', background: '#60A5FA', borderRadius: '3px' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Financial Performance */}
+        {financials.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Financial Performance (Yearly)</h4>
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {financials.map(fin => (
+                <div key={fin.title} className="glass-panel" style={{ padding: '12px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#E2E8F0' }}>{fin.title}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Year</span>
+                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Value (Cr)</span>
+                  </div>
+                  {fin.yearly && Object.entries(fin.yearly).slice(-5).map(([year, val]) => (
+                    <div key={year} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600' }}>{year}</span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: fin.title === 'Profit' && val < 0 ? '#EF4444' : '#10B981' }}>₹{val?.toLocaleString('en-IN', {maximumFractionDigits: 2})}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mutual Funds Invested */}
+        {fundsInvested.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Mutual Funds Invested</h4>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {fundsInvested.map(fund => (
+                <div key={fund.searchId} className="glass-panel hoverable" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}>
+                  {fund.logoUrl && <img src={fund.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: '#FFF' }} />}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{fund.name}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>AUM %</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{fund.investedAumPercent?.toFixed(2)}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Similar Stocks */}
+        {similarAssets.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Similar Stocks</h4>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {similarAssets.map(peer => (
+                <div key={peer.companyHeader?.searchId} className="glass-panel hoverable" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{peer.companyHeader?.displayName}</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>{peer.companyHeader?.nseScriptCode || peer.companyHeader?.bseScriptCode}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700' }}>₹{peer.companyStats?.close?.data?.toFixed(2) || '-'}</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Mkt Cap: {formatNum(peer.companyStats?.marketCap)}</div>
                   </div>
                 </div>
               ))}
