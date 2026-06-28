@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
@@ -21,6 +21,8 @@ export default function ChartWidget() {
   const volumeSeriesRef   = useRef(null);
   const liveLineRef       = useRef(null);
   const mountedRef        = useRef(true);
+
+  const [hoveredCandle, setHoveredCandle] = useState(null);
 
   const {
     selectedSymbol, prices, candleData,
@@ -106,6 +108,20 @@ export default function ChartWidget() {
       }
     });
     ro.observe(chartContainerRef.current);
+
+    // Crosshair hover for OHLC
+    chart.subscribeCrosshairMove((param) => {
+      if (
+        !param.time || 
+        param.point.x < 0 || param.point.x > chartContainerRef.current?.clientWidth || 
+        param.point.y < 0 || param.point.y > chartContainerRef.current?.clientHeight
+      ) {
+        setHoveredCandle(null);
+      } else {
+        const data = param.seriesData.get(candleSeriesRef.current);
+        if (data) setHoveredCandle(data);
+      }
+    });
 
     return () => { ro.disconnect(); };
   }, []);
@@ -215,9 +231,13 @@ export default function ChartWidget() {
       </div>
 
       {/* ── Row 2: OHLC ── */}
-      {price && (
+      {(hoveredCandle || price) && (
         <div style={{ display: 'flex', gap: '16px', fontSize: '11px', marginBottom: '8px' }}>
-          {[['O', price.open], ['H', price.high], ['L', price.low], ['C', price.close]].map(([lbl, val]) =>
+          {[['O', hoveredCandle?.open ?? price?.open], 
+            ['H', hoveredCandle?.high ?? price?.high], 
+            ['L', hoveredCandle?.low ?? price?.low], 
+            ['C', hoveredCandle?.close ?? price?.close]]
+            .map(([lbl, val]) =>
             val != null ? (
               <span key={lbl}>
                 <span style={{ color: '#475569' }}>{lbl} </span>
