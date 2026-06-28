@@ -391,34 +391,6 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
-  fundHistoryCache: {},
-  fetchFundHistory: async (schemeCode) => {
-      const currentCache = get().fundHistoryCache;
-      if (currentCache[schemeCode]) return currentCache[schemeCode]; // already fetched
-
-      try {
-          const res = await fetch(`${API}/api/mf/${schemeCode}`);
-          const data = await res.json();
-          
-          if (data && data.data) {
-              // mfapi.in returns data.data as an array of { date: "DD-MM-YYYY", nav: "123.45" }
-              // we need to reverse it (it's descending, we want ascending for chart) and parse
-              const historicalData = data.data.reverse().map(item => {
-                  const [dd, mm, yyyy] = item.date.split('-');
-                  return {
-                      time: `${yyyy}-${mm}-${dd}`,
-                      value: parseFloat(item.nav)
-                  };
-              });
-
-              const newCache = { ...currentCache, [schemeCode]: historicalData };
-              set({ fundHistoryCache: newCache });
-              return historicalData;
-          }
-      } catch (_) {}
-      return null;
-  },
-
   convertPosition: async (positionId, newProductType, requiredMargin) => {
       const { token } = get();
       try {
