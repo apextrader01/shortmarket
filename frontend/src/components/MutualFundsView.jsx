@@ -10,12 +10,18 @@ export default function MutualFundsView() {
   const [selectedFund, setSelectedFund] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = async (e) => {
+  useEffect(() => {
+      const delayDebounceFn = setTimeout(() => {
+          if (search && search.length >= 3) {
+              setIsSearching(true);
+              searchMutualFunds(search).finally(() => setIsSearching(false));
+          }
+      }, 400); // 400ms debounce
+      return () => clearTimeout(delayDebounceFn);
+  }, [search, searchMutualFunds]);
+
+  const handleSearch = (e) => {
       e.preventDefault();
-      if (!search || search.length < 3) return;
-      setIsSearching(true);
-      await searchMutualFunds(search);
-      setIsSearching(false);
   };
 
   const tabs = ['All', 'Equity', 'Debt', 'Hybrid'];
