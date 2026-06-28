@@ -276,19 +276,60 @@ export default function StockDetails({ symbol, price, candles }) {
         {similarAssets.length > 0 && (
           <div style={{ marginTop: '16px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Similar Stocks</h4>
-            <div style={{ display: 'grid', gap: '12px' }}>
-              {similarAssets.map(peer => (
-                <div key={peer.companyHeader?.searchId} className="glass-panel hoverable" style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }}>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{peer.companyHeader?.displayName}</div>
-                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>{peer.companyHeader?.nseScriptCode || peer.companyHeader?.bseScriptCode}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>₹{peer.companyStats?.close?.data?.toFixed(2) || '-'}</div>
-                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Mkt Cap: {formatNum(peer.companyStats?.marketCap)}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="glass-panel" style={{ overflowX: 'auto', padding: '0' }}>
+              <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'right' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#94A3B8', fontSize: '12px' }}>
+                    <th style={{ padding: '16px', textAlign: 'left', fontWeight: '400' }}>Stock</th>
+                    <th style={{ padding: '16px', fontWeight: '400' }}>Mkt price (1D)</th>
+                    <th style={{ padding: '16px', fontWeight: '400', width: '150px', textAlign: 'center' }}>52 week performance</th>
+                    <th style={{ padding: '16px', fontWeight: '400' }}>Market cap (Cr)</th>
+                    <th style={{ padding: '16px', fontWeight: '400' }}>P/E ratio</th>
+                    <th style={{ padding: '16px', fontWeight: '400' }}>P/B ratio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {similarAssets.map(peer => {
+                    // For the slider, since we don't have LTP in this payload, we just render the bounds
+                    // If we had LTP, we'd calculate the dot position. We'll put it in the middle for now or omit the dot.
+                    return (
+                      <tr key={peer.companyHeader?.searchId} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }} className="hoverable-row">
+                        <td style={{ padding: '16px', textAlign: 'left' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {peer.companyHeader?.logoUrl && <img src={peer.companyHeader.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: '#FFF' }} />}
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>{peer.companyHeader?.displayName}</div>
+                              <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{peer.companyHeader?.nseScriptCode || peer.companyHeader?.bseScriptCode}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                          -
+                        </td>
+                        <td style={{ padding: '16px', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '10px', color: '#94A3B8' }}>L</span>
+                            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', position: 'relative' }}>
+                                {/* Fake tick in the middle since we don't know the exact LTP for peers yet */}
+                                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '4px', height: '10px', background: '#64748B', borderRadius: '2px' }} />
+                            </div>
+                            <span style={{ fontSize: '10px', color: '#94A3B8' }}>H</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                          {formatNum(peer.marketCap)}
+                        </td>
+                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                          {peer.peRatio ? peer.peRatio.toFixed(2) : '-'}
+                        </td>
+                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                          {peer.pbRatio ? peer.pbRatio.toFixed(2) : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
