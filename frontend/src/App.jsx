@@ -11,7 +11,7 @@ import LoginView from './components/LoginView';
 import { useStore } from './store';
 import { Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
 
-const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE', 'FINNIFTY-NSE'];
+const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
 function App() {
   const {
