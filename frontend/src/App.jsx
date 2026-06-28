@@ -165,13 +165,7 @@ function App() {
                   </div>
                 </div>
               </div>
-              <button 
-                className="btn btn-primary" 
-                style={{ padding: '6px 12px', fontSize: '11px' }}
-                onClick={() => setShowDepositModal(true)}
-              >
-                Deposit
-              </button>
+              {/* Deposit button moved to ClientDataView */}
             </div>
 
             <div className="hide-on-mobile" style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
@@ -240,7 +234,7 @@ function App() {
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
-              <ClientDataView />
+              <ClientDataView onDepositClick={() => setShowDepositModal(true)} />
             </div>
           )}
           {activeTab === 'Settings' && (

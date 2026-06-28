@@ -4,7 +4,7 @@ import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Us
 import { storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-export default function ClientDataView() {
+export default function ClientDataView({ onDepositClick }) {
   const { user, logout, updateProfilePicture } = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -243,7 +243,7 @@ export default function ClientDataView() {
             <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
           </div>
         </div>
-        <button style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', width: '100%', maxWidth: '300px' }}>
+        <button onClick={onDepositClick} style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', width: '100%', maxWidth: '300px' }}>
           DEPOSIT
         </button>
       </div>
