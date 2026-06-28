@@ -462,6 +462,47 @@ app.get('/api/mf/enrich', async (req, res) => {
     }
 });
 
+// 2c. Rich Details Endpoint (Proxies Groww API for AUM, Holdings, Ratings, Pros/Cons)
+const mfDetailsCache = {};
+app.get('/api/mf/details', async (req, res) => {
+    try {
+        const { name } = req.query;
+        if (!name) return res.status(400).json({ error: 'Name required' });
+        
+        // Check cache first
+        if (mfDetailsCache[name] && (Date.now() - mfDetailsCache[name].timestamp < 43200000)) { // 12 hours cache
+            return res.json(mfDetailsCache[name].data);
+        }
+
+        // 1. Get search ID
+        const searchUrl = `https://groww.in/v1/api/search/v1/entity?app=false&entity_type=scheme&size=5&q=${encodeURIComponent(name)}`;
+        const searchRes = await myFetch(searchUrl);
+        const searchData = await searchRes.json();
+        
+        if (!searchData || !searchData.content || searchData.content.length === 0) {
+            return res.status(404).json({ error: 'Details not found for this fund' });
+        }
+        
+        // Take the first matching ID
+        const searchId = searchData.content[0].id;
+
+        // 2. Fetch full details using the search ID
+        const detailsUrl = `https://groww.in/v1/api/data/mf/web/v2/scheme/search/${searchId}`;
+        const detailsRes = await myFetch(detailsUrl);
+        const detailsData = await detailsRes.json();
+        
+        if (detailsData.errorCode) {
+            return res.status(404).json({ error: detailsData.errorMessage || 'Details not found' });
+        }
+
+        mfDetailsCache[name] = { timestamp: Date.now(), data: detailsData };
+        res.json(detailsData);
+    } catch (err) {
+        console.error('MF Details Error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch fund details' });
+    }
+});
+
 // 3. Historical Data Endpoint (for charts)
 app.get('/api/mf/:schemeCode', async (req, res) => {
     try {

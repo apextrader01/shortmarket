@@ -442,6 +442,25 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
+  fundDetailsCache: {},
+  fetchFundDetails: async (schemeName) => {
+      if (!schemeName) return null;
+      const currentCache = get().fundDetailsCache;
+      if (currentCache[schemeName] && (Date.now() - currentCache[schemeName].timestamp < 43200000)) {
+          return currentCache[schemeName].data;
+      }
+      try {
+          const res = await fetch(`${API}/api/mf/details?name=${encodeURIComponent(schemeName)}`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          set({ fundDetailsCache: { ...currentCache, [schemeName]: { timestamp: Date.now(), data } } });
+          return data;
+      } catch (e) {
+          console.error("Failed to fetch rich fund details:", e);
+          return null;
+      }
+  },
+
   fundHistoryCache: {},
   fetchFundHistory: async (schemeCode) => {
       const currentCache = get().fundHistoryCache;

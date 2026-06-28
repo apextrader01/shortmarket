@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react';
-import MutualFundModal from './MutualFundModal';
+import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds } = useStore();
@@ -221,7 +221,7 @@ export default function MutualFundsView() {
         )}
       </div>
       
-      {selectedFund && <MutualFundModal fund={selectedFund} onClose={() => setSelectedFund(null)} />}
+      {selectedFund && <MutualFundDetailsModal fund={selectedFund} onClose={() => setSelectedFund(null)} />}
     </div>
   );
 }
