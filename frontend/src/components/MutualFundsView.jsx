@@ -15,13 +15,8 @@ export default function MutualFundsView() {
 
   const ITEMS_PER_PAGE = 50;
 
-  // Debounced auto-search: clears old results immediately when user types
+  // Debounced auto-search
   useEffect(() => {
-      if (!search || search.length < 2) {
-          useStore.setState({ mutualFunds: [] });
-          return;
-      }
-
       setIsSearching(true);
       setPage(1);
       const currentSearchId = ++searchIdRef.current;
@@ -35,7 +30,7 @@ export default function MutualFundsView() {
                   setIsSearching(false);
               }
           }
-      }, 500);
+      }, search && search.length >= 2 ? 500 : 0); // No debounce on initial load or empty search
 
       return () => clearTimeout(timer);
   }, [search, searchMutualFunds]);
@@ -220,7 +215,7 @@ export default function MutualFundsView() {
                             <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                     <Search size={32} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
-                                    <span>Type a fund house name (HDFC, SBI, ICICI, Quant, Axis...) to explore all their funds</span>
+                                    <span>Failed to load default funds. Please try searching.</span>
                                 </div>
                             </td>
                         </tr>

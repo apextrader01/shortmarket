@@ -357,12 +357,25 @@ const mfCache = {};
 app.get('/api/mf/search', async (req, res) => {
     try {
         const query = (req.query.q || '').toLowerCase().trim();
+        
+        let matches = [];
         if (!query || query.length < 2) {
-            return res.json([]);
+            // Default top funds across categories (Equity, Debt, Hybrid) if no search query
+            const topKeywords = [
+                'parag parikh flexi', 'quant small', 'quant active', 'sbi small cap', 
+                'sbi magnum midcap', 'sbi liquid', 'hdfc balanced advantage', 'hdfc mid-cap', 
+                'nippon india liquid', 'nippon india small cap', 'motilal oswal midcap', 
+                'icici prudential equity & debt', 'icici prudential liquid', 'axis bluechip', 
+                'kotak emerging equity', 'mirae asset large cap', 'ppfas', 'edelweiss balanced'
+            ];
+            matches = allMutualFunds.filter(f => {
+                const n = f.schemeName.toLowerCase();
+                return n.includes('direct') && n.includes('growth') && topKeywords.some(k => n.includes(k));
+            });
+        } else {
+            // Instantly filter from the 37,000+ in-memory list
+            matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
         }
-
-        // Instantly filter from the 37,000+ in-memory list
-        const matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
         
         // Sort: Direct+Growth first, then Regular+Growth, then others
         matches.sort((a, b) => {
