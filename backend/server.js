@@ -735,9 +735,17 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     }
     const searchId = searchData.content[0].search_id;
 
-    // 2. Fetch full details from Groww
-    const detailsRes = await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`);
+    // 2. Fetch full details from Groww and live price data for circuits
+    const [detailsRes, liveRes] = await Promise.all([
+      fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`),
+      fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${rawName}/latest`).catch(() => null)
+    ]);
     const data = await detailsRes.json();
+    const liveData = liveRes && liveRes.ok ? await liveRes.json().catch(() => null) : null;
+    
+    if (liveData) {
+      data.livePriceData = liveData;
+    }
     data.news = []; // Removed Yahoo finance completely
 
     stockDetailsCache[rawName] = { timestamp: Date.now(), data };

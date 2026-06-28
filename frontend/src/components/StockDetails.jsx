@@ -77,6 +77,10 @@ export default function StockDetails({ symbol, price, candles }) {
     const bsePrice = details.priceData?.bse || {};
     const low52 = nsePrice.yearLowPrice || bsePrice.yearLowPrice || 0;
     const high52 = nsePrice.yearHighPrice || bsePrice.yearHighPrice || 0;
+    
+    // Circuit limits
+    const lowerCircuit = details.livePriceData?.lowPriceRange;
+    const upperCircuit = details.livePriceData?.highPriceRange;
 
     const formatNum = (num) => num ? (num >= 1e7 ? (num / 1e7).toFixed(2) + ' Cr' : num.toLocaleString('en-IN')) : '-';
     
@@ -141,11 +145,11 @@ export default function StockDetails({ symbol, price, candles }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Lower circuit</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>-</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{lowerCircuit ? lowerCircuit.toFixed(2) : '-'}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Upper circuit</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>-</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{upperCircuit ? upperCircuit.toFixed(2) : '-'}</span>
             </div>
           </div>
         </div>
