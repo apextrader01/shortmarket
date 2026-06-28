@@ -109,7 +109,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                         <div>
                             <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: '#fff' }}>Performance Chart</h3>
                             <div style={{ height: '300px', background: 'var(--bg-panel)', borderRadius: '8px', overflow: 'hidden' }}>
-                                <MutualFundChart schemeCode={fund.id} color="var(--color-blue)" />
+                                <MutualFundChart schemeCode={fund.id} color="#3b82f6" />
                             </div>
                         </div>
 
@@ -207,7 +207,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                         </div>
                                         <div>
                                             <strong style={{ color: '#fff' }}>Fund Managers:</strong><br />
-                                            {details.fund_manager_details?.map(fm => fm.name).join(', ') || 'N/A'}
+                                            {details.fund_manager || 'N/A'}
                                         </div>
                                         <div style={{ marginTop: '16px', display: 'flex', gap: '24px' }}>
                                             <div>
