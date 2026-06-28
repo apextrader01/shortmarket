@@ -85,29 +85,67 @@ export default function StockDetails({ symbol, price, candles }) {
         
         {/* Performance */}
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Performance</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div className="glass-panel" style={{ padding: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#94A3B8' }}>Today's Low / High</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {l ? `₹${l.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {h ? `₹${h.toFixed(2)}` : '-'}
-              </div>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '24px' }}>Performance</h4>
+          
+          {/* Range Slider 1 */}
+          <div style={{ marginBottom: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>
+              <span>Today's low</span>
+              <span>Today's high</span>
             </div>
-            <div className="glass-panel" style={{ padding: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#94A3B8' }}>52 Week Low / High</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {low52 ? `₹${low52.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {high52 ? `₹${high52.toFixed(2)}` : '-'}
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>
+              <span>{l ? l.toFixed(2) : '-'}</span>
+              <span>{h ? h.toFixed(2) : '-'}</span>
             </div>
-            <div className="glass-panel" style={{ padding: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#94A3B8' }}>Open / Prev Close</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {price?.open ? `₹${price.open.toFixed(2)}` : '-'} / {price?.close ? `₹${price.close.toFixed(2)}` : '-'}
-              </div>
+            <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+              {livePrice > 0 && h > l && (
+                <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - l) / (h - l)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
+                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
+                </div>
+              )}
             </div>
-            <div className="glass-panel" style={{ padding: '12px' }}>
-              <div style={{ fontSize: '11px', color: '#94A3B8' }}>Volume</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(vol)}</div>
+          </div>
+
+          {/* Range Slider 2 */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>
+              <span>52 week low</span>
+              <span>52 week high</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>
+              <span>{low52 ? low52.toFixed(2) : '-'}</span>
+              <span>{high52 ? high52.toFixed(2) : '-'}</span>
+            </div>
+            <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+              {livePrice > 0 && high52 > low52 && (
+                <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - low52) / (high52 - low52)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
+                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom row metrics */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Open price</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.open ? price.open.toFixed(2) : '-'}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Previous close</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.close ? price.close.toFixed(2) : '-'}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Live volume</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(vol)}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Lower circuit</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>-</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Upper circuit</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>-</span>
             </div>
           </div>
         </div>
