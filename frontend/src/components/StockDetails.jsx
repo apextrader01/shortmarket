@@ -304,14 +304,27 @@ export default function StockDetails({ symbol, price, candles }) {
                           </div>
                         </td>
                         <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
-                          -
+                          {peer.livePriceData?.ltp ? (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span>₹{peer.livePriceData.ltp.toFixed(2)}</span>
+                              <span style={{ fontSize: '11px', color: peer.livePriceData.dayChange < 0 ? '#EF4444' : '#10B981' }}>
+                                {peer.livePriceData.dayChange > 0 ? '+' : ''}{peer.livePriceData.dayChange.toFixed(2)} ({peer.livePriceData.dayChangePerc.toFixed(2)}%)
+                              </span>
+                            </div>
+                          ) : '-'}
                         </td>
                         <td style={{ padding: '16px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                             <span style={{ fontSize: '10px', color: '#94A3B8' }}>L</span>
                             <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', position: 'relative' }}>
-                                {/* Fake tick in the middle since we don't know the exact LTP for peers yet */}
-                                <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '4px', height: '10px', background: '#64748B', borderRadius: '2px' }} />
+                                {peer.livePriceData?.ltp && peer.nseYearHigh > peer.nseYearLow && (
+                                    <div style={{ 
+                                      position: 'absolute', 
+                                      left: `${Math.max(0, Math.min(100, ((peer.livePriceData.ltp - peer.nseYearLow) / (peer.nseYearHigh - peer.nseYearLow)) * 100))}%`, 
+                                      top: '50%', transform: 'translate(-50%, -50%)', 
+                                      width: '4px', height: '10px', background: '#94A3B8', borderRadius: '2px' 
+                                    }} />
+                                )}
                             </div>
                             <span style={{ fontSize: '10px', color: '#94A3B8' }}>H</span>
                           </div>

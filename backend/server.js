@@ -746,6 +746,21 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     if (liveData) {
       data.livePriceData = liveData;
     }
+    
+    if (data.similarAssets && data.similarAssets.peerList) {
+      const peerPromises = data.similarAssets.peerList.map(p => 
+        fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${p.companyHeader.nseScriptCode || p.companyHeader.bseScriptCode}/latest`)
+          .then(r => r.json())
+          .catch(() => null)
+      );
+      const peerLivePrices = await Promise.all(peerPromises);
+      data.similarAssets.peerList.forEach((p, i) => {
+        if (peerLivePrices[i]) {
+          p.livePriceData = peerLivePrices[i];
+        }
+      });
+    }
+    
     data.news = []; // Removed Yahoo finance completely
 
     stockDetailsCache[rawName] = { timestamp: Date.now(), data };
