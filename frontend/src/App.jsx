@@ -75,7 +75,7 @@ function App() {
               DASHBOARD
             </h2>
 
-            <div className="hide-on-tablet" style={{ display: 'flex', gap: '12px', marginLeft: '12px' }}>
+            <div className="hide-on-tablet" style={{ display: 'flex', gap: '8px', marginLeft: '12px' }}>
               {TOP_INDICES.map((idx) => {
                 const p      = prices[idx];
                 const isUp   = p?.pct >= 0;
@@ -85,24 +85,24 @@ function App() {
                     style={{
                       display:      'flex',
                       alignItems:   'center',
-                      gap:          '6px',
+                      gap:          '4px',
                       background:   p
                         ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
                         : 'rgba(255,255,255,0.05)',
                       color: p
                         ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
                         : 'var(--text-secondary)',
-                      padding:      '4px 12px',
-                      borderRadius: '20px',
-                      fontSize:     '13px',
-                      fontWeight:   '600',
+                      padding:      '2px 8px',
+                      borderRadius: '16px',
+                      fontSize:     '11px',
+                      fontWeight:   '700',
                     }}
                   >
-                    {p && (isUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />)}
+                    {p && (isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />)}
                     {idx.split('-')[0]}{' '}
-                    {p ? `₹${p.ltp.toFixed(2)}` : '...'}
+                    {p ? `${p.ltp.toFixed(2)}` : '...'}
                     {p && (
-                      <span style={{ opacity: 0.8 }}>
+                      <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
                         {p.pct > 0 ? '+' : ''}{Number(p.pct || 0).toFixed(2)}%
                       </span>
                     )}
@@ -113,11 +113,11 @@ function App() {
           </div>
 
           {/* Right: nav tabs + user info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
             {/* Tab Navigation */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              fontSize: '13px', fontWeight: '600', marginRight: '10px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              fontSize: '11px', fontWeight: '700', marginRight: '6px',
             }}>
               {['Markets', 'Options', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
                 <div
@@ -128,7 +128,7 @@ function App() {
                     borderBottom: activeTab === tab
                       ? '2px solid var(--color-blue)'
                       : '2px solid transparent',
-                    padding:        '16px 4px',
+                    padding:        '16px 2px',
                     cursor:         'pointer',
                     transition:     'all 0.2s ease',
                     textTransform:  'uppercase',
