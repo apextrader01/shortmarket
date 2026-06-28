@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PortfolioView() {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -35,6 +36,20 @@ export default function PortfolioView() {
   const overallPct = totalInvested > 0 ? (overallGain / totalInvested) * 100 : 0;
   
   const isGain = overallGain >= 0;
+
+  // Chart Data
+  const COLORS = ['#3B82F6', '#22C55E', '#EAB308'];
+  const chartData = [
+    { name: 'Stocks', value: totalInvestedStocks },
+    { name: 'ETFs', value: totalInvestedETFs },
+    { name: 'Mutual Funds', value: 0 }, // Future addition
+  ].filter(d => d.value > 0);
+  
+  // If no investments yet, show placeholder
+  if (chartData.length === 0) {
+    chartData.push({ name: 'Uninvested Cash', value: 100 });
+    COLORS[0] = 'rgba(255,255,255,0.1)';
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
@@ -82,39 +97,69 @@ export default function PortfolioView() {
 
         {/* Portfolio Breakup */}
         <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Portfolio Breakup</h3>
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
-          {deliveryPositions.length === 0 ? (
-            <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', padding: '12px 16px', borderRadius: '4px', fontSize: '13px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <span style={{ background: 'var(--color-blue)', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>!</span>
-              You have not invested in Equity, Mutual Funds with Angel One yet.
-            </div>
-          ) : (
-            <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-green-light)', padding: '12px 16px', borderRadius: '4px', fontSize: '13px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-              You have {deliveryPositions.length} active Delivery holding(s).
-            </div>
-          )}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+          {/* Chart Section */}
+          <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Asset Allocation</h4>
+            <div style={{ width: '100%', height: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value) => `₹${value.toFixed(2)}`}
+                    contentStyle={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                    itemStyle={{ color: 'var(--text-primary)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Stats Breakdown Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <div style={{ fontWeight: '600', fontSize: '15px' }}>Equity <span style={{ color: 'var(--text-secondary)', fontWeight: '400', fontSize: '12px' }}>(₹{totalInvested.toFixed(2)})</span></div>
-                <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>INVEST NOW</button>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                   <span style={{ color: 'var(--text-secondary)' }}>Stocks</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[0] }} />
+                     <span style={{ color: 'var(--text-secondary)' }}>Stocks</span>
+                   </div>
                    <span style={{ fontWeight: '600' }}>₹{totalInvestedStocks.toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                   <span style={{ color: 'var(--text-secondary)' }}>ETFs</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[1] }} />
+                     <span style={{ color: 'var(--text-secondary)' }}>ETFs</span>
+                   </div>
                    <span style={{ fontWeight: '600' }}>₹{totalInvestedETFs.toFixed(2)}</span>
                 </div>
               </div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: '600' }}>Mutual Funds</div>
-              <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>INVEST NOW</button>
+            
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[2] }} />
+                Mutual Funds
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Coming Soon</div>
             </div>
           </div>
         </div>

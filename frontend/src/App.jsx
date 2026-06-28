@@ -13,7 +13,7 @@ import OrderModal from './components/OrderModal';
 import DepositModal from './components/DepositModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign } from 'lucide-react';
 
 const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
@@ -259,6 +259,30 @@ function App() {
 
       {showOrderModal && <OrderModal onClose={() => setShowOrderModal(false)} defaultSymbol={selectedSymbol} />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
+      
+      {/* Mobile Bottom Navigation */}
+      <div className="mobile-bottom-nav">
+        <div className={`mobile-nav-item ${activeTab === 'Markets' ? 'active' : ''}`} onClick={() => setActiveTab('Markets')}>
+          <TrendingUp size={20} />
+          <span>Markets</span>
+        </div>
+        <div className={`mobile-nav-item ${activeTab === 'Orders' ? 'active' : ''}`} onClick={() => setActiveTab('Orders')}>
+          <List size={20} />
+          <span>Orders</span>
+        </div>
+        <div className={`mobile-nav-item ${activeTab === 'Portfolio' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
+          <Briefcase size={20} />
+          <span>Portfolio</span>
+        </div>
+        <div className="mobile-nav-item" onClick={() => setShowDepositModal(true)}>
+          <CircleDollarSign size={20} />
+          <span>Funds</span>
+        </div>
+        <div className={`mobile-nav-item ${activeTab === 'Settings' ? 'active' : ''}`} onClick={() => setActiveTab('Settings')}>
+          <User size={20} />
+          <span>Profile</span>
+        </div>
+      </div>
     </div>
   );
 }

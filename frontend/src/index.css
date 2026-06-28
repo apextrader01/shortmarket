@@ -245,6 +245,81 @@ tbody tr:hover {
   background: rgba(255, 255, 255, 0.02);
 }
 
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile specific styling */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding-bottom: 60px; /* Space for bottom nav */
+  }
+  
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    z-index: 1000;
+    justify-content: space-around;
+    align-items: center;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    width: 20%;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--color-blue);
+  }
+
+  /* Modals on mobile should slide up like bottom sheets */
+  .modal-backdrop {
+    align-items: flex-end !important;
+  }
+  
+  .modal-backdrop > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-top: 1px solid var(--border-color) !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 /* Ticker Animation */
 @keyframes flash-green {
   0% { background-color: rgba(34, 197, 94, 0.2); }
