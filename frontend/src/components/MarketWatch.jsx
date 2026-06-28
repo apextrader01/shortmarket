@@ -26,20 +26,28 @@ export default function MarketWatch() {
   const displayStocks = isSearchMode ? searchResults : watchlistStocks;
 
   React.useEffect(() => {
-    if (isSearchMode && searchResults.length > 0) {
-      const timer = setTimeout(() => {
-        const missingSymbols = searchResults
-          .filter(s => !prices[s.uniqueSymbol])
-          .map(s => s.uniqueSymbol)
-          .slice(0, 50);
-        
-        if (missingSymbols.length > 0 && fetchBatchPrices) {
-          fetchBatchPrices(missingSymbols);
-        }
-      }, 400); 
-      return () => clearTimeout(timer);
+    // Collect all stocks currently visible (watchlist or search results)
+    const visibleStocks = isSearchMode ? searchResults : watchlistStocks;
+    
+    // Subscribe to all of them for instant updates
+    if (visibleStocks.length > 0) {
+      const subscribeBatch = useStore.getState().subscribeToOptionBatch;
+      const unsubscribeBatch = useStore.getState().unsubscribeFromOptionBatch;
+      
+      const tokensToSub = visibleStocks.map(s => ({
+        token: s.token,
+        symbol: s.uniqueSymbol,
+        exchange: s.exchange,
+        name: s.name
+      }));
+      
+      subscribeBatch(tokensToSub);
+      
+      return () => {
+        unsubscribeBatch(tokensToSub);
+      };
     }
-  }, [searchQuery, isSearchMode]);
+  }, [searchQuery, isSearchMode, activeWatchlistId, stocks]);
 
   return (
     <div className="sidebar">
