@@ -5,6 +5,11 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     balance REAL NOT NULL DEFAULT 1000000.0,
     profile_picture_url TEXT,
+    phone TEXT,
+    pan_card TEXT,
+    aadhar_number TEXT,
+    kyc_pan_url TEXT,
+    kyc_aadhar_url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

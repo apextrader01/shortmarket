@@ -229,6 +229,26 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/user/details', authenticateToken, async (req, res) => {
+  try {
+    const { phone, pan_card, aadhar_number } = req.body;
+    await db('users').where({ id: req.user.id }).update({ phone, pan_card, aadhar_number });
+    res.json({ success: true, phone, pan_card, aadhar_number });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/user/kyc', authenticateToken, async (req, res) => {
+  try {
+    const { kyc_pan_url, kyc_aadhar_url } = req.body;
+    await db('users').where({ id: req.user.id }).update({ kyc_pan_url, kyc_aadhar_url });
+    res.json({ success: true, kyc_pan_url, kyc_aadhar_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;

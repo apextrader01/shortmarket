@@ -119,6 +119,74 @@ export default function PortfolioView() {
           </div>
         </div>
 
+        {/* Holdings Table */}
+        <div style={{ marginTop: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Your Holdings</h3>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Showing {deliveryPositions.length} position(s)
+            </div>
+          </div>
+          
+          <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Qty</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg Price</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>LTP</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Current Value</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Total P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveryPositions.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      You have no active holdings.
+                    </td>
+                  </tr>
+                ) : (
+                  deliveryPositions.map(pos => {
+                    const priceData = prices[pos.symbol] || {};
+                    const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
+                    const qty = Math.abs(pos.quantity);
+                    const invested = parseFloat(pos.average_price) * qty;
+                    const current = ltp * qty;
+                    const pnl = current - invested;
+                    const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                    const isProfit = pnl >= 0;
+                    
+                    return (
+                      <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '16px', fontWeight: '600' }}>
+                          {pos.symbol.split('-')[0]}
+                          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>
+                            {pos.symbol.split('-')[1] || 'NSE'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>{qty}</td>
+                        <td style={{ padding: '16px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{parseFloat(pos.average_price).toFixed(2)}</td>
+                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{ltp.toFixed(2)}</td>
+                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{current.toFixed(2)}</td>
+                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <div style={{ color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
+                            {isProfit ? '+' : ''}₹{pnl.toFixed(2)}
+                          </div>
+                          <div style={{ fontSize: '11px', color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', opacity: 0.8 }}>
+                            {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );

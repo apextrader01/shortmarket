@@ -47,6 +47,115 @@ export default function ClientDataView() {
     }
   };
 
+  const PersonalDetailsSection = () => {
+    const { updateUserDetails, updateKycDocuments } = useStore();
+    const [details, setDetails] = useState({ phone: user?.phone || '', pan_card: user?.pan_card || '', aadhar_number: user?.aadhar_number || '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState('');
+    
+    const [kycUploading, setKycUploading] = useState({ pan: false, aadhar: false });
+    
+    const handleSaveDetails = async () => {
+      setIsSaving(true);
+      const res = await updateUserDetails(details);
+      setIsSaving(false);
+      if (res.success) setSaveMessage('Details saved successfully!');
+      else setSaveMessage('Failed to save details.');
+      setTimeout(() => setSaveMessage(''), 3000);
+    };
+
+    const handleKycUpload = async (e, type) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setKycUploading(prev => ({ ...prev, [type]: true }));
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `kyc_${type}_${user.id}_${Date.now()}.${fileExt}`;
+        const storageRef = ref(storage, `kyc/${fileName}`);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        uploadTask.on('state_changed', null, 
+          (error) => setKycUploading(prev => ({ ...prev, [type]: false })), 
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            await updateKycDocuments({ [`kyc_${type}_url`]: url });
+            setKycUploading(prev => ({ ...prev, [type]: false }));
+          }
+        );
+      } catch (err) {
+        setKycUploading(prev => ({ ...prev, [type]: false }));
+      }
+    };
+
+    return (
+      <div style={{ marginBottom: '40px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        {/* Personal Details Form */}
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Personal Details</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Phone Number</label>
+              <input type="text" value={details.phone} onChange={e => setDetails({...details, phone: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#FFF' }} placeholder="Enter Phone Number" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>PAN Card</label>
+              <input type="text" value={details.pan_card} onChange={e => setDetails({...details, pan_card: e.target.value.toUpperCase()})} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#FFF' }} placeholder="Enter PAN Number" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Aadhar Number</label>
+              <input type="text" value={details.aadhar_number} onChange={e => setDetails({...details, aadhar_number: e.target.value})} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#FFF' }} placeholder="Enter Aadhar Number" />
+            </div>
+            <button onClick={handleSaveDetails} disabled={isSaving} style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', marginTop: '8px', opacity: isSaving ? 0.7 : 1 }}>
+              {isSaving ? 'Saving...' : 'Save Details'}
+            </button>
+            {saveMessage && <div style={{ fontSize: '12px', color: 'var(--color-green-light)', textAlign: 'center' }}>{saveMessage}</div>}
+          </div>
+        </div>
+
+        {/* KYC Documents */}
+        <div className="glass-panel" style={{ padding: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>KYC Documents</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* PAN Card Upload */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>PAN Card Image</div>
+              {user?.kyc_pan_url ? (
+                <div style={{ position: 'relative', width: '100%', height: '120px', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                  <img src={user.kyc_pan_url} alt="PAN Card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--color-green)', color: '#FFF', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: '700' }}>VERIFIED</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Please upload a clear picture of your PAN Card</div>
+              )}
+              <label style={{ cursor: 'pointer', display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+                {kycUploading.pan ? <Loader2 size={14} className="animate-spin" /> : (user?.kyc_pan_url ? 'Update Document' : 'Upload PAN')}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleKycUpload(e, 'pan')} />
+              </label>
+            </div>
+
+            {/* Aadhar Upload */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Aadhar Card Image</div>
+              {user?.kyc_aadhar_url ? (
+                <div style={{ position: 'relative', width: '100%', height: '120px', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+                  <img src={user.kyc_aadhar_url} alt="Aadhar Card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--color-green)', color: '#FFF', fontSize: '10px', padding: '4px 8px', borderRadius: '12px', fontWeight: '700' }}>VERIFIED</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>Please upload a clear picture of your Aadhar Card</div>
+              )}
+              <label style={{ cursor: 'pointer', display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+                {kycUploading.aadhar ? <Loader2 size={14} className="animate-spin" /> : (user?.kyc_aadhar_url ? 'Update Document' : 'Upload Aadhar')}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleKycUpload(e, 'aadhar')} />
+              </label>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const Card = ({ title, desc, icon: Icon, color }) => (
     <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
       {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
@@ -131,6 +240,9 @@ export default function ClientDataView() {
           ADD FUNDS TO START TRADING
         </button>
       </div>
+
+      <PersonalDetailsSection />
+
 
       {/* Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>

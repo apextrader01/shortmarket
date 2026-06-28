@@ -521,6 +521,42 @@ export const useStore = create(persist((set, get) => ({
     } catch (err) { return { success: false, error: err.message }; }
   },
 
+  updateUserDetails: async (details) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(details)
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
+  updateKycDocuments: async (kycDocs) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(kycDocs)
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
     const { token } = get();

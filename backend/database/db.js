@@ -29,6 +29,11 @@ async function initSchema() {
         table.string('reset_otp');
         table.datetime('reset_otp_expires');
         table.string('profile_picture_url');
+        table.string('phone');
+        table.string('pan_card');
+        table.string('aadhar_number');
+        table.string('kyc_pan_url');
+        table.string('kyc_aadhar_url');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -49,6 +54,18 @@ async function initSchema() {
           table.string('profile_picture_url');
         });
         console.log('Added profile_picture_url to users table');
+      }
+
+      const hasPhone = await db.schema.hasColumn('users', 'phone');
+      if (!hasPhone) {
+        await db.schema.alterTable('users', table => {
+          table.string('phone');
+          table.string('pan_card');
+          table.string('aadhar_number');
+          table.string('kyc_pan_url');
+          table.string('kyc_aadhar_url');
+        });
+        console.log('Added client details and KYC columns to users table');
       }
     }
 
