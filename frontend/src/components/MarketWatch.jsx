@@ -51,12 +51,6 @@ export default function MarketWatch() {
 
   return (
     <div className="sidebar">
-      <div className="logo-container">
-        <div className="logo-text">
-          SH<span>O</span>RT MARKET
-        </div>
-      </div>
-
       {/* Watchlist Tabs */}
       <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', padding: '0 8px', background: 'var(--bg-panel)' }} className="scrollbar-hide">
         {watchlists.map(w => (

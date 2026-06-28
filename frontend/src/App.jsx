@@ -6,6 +6,7 @@ import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
 import MutualFundsView from './components/MutualFundsView';
+import ClientDataView from './components/ClientDataView';
 import OrderModal from './components/OrderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
@@ -72,9 +73,9 @@ function App() {
         <header className="topbar">
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h2 style={{ letterSpacing: '0.5px', fontSize: '14px', fontWeight: '800', marginRight: '4px' }}>
-              DASHBOARD
-            </h2>
+            <div className="logo-text" style={{ fontSize: '15px', marginRight: '12px' }}>
+              SH<span>O</span>RT MARKET
+            </div>
 
             <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
               {TOP_INDICES.map((idx) => {
@@ -120,13 +121,15 @@ function App() {
               display: 'flex', alignItems: 'center', gap: '4px',
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
-              {['Markets', 'Options', 'Portfolio', 'MutualFunds', 'Orders', 'Positions'].map((tab) => (
+              {['Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data'].map((tab) => {
+                const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
+                return (
                 <div
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => setActiveTab(tabKey)}
                   style={{
-                    color:        activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    borderBottom: activeTab === tab
+                    color:        activeTab === tabKey ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    borderBottom: activeTab === tabKey
                       ? '2px solid var(--color-blue)'
                       : '2px solid transparent',
                     padding:        '16px 2px',
@@ -136,9 +139,9 @@ function App() {
                     letterSpacing:  '0.5px',
                   }}
                 >
-                  {tab === 'MutualFunds' ? 'MUTUAL FUNDS' : tab}
+                  {tab}
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* Margin */}
@@ -211,6 +214,11 @@ function App() {
           {activeTab === 'Orders' && <OrdersView />}
           {activeTab === 'Positions' && <PositionsView />}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
+          {activeTab === 'ClientData' && (
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+              <ClientDataView />
+            </div>
+          )}
         </main>
       </div>
 
