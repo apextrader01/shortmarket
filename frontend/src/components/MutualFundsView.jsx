@@ -160,7 +160,7 @@ export default function MutualFundsView() {
             </div>
         )}
 
-        <div className="glass-panel" style={{ overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>

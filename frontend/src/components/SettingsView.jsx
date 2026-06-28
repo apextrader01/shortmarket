@@ -46,7 +46,7 @@ export default function SettingsView() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      <div className="settings-grid">
         
         {/* Profile Card */}
         <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>

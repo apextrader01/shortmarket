@@ -97,7 +97,7 @@ export default function PortfolioView() {
 
         {/* Portfolio Breakup */}
         <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Portfolio Breakup</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        <div className="portfolio-grid">
           
           {/* Chart Section */}
           <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
@@ -173,7 +173,7 @@ export default function PortfolioView() {
             </div>
           </div>
           
-          <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
