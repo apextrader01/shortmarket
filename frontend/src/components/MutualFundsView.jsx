@@ -10,6 +10,7 @@ export default function MutualFundsView() {
   const [selectedFund, setSelectedFund] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [page, setPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
   const searchIdRef = useRef(0); // Track latest search to prevent race conditions
 
   const ITEMS_PER_PAGE = 50;
@@ -46,11 +47,34 @@ export default function MutualFundsView() {
   const tabs = ['All', 'Equity', 'Debt', 'Hybrid'];
 
   const filteredFunds = mutualFunds.filter(fund => {
-    return activeTab === 'All' || fund.category.includes(activeTab);
+    return activeTab === 'All' || (fund.category && fund.category.toLowerCase().includes(activeTab.toLowerCase()));
   });
 
-  const totalPages = Math.ceil(filteredFunds.length / ITEMS_PER_PAGE);
-  const paginatedFunds = filteredFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const sortedFunds = [...filteredFunds].sort((a, b) => {
+      if (!sortConfig.key) return 0;
+      
+      const valA = a[sortConfig.key] || -9999;
+      const valB = b[sortConfig.key] || -9999;
+      
+      if (valA < valB) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (valA > valB) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+  });
+
+  const totalPages = Math.ceil(sortedFunds.length / ITEMS_PER_PAGE);
+  const paginatedFunds = sortedFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const handleSort = (key) => {
+      let direction = 'desc';
+      if (sortConfig.key === key && sortConfig.direction === 'desc') {
+          direction = 'asc';
+      }
+      setSortConfig({ key, direction });
+  };
 
   const enrichFundsBatch = useStore(state => state.enrichFundsBatch);
 
@@ -106,9 +130,9 @@ export default function MutualFundsView() {
         </div>
 
         {/* Results count */}
-        {filteredFunds.length > 0 && (
+        {sortedFunds.length > 0 && (
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filteredFunds.length)} of {filteredFunds.length} funds
+                Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, sortedFunds.length)} of {sortedFunds.length} funds
                 {activeTab !== 'All' && ` (${activeTab})`}
             </div>
         )}
@@ -121,9 +145,15 @@ export default function MutualFundsView() {
                         <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
                         <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
                         <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>NAV</th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>1Y Return</th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>3Y Return</th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>5Y Return</th>
+                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return1y')}>
+                            1Y Return {sortConfig.key === 'return1y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                        </th>
+                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return3y')}>
+                            3Y Return {sortConfig.key === 'return3y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                        </th>
+                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
+                            5Y Return {sortConfig.key === 'return5y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                        </th>
                         <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Action</th>
                     </tr>
                 </thead>
