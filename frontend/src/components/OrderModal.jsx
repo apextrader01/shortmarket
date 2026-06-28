@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { X, Maximize2, Info } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user } = useStore();
+  const { orderModal, closeOrderModal, prices, user, restrictedStocks } = useStore();
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
@@ -13,6 +13,7 @@ export default function OrderModal() {
   const [showSlTgt, setShowSlTgt] = useState(false);
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
+  const [showCautionPopup, setShowCautionPopup] = useState(false);
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
@@ -33,12 +34,22 @@ export default function OrderModal() {
 
   const balanceNum = Number(user?.balance) || 0;
   const totalQuantity = quantity * (orderModal.lotsize || 1);
-  const requiredMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
+  const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0; // 4x Leverage for Intraday
+  const requiredMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0)) * leverageMultiplier;
   const isInsufficient = balanceNum < requiredMargin;
+
+  const isRestricted = restrictedStocks.includes(symbol);
+  const isIntradayBlocked = isRestricted && productType === 'INT';
 
   const isBuy = side === 'BUY';
 
   const handlePlaceOrder = async () => {
+    if (isIntradayBlocked) return;
+    if (isRestricted && !showCautionPopup) {
+       setShowCautionPopup(true);
+       return;
+    }
+
     const payload = {
       symbol,
       type: orderType,
@@ -47,7 +58,8 @@ export default function OrderModal() {
       price: orderType === 'MARKET' ? null : parseFloat(price),
       sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
       tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
-      margin: requiredMargin // Backend will deduct this
+      margin: requiredMargin, // Backend will deduct this
+      product_type: productType
     };
 
     const success = await useStore.getState().placeOrder(payload);
@@ -220,12 +232,12 @@ export default function OrderModal() {
           </div>
           <button 
             onClick={handlePlaceOrder}
-            disabled={isInsufficient}
+            disabled={isInsufficient || isIntradayBlocked}
             style={{ 
-              background: isInsufficient ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-              color: isInsufficient ? 'var(--text-secondary)' : '#fff', 
+              background: (isInsufficient || isIntradayBlocked) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
+              color: (isInsufficient || isIntradayBlocked) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: isInsufficient ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
             }}
           >
             PLACE {isBuy ? 'BUY' : 'SELL'} ORDER
@@ -233,6 +245,41 @@ export default function OrderModal() {
         </div>
 
       </div>
+
+      {/* Block Intraday Overlay inside Modal */}
+      {isIntradayBlocked && (
+         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+            <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '380px', textAlign: 'center' }}>
+               <X size={48} style={{ color: 'var(--color-red)', marginBottom: '16px' }} />
+               <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Intraday Unavailable</h3>
+               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Intraday trading is not available in {symbol.split('-')[0]}</p>
+               <button onClick={() => setProductType('DEL')} style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '4px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Switch to Delivery</button>
+            </div>
+         </div>
+      )}
+
+      {/* Caution Popup for Restricted Stocks in Delivery */}
+      {showCautionPopup && (
+         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
+            <div style={{ background: 'var(--bg-dark)', padding: '24px', borderRadius: '8px', border: '1px solid var(--color-red)', width: '420px' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--color-red)' }}>
+                  <div style={{ background: 'var(--color-red)', color: 'white', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px' }}>!</div>
+                  <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Caution</h3>
+               </div>
+               <p style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '12px' }}>Security is under the following list of cautions:</p>
+               <ul style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingLeft: '20px', marginBottom: '16px' }}>
+                  <li style={{ marginBottom: '8px' }}>Security is under Gross settlement (Trade for Trade)</li>
+                  <li>The company is in BZ/SZ series due to non compliance with SEBI SOP Circular</li>
+               </ul>
+               <div style={{ fontSize: '13px', color: 'var(--color-blue)', cursor: 'pointer', marginBottom: '20px' }}>KNOW MORE</div>
+               <p style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '20px' }}>Would you like to continue?</p>
+               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowCautionPopup(false)} style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>NO</button>
+                  <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
+               </div>
+            </div>
+         </div>
+      )}
     </div>
   );
 }

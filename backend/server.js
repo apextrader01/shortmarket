@@ -238,6 +238,66 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── Convert Position (INT <-> DEL) ───────────────────────────────────────
+app.post('/api/position/convert', authenticateToken, async (req, res) => {
+  const { positionId, newProductType, requiredMargin } = req.body;
+  if (!positionId || !newProductType) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  try {
+    await db.transaction(async (trx) => {
+      const position = await trx('positions').where({ id: positionId, user_id: req.user.id }).first();
+      if (!position) return res.status(404).json({ error: 'Position not found' });
+      if (position.product_type === newProductType) {
+        return res.status(400).json({ error: 'Position is already in the requested product type' });
+      }
+
+      // If converting INT -> DEL, we must charge the remaining margin
+      if (position.product_type === 'INT' && newProductType === 'DEL') {
+        const user = await trx('users').where({ id: req.user.id }).first();
+        if (parseFloat(user.balance) < requiredMargin) {
+          throw new Error('Insufficient Funds to convert to Delivery');
+        }
+        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - requiredMargin });
+      }
+
+      // If converting DEL -> INT, we refund the 3x margin
+      if (position.product_type === 'DEL' && newProductType === 'INT') {
+        const user = await trx('users').where({ id: req.user.id }).first();
+        const refund = requiredMargin; // the frontend passes the amount to refund
+        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refund });
+      }
+
+      // Update position product type
+      await trx('positions').where({ id: positionId }).update({ product_type: newProductType });
+      
+      // Try to merge positions if there's already an existing position for the same symbol + product_type
+      const existingPos = await trx('positions').where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType }).whereNot('id', positionId).first();
+      if (existingPos) {
+        // Merge them
+        const newQty = existingPos.quantity + position.quantity;
+        const newAvg = ((existingPos.quantity * parseFloat(existingPos.average_price)) + (position.quantity * parseFloat(position.average_price))) / newQty;
+        await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvg });
+        await trx('positions').where({ id: positionId }).del();
+      }
+      
+      res.json({ success: true });
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── Restricted Stocks ────────────────────────────────────────────────────
+let restrictedStocksCache = [];
+app.get('/api/restricted-stocks', async (req, res) => {
+  res.json(restrictedStocksCache);
+});
+app.setRestrictedStocksCache = (list) => {
+  restrictedStocksCache = list;
+};
 // ─── Option Chain ───────────────────────────────────────────────────────────
 let cachedOptionsData = null;
 let lastOptionsReadTime = 0;
@@ -281,7 +341,7 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 
 // ─── Place Order ─────────────────────────────────────────────────────────
 app.post('/api/order', authenticateToken, async (req, res) => {
-  const { symbol, type, side, quantity, price, sl_price, tgt_price, margin } = req.body;
+  const { symbol, type, side, quantity, price, sl_price, tgt_price, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -290,7 +350,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // 1. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: price || null,
-        sl_price: sl_price || null, tgt_price: tgt_price || null
+        sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL'
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 
@@ -443,6 +503,12 @@ server.listen(PORT, '0.0.0.0', async () => {
   } else {
       await loginAngelOne(io, priceCache);
   }
+  
+  // Start Cron Jobs
+  const { initAutoSquareOff } = require('./services/autoSquareOff');
+  const { initRiskyStocksSync } = require('./services/riskyStocksSync');
+  initAutoSquareOff();
+  initRiskyStocksSync();
 });
 
 module.exports = { io, priceCache };

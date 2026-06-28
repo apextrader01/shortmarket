@@ -366,7 +366,33 @@ export const useStore = create(persist((set, get) => ({
         get().fetchBatchPrices(posSymbols);
         posSymbols.forEach(sym => socket.emit('subscribe', sym));
       }
+      
+      // Also fetch restricted stocks on load
+      get().fetchRestrictedStocks();
     } catch (_) {}
+  },
+  
+  restrictedStocks: [],
+  fetchRestrictedStocks: async () => {
+      try {
+          const res = await fetch(`${API}/api/restricted-stocks`);
+          const data = await res.json();
+          if (Array.isArray(data)) set({ restrictedStocks: data });
+      } catch (_) {}
+  },
+
+  convertPosition: async (positionId, newProductType, requiredMargin) => {
+      const { token } = get();
+      try {
+          const res = await fetch(`${API}/api/position/convert`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ positionId, newProductType, requiredMargin }),
+          });
+          const data = await res.json();
+          if (data.success) { get().fetchUserData(); return { success: true }; }
+          return { success: false, error: data.error };
+      } catch (err) { return { success: false, error: err.message }; }
   },
 
   // ── Orders ───────────────────────────────────────────────────────────────────

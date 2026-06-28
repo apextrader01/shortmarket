@@ -38,10 +38,12 @@ export default function PositionsView() {
           <thead>
             <tr>
               <th>Instrument</th>
+              <th>Type</th>
               <th style={{ textAlign: 'right' }}>Qty.</th>
               <th style={{ textAlign: 'right' }}>Avg. Price</th>
               <th style={{ textAlign: 'right' }}>LTP</th>
               <th style={{ textAlign: 'right' }}>P&L</th>
+              <th style={{ textAlign: 'center' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -60,6 +62,13 @@ export default function PositionsView() {
               return (
                 <tr key={pos.id || pos.symbol}>
                   <td style={{ fontWeight: '600' }}>{pos.symbol}</td>
+                  <td>
+                    <span style={{ 
+                      background: pos.product_type === 'INT' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                      color: pos.product_type === 'INT' ? '#fef08a' : 'var(--color-green-light)',
+                      padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
+                    }}>{pos.product_type || 'DEL'}</span>
+                  </td>
                   <td style={{ textAlign: 'right' }}>{qty}</td>
                   <td style={{ textAlign: 'right' }}>₹{avg.toFixed(2)}</td>
                   <td style={{ textAlign: 'right', fontWeight: '600' }}>{ltp > 0 ? `₹${ltp.toFixed(2)}` : '—'}</td>
@@ -69,6 +78,29 @@ export default function PositionsView() {
                     color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)'
                   }}>
                     {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button 
+                      onClick={async () => {
+                        const isInt = pos.product_type === 'INT';
+                        const newType = isInt ? 'DEL' : 'INT';
+                        // if INT -> DEL, user needs to pay remaining 75% margin. If DEL -> INT, user gets 75% margin back.
+                        const requiredMargin = avg * Math.abs(qty) * 0.75;
+                        const confirmMsg = isInt 
+                           ? `Convert to Delivery? This requires ₹${requiredMargin.toFixed(2)} available cash.` 
+                           : `Convert to Intraday? This will free up ₹${requiredMargin.toFixed(2)} cash.`;
+                        if (window.confirm(confirmMsg)) {
+                           const res = await useStore.getState().convertPosition(pos.id, newType, requiredMargin);
+                           if (!res.success) alert(res.error);
+                        }
+                      }}
+                      style={{ 
+                        background: 'transparent', color: 'var(--color-blue)', border: '1px solid var(--color-blue)', 
+                        padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' 
+                      }}
+                    >
+                      Convert to {pos.product_type === 'INT' ? 'DEL' : 'INT'}
+                    </button>
                   </td>
                 </tr>
               );

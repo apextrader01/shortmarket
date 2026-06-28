@@ -52,9 +52,18 @@ async function initSchema() {
         table.string('symbol').notNullable();
         table.integer('quantity').notNullable().defaultTo(0);
         table.decimal('average_price', 14, 2).notNullable();
+        table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.timestamps(true, true);
       });
       console.log('Created positions table');
+    } else {
+      const hasProductType = await db.schema.hasColumn('positions', 'product_type');
+      if (!hasProductType) {
+        await db.schema.alterTable('positions', table => {
+          table.string('product_type').notNullable().defaultTo('DEL');
+        });
+        console.log('Added product_type to positions table');
+      }
     }
 
     // 3. Orders Table
@@ -66,6 +75,7 @@ async function initSchema() {
         table.string('symbol').notNullable();
         table.string('type').notNullable(); // MARKET, LIMIT
         table.string('side').notNullable(); // BUY, SELL
+        table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.integer('quantity').notNullable();
         table.decimal('price', 14, 2); // Nullable for MARKET orders
         table.string('status').notNullable().defaultTo('PENDING'); // PENDING, EXECUTED, CANCELLED, REJECTED
@@ -74,6 +84,14 @@ async function initSchema() {
         table.timestamps(true, true);
       });
       console.log('Created orders table');
+    } else {
+      const hasProductType = await db.schema.hasColumn('orders', 'product_type');
+      if (!hasProductType) {
+        await db.schema.alterTable('orders', table => {
+          table.string('product_type').notNullable().defaultTo('DEL');
+        });
+        console.log('Added product_type to orders table');
+      }
     }
 
     // Check if we need to migrate existing better-sqlite3 data?
