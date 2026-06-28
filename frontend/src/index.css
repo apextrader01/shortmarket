@@ -157,8 +157,9 @@ h1, h2, h3, h4, h5, h6 {
   .dashboard-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
-    height: auto;
-    overflow-y: visible;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px;
   }
 }

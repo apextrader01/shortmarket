@@ -85,7 +85,7 @@ export default function MutualFundsView() {
   }, [paginatedFunds, enrichFundsBatch]);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
 
       {/* Main Navigation (Explore, Dashboard, etc) */}
       <div style={{ padding: '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>

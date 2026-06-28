@@ -74,7 +74,7 @@ const OptionChainView = () => {
   const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a] text-gray-200">
+    <div className="flex flex-col h-full bg-[#0a0a0a] text-gray-200 min-h-0 min-w-0">
       {/* Header Controls */}
       <div className="p-4 border-b border-[#222] flex gap-4 items-center bg-[#111]">
         <select 
