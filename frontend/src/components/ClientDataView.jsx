@@ -220,7 +220,7 @@ export default function ClientDataView({ onDepositClick }) {
               Client ID: {user?.id}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
-              Available Margin: ₹{user?.available_margin ? parseFloat(user.available_margin).toFixed(2) : '0.00'}
+              Available Margin: ₹{(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
