@@ -5,6 +5,7 @@ import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds } = useStore();
+  const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedFund, setSelectedFund] = useState(null);
@@ -39,6 +40,7 @@ export default function MutualFundsView() {
       e.preventDefault();
   };
 
+  const mainTabs = ['Explore', 'Dashboard', 'SIPs', 'Watchlist'];
   const tabs = ['All', 'Equity', 'Debt', 'Hybrid'];
 
   const filteredFunds = mutualFunds.filter(fund => {
@@ -84,30 +86,31 @@ export default function MutualFundsView() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
-      {/* Sub Navigation */}
-      <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
-        {tabs.map(tab => (
-          <div
-            key={tab}
-            onClick={() => { setActiveTab(tab); setPage(1); }}
-            style={{
-              padding: '16px 4px',
-              fontSize: '13px',
-              fontWeight: activeTab === tab ? '600' : '500',
-              color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {tab}
-          </div>
-        ))}
-      </div>
 
-      <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Explore 10,000+ Mutual Funds</h2>
+      {/* Main Navigation (Explore, Dashboard, etc) */}
+      <div style={{ padding: '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '32px' }}>
+                {mainTabs.map(tab => (
+                  <div
+                    key={tab}
+                    onClick={() => setMainTab(tab)}
+                    style={{
+                      padding: '0 4px 16px 4px',
+                      fontSize: '18px',
+                      fontWeight: mainTab === tab ? '700' : '600',
+                      color: mainTab === tab ? '#E2E8F0' : 'var(--text-secondary)',
+                      borderBottom: mainTab === tab ? '3px solid #E2E8F0' : '3px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      position: 'relative',
+                      top: '1px' // Cover the border bottom
+                    }}
+                  >
+                    {tab}
+                  </div>
+                ))}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 12px' }}>
                     <Search size={14} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
@@ -123,6 +126,31 @@ export default function MutualFundsView() {
                 </form>
             </div>
         </div>
+
+        {mainTab === 'Explore' ? (
+          <>
+            {/* Sub Navigation for Explore (All, Equity, Debt, Hybrid) */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+              {tabs.map(tab => (
+                <div
+                  key={tab}
+                  onClick={() => { setActiveTab(tab); setPage(1); }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    background: activeTab === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: activeTab === tab ? '#FFF' : 'var(--text-secondary)',
+                    border: activeTab === tab ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-color)',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {tab}
+                </div>
+              ))}
+            </div>
 
         {/* Results count */}
         {sortedFunds.length > 0 && (
@@ -227,27 +255,34 @@ export default function MutualFundsView() {
                 </tbody>
             </table>
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && !isSearching && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
+        
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
                 <button 
-                    onClick={() => setPage(p => Math.max(1, p - 1))} 
                     disabled={page === 1}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: page === 1 ? 'var(--text-secondary)' : 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: page === 1 ? 0.5 : 1 }}
+                    onClick={() => setPage(p => p - 1)}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
                 >
-                    ← Previous
+                    Previous
                 </button>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
                 <button 
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
                     disabled={page === totalPages}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: page === totalPages ? 'var(--text-secondary)' : 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: page === totalPages ? 0.5 : 1 }}
+                    onClick={() => setPage(p => p + 1)}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}
                 >
-                    Next →
+                    Next
                 </button>
             </div>
         )}
+        </>
+        ) : (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            This section is currently under development.
+          </div>
+        )}
+
       </div>
       
       {selectedFund && <MutualFundDetailsModal fund={selectedFund} onClose={() => setSelectedFund(null)} />}
