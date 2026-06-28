@@ -55,12 +55,18 @@ export default function StockDetails({ symbol, price, candles }) {
 
   const renderOverview = () => {
     if (loading) return <div style={{ padding: '20px', color: '#94A3B8' }}>Loading detailed data...</div>;
-    if (!details || details.error) return <div style={{ padding: '20px', color: '#94A3B8' }}>Details not available for this stock.</div>;
+    if (!details) return <div style={{ padding: '20px', color: '#94A3B8' }}>Details not available for this stock.</div>;
+    if (details.error) return <div style={{ padding: '20px', color: '#EF5350' }}>Error: {details.error} - {details.details}</div>;
 
-    const summary = details.summaryDetail || {};
-    const keyStats = details.defaultKeyStatistics || {};
-    const profile = details.assetProfile || {};
-    const holders = details.majorHoldersBreakdown || {};
+    const stats = details.stats || {};
+    const header = details.header || {};
+    const profile = details.details || {};
+    const holders = details.shareHoldingPattern || {};
+    
+    // Fallbacks if price is missing from AngelOne
+    const livePrice = price?.ltp || details.priceData?.ltp || 0;
+    const l = price?.low || details.priceData?.low || 0;
+    const h = price?.high || details.priceData?.high || 0;
 
     const formatNum = (num) => num ? (num >= 1e7 ? (num / 1e7).toFixed(2) + ' Cr' : num.toLocaleString('en-IN')) : '-';
     
@@ -74,13 +80,13 @@ export default function StockDetails({ symbol, price, candles }) {
             <div className="glass-panel" style={{ padding: '12px' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8' }}>Today's Low / High</div>
               <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {price?.low ? `₹${price.low.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {price?.high ? `₹${price.high.toFixed(2)}` : '-'}
+                {l ? `₹${l.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {h ? `₹${h.toFixed(2)}` : '-'}
               </div>
             </div>
             <div className="glass-panel" style={{ padding: '12px' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8' }}>52 Week Low / High</div>
               <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {summary.fiftyTwoWeekLow ? `₹${summary.fiftyTwoWeekLow.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {summary.fiftyTwoWeekHigh ? `₹${summary.fiftyTwoWeekHigh.toFixed(2)}` : '-'}
+                {details.priceData?.low52w ? `₹${details.priceData.low52w.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {details.priceData?.high52w ? `₹${details.priceData.high52w.toFixed(2)}` : '-'}
               </div>
             </div>
             <div className="glass-panel" style={{ padding: '12px' }}>
@@ -91,7 +97,7 @@ export default function StockDetails({ symbol, price, candles }) {
             </div>
             <div className="glass-panel" style={{ padding: '12px' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8' }}>Volume</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(summary.volume || price?.volume)}</div>
+              <div style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(details.priceData?.volume || price?.volume)}</div>
             </div>
           </div>
         </div>
@@ -101,14 +107,16 @@ export default function StockDetails({ symbol, price, candles }) {
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Fundamentals</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
             {[
-              ['Market Cap', formatNum(summary.marketCap)],
-              ['P/E Ratio (TTM)', summary.trailingPE?.toFixed(2) || '-'],
-              ['P/B Ratio', keyStats.priceToBook?.toFixed(2) || '-'],
-              ['Industry P/E', '-'],
-              ['ROE', details.financialData?.returnOnEquity ? (details.financialData.returnOnEquity * 100).toFixed(2) + '%' : '-'],
-              ['EPS (TTM)', keyStats.trailingEps?.toFixed(2) || '-'],
-              ['Dividend Yield', summary.dividendYield ? (summary.dividendYield * 100).toFixed(2) + '%' : '-'],
-              ['Book Value', keyStats.bookValue?.toFixed(2) || '-'],
+              ['Market Cap', formatNum(stats.marketCap)],
+              ['P/E Ratio (TTM)', stats.peRatio?.toFixed(2) || '-'],
+              ['P/B Ratio', stats.pbRatio?.toFixed(2) || '-'],
+              ['Industry P/E', stats.industryPe?.toFixed(2) || '-'],
+              ['Debt to Equity', stats.debtToEquity?.toFixed(2) || '-'],
+              ['ROE', stats.roe ? stats.roe.toFixed(2) + '%' : '-'],
+              ['EPS (TTM)', stats.epsTtm?.toFixed(2) || '-'],
+              ['Dividend Yield', stats.divYield ? stats.divYield.toFixed(2) + '%' : '-'],
+              ['Book Value', stats.bookValue?.toFixed(2) || '-'],
+              ['Face Value', stats.faceValue || '-'],
             ].map(([lbl, val]) => (
               <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
                 <span style={{ color: '#94A3B8', fontSize: '12px' }}>{lbl}</span>
@@ -122,40 +130,47 @@ export default function StockDetails({ symbol, price, candles }) {
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>About Company</h4>
           <p style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: '1.6', marginBottom: '16px', opacity: 0.9 }}>
-            {profile.longBusinessSummary ? profile.longBusinessSummary.substring(0, 300) + '...' : 'No description available.'}
+            {profile.businessSummary ? profile.businessSummary.substring(0, 300) + '...' : 'No description available.'}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div className="glass-panel" style={{ padding: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Sector</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.sector || '-'}</div>
+              <div style={{ fontSize: '10px', color: '#94A3B8' }}>MD/CEO</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.managingDirector || profile.ceo || '-'}</div>
+            </div>
+            <div className="glass-panel" style={{ padding: '10px' }}>
+              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Founded</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.foundedYear || '-'}</div>
+            </div>
+            <div className="glass-panel" style={{ padding: '10px' }}>
+              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Symbol</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.nseScriptCode || header.bseScriptCode || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
               <div style={{ fontSize: '10px', color: '#94A3B8' }}>Industry</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.industry || '-'}</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.industryName || '-'}</div>
             </div>
           </div>
         </div>
 
         {/* Shareholding Pattern */}
-        <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Shareholding Pattern</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {[
-              ['Insiders / Promoters', holders.insidersPercentHeld],
-              ['Institutions', holders.institutionsPercentHeld],
-            ].map(([lbl, val]) => val ? (
-              <div key={lbl}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                  <span>{lbl}</span>
-                  <span style={{ fontWeight: '700' }}>{(val * 100).toFixed(2)}%</span>
+        {holders && holders.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Shareholding Pattern</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {holders[0].shareHoldings.map((h) => (
+                <div key={h.key}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                    <span>{h.key}</span>
+                    <span style={{ fontWeight: '700' }}>{(h.value).toFixed(2)}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
+                    <div style={{ width: `${h.value}%`, height: '100%', background: '#60A5FA', borderRadius: '3px' }} />
+                  </div>
                 </div>
-                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
-                  <div style={{ width: `${val * 100}%`, height: '100%', background: '#60A5FA', borderRadius: '3px' }} />
-                </div>
-              </div>
-            ) : null)}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     );
