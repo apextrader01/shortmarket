@@ -290,30 +290,146 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
   }
 });
 
-// ── MUTUAL FUNDS ─────────────────────────────────────────────────────────────
-app.get('/api/mutual-funds', async (req, res) => {
-    // 15 curated Mutual Funds (No historical data needed)
-    const mutualFunds = [
-        // Equity
-        { id: 'MF001', name: 'Parag Parikh Flexi Cap Fund', amc: 'PPFAS', category: 'Equity - Flexi Cap', risk: 'Very High', nav: 78.45, return1y: 28.5, return3y: 22.1, return5y: 19.8 },
-        { id: 'MF002', name: 'Quant Small Cap Fund', amc: 'Quant', category: 'Equity - Small Cap', risk: 'Very High', nav: 215.30, return1y: 52.4, return3y: 35.6, return5y: 28.2 },
-        { id: 'MF003', name: 'HDFC Index Fund Nifty 50 Plan', amc: 'HDFC', category: 'Equity - Index', risk: 'Very High', nav: 210.15, return1y: 26.2, return3y: 15.4, return5y: 14.8 },
-        { id: 'MF004', name: 'Mirae Asset Large Cap Fund', amc: 'Mirae Asset', category: 'Equity - Large Cap', risk: 'Very High', nav: 98.60, return1y: 24.1, return3y: 16.8, return5y: 15.2 },
-        { id: 'MF005', name: 'Axis Midcap Fund', amc: 'Axis', category: 'Equity - Mid Cap', risk: 'Very High', nav: 85.20, return1y: 32.5, return3y: 21.4, return5y: 18.6 },
-        { id: 'MF006', name: 'SBI Small Cap Fund', amc: 'SBI', category: 'Equity - Small Cap', risk: 'Very High', nav: 145.80, return1y: 38.2, return3y: 29.1, return5y: 26.4 },
-        { id: 'MF007', name: 'Kotak Emerging Equity Fund', amc: 'Kotak', category: 'Equity - Mid Cap', risk: 'Very High', nav: 110.25, return1y: 30.5, return3y: 22.8, return5y: 19.5 },
-        // Debt
-        { id: 'MF008', name: 'Nippon India Liquid Fund', amc: 'Nippon', category: 'Debt - Liquid', risk: 'Low', nav: 5620.40, return1y: 7.2, return3y: 6.5, return5y: 6.1 },
-        { id: 'MF009', name: 'ICICI Prudential Corporate Bond Fund', amc: 'ICICI Pru', category: 'Debt - Corporate Bond', risk: 'Moderate', nav: 38.45, return1y: 8.1, return3y: 7.4, return5y: 7.0 },
-        { id: 'MF010', name: 'HDFC Short Term Debt Fund', amc: 'HDFC', category: 'Debt - Short Term', risk: 'Moderate', nav: 28.90, return1y: 7.8, return3y: 6.9, return5y: 7.2 },
-        { id: 'MF011', name: 'SBI Magnum Gilt Fund', amc: 'SBI', category: 'Debt - Gilt', risk: 'Moderate', nav: 62.15, return1y: 8.5, return3y: 7.1, return5y: 7.5 },
-        { id: 'MF012', name: 'Aditya Birla Sun Life Liquid Fund', amc: 'Aditya Birla', category: 'Debt - Liquid', risk: 'Low', nav: 365.40, return1y: 7.1, return3y: 6.4, return5y: 6.0 },
-        // Hybrid
-        { id: 'MF013', name: 'SBI Equity Hybrid Fund', amc: 'SBI', category: 'Hybrid - Aggressive', risk: 'High', nav: 245.80, return1y: 21.3, return3y: 14.2, return5y: 13.5 },
-        { id: 'MF014', name: 'ICICI Prudential Balanced Advantage', amc: 'ICICI Pru', category: 'Hybrid - Dynamic', risk: 'Moderate', nav: 65.30, return1y: 18.5, return3y: 13.1, return5y: 12.8 },
-        { id: 'MF015', name: 'HDFC Balanced Advantage Fund', amc: 'HDFC', category: 'Hybrid - Dynamic', risk: 'High', nav: 420.60, return1y: 22.1, return3y: 16.5, return5y: 14.2 }
-    ];
-    res.json(mutualFunds);
+// ── MUTUAL FUNDS ENGINE ───────────────────────────────────────────────────────
+const fetch = require('node-fetch');
+
+// 1. Master List Cache
+let allMutualFunds = [];
+
+// Initialize by fetching all 10,000+ funds from mfapi.in
+async function initMutualFundsList() {
+    try {
+        console.log('🔄 Fetching master list of all Mutual Funds from mfapi.in...');
+        const res = await fetch('https://api.mfapi.in/mf');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            allMutualFunds = data;
+            console.log(`✅ Loaded ${allMutualFunds.length} mutual funds into memory.`);
+        }
+    } catch (err) {
+        console.error('❌ Failed to fetch mutual funds master list:', err.message);
+    }
+}
+initMutualFundsList();
+
+// Helper to calculate CAGR
+function calculateReturn(historicalData, years) {
+    if (!historicalData || historicalData.length === 0) return null;
+    const latestNav = parseFloat(historicalData[0].nav);
+    
+    // Find the NAV from `years` ago
+    const targetDate = new Date();
+    targetDate.setFullYear(targetDate.getFullYear() - years);
+    
+    // Data is sorted descending (latest first)
+    let pastNavObj = null;
+    for (let i = 0; i < historicalData.length; i++) {
+        const [dd, mm, yyyy] = historicalData[i].date.split('-');
+        const itemDate = new Date(`${yyyy}-${mm}-${dd}`);
+        if (itemDate <= targetDate) {
+            pastNavObj = historicalData[i];
+            break;
+        }
+    }
+
+    if (!pastNavObj) return null; // Not enough history
+    
+    const pastNav = parseFloat(pastNavObj.nav);
+    const cagr = (Math.pow((latestNav / pastNav), (1 / years)) - 1) * 100;
+    return parseFloat(cagr.toFixed(2));
+}
+
+function determineRisk(return1y) {
+    if (return1y === null) return 'Moderate';
+    if (return1y > 25) return 'Very High';
+    if (return1y > 15) return 'High';
+    if (return1y > 8) return 'Moderate';
+    return 'Low';
+}
+
+const mfCache = {};
+
+// 2. Search & Enrich Endpoint
+app.get('/api/mf/search', async (req, res) => {
+    try {
+        const query = (req.query.q || '').toLowerCase();
+        if (!query || query.length < 3) {
+            return res.json([]);
+        }
+
+        // Find up to 10 matches
+        const matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query)).slice(0, 10);
+        
+        // Enrich with NAV and returns concurrently
+        const enrichedMatches = await Promise.all(matches.map(async (fund) => {
+            const schemeCode = fund.schemeCode;
+            let data = null;
+
+            if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
+                data = mfCache[schemeCode].data;
+            } else {
+                const response = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+                data = await response.json();
+                mfCache[schemeCode] = { timestamp: Date.now(), data };
+            }
+
+            if (!data || !data.data || data.data.length === 0) {
+                return null;
+            }
+
+            const historicalData = data.data; // Descending
+            const latestNav = parseFloat(historicalData[0].nav);
+            const return1y = calculateReturn(historicalData, 1);
+            const return3y = calculateReturn(historicalData, 3);
+            const return5y = calculateReturn(historicalData, 5);
+            const risk = determineRisk(return1y);
+
+            // Determine category rough estimation based on name
+            let category = 'Equity';
+            if (fund.schemeName.toLowerCase().includes('debt') || fund.schemeName.toLowerCase().includes('liquid') || fund.schemeName.toLowerCase().includes('bond')) category = 'Debt';
+            if (fund.schemeName.toLowerCase().includes('hybrid') || fund.schemeName.toLowerCase().includes('balanced')) category = 'Hybrid';
+
+            // Extract AMC from first word
+            const amc = fund.schemeName.split(' ')[0];
+
+            return {
+                id: schemeCode,
+                name: fund.schemeName,
+                amc: amc,
+                category: category,
+                risk: risk,
+                nav: latestNav,
+                return1y: return1y !== null ? return1y : 0,
+                return3y: return3y !== null ? return3y : 0,
+                return5y: return5y !== null ? return5y : 0
+            };
+        }));
+
+        res.json(enrichedMatches.filter(Boolean));
+    } catch (err) {
+        console.error('MF Search Error:', err.message);
+        res.status(500).json({ error: 'Failed to search mutual funds' });
+    }
+});
+
+// 3. Historical Data Endpoint (for charts)
+app.get('/api/mf/:schemeCode', async (req, res) => {
+    try {
+        const { schemeCode } = req.params;
+        
+        if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
+            return res.json(mfCache[schemeCode].data);
+        }
+
+        const response = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+        const data = await response.json();
+        
+        mfCache[schemeCode] = { timestamp: Date.now(), data };
+        res.json(data);
+    } catch (err) {
+        console.error('MF History Error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch mutual fund history' });
+    }
 });
 
 // ─── Restricted Stocks ────────────────────────────────────────────────────

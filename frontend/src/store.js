@@ -367,9 +367,10 @@ export const useStore = create(persist((set, get) => ({
         posSymbols.forEach(sym => socket.emit('subscribe', sym));
       }
       
-      // Also fetch restricted stocks and mutual funds on load
+      // Also fetch restricted stocks on load
       get().fetchRestrictedStocks();
-      get().fetchMutualFunds();
+      // Preload initial mutual funds search
+      get().searchMutualFunds('quant');
     } catch (_) {}
   },
   
@@ -383,12 +384,40 @@ export const useStore = create(persist((set, get) => ({
   },
 
   mutualFunds: [],
-  fetchMutualFunds: async () => {
+  searchMutualFunds: async (query) => {
       try {
-          const res = await fetch(`${API}/api/mutual-funds`);
+          const res = await fetch(`${API}/api/mf/search?q=${query}`);
           const data = await res.json();
           if (Array.isArray(data)) set({ mutualFunds: data });
       } catch (_) {}
+  },
+
+  fundHistoryCache: {},
+  fetchFundHistory: async (schemeCode) => {
+      const currentCache = get().fundHistoryCache;
+      if (currentCache[schemeCode]) return currentCache[schemeCode]; // already fetched
+
+      try {
+          const res = await fetch(`${API}/api/mf/${schemeCode}`);
+          const data = await res.json();
+          
+          if (data && data.data) {
+              // mfapi.in returns data.data as an array of { date: "DD-MM-YYYY", nav: "123.45" }
+              // reverse it (descending -> ascending for chart)
+              const historicalData = data.data.reverse().map(item => {
+                  const [dd, mm, yyyy] = item.date.split('-');
+                  return {
+                      time: `${yyyy}-${mm}-${dd}`,
+                      value: parseFloat(item.nav)
+                  };
+              });
+
+              const newCache = { ...currentCache, [schemeCode]: historicalData };
+              set({ fundHistoryCache: newCache });
+              return historicalData;
+          }
+      } catch (_) {}
+      return null;
   },
 
   convertPosition: async (positionId, newProductType, requiredMargin) => {

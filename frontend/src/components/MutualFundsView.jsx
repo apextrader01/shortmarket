@@ -4,17 +4,24 @@ import { Search, Filter, ArrowUpRight, TrendingUp } from 'lucide-react';
 import MutualFundModal from './MutualFundModal';
 
 export default function MutualFundsView() {
-  const { mutualFunds } = useStore();
+  const { mutualFunds, searchMutualFunds } = useStore();
   const [activeTab, setActiveTab] = useState('All'); // All, Equity, Debt, Hybrid
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState('quant'); // default preloaded search
   const [selectedFund, setSelectedFund] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async (e) => {
+      e.preventDefault();
+      if (!search || search.length < 3) return;
+      setIsSearching(true);
+      await searchMutualFunds(search);
+      setIsSearching(false);
+  };
 
   const tabs = ['All', 'Equity', 'Debt', 'Hybrid'];
 
   const filteredFunds = mutualFunds.filter(fund => {
-    const matchesTab = activeTab === 'All' || fund.category.includes(activeTab);
-    const matchesSearch = fund.name.toLowerCase().includes(search.toLowerCase()) || fund.amc.toLowerCase().includes(search.toLowerCase());
-    return matchesTab && matchesSearch;
+    return activeTab === 'All' || fund.category.includes(activeTab);
   });
 
   return (
@@ -42,18 +49,19 @@ export default function MutualFundsView() {
 
       <div style={{ padding: '24px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Explore Mutual Funds</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Explore 10,000+ Mutual Funds</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 12px' }}>
+                <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 12px' }}>
                     <Search size={14} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
                     <input 
                         type="text" 
-                        placeholder="Search funds or AMCs..." 
+                        placeholder="Search any fund..." 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', outline: 'none', width: '200px' }}
                     />
-                </div>
+                    <button type="submit" style={{ display: 'none' }}></button>
+                </form>
                 <button style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
                     <Filter size={14} /> Filter
                 </button>
@@ -116,13 +124,19 @@ export default function MutualFundsView() {
                             </td>
                         </tr>
                     ))}
-                    {filteredFunds.length === 0 && (
+                    {isSearching ? (
                         <tr>
                             <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                No mutual funds found matching your criteria.
+                                Fetching live data...
                             </td>
                         </tr>
-                    )}
+                    ) : filteredFunds.length === 0 ? (
+                        <tr>
+                            <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                No mutual funds found matching your criteria. Try searching for "HDFC" or "SBI".
+                            </td>
+                        </tr>
+                    ) : null}
                 </tbody>
             </table>
         </div>
