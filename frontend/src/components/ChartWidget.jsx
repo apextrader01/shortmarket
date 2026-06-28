@@ -119,7 +119,10 @@ export default function ChartWidget() {
         setHoveredCandle(null);
       } else {
         const data = param.seriesData.get(candleSeriesRef.current);
-        if (data) setHoveredCandle(data);
+        const volData = param.seriesData.get(volumeSeriesRef.current);
+        if (data) {
+          setHoveredCandle({ ...data, volume: volData?.value });
+        }
       }
     });
 
@@ -236,12 +239,15 @@ export default function ChartWidget() {
           {[['O', hoveredCandle?.open ?? price?.open], 
             ['H', hoveredCandle?.high ?? price?.high], 
             ['L', hoveredCandle?.low ?? price?.low], 
-            ['C', hoveredCandle?.close ?? price?.close]]
+            ['C', hoveredCandle?.close ?? price?.close],
+            ['Vol', hoveredCandle?.volume ?? price?.volume]]
             .map(([lbl, val]) =>
             val != null ? (
               <span key={lbl}>
                 <span style={{ color: '#475569' }}>{lbl} </span>
-                <span style={{ color: '#CBD5E1', fontWeight: '600' }}>₹{Number(val).toFixed(2)}</span>
+                <span style={{ color: '#CBD5E1', fontWeight: '600' }}>
+                  {lbl === 'Vol' ? new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2, notation: "compact" }).format(val) : `₹${Number(val).toFixed(2)}`}
+                </span>
               </span>
             ) : null
           )}
