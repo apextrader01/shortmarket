@@ -369,8 +369,7 @@ export const useStore = create(persist((set, get) => ({
       
       // Also fetch restricted stocks on load
       get().fetchRestrictedStocks();
-      // Preload initial mutual funds search
-      get().searchMutualFunds('quant');
+      // No initial search; let MutualFundsView handle empty state
     } catch (_) {}
   },
   
@@ -384,11 +383,15 @@ export const useStore = create(persist((set, get) => ({
   },
 
   mutualFunds: [],
+  searchMfRequestId: 0,
   searchMutualFunds: async (query) => {
       try {
+          const currentRequestId = ++get().searchMfRequestId;
           const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`);
           const data = await res.json();
-          if (Array.isArray(data)) {
+          
+          // Only update if this is still the latest search request!
+          if (Array.isArray(data) && currentRequestId === get().searchMfRequestId) {
               set({ mutualFunds: data });
               
               // Background enrich: take first 10 non-enriched funds and fetch their NAV/returns
@@ -397,11 +400,12 @@ export const useStore = create(persist((set, get) => ({
                   try {
                       const enrichRes = await fetch(`${API}/api/mf/enrich?ids=${toEnrich.join(',')}`);
                       const enrichData = await enrichRes.json();
-                      if (Array.isArray(enrichData)) {
+                      
+                      // Check AGAIN if this is still the latest search before merging enrich data
+                      if (Array.isArray(enrichData) && currentRequestId === get().searchMfRequestId) {
                           const enrichMap = {};
                           enrichData.forEach(e => { enrichMap[e.id] = e; });
                           
-                          // Merge enriched data into existing funds
                           const currentFunds = get().mutualFunds;
                           const updatedFunds = currentFunds.map(f => {
                               if (enrichMap[f.id]) {
