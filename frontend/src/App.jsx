@@ -7,6 +7,7 @@ import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
 import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
+import AdminDashboard from './components/AdminDashboard';
 import OrderModal from './components/OrderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
@@ -121,7 +122,10 @@ function App() {
               display: 'flex', alignItems: 'center', gap: '4px',
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
-              {['Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data'].map((tab) => {
+              {[
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data',
+                ...(user?.is_admin ? ['Admin Panel'] : [])
+              ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
                 return (
                 <div
@@ -130,7 +134,7 @@ function App() {
                   style={{
                     color:        activeTab === tabKey ? 'var(--text-primary)' : 'var(--text-secondary)',
                     borderBottom: activeTab === tabKey
-                      ? '2px solid var(--color-blue)'
+                      ? (tabKey === 'AdminPanel' ? '2px solid var(--color-red)' : '2px solid var(--color-blue)')
                       : '2px solid transparent',
                     padding:        '16px 2px',
                     cursor:         'pointer',
@@ -220,6 +224,11 @@ function App() {
           {activeTab === 'ClientData' && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
               <ClientDataView />
+            </div>
+          )}
+          {activeTab === 'AdminPanel' && user?.is_admin && (
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+              <AdminDashboard />
             </div>
           )}
           </main>

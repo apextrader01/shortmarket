@@ -572,6 +572,201 @@ export const useStore = create(persist((set, get) => ({
     } catch (_) { return false; }
   },
 
+const data = await res.json();
+          if (Array.isArray(data)) set({ restrictedStocks: data });
+      } catch (_) {}
+  },
+
+  mutualFunds: [],
+  searchMfRequestId: 0,
+  searchMutualFunds: async (query) => {
+      try {
+          const currentRequestId = ++get().searchMfRequestId;
+          const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          
+          // Only update if this is still the latest search request!
+          if (Array.isArray(data) && currentRequestId === get().searchMfRequestId) {
+              set({ mutualFunds: data });
+              
+              // Background enrich: take first 10 non-enriched funds and fetch their NAV/returns
+              const toEnrich = data.filter(f => !f.enriched).slice(0, 10).map(f => f.id);
+              if (toEnrich.length > 0) {
+                  try {
+                      const enrichRes = await fetch(`${API}/api/mf/enrich?ids=${toEnrich.join(',')}`);
+                      const enrichData = await enrichRes.json();
+                      
+                      // Check AGAIN if this is still the latest search before merging enrich data
+                      if (Array.isArray(enrichData) && currentRequestId === get().searchMfRequestId) {
+                          const enrichMap = {};
+                          enrichData.forEach(e => { enrichMap[e.id] = e; });
+                          
+                          const currentFunds = get().mutualFunds;
+                          const updatedFunds = currentFunds.map(f => {
+                              if (enrichMap[f.id]) {
+                                  return { ...f, ...enrichMap[f.id], enriched: true };
+                              }
+                              return f;
+                          });
+                          set({ mutualFunds: updatedFunds });
+                      }
+                  } catch (_) {} // Silent fail for enrichment
+              }
+          }
+      } catch (_) {}
+  },
+
+  enrichFundsBatch: async (ids) => {
+      if (!ids || ids.length === 0) return;
+      try {
+          const res = await fetch(`${API}/api/mf/enrich?ids=${ids.join(',')}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+              const enrichMap = {};
+              data.forEach(e => { enrichMap[e.id] = e; });
+              
+              const currentFunds = get().mutualFunds;
+              const updatedFunds = currentFunds.map(f => {
+                  if (enrichMap[f.id]) {
+                      return { ...f, ...enrichMap[f.id], enriched: true };
+                  }
+                  return f;
+              });
+              set({ mutualFunds: updatedFunds });
+          }
+      } catch (_) {}
+  },
+
+  fundDetailsCache: {},
+  fetchFundDetails: async (schemeName) => {
+      if (!schemeName) return null;
+      const currentCache = get().fundDetailsCache;
+      if (currentCache[schemeName] && (Date.now() - currentCache[schemeName].timestamp < 43200000)) {
+          return currentCache[schemeName].data;
+      }
+      try {
+          const res = await fetch(`${API}/api/mf/details?name=${encodeURIComponent(schemeName)}`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          set({ fundDetailsCache: { ...currentCache, [schemeName]: { timestamp: Date.now(), data } } });
+          return data;
+      } catch (e) {
+          console.error("Failed to fetch rich fund details:", e);
+          return null;
+      }
+  },
+
+  fundHistoryCache: {},
+  fetchFundHistory: async (schemeCode) => {
+      const currentCache = get().fundHistoryCache;
+      if (currentCache[schemeCode]) return currentCache[schemeCode]; // already fetched
+
+      try {
+          const res = await fetch(`${API}/api/mf/${schemeCode}`);
+          const data = await res.json();
+          
+          if (data && data.data) {
+              // mfapi.in returns data.data as an array of { date: "DD-MM-YYYY", nav: "123.45" }
+              // reverse it (descending -> ascending for chart)
+              const historicalData = data.data.reverse().map(item => {
+                  const [dd, mm, yyyy] = item.date.split('-');
+                  return {
+                      time: `${yyyy}-${mm}-${dd}`,
+                      value: parseFloat(item.nav)
+                  };
+              });
+
+              const newCache = { ...currentCache, [schemeCode]: historicalData };
+              set({ fundHistoryCache: newCache });
+              return historicalData;
+          }
+      } catch (_) {}
+      return null;
+  },
+
+  convertPosition: async (positionId, newProductType, requiredMargin) => {
+      const { token } = get();
+      try {
+          const res = await fetch(`${API}/api/position/convert`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ positionId, newProductType, requiredMargin }),
+          });
+          const data = await res.json();
+          if (data.success) { get().fetchUserData(); return { success: true }; }
+          return { success: false, error: data.error };
+      } catch (err) { return { success: false, error: err.message }; }
+  },
+
+  updateProfilePicture: async (url) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/profile_picture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ profile_picture_url: url })
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
+  updateUserDetails: async (details) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(details)
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
+  updateKycDocuments: async (kycDocs) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(kycDocs)
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { return { success: false, error: err.message }; }
+  },
+
+  // ── Orders ───────────────────────────────────────────────────────────────────
+  placeOrder: async (orderPayload) => {
+    const { token } = get();
+    try {
+      const res  = await fetch(`${API}/api/order`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify(orderPayload),
+      });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return true; }
+      return false;
+    } catch (_) { return false; }
+  },
+
   cancelOrder: async (orderId) => {
     const { token } = get();
     try {
@@ -584,6 +779,40 @@ export const useStore = create(persist((set, get) => ({
       return false;
     } catch (_) { return false; }
   },
+
+  // ── Admin ───────────────────────────────────────────────────────────────────
+  fetchAdminUsers: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const users = await res.json();
+        return { success: true, users };
+      }
+      return { success: false, error: 'Unauthorized' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  updateUserBalance: async (userId, balance) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}/balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ balance })
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
 
 }), {
   name: 'shortmarket-storage',

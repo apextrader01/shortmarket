@@ -112,9 +112,9 @@ app.post('/api/auth/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
     
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, watchlists } });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
@@ -244,6 +244,34 @@ app.post('/api/user/kyc', authenticateToken, async (req, res) => {
     const { kyc_pan_url, kyc_aadhar_url } = req.body;
     await db('users').where({ id: req.user.id }).update({ kyc_pan_url, kyc_aadhar_url });
     res.json({ success: true, kyc_pan_url, kyc_aadhar_url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Admin ────────────────────────────────────────────────────────────────
+app.get('/api/admin/users', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const users = await db('users').select('id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at').orderBy('created_at', 'desc');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { balance } = req.body;
+    if (balance === undefined) return res.status(400).json({ error: 'Balance required' });
+
+    await db('users').where({ id: req.params.id }).update({ balance: Number(balance) });
+    res.json({ success: true, balance: Number(balance) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -644,21 +672,54 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
   try {
     await db.transaction(async (trx) => {
-      // 1. Insert Order
-      const [id] = await trx('orders').insert({
-        user_id: req.user.id, symbol, type, side, quantity, price: price || null,
-        sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL'
-      }).returning('id');
-      const orderId = typeof id === 'object' ? id.id : id;
-
+      // 1. Determine execution status
+      const isMarket = type === 'MARKET';
+      const status = isMarket ? 'EXECUTED' : 'PENDING';
+      const execPrice = price || 0; // In a real app, fetch live LTP here for market orders
+      
       // 2. Deduct Margin from User Balance
-      if (margin && Number(margin) > 0) {
+      if (margin && Number(margin) > 0 && side === 'BUY') {
         const user = await trx('users').where({ id: req.user.id }).first();
+        if (user.balance < Number(margin)) {
+           throw new Error('Insufficient funds');
+        }
         const newBalance = Number(user.balance) - Number(margin);
         await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
       }
 
-      res.json({ success: true, orderId });
+      // 3. Insert Order
+      const [id] = await trx('orders').insert({
+        user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL'
+      }).returning('id');
+      const orderId = typeof id === 'object' ? id.id : id;
+
+      // 4. Update Positions if EXECUTED
+      if (status === 'EXECUTED') {
+        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
+        const qtyChange = side === 'BUY' ? Number(quantity) : -Number(quantity);
+        
+        if (existingPos) {
+          const newQty = existingPos.quantity + qtyChange;
+          // Calculate new average price on BUY
+          let newAvgPrice = existingPos.average_price;
+          if (side === 'BUY' && newQty > 0) {
+            const totalCost = (existingPos.quantity * existingPos.average_price) + (Number(quantity) * execPrice);
+            newAvgPrice = totalCost / newQty;
+          }
+          await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+        } else {
+          // If selling something they don't have, it's a short position
+          await trx('positions').insert({
+            user_id: req.user.id,
+            symbol,
+            quantity: qtyChange,
+            average_price: execPrice
+          });
+        }
+      }
+
+      res.json({ success: true, orderId, status });
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     aadhar_number TEXT,
     kyc_pan_url TEXT,
     kyc_aadhar_url TEXT,
+    is_admin BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

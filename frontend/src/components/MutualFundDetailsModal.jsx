@@ -4,9 +4,10 @@ import { useStore } from '../store';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, fetchFundHistory } = useStore();
+    const { fetchFundDetails, fetchFundHistory, placeOrder } = useStore();
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isInvesting, setIsInvesting] = useState(false);
     
     // Calculator state
     const [calcType, setCalcType] = useState('SIP');
@@ -300,9 +301,30 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
                         <div style={{ marginTop: 'auto' }}>
                             <button 
-                                style={{ width: '100%', padding: '14px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' }}
+                                disabled={isInvesting}
+                                onClick={async () => {
+                                    setIsInvesting(true);
+                                    const qty = investmentAmount / (details?.nav || fund.nav || 1);
+                                    const res = await placeOrder({
+                                        symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
+                                        type: 'MARKET',
+                                        side: 'BUY',
+                                        quantity: parseFloat(qty.toFixed(4)),
+                                        price: details?.nav || fund.nav,
+                                        margin: investmentAmount,
+                                        product_type: calcType === 'SIP' ? 'SIP' : 'DEL'
+                                    });
+                                    setIsInvesting(false);
+                                    if (res) {
+                                        alert(`Successfully invested ₹${investmentAmount} in ${fund.name}!`);
+                                        onClose();
+                                    } else {
+                                        alert("Failed to invest. Please check your margin balance.");
+                                    }
+                                }}
+                                style={{ width: '100%', padding: '14px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: isInvesting ? 'not-allowed' : 'pointer', opacity: isInvesting ? 0.7 : 1 }}
                             >
-                                Start Investing
+                                {isInvesting ? 'Processing...' : 'Start Investing'}
                             </button>
                         </div>
                     </div>

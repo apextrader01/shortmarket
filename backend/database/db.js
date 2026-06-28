@@ -34,6 +34,7 @@ async function initSchema() {
         table.string('aadhar_number');
         table.string('kyc_pan_url');
         table.string('kyc_aadhar_url');
+        table.boolean('is_admin').defaultTo(false);
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -66,6 +67,17 @@ async function initSchema() {
           table.string('kyc_aadhar_url');
         });
         console.log('Added client details and KYC columns to users table');
+      }
+      const hasIsAdmin = await db.schema.hasColumn('users', 'is_admin');
+      if (!hasIsAdmin) {
+        await db.schema.alterTable('users', table => {
+          table.boolean('is_admin').defaultTo(false);
+        });
+        
+        // Make existing mock_trader (if any) or user ID 1 an admin
+        await db('users').where({ id: 1 }).orWhere({ username: 'mock_trader' }).update({ is_admin: true });
+        
+        console.log('Added is_admin to users table');
       }
     }
 
