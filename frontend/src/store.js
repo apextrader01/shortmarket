@@ -367,8 +367,9 @@ export const useStore = create(persist((set, get) => ({
         posSymbols.forEach(sym => socket.emit('subscribe', sym));
       }
       
-      // Also fetch restricted stocks on load
+      // Also fetch restricted stocks and mutual funds on load
       get().fetchRestrictedStocks();
+      get().fetchMutualFunds();
     } catch (_) {}
   },
   
@@ -378,6 +379,15 @@ export const useStore = create(persist((set, get) => ({
           const res = await fetch(`${API}/api/restricted-stocks`);
           const data = await res.json();
           if (Array.isArray(data)) set({ restrictedStocks: data });
+      } catch (_) {}
+  },
+
+  mutualFunds: [],
+  fetchMutualFunds: async () => {
+      try {
+          const res = await fetch(`${API}/api/mutual-funds`);
+          const data = await res.json();
+          if (Array.isArray(data)) set({ mutualFunds: data });
       } catch (_) {}
   },
 

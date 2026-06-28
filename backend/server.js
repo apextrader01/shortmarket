@@ -290,6 +290,22 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
   }
 });
 
+// ── MUTUAL FUNDS ─────────────────────────────────────────────────────────────
+app.get('/api/mutual-funds', async (req, res) => {
+    // A curated list of top Mutual Funds with realistic data
+    const mutualFunds = [
+        { id: 'MF001', name: 'Parag Parikh Flexi Cap Fund', amc: 'PPFAS', category: 'Equity - Flexi Cap', risk: 'Very High', nav: 78.45, return1y: 28.5, return3y: 22.1, return5y: 19.8 },
+        { id: 'MF002', name: 'Quant Small Cap Fund', amc: 'Quant', category: 'Equity - Small Cap', risk: 'Very High', nav: 215.30, return1y: 52.4, return3y: 35.6, return5y: 28.2 },
+        { id: 'MF003', name: 'HDFC Index Fund Nifty 50 Plan', amc: 'HDFC', category: 'Equity - Index', risk: 'Very High', nav: 210.15, return1y: 26.2, return3y: 15.4, return5y: 14.8 },
+        { id: 'MF004', name: 'SBI Equity Hybrid Fund', amc: 'SBI', category: 'Hybrid - Aggressive', risk: 'High', nav: 245.80, return1y: 21.3, return3y: 14.2, return5y: 13.5 },
+        { id: 'MF005', name: 'Nippon India Liquid Fund', amc: 'Nippon', category: 'Debt - Liquid', risk: 'Low', nav: 5620.40, return1y: 7.2, return3y: 6.5, return5y: 6.1 },
+        { id: 'MF006', name: 'Mirae Asset Large Cap Fund', amc: 'Mirae Asset', category: 'Equity - Large Cap', risk: 'Very High', nav: 98.60, return1y: 24.1, return3y: 16.8, return5y: 15.2 },
+        { id: 'MF007', name: 'Axis Midcap Fund', amc: 'Axis', category: 'Equity - Mid Cap', risk: 'Very High', nav: 85.20, return1y: 32.5, return3y: 21.4, return5y: 18.6 },
+        { id: 'MF008', name: 'ICICI Prudential Corporate Bond Fund', amc: 'ICICI Pru', category: 'Debt - Corporate Bond', risk: 'Moderate', nav: 38.45, return1y: 8.1, return3y: 7.4, return5y: 7.0 },
+    ];
+    res.json(mutualFunds);
+});
+
 // ─── Restricted Stocks ────────────────────────────────────────────────────
 let restrictedStocksCache = [];
 app.get('/api/restricted-stocks', async (req, res) => {

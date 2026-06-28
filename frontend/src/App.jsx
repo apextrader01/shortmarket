@@ -5,6 +5,7 @@ import PositionsView from './components/PositionsView';
 import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
+import MutualFundsView from './components/MutualFundsView';
 import OrderModal from './components/OrderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
@@ -119,7 +120,7 @@ function App() {
               display: 'flex', alignItems: 'center', gap: '4px',
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
-              {['Markets', 'Options', 'Portfolio', 'Orders', 'Positions'].map((tab) => (
+              {['Markets', 'Options', 'Portfolio', 'MutualFunds', 'Orders', 'Positions'].map((tab) => (
                 <div
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -135,7 +136,7 @@ function App() {
                     letterSpacing:  '0.5px',
                   }}
                 >
-                  {tab}
+                  {tab === 'MutualFunds' ? 'MUTUAL FUNDS' : tab}
                 </div>
               ))}
             </div>
@@ -206,9 +207,10 @@ function App() {
               <OptionChainView />
             </div>
           )}
-          {activeTab === 'Portfolio'  && <PortfolioView />}
-          {activeTab === 'Orders'     && <OrdersView />}
-          {activeTab === 'Positions'  && <PositionsView />}
+          {activeTab === 'Portfolio' && <PortfolioView />}
+          {activeTab === 'Orders' && <OrdersView />}
+          {activeTab === 'Positions' && <PositionsView />}
+          {activeTab === 'MutualFunds' && <MutualFundsView />}
         </main>
       </div>
 
