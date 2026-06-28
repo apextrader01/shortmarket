@@ -330,7 +330,7 @@ async function addSubscription(data, io, priceCache) {
                 const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
                 if (exchangeMap[exchStr]) {
                     exchangeMap[exchStr].push(token);
-                    const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: exchangeMap });
+                    const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap });
                     if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
                         const item = res.data.fetched[0];
                         if (item.ltp && priceCache) {
@@ -404,7 +404,7 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
                     try {
                         const reqMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
                         reqMap[exch] = chunk;
-                        const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: reqMap });
+                        const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: reqMap });
                         if (res?.status && res.data?.fetched) {
                             for (const item of res.data.fetched) {
                                 const info = STOCK_MASTER[item.symbolToken];
