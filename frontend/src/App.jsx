@@ -127,7 +127,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data', 'Settings',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Settings',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -160,20 +160,26 @@ function App() {
               >
                 {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '50%',
-                background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid var(--border-color)', overflow: 'hidden'
-              }}>
-                {user?.profile_picture_url ? (
-                  <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <User size={14} color="var(--text-secondary)" />
-                )}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '11px', fontWeight: '600' }}>{user.username}</span>
-                <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{user.id}</span>
+              <div 
+                onClick={() => setActiveTab('ClientData')}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
+                className="hover:bg-white/5 transition-colors"
+              >
+                <div style={{
+                  width: '28px', height: '28px', borderRadius: '50%',
+                  background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid var(--border-color)', overflow: 'hidden'
+                }}>
+                  {user?.profile_picture_url ? (
+                    <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <User size={14} color="var(--text-secondary)" />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '600' }}>{user.username}</span>
+                  <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
+                </div>
               </div>
               <div
                 onClick={logout}
