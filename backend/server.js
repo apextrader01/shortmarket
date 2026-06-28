@@ -353,35 +353,84 @@ function determineRisk(return1y) {
 
 const mfCache = {};
 
-// 2. Search & Enrich Endpoint
+// 2. FAST Search Endpoint — returns ALL matching funds instantly from memory (no mfapi calls)
 app.get('/api/mf/search', async (req, res) => {
     try {
-        const query = (req.query.q || '').toLowerCase();
-        if (!query || query.length < 3) {
+        const query = (req.query.q || '').toLowerCase().trim();
+        if (!query || query.length < 2) {
             return res.json([]);
         }
 
-        // Find matches and prioritize Direct and Growth plans
-        let matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
+        // Instantly filter from the 37,000+ in-memory list
+        const matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
         
+        // Sort: Direct+Growth first, then Regular+Growth, then others
         matches.sort((a, b) => {
-            const aScore = (a.schemeName.toLowerCase().includes('direct') ? 2 : 0) + (a.schemeName.toLowerCase().includes('growth') ? 1 : 0);
-            const bScore = (b.schemeName.toLowerCase().includes('direct') ? 2 : 0) + (b.schemeName.toLowerCase().includes('growth') ? 1 : 0);
-            return bScore - aScore;
+            const nameLower = (n) => n.schemeName.toLowerCase();
+            const score = (f) => {
+                let s = 0;
+                const n = nameLower(f);
+                if (n.includes('direct')) s += 4;
+                if (n.includes('growth')) s += 2;
+                // Penalize closed/FMP/maturity funds
+                if (n.includes('fmp') || n.includes('fixed maturity') || n.includes('interval') || n.includes('series')) s -= 3;
+                return s;
+            };
+            return score(b) - score(a);
         });
 
-        // Take top 20 candidates
-        const candidates = matches.slice(0, 20);
-        const enrichedMatches = [];
-        
-        // Enrich with NAV and returns concurrently
-        await Promise.all(candidates.map(async (fund) => {
-            if (enrichedMatches.length >= 8) return; // Limit to 8 valid results
+        // Return ALL matches with basic info (no API calls needed = instant)
+        const results = matches.map(fund => {
+            const nameLower = fund.schemeName.toLowerCase();
+            let category = 'Equity';
+            if (nameLower.includes('debt') || nameLower.includes('liquid') || nameLower.includes('bond') || nameLower.includes('gilt') || nameLower.includes('money market') || nameLower.includes('overnight') || nameLower.includes('floating')) category = 'Debt';
+            if (nameLower.includes('hybrid') || nameLower.includes('balanced') || nameLower.includes('dynamic asset') || nameLower.includes('multi asset') || nameLower.includes('aggressive')) category = 'Hybrid';
+            
+            const amc = fund.schemeName.split(' ')[0];
+            
+            // Check if we have cached data to show returns
+            const cached = mfCache[fund.schemeCode];
+            let nav = 0, return1y = 0, return3y = 0, return5y = 0, risk = 'Moderate';
+            
+            if (cached && cached.data && cached.data.data && cached.data.data.length > 0) {
+                const historicalData = cached.data.data;
+                nav = parseFloat(historicalData[0].nav);
+                return1y = calculateReturn(historicalData, 1) || 0;
+                return3y = calculateReturn(historicalData, 3) || 0;
+                return5y = calculateReturn(historicalData, 5) || 0;
+                risk = determineRisk(return1y);
+            }
+            
+            return {
+                id: fund.schemeCode,
+                name: fund.schemeName,
+                amc,
+                category,
+                risk,
+                nav,
+                return1y,
+                return3y,
+                return5y,
+                enriched: !!cached
+            };
+        });
 
-            const schemeCode = fund.schemeCode;
-            let data = null;
+        res.json(results);
+    } catch (err) {
+        console.error('MF Search Error:', err.message);
+        res.status(500).json({ error: 'Failed to search mutual funds' });
+    }
+});
 
+// 2b. Enrich a batch of funds with live NAV and returns
+app.get('/api/mf/enrich', async (req, res) => {
+    try {
+        const ids = (req.query.ids || '').split(',').filter(Boolean).slice(0, 10);
+        if (ids.length === 0) return res.json([]);
+
+        const results = await Promise.all(ids.map(async (schemeCode) => {
             try {
+                let data = null;
                 if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
                     data = mfCache[schemeCode].data;
                 } else {
@@ -391,46 +440,25 @@ app.get('/api/mf/search', async (req, res) => {
                         mfCache[schemeCode] = { timestamp: Date.now(), data };
                     }
                 }
-            } catch (e) {
-                return; // Ignore fetch failures
-            }
 
-            if (!data || !data.data || data.data.length === 0) {
-                return;
-            }
+                if (!data || !data.data || data.data.length === 0) return null;
 
-            const historicalData = data.data; // Descending
-            const latestNav = parseFloat(historicalData[0].nav);
-            const return1y = calculateReturn(historicalData, 1);
-            const return3y = calculateReturn(historicalData, 3);
-            const return5y = calculateReturn(historicalData, 5);
-            const risk = determineRisk(return1y);
-
-            // Determine category rough estimation based on name
-            let category = 'Equity';
-            if (fund.schemeName.toLowerCase().includes('debt') || fund.schemeName.toLowerCase().includes('liquid') || fund.schemeName.toLowerCase().includes('bond')) category = 'Debt';
-            if (fund.schemeName.toLowerCase().includes('hybrid') || fund.schemeName.toLowerCase().includes('balanced')) category = 'Hybrid';
-
-            // Extract AMC from first word
-            const amc = fund.schemeName.split(' ')[0];
-
-            enrichedMatches.push({
-                id: schemeCode,
-                name: fund.schemeName,
-                amc: amc,
-                category: category,
-                risk: risk,
-                nav: latestNav,
-                return1y: return1y !== null ? return1y : 0,
-                return3y: return3y !== null ? return3y : 0,
-                return5y: return5y !== null ? return5y : 0
-            });
+                const historicalData = data.data;
+                return {
+                    id: parseInt(schemeCode),
+                    nav: parseFloat(historicalData[0].nav),
+                    return1y: calculateReturn(historicalData, 1) || 0,
+                    return3y: calculateReturn(historicalData, 3) || 0,
+                    return5y: calculateReturn(historicalData, 5) || 0,
+                    risk: determineRisk(calculateReturn(historicalData, 1))
+                };
+            } catch { return null; }
         }));
 
-        res.json(enrichedMatches);
+        res.json(results.filter(Boolean));
     } catch (err) {
-        console.error('MF Search Error:', err.message);
-        res.status(500).json({ error: 'Failed to search mutual funds' });
+        console.error('MF Enrich Error:', err.message);
+        res.status(500).json({ error: 'Failed to enrich' });
     }
 });
 

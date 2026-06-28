@@ -1,23 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
-import { Search, Filter, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react';
 import MutualFundModal from './MutualFundModal';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds } = useStore();
-  const [activeTab, setActiveTab] = useState('All'); // All, Equity, Debt, Hybrid
-  const [search, setSearch] = useState('quant'); // default preloaded search
+  const [activeTab, setActiveTab] = useState('All');
+  const [search, setSearch] = useState('');
   const [selectedFund, setSelectedFund] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [page, setPage] = useState(1);
+  const searchIdRef = useRef(0); // Track latest search to prevent race conditions
 
+  const ITEMS_PER_PAGE = 50;
+
+  // Debounced auto-search: clears old results immediately when user types
   useEffect(() => {
-      const delayDebounceFn = setTimeout(() => {
-          if (search && search.length >= 3) {
-              setIsSearching(true);
-              searchMutualFunds(search).finally(() => setIsSearching(false));
+      if (!search || search.length < 2) {
+          useStore.setState({ mutualFunds: [] });
+          return;
+      }
+
+      setIsSearching(true);
+      setPage(1);
+      const currentSearchId = ++searchIdRef.current;
+
+      const timer = setTimeout(async () => {
+          try {
+              await searchMutualFunds(search);
+          } finally {
+              // Only clear loading if this is still the latest search
+              if (currentSearchId === searchIdRef.current) {
+                  setIsSearching(false);
+              }
           }
-      }, 400); // 400ms debounce
-      return () => clearTimeout(delayDebounceFn);
+      }, 500);
+
+      return () => clearTimeout(timer);
   }, [search, searchMutualFunds]);
 
   const handleSearch = (e) => {
@@ -30,6 +49,9 @@ export default function MutualFundsView() {
     return activeTab === 'All' || fund.category.includes(activeTab);
   });
 
+  const totalPages = Math.ceil(filteredFunds.length / ITEMS_PER_PAGE);
+  const paginatedFunds = filteredFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Sub Navigation */}
@@ -37,7 +59,7 @@ export default function MutualFundsView() {
         {tabs.map(tab => (
           <div
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => { setActiveTab(tab); setPage(1); }}
             style={{
               padding: '16px 4px',
               fontSize: '13px',
@@ -53,7 +75,7 @@ export default function MutualFundsView() {
         ))}
       </div>
 
-      <div style={{ padding: '24px', overflowY: 'auto' }}>
+      <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Explore 10,000+ Mutual Funds</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -61,18 +83,24 @@ export default function MutualFundsView() {
                     <Search size={14} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
                     <input 
                         type="text" 
-                        placeholder="Search any fund..." 
+                        placeholder="Search HDFC, SBI, Quant..." 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', outline: 'none', width: '200px' }}
+                        autoFocus
+                        style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', outline: 'none', width: '220px' }}
                     />
-                    <button type="submit" style={{ display: 'none' }}></button>
+                    {isSearching && <Loader2 size={14} color="var(--color-blue)" className="spin" />}
                 </form>
-                <button style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <Filter size={14} /> Filter
-                </button>
             </div>
         </div>
+
+        {/* Results count */}
+        {filteredFunds.length > 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filteredFunds.length)} of {filteredFunds.length} funds
+                {activeTab !== 'All' && ` (${activeTab})`}
+            </div>
+        )}
 
         <div className="glass-panel" style={{ overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
@@ -89,16 +117,26 @@ export default function MutualFundsView() {
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredFunds.map((fund, idx) => (
-                        <tr key={fund.id} style={{ borderBottom: idx < filteredFunds.length - 1 ? '1px solid var(--border-color)' : 'none', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
+                    {isSearching ? (
+                        <tr>
+                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                    <Loader2 size={28} color="var(--color-blue)" className="spin" />
+                                    <span>Searching & calculating returns for "{search}"...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    ) : paginatedFunds.length > 0 ? (
+                        paginatedFunds.map((fund, idx) => (
+                        <tr key={fund.id} style={{ borderBottom: idx < paginatedFunds.length - 1 ? '1px solid var(--border-color)' : 'none', transition: 'background 0.2s' }}>
                             <td style={{ padding: '16px', fontWeight: '600' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', flexShrink: 0 }}>
                                         <TrendingUp size={16} />
                                     </div>
-                                    <div>
-                                        <div style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{fund.name}</div>
-                                        <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{fund.amc} Mutual Fund</div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ color: 'var(--text-primary)', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }} title={fund.name}>{fund.name}</div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{fund.amc} Mutual Fund</div>
                                     </div>
                                 </div>
                             </td>
@@ -113,9 +151,9 @@ export default function MutualFundsView() {
                                 </span>
                             </td>
                             <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>₹{fund.nav.toFixed(2)}</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)', fontWeight: '600' }}>+{fund.return1y}%</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)', fontWeight: '600' }}>+{fund.return3y}%</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)', fontWeight: '600' }}>+{fund.return5y}%</td>
+                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
+                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
+                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return5y >= 0 ? '+' : ''}{fund.return5y}%</td>
                             <td style={{ padding: '16px', textAlign: 'center' }}>
                                 <button 
                                     onClick={() => setSelectedFund(fund)}
@@ -129,23 +167,47 @@ export default function MutualFundsView() {
                                 </button>
                             </td>
                         </tr>
-                    ))}
-                    {isSearching ? (
+                    ))
+                    ) : search.length >= 2 ? (
                         <tr>
-                            <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                Fetching live data...
+                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                No mutual funds found for "{search}". Try "HDFC", "SBI", "Axis", or "Quant".
                             </td>
                         </tr>
-                    ) : filteredFunds.length === 0 ? (
+                    ) : (
                         <tr>
-                            <td colSpan="8" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                No mutual funds found matching your criteria. Try searching for "HDFC" or "SBI".
+                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <Search size={32} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
+                                    <span>Type a fund house name (HDFC, SBI, ICICI, Quant, Axis...) to explore all their funds</span>
+                                </div>
                             </td>
                         </tr>
-                    ) : null}
+                    )}
                 </tbody>
             </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && !isSearching && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px' }}>
+                <button 
+                    onClick={() => setPage(p => Math.max(1, p - 1))} 
+                    disabled={page === 1}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: page === 1 ? 'var(--text-secondary)' : 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: page === 1 ? 0.5 : 1 }}
+                >
+                    ← Previous
+                </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
+                <button 
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                    disabled={page === totalPages}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: page === totalPages ? 'var(--text-secondary)' : 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', opacity: page === totalPages ? 0.5 : 1 }}
+                >
+                    Next →
+                </button>
+            </div>
+        )}
       </div>
       
       {selectedFund && <MutualFundModal fund={selectedFund} onClose={() => setSelectedFund(null)} />}

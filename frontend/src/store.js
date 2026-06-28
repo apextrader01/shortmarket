@@ -386,9 +386,34 @@ export const useStore = create(persist((set, get) => ({
   mutualFunds: [],
   searchMutualFunds: async (query) => {
       try {
-          const res = await fetch(`${API}/api/mf/search?q=${query}`);
+          const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`);
           const data = await res.json();
-          if (Array.isArray(data)) set({ mutualFunds: data });
+          if (Array.isArray(data)) {
+              set({ mutualFunds: data });
+              
+              // Background enrich: take first 10 non-enriched funds and fetch their NAV/returns
+              const toEnrich = data.filter(f => !f.enriched).slice(0, 10).map(f => f.id);
+              if (toEnrich.length > 0) {
+                  try {
+                      const enrichRes = await fetch(`${API}/api/mf/enrich?ids=${toEnrich.join(',')}`);
+                      const enrichData = await enrichRes.json();
+                      if (Array.isArray(enrichData)) {
+                          const enrichMap = {};
+                          enrichData.forEach(e => { enrichMap[e.id] = e; });
+                          
+                          // Merge enriched data into existing funds
+                          const currentFunds = get().mutualFunds;
+                          const updatedFunds = currentFunds.map(f => {
+                              if (enrichMap[f.id]) {
+                                  return { ...f, ...enrichMap[f.id], enriched: true };
+                              }
+                              return f;
+                          });
+                          set({ mutualFunds: updatedFunds });
+                      }
+                  } catch (_) {} // Silent fail for enrichment
+              }
+          }
       } catch (_) {}
   },
 
