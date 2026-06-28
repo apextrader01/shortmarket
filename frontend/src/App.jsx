@@ -152,24 +152,6 @@ function App() {
               )})}
             </div>
 
-            {/* Margin & Deposit */}
-            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Wallet size={12} style={{ color: 'var(--text-secondary)' }} />
-                <div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
-                    Available Margin
-                  </div>
-                  <div style={{ fontWeight: '700', fontSize: '11px' }}>
-                    ₹{(user.balance || 1000000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-              {/* Deposit button moved to ClientDataView */}
-            </div>
-
-            <div className="hide-on-mobile" style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
-
             {/* User avatar + logout */}
             <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button 
