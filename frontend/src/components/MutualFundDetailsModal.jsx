@@ -131,16 +131,25 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {details.return_stats?.filter(r => [1, 3, 5].includes(r.year)).map(r => (
-                                                    <tr key={r.year} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                        <td style={{ padding: '12px 16px' }}>{r.year} Year</td>
-                                                        <td style={{ padding: '12px 16px', color: r.fund_return >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
-                                                            {r.fund_return}%
-                                                        </td>
-                                                        <td style={{ padding: '12px 16px' }}>{r.category_return}%</td>
-                                                        <td style={{ padding: '12px 16px' }}>#{r.rank}</td>
-                                                    </tr>
-                                                ))}
+                                                {details.return_stats && details.return_stats.length > 0 && [1, 3, 5].map(year => {
+                                                    const stat = details.return_stats[0];
+                                                    const fundReturn = stat[`return${year}y`];
+                                                    const catReturn = stat[`cat_return${year}y`];
+                                                    const rank = stat[`rank${year}yr`];
+                                                    
+                                                    if (fundReturn == null) return null;
+
+                                                    return (
+                                                        <tr key={year} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                            <td style={{ padding: '12px 16px' }}>{year} Year</td>
+                                                            <td style={{ padding: '12px 16px', color: fundReturn >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
+                                                                {fundReturn}%
+                                                            </td>
+                                                            <td style={{ padding: '12px 16px' }}>{catReturn}%</td>
+                                                            <td style={{ padding: '12px 16px' }}>#{rank}</td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>
@@ -154,13 +163,13 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             <div style={{ background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.1)', borderRadius: '8px', padding: '16px' }}>
                                                 <h4 style={{ margin: '0 0 12px 0', color: 'var(--color-green-light)', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={16} /> Pros</h4>
                                                 <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {details.analysis.filter(a => a.sentiment === 'POSITIVE').map((p, i) => <li key={i}>{p.text}</li>)}
+                                                    {details.analysis.filter(a => a.analysis_type === 'PROS').map((p, i) => <li key={i}>{p.analysis_desc}</li>)}
                                                 </ul>
                                             </div>
                                             <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '8px', padding: '16px' }}>
                                                 <h4 style={{ margin: '0 0 12px 0', color: 'var(--color-red-light)', display: 'flex', alignItems: 'center', gap: '8px' }}><XCircle size={16} /> Cons</h4>
                                                 <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {details.analysis.filter(a => a.sentiment === 'NEGATIVE').map((c, i) => <li key={i}>{c.text}</li>)}
+                                                    {details.analysis.filter(a => a.analysis_type === 'CONS').map((c, i) => <li key={i}>{c.analysis_desc}</li>)}
                                                 </ul>
                                             </div>
                                         </div>
