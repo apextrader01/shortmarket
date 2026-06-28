@@ -291,7 +291,11 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
 });
 
 // ── MUTUAL FUNDS ENGINE ───────────────────────────────────────────────────────
-const fetch = require('node-fetch');
+
+const myFetch = async (...args) => {
+    const { default: nf } = await import('node-fetch');
+    return nf(...args);
+};
 
 // 1. Master List Cache
 let allMutualFunds = [];
@@ -300,7 +304,7 @@ let allMutualFunds = [];
 async function initMutualFundsList() {
     try {
         console.log('🔄 Fetching master list of all Mutual Funds from mfapi.in...');
-        const res = await fetch('https://api.mfapi.in/mf');
+        const res = await myFetch('https://api.mfapi.in/mf');
         const data = await res.json();
         if (Array.isArray(data)) {
             allMutualFunds = data;
@@ -368,7 +372,7 @@ app.get('/api/mf/search', async (req, res) => {
             if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
                 data = mfCache[schemeCode].data;
             } else {
-                const response = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+                const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
                 data = await response.json();
                 mfCache[schemeCode] = { timestamp: Date.now(), data };
             }
@@ -421,7 +425,7 @@ app.get('/api/mf/:schemeCode', async (req, res) => {
             return res.json(mfCache[schemeCode].data);
         }
 
-        const response = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+        const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
         const data = await response.json();
         
         mfCache[schemeCode] = { timestamp: Date.now(), data };
