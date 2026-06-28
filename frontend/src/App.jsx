@@ -21,11 +21,10 @@ function App() {
   const {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
-    selectedSymbol, prices, toggleTheme, theme
+    selectedSymbol, prices, toggleTheme, theme, orderModal
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('Markets');
-  const [showOrderModal, setShowOrderModal] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
@@ -253,7 +252,7 @@ function App() {
         </div>
       </div>
 
-      {showOrderModal && <OrderModal onClose={() => setShowOrderModal(false)} defaultSymbol={selectedSymbol} />}
+      {orderModal?.isOpen && <OrderModal />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       
       {/* Mobile Bottom Navigation */}
