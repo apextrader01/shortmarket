@@ -52,6 +52,17 @@ export default function MutualFundsView() {
   const totalPages = Math.ceil(filteredFunds.length / ITEMS_PER_PAGE);
   const paginatedFunds = filteredFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
+  const enrichFundsBatch = useStore(state => state.enrichFundsBatch);
+
+  useEffect(() => {
+      // Whenever the page changes or new funds arrive, enrich any visible funds that don't have return data yet
+      if (paginatedFunds.length === 0) return;
+      const idsToEnrich = paginatedFunds.filter(f => !f.enriched).map(f => f.id);
+      if (idsToEnrich.length > 0) {
+          enrichFundsBatch(idsToEnrich);
+      }
+  }, [paginatedFunds, enrichFundsBatch]);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Sub Navigation */}

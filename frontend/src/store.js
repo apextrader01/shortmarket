@@ -421,6 +421,27 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
+  enrichFundsBatch: async (ids) => {
+      if (!ids || ids.length === 0) return;
+      try {
+          const res = await fetch(`${API}/api/mf/enrich?ids=${ids.join(',')}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+              const enrichMap = {};
+              data.forEach(e => { enrichMap[e.id] = e; });
+              
+              const currentFunds = get().mutualFunds;
+              const updatedFunds = currentFunds.map(f => {
+                  if (enrichMap[f.id]) {
+                      return { ...f, ...enrichMap[f.id], enriched: true };
+                  }
+                  return f;
+              });
+              set({ mutualFunds: updatedFunds });
+          }
+      } catch (_) {}
+  },
+
   fundHistoryCache: {},
   fetchFundHistory: async (schemeCode) => {
       const currentCache = get().fundHistoryCache;
