@@ -244,7 +244,7 @@ export default function ClientDataView() {
           </div>
         </div>
         <button style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', width: '100%', maxWidth: '300px' }}>
-          ADD FUNDS TO START TRADING
+          DEPOSIT
         </button>
       </div>
 
