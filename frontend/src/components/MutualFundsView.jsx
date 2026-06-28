@@ -149,13 +149,16 @@ export default function MutualFundsView() {
                         <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
                             5Y Return {sortConfig.key === 'return5y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                         </th>
+                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('returnAllTime')}>
+                            All Time {sortConfig.key === 'returnAllTime' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                        </th>
                         <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {isSearching ? (
                         <tr>
-                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                                     <Loader2 size={28} color="var(--color-blue)" className="spin" />
                                     <span>Searching & calculating returns for "{search}"...</span>
@@ -189,7 +192,8 @@ export default function MutualFundsView() {
                             <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>₹{fund.nav.toFixed(2)}</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return5y >= 0 ? '+' : ''}{fund.return5y}%</td>
+                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
+                            <td style={{ padding: '16px', textAlign: 'right', color: fund.returnAllTime >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.returnAllTime ? `${fund.returnAllTime >= 0 ? '+' : ''}${fund.returnAllTime}%` : '-'}</td>
                             <td style={{ padding: '16px', textAlign: 'center' }}>
                                 <button 
                                     onClick={() => setSelectedFund(fund)}
@@ -206,13 +210,13 @@ export default function MutualFundsView() {
                     ))
                     ) : search.length >= 2 ? (
                         <tr>
-                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 No mutual funds found for "{search}". Try "HDFC", "SBI", "Axis", or "Quant".
                             </td>
                         </tr>
                     ) : (
                         <tr>
-                            <td colSpan="8" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                     <Search size={32} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
                                     <span>Failed to load default funds. Please try searching.</span>

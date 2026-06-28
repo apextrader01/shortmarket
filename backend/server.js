@@ -343,6 +343,24 @@ function calculateReturn(historicalData, years) {
     return parseFloat(cagr.toFixed(2));
 }
 
+function calculateReturnAllTime(historicalData) {
+    if (!historicalData || historicalData.length < 2) return null;
+    const latestNav = parseFloat(historicalData[0].nav);
+    const oldestData = historicalData[historicalData.length - 1];
+    const oldestNav = parseFloat(oldestData.nav);
+    
+    const [d1, m1, y1] = historicalData[0].date.split('-');
+    const [d2, m2, y2] = oldestData.date.split('-');
+    const latestDate = new Date(`${y1}-${m1}-${d1}`);
+    const oldestDate = new Date(`${y2}-${m2}-${d2}`);
+    
+    const years = (latestDate - oldestDate) / (1000 * 60 * 60 * 24 * 365.25);
+    if (years <= 0) return null;
+    
+    const cagr = (Math.pow((latestNav / oldestNav), (1 / years)) - 1) * 100;
+    return parseFloat(cagr.toFixed(2));
+}
+
 function determineRisk(return1y) {
     if (return1y === null) return 'Moderate';
     if (return1y > 25) return 'Very High';
@@ -403,7 +421,7 @@ app.get('/api/mf/search', async (req, res) => {
             
             // Check if we have cached data to show returns
             const cached = mfCache[fund.schemeCode];
-            let nav = 0, return1y = 0, return3y = 0, return5y = 0, risk = 'Moderate';
+            let nav = 0, return1y = 0, return3y = 0, return5y = 0, returnAllTime = 0, risk = 'Moderate';
             
             if (cached && cached.data && cached.data.data && cached.data.data.length > 0) {
                 const historicalData = cached.data.data;
@@ -411,6 +429,7 @@ app.get('/api/mf/search', async (req, res) => {
                 return1y = calculateReturn(historicalData, 1) || 0;
                 return3y = calculateReturn(historicalData, 3) || 0;
                 return5y = calculateReturn(historicalData, 5) || 0;
+                returnAllTime = calculateReturnAllTime(historicalData) || 0;
                 risk = determineRisk(return1y);
             }
             
@@ -424,6 +443,7 @@ app.get('/api/mf/search', async (req, res) => {
                 return1y,
                 return3y,
                 return5y,
+                returnAllTime,
                 enriched: !!cached
             };
         });
@@ -463,6 +483,7 @@ app.get('/api/mf/enrich', async (req, res) => {
                     return1y: calculateReturn(historicalData, 1) || 0,
                     return3y: calculateReturn(historicalData, 3) || 0,
                     return5y: calculateReturn(historicalData, 5) || 0,
+                    returnAllTime: calculateReturnAllTime(historicalData) || 0,
                     risk: determineRisk(calculateReturn(historicalData, 1))
                 };
             } catch { return null; }
