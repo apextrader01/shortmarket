@@ -306,7 +306,7 @@ export const useStore = create(persist((set, get) => ({
         const tick = old
           ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
           : 'flat';
-        return { prices: { ...state.prices, [data.symbol]: { ...data, tick } } };
+        return { prices: { ...state.prices, [data.symbol]: { ...old, ...data, tick } } };
       });
     });
 

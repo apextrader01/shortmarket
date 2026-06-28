@@ -497,7 +497,7 @@ async function fetchAllLTPs() {
 
         try {
             const res = await smart_api.marketData({
-                mode: 'LTP',
+                mode: 'FULL',
                 exchangeTokens: exchangeMap
             });
             if (res?.status && res.data?.fetched) {
@@ -702,9 +702,9 @@ function startLiveWebSocket(io) {
             const info = STOCK_MASTER[data.token];
             if (info && data.last_traded_price) {
                 const ltp = data.last_traded_price / 100;
-                processTick(info.symbol, ltp);
-                io.to(info.symbol).emit('market_data', {
-                    symbol: info.symbol, ltp,
+                processTick(info.uniqueSymbol, ltp);
+                io.to(info.uniqueSymbol).emit('market_data', {
+                    symbol: info.uniqueSymbol, ltp,
                     timestamp: new Date().toISOString()
                 });
             }
