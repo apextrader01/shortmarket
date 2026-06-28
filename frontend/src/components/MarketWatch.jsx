@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check } from 'lucide-react';
 
-export default function MarketWatch() {
+export default function MarketWatch({ className = '' }) {
   const { 
     prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices,
     watchlists, activeWatchlistId, setActiveWatchlist, 
@@ -50,7 +50,7 @@ export default function MarketWatch() {
   }, [searchQuery, isSearchMode, activeWatchlistId, stocks]);
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${className}`}>
       {/* Watchlist Tabs */}
       <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', padding: '0 8px', background: 'var(--bg-panel)' }} className="scrollbar-hide">
         {watchlists.map(w => (

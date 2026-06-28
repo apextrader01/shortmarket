@@ -219,8 +219,8 @@ function App() {
         </header>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
-        <MarketWatch />
-        <div className="main-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <MarketWatch className={activeTab !== 'Markets' ? 'mobile-hidden' : ''} />
+        <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           <main style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {activeTab === 'Markets' && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>

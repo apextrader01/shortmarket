@@ -144,6 +144,13 @@ h1, h2, h3, h4, h5, h6 {
   .hide-on-mobile {
     display: none !important;
   }
+  .mobile-hidden {
+    display: none !important;
+  }
+  .mobile-full {
+    height: 100vh !important;
+    max-height: calc(100vh - 64px - 60px) !important; /* adjust for topbar + bottom nav */
+  }
   .dashboard-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
