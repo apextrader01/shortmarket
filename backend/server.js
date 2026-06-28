@@ -14,6 +14,7 @@ const compression = require('compression');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const yahooFinance = require('yahoo-finance2').default;
 const db = require('./database/db');
 const path = require('path');
 const fs = require('fs');
@@ -735,9 +736,13 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     }
     const searchId = searchData.content[0].search_id;
 
-    // 2. Fetch full details
-    const detailsRes = await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`);
+    // 2. Fetch full details and Yahoo news concurrently
+    const [detailsRes, newsRes] = await Promise.all([
+      fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`),
+      yahooFinance.search(rawName + '.NS', { newsCount: 15 }).catch(() => ({ news: [] }))
+    ]);
     const data = await detailsRes.json();
+    data.news = newsRes.news || [];
 
     stockDetailsCache[rawName] = { timestamp: Date.now(), data };
     res.json(data);

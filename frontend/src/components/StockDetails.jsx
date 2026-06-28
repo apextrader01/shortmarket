@@ -65,8 +65,18 @@ export default function StockDetails({ symbol, price, candles }) {
     
     // Fallbacks if price is missing from AngelOne
     const livePrice = price?.ltp || details.priceData?.ltp || 0;
-    const l = price?.low || details.priceData?.low || 0;
-    const h = price?.high || details.priceData?.high || 0;
+    
+    // Get latest daily candle for today's high/low and volume
+    const latestCandle = candles && candles.length > 0 ? candles[candles.length - 1] : null;
+    const l = price?.low || latestCandle?.low || 0;
+    const h = price?.high || latestCandle?.high || 0;
+    const vol = price?.volume || latestCandle?.volume || details.header?.floatingShares || 0;
+    
+    // 52 Week High/Low from Groww
+    const nsePrice = details.priceData?.nse || {};
+    const bsePrice = details.priceData?.bse || {};
+    const low52 = nsePrice.yearLowPrice || bsePrice.yearLowPrice || 0;
+    const high52 = nsePrice.yearHighPrice || bsePrice.yearHighPrice || 0;
 
     const formatNum = (num) => num ? (num >= 1e7 ? (num / 1e7).toFixed(2) + ' Cr' : num.toLocaleString('en-IN')) : '-';
     
@@ -86,7 +96,7 @@ export default function StockDetails({ symbol, price, candles }) {
             <div className="glass-panel" style={{ padding: '12px' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8' }}>52 Week Low / High</div>
               <div style={{ fontSize: '14px', fontWeight: '700' }}>
-                {details.priceData?.low52w ? `₹${details.priceData.low52w.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {details.priceData?.high52w ? `₹${details.priceData.high52w.toFixed(2)}` : '-'}
+                {low52 ? `₹${low52.toFixed(2)}` : '-'} <span style={{color:'#64748B', fontWeight:'400'}}>—</span> {high52 ? `₹${high52.toFixed(2)}` : '-'}
               </div>
             </div>
             <div className="glass-panel" style={{ padding: '12px' }}>
@@ -97,7 +107,7 @@ export default function StockDetails({ symbol, price, candles }) {
             </div>
             <div className="glass-panel" style={{ padding: '12px' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8' }}>Volume</div>
-              <div style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(details.priceData?.volume || price?.volume)}</div>
+              <div style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(vol)}</div>
             </div>
           </div>
         </div>

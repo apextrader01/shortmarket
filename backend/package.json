@@ -27,6 +27,7 @@
     "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
     "sqlite3": "^6.0.1",
-    "totp-generator": "^2.0.1"
+    "totp-generator": "^2.0.1",
+    "yahoo-finance2": "^3.15.3"
   }
 }
