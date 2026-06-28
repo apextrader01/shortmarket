@@ -127,7 +127,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Settings',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -180,6 +180,20 @@ function App() {
                   <span style={{ fontSize: '11px', fontWeight: '600' }}>{user.username}</span>
                   <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
                 </div>
+              </div>
+              <div
+                onClick={() => setActiveTab('Settings')}
+                title="Settings"
+                style={{
+                  cursor:       'pointer',
+                  padding:      '6px',
+                  background:   'rgba(255,255,255,0.05)',
+                  borderRadius: '4px',
+                  display:      'flex',
+                  alignItems:   'center',
+                }}
+              >
+                <Settings size={14} color="var(--text-secondary)" />
               </div>
               <div
                 onClick={logout}
