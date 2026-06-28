@@ -80,21 +80,22 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
         };
     }, [schemeCode, fetchFundHistory, color]);
 
-    if (loading) {
-        return (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-                <Loader2 size={24} className="spin" style={{ marginRight: '8px' }} /> Loading NAV History...
-            </div>
-        );
-    }
+    return (
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            {/* Always render the container so the ref exists immediately */}
+            <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+            
+            {loading && (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', background: 'var(--bg-panel)' }}>
+                    <Loader2 size={24} className="spin" style={{ marginRight: '8px' }} /> Loading NAV History...
+                </div>
+            )}
 
-    if (error) {
-        return (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-red)' }}>
-                {error}
-            </div>
-        );
-    }
-
-    return <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />;
+            {error && !loading && (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-red)', background: 'var(--bg-panel)' }}>
+                    {error}
+                </div>
+            )}
+        </div>
+    );
 }
