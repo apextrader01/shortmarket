@@ -442,6 +442,230 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
+  updateOrder: async (id, quantity, price) => {
+    try {
+      const res = await fetch(`${API}/api/order/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${get().token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ quantity, price })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await get().fetchUserData();
+      return true;
+    } catch (err) {
+      set({ authError: err.message });
+      return false;
+    }
+  },
+
+  // ── Market Data ─────────────────────────────────────────────────────────────
+  prices:         {},
+  stocks:         [],
+  positions:      [],
+  orders:         [],
+  selectedSymbol: 'RELIANCE-NSE',
+
+  setSelectedSymbol: (symbol) => {
+    set({ selectedSymbol: symbol });
+    socket.emit('subscribe', symbol);
+  },
+
+  subscribeToOption: (data) => socket.emit('subscribe', data),
+  subscribeToOptionBatch: (dataArray) => socket.emit('subscribe_batch', dataArray),
+  unsubscribeFromOption: (data) => socket.emit('unsubscribe', data),
+  unsubscribeFromOptionBatch: (dataArray) => {
+    if(Array.isArray(dataArray)) {
+      dataArray.forEach(data => socket.emit('unsubscribe', data));
+    }
+  },
+
+  // ── Chart / Candle State (used by ChartWidget.jsx) ──────────────────────────
+  candleData:       {},   // { [symbol]: CandleBar[] }
+  isLoadingCandles: false,
+  candleError:      null,
+  chartInterval:    'ONE_DAY',
+
+  setChartInterval: (interval) => {
+    set({ chartInterval: interval });
+    const { selectedSymbol } = get();
+    if (selectedSymbol) get().loadCandleData(selectedSymbol, interval);
+  },
+
+  loadCandleData: async (symbol, interval) => {
+    if (!symbol) return;
+    const resolvedInterval = interval || get().chartInterval;
+    set({ isLoadingCandles: true, candleError: null });
+    try {
+      const res = await fetch(
+        `${API}/api/candles/${encodeURIComponent(symbol)}?interval=${resolvedInterval}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const candles = await res.json();
+      if (!Array.isArray(candles)) throw new Error('Invalid candle data');
+      set((state) => ({
+        candleData:       { ...state.candleData, [symbol]: candles },
+        isLoadingCandles: false,
+        candleError:      null,
+      }));
+    } catch (err) {
+      set({ isLoadingCandles: false, candleError: err.message });
+    }
+  },
+
+  // ── Socket ──────────────────────────────────────────────────────────────────
+  initSocket: () => {
+    socket.off('price_snapshot');
+    socket.on('price_snapshot', (snapshot) => {
+      set((state) => ({ prices: applySnapshot(snapshot, state) }));
+    });
+
+    socket.off('market_data');
+    socket.on('market_data', (data) => {
+      set((state) => {
+        const old  = state.prices[data.symbol];
+        const tick = old
+          ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
+          : 'flat';
+        return { prices: { ...state.prices, [data.symbol]: { ...old, ...data, tick } } };
+      });
+    });
+
+    socket.on('connect', () => get().refreshPrices());
+  },
+
+  // ── Price Fetching ───────────────────────────────────────────────────────────
+  refreshPrices: async () => {
+    try {
+      const res      = await fetch(`${API}/api/prices`);
+      const snapshot = await res.json();
+      if (snapshot && Object.keys(snapshot).length > 0) {
+        set((state) => ({ prices: applySnapshot(snapshot, state) }));
+      }
+    } catch (_) {}
+  },
+
+  fetchBatchPrices: async (symbols) => {
+    try {
+      const res      = await fetch(`${API}/api/prices/batch?symbols=${symbols.join(',')}`);
+      const snapshot = await res.json();
+      if (snapshot && Object.keys(snapshot).length > 0) {
+        set((state) => ({ prices: applySnapshot(snapshot, state) }));
+      }
+    } catch (_) {}
+  },
+
+  // ── Stock List ───────────────────────────────────────────────────────────────
+  loadStocks: async () => {
+    try {
+      const res    = await fetch(`${API}/api/stocks`);
+      const stocks = await res.json();
+      if (!Array.isArray(stocks) || stocks.length === 0) return;
+      set({ stocks });
+      get().refreshPrices();
+    } catch (_) {}
+  },
+
+  // ── User Data ────────────────────────────────────────────────────────────────
+  fetchUserData: async () => {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [posRes, ordRes, userRes] = await Promise.all([
+        fetch(`${API}/api/positions`, { headers }),
+        fetch(`${API}/api/orders`,    { headers }),
+        fetch(`${API}/api/user`,      { headers }),
+      ]);
+      const [positions, orders, user] = await Promise.all([
+        posRes.json(), ordRes.json(), userRes.json(),
+      ]);
+      set({ positions: positions || [], orders: orders || [], user: user || get().user });
+      
+      const posSymbols = (positions || []).map(p => p.symbol);
+      if (posSymbols.length > 0) {
+        get().fetchBatchPrices(posSymbols);
+        posSymbols.forEach(sym => socket.emit('subscribe', sym));
+      }
+      
+      // Also fetch restricted stocks on load
+      get().fetchRestrictedStocks();
+      // No initial search; let MutualFundsView handle empty state
+    } catch (_) {}
+  },
+  
+  restrictedStocks: [],
+  fetchRestrictedStocks: async () => {
+      try {
+          const res = await fetch(`${API}/api/restricted-stocks`);
+          const data = await res.json();
+          if (Array.isArray(data)) set({ restrictedStocks: data });
+      } catch (_) {}
+  },
+
+  mutualFunds: [],
+  searchMfRequestId: 0,
+  searchMutualFunds: async (query) => {
+      try {
+          const currentRequestId = ++get().searchMfRequestId;
+          const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          
+          // Only update if this is still the latest search request!
+          if (Array.isArray(data) && currentRequestId === get().searchMfRequestId) {
+              set({ mutualFunds: data });
+              
+              // Background enrich: take first 10 non-enriched funds and fetch their NAV/returns
+              const toEnrich = data.filter(f => !f.enriched).slice(0, 10).map(f => f.id);
+              if (toEnrich.length > 0) {
+                  try {
+                      const enrichRes = await fetch(`${API}/api/mf/enrich?ids=${toEnrich.join(',')}`);
+                      const enrichData = await enrichRes.json();
+                      
+                      // Check AGAIN if this is still the latest search before merging enrich data
+                      if (Array.isArray(enrichData) && currentRequestId === get().searchMfRequestId) {
+                          const enrichMap = {};
+                          enrichData.forEach(e => { enrichMap[e.id] = e; });
+                          
+                          const currentFunds = get().mutualFunds;
+                          const updatedFunds = currentFunds.map(f => {
+                              if (enrichMap[f.id]) {
+                                  return { ...f, ...enrichMap[f.id], enriched: true };
+                              }
+                              return f;
+                          });
+                          set({ mutualFunds: updatedFunds });
+                      }
+                  } catch (_) {} // Silent fail for enrichment
+              }
+          }
+      } catch (_) {}
+  },
+
+  enrichFundsBatch: async (ids) => {
+      if (!ids || ids.length === 0) return;
+      try {
+          const res = await fetch(`${API}/api/mf/enrich?ids=${ids.join(',')}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+              const enrichMap = {};
+              data.forEach(e => { enrichMap[e.id] = e; });
+              
+              const currentFunds = get().mutualFunds;
+              const updatedFunds = currentFunds.map(f => {
+                  if (enrichMap[f.id]) {
+                      return { ...f, ...enrichMap[f.id], enriched: true };
+                  }
+                  return f;
+              });
+              set({ mutualFunds: updatedFunds });
+          }
+      } catch (_) {}
+  },
+
   fundDetailsCache: {},
   fetchFundDetails: async (schemeName) => {
       if (!schemeName) return null;
@@ -572,6 +796,147 @@ export const useStore = create(persist((set, get) => ({
     } catch (_) { return false; }
   },
 
+  cancelOrder: async (orderId) => {
+    const { token } = get();
+    try {
+      const res  = await fetch(`${API}/api/order/${orderId}/cancel`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return true; }
+      return false;
+    } catch (_) { return false; }
+  },
+
+  // ── Wallet / Deposits ───────────────────────────────────────────────────────
+  requestDeposit: async (amount) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/wallet/deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount })
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  // ── Settings ────────────────────────────────────────────────────────────────
+  updatePassword: async (oldPassword, newPassword) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  syncWatchlists: async (watchlists) => {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await fetch(`${API}/api/user/watchlists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ watchlists })
+      });
+    } catch (err) {}
+  },
+
+  // ── Admin ───────────────────────────────────────────────────────────────────
+  fetchAdminUsers: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const users = await res.json();
+        return { success: true, users };
+      }
+      return { success: false, error: 'Unauthorized' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  updateUserBalance: async (userId, balance) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}/balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ balance })
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchDepositRequests: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/deposits`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, deposits: data.deposits };
+      }
+      return { success: false, error: 'Unauthorized' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  processDeposit: async (depositId, action) => {
+    // action should be 'approve' or 'reject'
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/deposits/${depositId}/${action}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  setToken: (token) => set({ token }),
+  setUser:  (user)  => set({ user }),
+  logout:   ()      => set({ token: null, user: null }),
+  
+  // ── Theme ───────────────────────────────────────────────────────────────────
+  theme: 'dark', // default to dark
+  toggleTheme: () => set((state) => {
+    const newTheme = state.theme === 'dark' ? 'light' : 'dark';
+    if (newTheme === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    return { theme: newTheme };
+  }),
 
 }), {
   name: 'shortmarket-storage',
@@ -580,5 +945,6 @@ export const useStore = create(persist((set, get) => ({
     activeWatchlistId: state.activeWatchlistId,
     token:             state.token,
     user:              state.user,
+    theme:             state.theme,
   }),
 }));

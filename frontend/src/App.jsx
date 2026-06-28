@@ -8,10 +8,12 @@ import OptionChainView from './components/OptionChainView';
 import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
 import AdminDashboard from './components/AdminDashboard';
+import SettingsView from './components/SettingsView';
 import OrderModal from './components/OrderModal';
+import DepositModal from './components/DepositModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
-import { Wallet, TrendingUp, TrendingDown, LogOut } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User } from 'lucide-react';
 
 const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
@@ -19,10 +21,12 @@ function App() {
   const {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
-    selectedSymbol, prices,
+    selectedSymbol, prices, toggleTheme, theme
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('Markets');
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
 
@@ -123,7 +127,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Client Data', 'Settings',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -148,39 +152,52 @@ function App() {
               )})}
             </div>
 
-            {/* Margin */}
-            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Wallet size={12} style={{ color: 'var(--text-secondary)' }} />
-              <div>
-                <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
-                  Available Margin
-                </div>
-                <div style={{ fontWeight: '700', fontSize: '11px' }}>
-                  ₹{(user.balance || 1000000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            {/* Margin & Deposit */}
+            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Wallet size={12} style={{ color: 'var(--text-secondary)' }} />
+                <div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+                    Available Margin
+                  </div>
+                  <div style={{ fontWeight: '700', fontSize: '11px' }}>
+                    ₹{(user.balance || 1000000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
               </div>
+              <button 
+                className="btn btn-primary" 
+                style={{ padding: '6px 12px', fontSize: '11px' }}
+                onClick={() => setShowDepositModal(true)}
+              >
+                Deposit
+              </button>
             </div>
 
             <div className="hide-on-mobile" style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
 
             {/* User avatar + logout */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                onClick={toggleTheme}
+                style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
               <div style={{
-                width:          '24px',
-                height:         '24px',
-                borderRadius:   '50%',
-                background:     'linear-gradient(135deg, var(--color-red), var(--color-navy-light))',
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                fontWeight:     '800',
-                fontSize:       '11px',
+                width: '28px', height: '28px', borderRadius: '50%',
+                background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--border-color)', overflow: 'hidden'
               }}>
-                {user.username?.[0]?.toUpperCase()}
+                {user?.profile_picture_url ? (
+                  <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <User size={14} color="var(--text-secondary)" />
+                )}
               </div>
-              <div className="hide-on-mobile">
-                <div style={{ fontWeight: '700', fontSize: '11px' }}>{user.username}</div>
-                <div style={{ fontSize: '9px', color: 'var(--color-green-light)' }}>● Active</div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '11px', fontWeight: '600' }}>{user.username}</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{user.id}</span>
               </div>
               <div
                 onClick={logout}
@@ -226,6 +243,11 @@ function App() {
               <ClientDataView />
             </div>
           )}
+          {activeTab === 'Settings' && (
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+              <SettingsView />
+            </div>
+          )}
           {activeTab === 'AdminPanel' && user?.is_admin && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
               <AdminDashboard />
@@ -235,7 +257,8 @@ function App() {
         </div>
       </div>
 
-      <OrderModal />
+      {showOrderModal && <OrderModal onClose={() => setShowOrderModal(false)} defaultSymbol={selectedSymbol} />}
+      {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance } = useStore();
+  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit } = useStore();
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
+  const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
@@ -13,18 +15,21 @@ export default function AdminDashboard() {
   const [newBalance, setNewBalance] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const res = await fetchAdminUsers();
-    if (res.success) {
-      setUsers(res.users);
+    if (activeTab === 'users') {
+      const res = await fetchAdminUsers();
+      if (res.success) setUsers(res.users);
+    } else {
+      const res = await fetchDepositRequests();
+      if (res.success) setDeposits(res.deposits);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadData();
+  }, [activeTab]);
 
   const handleUpdateBalance = async (e) => {
     e.preventDefault();
@@ -34,11 +39,20 @@ export default function AdminDashboard() {
     if (res.success) {
       alert('Balance updated successfully!');
       setSelectedUser(null);
-      loadUsers();
+      loadData();
     } else {
       alert(`Error updating balance: ${res.error}`);
     }
     setUpdating(false);
+  };
+
+  const handleProcessDeposit = async (id, action) => {
+    const res = await processDeposit(id, action);
+    if (res.success) {
+      loadData();
+    } else {
+      alert(`Error: ${res.error}`);
+    }
   };
 
   const filteredUsers = users.filter(u => 
@@ -55,8 +69,19 @@ export default function AdminDashboard() {
             <Shield size={24} style={{ color: 'var(--color-red)' }} />
             Admin Control Center
           </h2>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Manage clients, funds, and KYC documents
+          <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+            <button 
+              onClick={() => setActiveTab('users')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer' }}
+            >
+              Client Management
+            </button>
+            <button 
+              onClick={() => setActiveTab('deposits')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer' }}
+            >
+              Deposit Requests
+            </button>
           </div>
         </div>
         
@@ -73,7 +98,7 @@ export default function AdminDashboard() {
           </div>
           <button 
             className="btn btn-secondary" 
-            onClick={loadUsers}
+            onClick={loadData}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <RefreshCw size={14} /> Refresh
@@ -81,11 +106,11 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Users Table */}
+      {/* Content */}
       <div style={{ background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading clients...</div>
-        ) : (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+        ) : activeTab === 'users' ? (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
@@ -155,6 +180,57 @@ export default function AdminDashboard() {
                     </tr>
                   );
                 })
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Status</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deposits.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No deposit requests found
+                  </td>
+                </tr>
+              ) : (
+                deposits.map(d => (
+                  <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Date(d.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ fontWeight: '600' }}>{d.username}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{d.email}</div>
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>
+                      ₹{Number(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      {d.status === 'PENDING' && <span style={{ color: 'var(--color-yellow)', background: 'rgba(234,179,8,0.1)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>PENDING</span>}
+                      {d.status === 'APPROVED' && <span style={{ color: 'var(--color-green-light)', background: 'rgba(34,197,94,0.1)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>APPROVED</span>}
+                      {d.status === 'REJECTED' && <span style={{ color: 'var(--color-red-light)', background: 'rgba(239,68,68,0.1)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>REJECTED</span>}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>
+                      {d.status === 'PENDING' && (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button onClick={() => handleProcessDeposit(d.id, 'approve')} className="btn" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.2)', padding: '6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
+                            <Check size={16} />
+                          </button>
+                          <button onClick={() => handleProcessDeposit(d.id, 'reject')} className="btn" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)', padding: '6px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
+                            <XCircle size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

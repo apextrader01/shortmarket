@@ -249,6 +249,43 @@ app.post('/api/user/kyc', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/user/password', authenticateToken, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const bcrypt = require('bcrypt');
+    
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const valid = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Incorrect old password' });
+    
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db('users').where({ id: req.user.id }).update({ password_hash: newHash });
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    
+    await db('deposit_requests').insert({
+      user_id: req.user.id,
+      amount: Number(amount),
+      status: 'PENDING'
+    });
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Admin ────────────────────────────────────────────────────────────────
 app.get('/api/admin/users', authenticateToken, async (req, res) => {
   try {
@@ -272,6 +309,56 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
 
     await db('users').where({ id: req.params.id }).update({ balance: Number(balance) });
     res.json({ success: true, balance: Number(balance) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const deposits = await db('deposit_requests')
+      .join('users', 'deposit_requests.user_id', 'users.id')
+      .select('deposit_requests.*', 'users.username', 'users.email')
+      .orderBy('deposit_requests.created_at', 'desc');
+      
+    res.json({ success: true, deposits });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    await db.transaction(async trx => {
+      const deposit = await trx('deposit_requests').where({ id: req.params.id }).first();
+      if (!deposit || deposit.status !== 'PENDING') throw new Error('Invalid deposit request');
+      
+      await trx('deposit_requests').where({ id: deposit.id }).update({ status: 'APPROVED' });
+      await trx('users').where({ id: deposit.user_id }).increment('balance', deposit.amount);
+    });
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/deposits/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const deposit = await db('deposit_requests').where({ id: req.params.id }).first();
+    if (!deposit || deposit.status !== 'PENDING') return res.status(400).json({ error: 'Invalid deposit request' });
+    
+    await db('deposit_requests').where({ id: deposit.id }).update({ status: 'REJECTED' });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

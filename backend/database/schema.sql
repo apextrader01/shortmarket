@@ -38,3 +38,12 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Insert a default mock user if not exists
 INSERT OR IGNORE INTO users (id, username, balance) VALUES (1, 'mock_trader', 1000000.0);
+
+CREATE TABLE IF NOT EXISTS deposit_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);

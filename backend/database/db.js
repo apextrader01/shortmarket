@@ -132,6 +132,19 @@ async function initSchema() {
       }
     }
 
+    // 4. Deposit Requests Table
+    const hasDepositRequests = await db.schema.hasTable('deposit_requests');
+    if (!hasDepositRequests) {
+      await db.schema.createTable('deposit_requests', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.decimal('amount', 14, 2).notNullable();
+        table.string('status').notNullable().defaultTo('PENDING'); // PENDING, APPROVED, REJECTED
+        table.timestamps(true, true);
+      });
+      console.log('Created deposit_requests table');
+    }
+
     // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
