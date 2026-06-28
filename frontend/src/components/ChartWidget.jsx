@@ -261,35 +261,35 @@ export default function ChartWidget() {
 
         {/* Quick Order Buttons Overlay */}
         {price && !isLoadingCandles && (
-          <div style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 5, display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', top: '12px', right: '80px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
               onClick={() => openOrderModal(selectedSymbol, 'SELL', 1)}
               style={{
                 background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
-                padding: '4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', transition: 'background 0.2s',
-                lineHeight: '1.2'
+                lineHeight: '1.2', minWidth: '46px'
               }}
               onMouseOver={e => e.currentTarget.style.background = '#d64530'}
               onMouseOut={e => e.currentTarget.style.background = '#F0533C'}
             >
-              <div style={{ fontSize: '13px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
-              <div style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.5px' }}>SELL</div>
+              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>SELL</div>
             </button>
-            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>0.00</span>
+            <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
               onClick={() => openOrderModal(selectedSymbol, 'BUY', 1)}
               style={{
                 background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
-                padding: '4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
                 cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', transition: 'background 0.2s',
-                lineHeight: '1.2'
+                lineHeight: '1.2', minWidth: '46px'
               }}
               onMouseOver={e => e.currentTarget.style.background = '#0d9b73'}
               onMouseOut={e => e.currentTarget.style.background = '#0FB384'}
             >
-              <div style={{ fontSize: '13px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
-              <div style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.5px' }}>BUY</div>
+              <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
+              <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>BUY</div>
             </button>
           </div>
         )}
