@@ -67,7 +67,6 @@ export default function EditOrderModal() {
 
             <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
           </div>
-        </div>
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
