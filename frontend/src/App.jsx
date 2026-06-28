@@ -66,11 +66,8 @@ function App() {
   const price = prices[selectedSymbol];
 
   return (
-    <div className="app-container">
-      <MarketWatch />
-
-      <div className="main-content">
-        <header className="topbar">
+    <div className="app-container" style={{ flexDirection: 'column' }}>
+      <header className="topbar" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="logo-text" style={{ fontSize: '15px', marginRight: '12px' }}>
@@ -197,7 +194,10 @@ function App() {
           </div>
         </header>
 
-        <main style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%' }}>
+        <MarketWatch />
+        <div className="main-content" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          <main style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
           {activeTab === 'Markets' && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -219,7 +219,8 @@ function App() {
               <ClientDataView />
             </div>
           )}
-        </main>
+          </main>
+        </div>
       </div>
 
       <OrderModal />
