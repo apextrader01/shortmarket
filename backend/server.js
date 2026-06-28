@@ -759,7 +759,7 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('Yahoo Finance Error for', yfSymbol, err.message);
-    res.status(500).json({ error: 'Failed to fetch stock details' });
+    res.status(500).json({ error: 'Failed to fetch stock details', details: err.message, stack: err.stack });
   }
 });
 
