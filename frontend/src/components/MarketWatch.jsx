@@ -153,7 +153,7 @@ export default function MarketWatch() {
               onMouseEnter={() => setHoveredStock(stock.uniqueSymbol)}
               onMouseLeave={() => setHoveredStock(null)}
               style={{
-                padding: '10px 16px',
+                padding: '6px 12px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 cursor: 'pointer',
                 background: isSelected ? 'rgba(225, 42, 31, 0.08)' : isHovered ? 'rgba(255,255,255,0.02)' : 'transparent',
@@ -166,48 +166,48 @@ export default function MarketWatch() {
               }}
             >
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: '700', fontSize: '13px', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontWeight: '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {stock.symbol}
-                  <span style={{ fontSize: '9px', padding: '1px 4px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', color: 'var(--text-secondary)' }}>
+                  <span style={{ fontSize: '9px', padding: '1px 3px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', color: 'var(--text-secondary)' }}>
                     {stock.exchange}
                   </span>
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.name}</div>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.name}</div>
               </div>
 
               {/* Action Buttons (visible on hover) */}
               {isHovered && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '8px' }}>
                   {isSearchMode ? (
                     isInWatchlist ? (
-                      <Check size={16} color="var(--color-green-light)" />
+                      <Check size={14} color="var(--color-green-light)" />
                     ) : (
                       <div 
                         onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
-                        style={{ padding: '4px', background: 'var(--color-blue)', borderRadius: '4px', display: 'flex' }}
+                        style={{ padding: '3px', background: 'var(--color-blue)', borderRadius: '4px', display: 'flex' }}
                       >
-                        <Plus size={14} color="#fff" />
+                        <Plus size={12} color="#fff" />
                       </div>
                     )
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <div 
                         onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY'); }}
-                        style={{ padding: '2px 8px', background: 'var(--color-blue)', borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
+                        style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         B
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL'); }}
-                        style={{ padding: '2px 8px', background: 'var(--color-red)', borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
+                        style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         S
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
-                        style={{ padding: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', display: 'flex', marginLeft: '4px' }}
+                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
                       >
-                        <Trash2 size={14} color="var(--color-red-light)" />
+                        <Trash2 size={12} color="var(--color-red-light)" />
                       </div>
                     </div>
                   )}
@@ -218,14 +218,14 @@ export default function MarketWatch() {
               {data && !isHovered ? (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{
-                    fontWeight: '700',
-                    fontSize: '13px',
+                    fontWeight: '600',
+                    fontSize: '12px',
                     color: data.tick === 'up' ? 'var(--color-green-light)' : data.tick === 'down' ? 'var(--color-red-light)' : 'var(--text-primary)'
                   }}>
-                    ₹{data.ltp.toFixed(2)}
+                    {data.ltp.toFixed(2)}
                   </div>
                   <div style={{
-                    fontSize: '11px',
+                    fontSize: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '2px',
@@ -237,7 +237,7 @@ export default function MarketWatch() {
                   </div>
                 </div>
               ) : !data && !isHovered ? (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</div>
               ) : null}
             </div>
           );
