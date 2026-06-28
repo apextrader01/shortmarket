@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart } from 'lightweight-charts';
+import { createChart, AreaSeries } from 'lightweight-charts';
 import { useStore } from '../store';
 import { Loader2 } from 'lucide-react';
 
@@ -40,7 +40,7 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
                     }
                 });
 
-                lineSeries = chart.addAreaSeries({
+                lineSeries = chart.addSeries(AreaSeries, {
                     lineColor: color,
                     topColor: `${color}40`, // 25% opacity
                     bottomColor: `${color}00`,
