@@ -10,6 +10,7 @@ import ClientDataView from './components/ClientDataView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
 import OrderModal from './components/OrderModal';
+import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
@@ -21,7 +22,7 @@ function App() {
   const {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
-    selectedSymbol, prices, toggleTheme, theme, orderModal
+    selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('Markets');
@@ -253,6 +254,7 @@ function App() {
       </div>
 
       {orderModal?.isOpen && <OrderModal />}
+      {editOrderModal?.isOpen && <EditOrderModal />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       
       {/* Mobile Bottom Navigation */}
