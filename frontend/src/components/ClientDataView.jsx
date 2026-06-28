@@ -216,6 +216,12 @@ export default function ClientDataView() {
             <div style={{ fontSize: '18px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>
               {user?.username || 'Hari Krishnan I Vijayan'}
             </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+              Client ID: {user?.id}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
+              Available Margin: ₹{user?.available_margin ? parseFloat(user.available_margin).toFixed(2) : '0.00'}
+            </div>
             <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
           </div>
@@ -226,17 +232,18 @@ export default function ClientDataView() {
       </div>
 
       {/* Add Funds Banner */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+      {/* Add Funds Banner */}
+      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
             ₹
           </div>
           <div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Get ready to invest</div>
-            <div style={{ fontSize: '16px', fontWeight: '700' }}>Add funds to start your trading journey with Short Market</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
           </div>
         </div>
-        <button style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+        <button style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', width: '100%', maxWidth: '300px' }}>
           ADD FUNDS TO START TRADING
         </button>
       </div>
