@@ -70,8 +70,11 @@ function App() {
       <header className="topbar" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="logo-text" style={{ fontSize: '15px', marginRight: '12px' }}>
-              SH<span>O</span>RT MARKET
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
+              <img src="/logo.png" alt="" style={{ height: '24px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+              <div className="logo-text" style={{ fontSize: '15px' }}>
+                SH<span>O</span>RT MARKET
+              </div>
             </div>
 
             <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
