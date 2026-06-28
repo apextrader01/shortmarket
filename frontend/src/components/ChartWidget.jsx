@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import StockDetails from './StockDetails';
 
 const TIMEFRAMES = [
   { label: '1M',  value: 'ONE_MINUTE' },
@@ -336,6 +337,10 @@ export default function ChartWidget() {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      
+      {selectedSymbol && price && (
+        <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
+      )}
     </div>
   );
 }

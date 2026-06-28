@@ -714,6 +714,55 @@ app.get('/api/candles/:symbol', async (req, res) => {
   }
 });
 
+// ─── Stock Details (Yahoo Finance) ──────────────────────────────────────────
+let _yahooFinance = null;
+function getYahooFinance() {
+  if (!_yahooFinance) {
+    const YahooFinance = require('yahoo-finance2').default;
+    _yahooFinance = new YahooFinance();
+  }
+  return _yahooFinance;
+}
+
+const stockDetailsCache = {};
+app.get('/api/stocks/:symbol/details', async (req, res) => {
+  const symbol = req.params.symbol;
+  // Convert our symbol format (e.g., RELIANCE-NSE) to Yahoo format (RELIANCE.NS)
+  let yfSymbol = symbol;
+  if (symbol.endsWith('-NSE')) yfSymbol = symbol.replace('-NSE', '.NS');
+  else if (symbol.endsWith('-BSE')) yfSymbol = symbol.replace('-BSE', '.BO');
+
+  if (stockDetailsCache[yfSymbol] && (Date.now() - stockDetailsCache[yfSymbol].timestamp < 3600000)) {
+    return res.json(stockDetailsCache[yfSymbol].data);
+  }
+
+  try {
+    const yf = getYahooFinance();
+    const quoteSummary = await yf.quoteSummary(yfSymbol, { 
+      modules: ['summaryDetail', 'assetProfile', 'financialData', 'defaultKeyStatistics', 'majorHoldersBreakdown'] 
+    });
+    
+    // Also fetch recent news
+    let news = [];
+    try {
+      news = await yf.search(yfSymbol, { newsCount: 5 });
+    } catch (e) {
+      console.error('Failed to fetch news for', yfSymbol);
+    }
+
+    const data = {
+      ...quoteSummary,
+      news: news.news || []
+    };
+
+    stockDetailsCache[yfSymbol] = { timestamp: Date.now(), data };
+    res.json(data);
+  } catch (err) {
+    console.error('Yahoo Finance Error for', yfSymbol, err.message);
+    res.status(500).json({ error: 'Failed to fetch stock details' });
+  }
+});
+
 // ─── Socket.IO ────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
