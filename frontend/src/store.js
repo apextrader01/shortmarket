@@ -360,6 +360,12 @@ export const useStore = create(persist((set, get) => ({
         posRes.json(), ordRes.json(), userRes.json(),
       ]);
       set({ positions: positions || [], orders: orders || [], user: user || get().user });
+      
+      const posSymbols = (positions || []).map(p => p.symbol);
+      if (posSymbols.length > 0) {
+        get().fetchBatchPrices(posSymbols);
+        posSymbols.forEach(sym => socket.emit('subscribe', sym));
+      }
     } catch (_) {}
   },
 
