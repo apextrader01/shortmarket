@@ -9,6 +9,8 @@ export default function PortfolioView() {
 
   let totalInvested = 0;
   let totalCurrent = 0;
+  let totalInvestedStocks = 0;
+  let totalInvestedETFs = 0;
 
   deliveryPositions.forEach(pos => {
       const priceData = prices[pos.symbol] || {};
@@ -20,6 +22,13 @@ export default function PortfolioView() {
       
       totalInvested += invested;
       totalCurrent += current;
+
+      const isETF = pos.symbol.includes('ETF') || pos.symbol.includes('BEES') || pos.symbol.includes('LIQUID');
+      if (isETF) {
+          totalInvestedETFs += invested;
+      } else {
+          totalInvestedStocks += invested;
+      }
   });
 
   const overallGain = totalCurrent - totalInvested;
@@ -86,9 +95,22 @@ export default function PortfolioView() {
           )}
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: '600' }}>Equity</div>
-              <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>INVEST NOW</button>
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ fontWeight: '600', fontSize: '15px' }}>Equity <span style={{ color: 'var(--text-secondary)', fontWeight: '400', fontSize: '12px' }}>(₹{totalInvested.toFixed(2)})</span></div>
+                <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>INVEST NOW</button>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                   <span style={{ color: 'var(--text-secondary)' }}>Stocks</span>
+                   <span style={{ fontWeight: '600' }}>₹{totalInvestedStocks.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                   <span style={{ color: 'var(--text-secondary)' }}>ETFs</span>
+                   <span style={{ fontWeight: '600' }}>₹{totalInvestedETFs.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
             <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontWeight: '600' }}>Mutual Funds</div>
