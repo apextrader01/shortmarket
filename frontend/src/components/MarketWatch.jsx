@@ -220,9 +220,14 @@ export default function MarketWatch() {
                   <div style={{
                     fontWeight: '600',
                     fontSize: '12px',
-                    color: data.tick === 'up' ? 'var(--color-green-light)' : data.tick === 'down' ? 'var(--color-red-light)' : 'var(--text-primary)'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '4px',
+                    color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)'
                   }}>
                     {data.ltp.toFixed(2)}
+                    {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
                   </div>
                   <div style={{
                     fontSize: '10px',
@@ -232,8 +237,9 @@ export default function MarketWatch() {
                     justifyContent: 'flex-end',
                     color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)'
                   }}>
-                    {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : <Minus size={10} />}
-                    {data.pct !== undefined ? `${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%` : '—'}
+                    {data.change !== undefined && data.pct !== undefined 
+                      ? `${data.pct > 0 ? '+' : ''}${Number(data.change).toFixed(2)} (${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%)` 
+                      : '—'}
                   </div>
                 </div>
               ) : !data && !isHovered ? (

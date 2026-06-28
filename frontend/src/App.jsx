@@ -103,7 +103,7 @@ function App() {
                     {p ? `${p.ltp.toFixed(2)}` : '...'}
                     {p && (
                       <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
-                        {p.pct > 0 ? '+' : ''}{Number(p.pct || 0).toFixed(2)}%
+                        {p.change !== undefined ? `${p.change > 0 ? '+' : ''}${Number(p.change).toFixed(2)} (${p.pct > 0 ? '+' : ''}${Number(p.pct).toFixed(2)}%)` : ''}
                       </span>
                     )}
                   </div>
