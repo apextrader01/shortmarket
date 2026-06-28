@@ -261,7 +261,7 @@ export default function ChartWidget() {
 
         {/* Quick Order Buttons Overlay */}
         {price && !isLoadingCandles && (
-          <div style={{ position: 'absolute', top: '12px', right: '80px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ position: 'absolute', top: '12px', left: '0px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
               onClick={() => openOrderModal(selectedSymbol, 'SELL', 1)}
               style={{
