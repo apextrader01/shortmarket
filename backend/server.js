@@ -714,51 +714,35 @@ app.get('/api/candles/:symbol', async (req, res) => {
   }
 });
 
-// ─── Stock Details (Yahoo Finance) ──────────────────────────────────────────
-let _yahooFinance = null;
-function getYahooFinance() {
-  if (!_yahooFinance) {
-    const YahooFinance = require('yahoo-finance2').default;
-    _yahooFinance = new YahooFinance();
-  }
-  return _yahooFinance;
-}
+// ─── Stock Details (Groww API) ──────────────────────────────────────────────
 
 const stockDetailsCache = {};
 app.get('/api/stocks/:symbol/details', async (req, res) => {
   const symbol = req.params.symbol;
-  // Convert our symbol format (e.g., RELIANCE-NSE) to Yahoo format (RELIANCE.NS)
-  let yfSymbol = symbol;
-  if (symbol.endsWith('-NSE')) yfSymbol = symbol.replace('-NSE', '.NS');
-  else if (symbol.endsWith('-BSE')) yfSymbol = symbol.replace('-BSE', '.BO');
+  let rawName = symbol.split('-')[0];
 
-  if (stockDetailsCache[yfSymbol] && (Date.now() - stockDetailsCache[yfSymbol].timestamp < 3600000)) {
-    return res.json(stockDetailsCache[yfSymbol].data);
+  if (stockDetailsCache[rawName] && (Date.now() - stockDetailsCache[rawName].timestamp < 3600000)) {
+    return res.json(stockDetailsCache[rawName].data);
   }
 
   try {
-    const yf = getYahooFinance();
-    const quoteSummary = await yf.quoteSummary(yfSymbol, { 
-      modules: ['summaryDetail', 'assetProfile', 'financialData', 'defaultKeyStatistics', 'majorHoldersBreakdown'] 
-    });
+    // 1. Find Groww search_id
+    const searchRes = await fetch(`https://groww.in/v1/api/search/v1/entity?app=false&entity_type=stocks&size=1&q=${encodeURIComponent(rawName)}`);
+    const searchData = await searchRes.json();
     
-    // Also fetch recent news
-    let news = [];
-    try {
-      news = await yf.search(yfSymbol, { newsCount: 5 });
-    } catch (e) {
-      console.error('Failed to fetch news for', yfSymbol);
+    if (!searchData || !searchData.content || searchData.content.length === 0) {
+      return res.status(404).json({ error: 'Stock not found on Groww' });
     }
+    const searchId = searchData.content[0].search_id;
 
-    const data = {
-      ...quoteSummary,
-      news: news.news || []
-    };
+    // 2. Fetch full details
+    const detailsRes = await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`);
+    const data = await detailsRes.json();
 
-    stockDetailsCache[yfSymbol] = { timestamp: Date.now(), data };
+    stockDetailsCache[rawName] = { timestamp: Date.now(), data };
     res.json(data);
   } catch (err) {
-    console.error('Yahoo Finance Error for', yfSymbol, err.message);
+    console.error('Groww API Error for', rawName, err.message);
     res.status(500).json({ error: 'Failed to fetch stock details', details: err.message, stack: err.stack });
   }
 });
