@@ -58,8 +58,8 @@ export default function OrderModal() {
       }
     }
     
-    // Exchange Margin Leverage is typically ~15% of contract value
-    const marginRate = 0.15; 
+    // User requested 9.50x leverage for option selling
+    const marginRate = 1 / 9.5; 
     
     if (optionStrike > 0) {
       baseMargin = optionStrike * totalQuantity * marginRate;
