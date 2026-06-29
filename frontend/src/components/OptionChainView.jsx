@@ -153,9 +153,7 @@ const OptionChainView = () => {
           <thead>
             <tr>
               <th className="header-call" colSpan="7">CALL</th>
-              <th className="header-strike">
-                <div className="view-pill">GREEKS & LTP</div>
-              </th>
+              <th className="header-strike"></th>
               <th className="header-put" colSpan="7">PUT</th>
             </tr>
             <tr>
