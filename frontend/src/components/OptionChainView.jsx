@@ -186,9 +186,9 @@ const OptionChainView = () => {
         <table className="option-chain-table">
           <thead>
             <tr>
-              <th className="header-call" colSpan="7">CALL</th>
+              <th className="header-call" colSpan="8">CALL</th>
               <th className="header-strike"></th>
-              <th className="header-put" colSpan="7">PUT</th>
+              <th className="header-put" colSpan="8">PUT</th>
             </tr>
             <tr>
               {/* Calls */}
@@ -198,10 +198,12 @@ const OptionChainView = () => {
               <th className="center">IV</th>
               <th className="center">Vol</th>
               <th className="center">Chg</th>
-              <th className="center border-right">LTP</th>
+              <th className="center">LTP</th>
+              <th className="center border-right">BrkEvn(%)</th>
               {/* Strike */}
               <th className="header-strike" style={{ background: '#111' }}>Strike</th>
               {/* Puts */}
+              <th className="center border-left">BrkEvn(%)</th>
               <th className="center">LTP</th>
               <th className="center">Chg</th>
               <th className="center">Vol</th>
@@ -238,6 +240,12 @@ const OptionChainView = () => {
               const isCallITM = spotPrice > 0 && strike < spotPrice;
               const isPutITM = spotPrice > 0 && strike > spotPrice;
 
+              const cBreakeven = cLtp > 0 ? strike + cLtp : 0;
+              const pBreakeven = pLtp > 0 ? strike - pLtp : 0;
+              
+              const cBreakPct = (cBreakeven > 0 && spotPrice > 0) ? ((cBreakeven / spotPrice) - 1) * 100 : 0;
+              const pBreakPct = (pBreakeven > 0 && spotPrice > 0) ? ((pBreakeven / spotPrice) - 1) * 100 : 0;
+
               return (
                 <tr key={strike} ref={strike === atmStrike ? atmRowRef : null}>
                   {/* Calls */}
@@ -249,7 +257,7 @@ const OptionChainView = () => {
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                     {callPriceData?.change ? callPriceData.change.toFixed(2) : '-'}
                   </td>
-                  <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
                     <div className="ltp-container">
                       <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                         {cLtp > 0 ? cLtp.toFixed(2) : '-'}
@@ -260,11 +268,31 @@ const OptionChainView = () => {
                       </div>
                     </div>
                   </td>
+                  <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
+                    {cBreakeven > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{cBreakeven.toFixed(1)}</span>
+                        <span style={{ fontSize: '10px', color: cBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {cBreakPct > 0 ? '+' : ''}{cBreakPct.toFixed(1)}%
+                        </span>
+                      </div>
+                    ) : '-'}
+                  </td>
 
                   {/* Strike */}
                   <td className="strike-cell">{strike}</td>
 
                   {/* Puts */}
+                  <td className={`center border-left ${isPutITM ? 'bg-itm-put' : ''}`}>
+                    {pBreakeven > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{pBreakeven.toFixed(1)}</span>
+                        <span style={{ fontSize: '10px', color: pBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {pBreakPct > 0 ? '+' : ''}{pBreakPct.toFixed(1)}%
+                        </span>
+                      </div>
+                    ) : '-'}
+                  </td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>
                     <div className="ltp-container">
                       <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
