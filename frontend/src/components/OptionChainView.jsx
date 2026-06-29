@@ -68,6 +68,8 @@ const OptionChainView = () => {
   const [expiries, setExpiries] = useState([]);
   const [optionsData, setOptionsData] = useState({});
   const [loading, setLoading] = useState(false);
+  const [futureData, setFutureData] = useState(null);
+  const [futureTokenKey, setFutureTokenKey] = useState(null);
 
   useEffect(() => {
     const fetchSymbols = async () => {
@@ -95,7 +97,7 @@ const OptionChainView = () => {
   const [hasScrolled, setHasScrolled] = useState(false);
 
   useEffect(() => {
-    const fetchChain = async () => {
+    const fetchChainAndFuture = async () => {
       setLoading(true);
       try {
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
@@ -108,13 +110,25 @@ const OptionChainView = () => {
         if (expList.length > 0) {
           setExpiry(expList[0]);
         }
+
+        // Fetch Future
+        const futRes = await fetch(`${API}/api/options/futures/${symbol}`);
+        if (futRes.ok) {
+          const futData = await futRes.json();
+          setFutureData(futData);
+          setFutureTokenKey(futData.symbol);
+        } else {
+          setFutureData(null);
+          setFutureTokenKey(null);
+        }
+
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchChain();
+    fetchChainAndFuture();
     setHasScrolled(false); // Reset scroll on symbol change
   }, [symbol]);
 
@@ -135,6 +149,10 @@ const OptionChainView = () => {
     subscribeToSymbol(indexKey);
     subscribeToSymbol('INDIA VIX-NSE');
 
+    if (futureData) {
+      subscribeToOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
+    }
+
     strikes.forEach((strike) => {
       const data = optionsData[expiry][strike];
       if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
@@ -149,8 +167,11 @@ const OptionChainView = () => {
       unsubscribeFromOptionBatch(tokensToSub);
       unsubscribeFromSymbol(indexKey);
       unsubscribeFromSymbol('INDIA VIX-NSE');
+      if (futureData) {
+        unsubscribeFromOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
+      }
     };
-  }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
+  }, [expiry, optionsData, symbol, futureData, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const getIndexKey = (sym) => {
     if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
@@ -210,6 +231,48 @@ const OptionChainView = () => {
     );
   }
 
+  // Pre-calculate IVs for IVP
+  let minIV = Infinity;
+  let maxIV = 0;
+  let atmIV = 0;
+
+  if (spotPrice > 0 && strikes.length > 0) {
+    strikes.forEach(strike => {
+      const call = chain[strike].CE;
+      const put = chain[strike].PE;
+      const cLtp = call ? (prices[call.symbol]?.ltp || 0) : 0;
+      const pLtp = put ? (prices[put.symbol]?.ltp || 0) : 0;
+
+      let cIV = (cLtp > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
+      let pIV = (pLtp > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
+
+      if (cIV === 0 && pIV > 0) cIV = pIV;
+      if (pIV === 0 && cIV > 0) pIV = cIV;
+
+      if (cIV > 0) {
+        if (cIV < minIV) minIV = cIV;
+        if (cIV > maxIV) maxIV = cIV;
+      }
+      if (pIV > 0) {
+        if (pIV < minIV) minIV = pIV;
+        if (pIV > maxIV) maxIV = pIV;
+      }
+
+      if (strike === atmStrike) {
+        atmIV = Math.max(cIV, pIV); // Use the highest active IV for ATM
+      }
+    });
+  }
+
+  let ivp = 0;
+  if (atmIV > 0 && maxIV > minIV && minIV !== Infinity) {
+    ivp = ((atmIV - minIV) / (maxIV - minIV)) * 100;
+  }
+
+  const futPriceData = futureTokenKey ? prices[futureTokenKey] : null;
+  const futPrice = futPriceData?.ltp || 0;
+  const futPct = futPriceData?.pct || 0;
+
   return (
     <div className="option-chain-container">
       {/* Header */}
@@ -251,10 +314,15 @@ const OptionChainView = () => {
 
         <div className="top-bar-divider"></div>
 
-        {/* Section 3: Fut Price */}
+        {/* Section 3: Futures */}
         <div className="top-bar-section">
           <span className="top-bar-label">Fut Price</span>
-          <span className="top-bar-value">-</span>
+          <span className="top-bar-value">{futPrice > 0 ? futPrice.toFixed(2) : '-'}</span>
+          {futPct !== 0 && (
+            <span className={`top-bar-pct ${futPct >= 0 ? 'positive' : 'negative'}`}>
+              {futPct > 0 ? '+' : ''}{futPct.toFixed(2)}%
+            </span>
+          )}
         </div>
 
         <div className="top-bar-divider"></div>
@@ -274,8 +342,8 @@ const OptionChainView = () => {
 
         {/* Section 5: IVP */}
         <div className="top-bar-section">
-          <span className="top-bar-label">IVP</span>
-          <span className="top-bar-value">-</span>
+          <span className="top-bar-label" title="Implied Volatility Percentile (Skew Rank)">IVP</span>
+          <span className="top-bar-value">{ivp > 0 ? ivp.toFixed(1) : '-'}</span>
         </div>
 
         <div className="top-bar-divider"></div>

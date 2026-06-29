@@ -20,7 +20,9 @@ async function updateOptionsMaster() {
 
     const options = {};
     const spots = {}; // To store Spot Tokens (Indices, Stocks, Commodities)
+    const futures = {}; // To store Future Tokens
     let count = 0;
+    let futCount = 0;
 
     for (const item of data) {
       // 1. Gather Option Contracts
@@ -61,6 +63,19 @@ async function updateOptionsMaster() {
           spots[uniqueKey] = { token: item.token, symbol: item.symbol, name: item.name, exchange: item.exch_seg };
         }
       }
+
+      // 3. Gather Futures Contracts
+      if (['FUTIDX', 'FUTSTK', 'FUTCOM'].includes(item.instrumenttype)) {
+        if (!futures[item.name]) futures[item.name] = [];
+        futures[item.name].push({
+          token: item.token,
+          symbol: item.symbol,
+          expiry: item.expiry,
+          lotsize: item.lotsize,
+          exchange: item.exch_seg
+        });
+        futCount++;
+      }
     }
 
     // Sort expiries for each name
@@ -84,6 +99,13 @@ async function updateOptionsMaster() {
 
     fs.writeFileSync(path.join(__dirname, 'spots.json'), JSON.stringify(spots));
     console.log(`Saved ${Object.keys(spots).length} Spot contracts to spots.json!`);
+
+    // Sort futures by expiry
+    for (const name of Object.keys(futures)) {
+      futures[name].sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
+    }
+    fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
+    console.log(`Saved ${futCount} Future contracts to futures.json!`);
 
   } catch (err) {
     console.error('Error updating options master:', err.message);
