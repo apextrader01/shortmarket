@@ -19,9 +19,11 @@ async function updateOptionsMaster() {
     console.log(`Successfully downloaded. Total items: ${data.length}`);
 
     const options = {};
+    const spots = {}; // To store Spot Tokens (Indices, Stocks, Commodities)
     let count = 0;
 
     for (const item of data) {
+      // 1. Gather Option Contracts
       if (OPTION_TYPES.includes(item.instrumenttype)) {
         // Expiry format from Angel One is "27JUN2024"
         const expiry = item.expiry;
@@ -46,6 +48,19 @@ async function updateOptionsMaster() {
         };
         count++;
       }
+      
+      // 2. Gather Spot / Underlying Contracts
+      if (item.instrumenttype === 'AMXIDX' || item.instrumenttype === 'EQ' || item.instrumenttype === 'FUTCOM') {
+        const uniqueKey = `${item.name}-${item.exch_seg}`;
+        // For FUTCOM (Commodities), we want the nearest expiry as the Spot.
+        if (item.instrumenttype === 'FUTCOM') {
+          if (!spots[uniqueKey] || new Date(item.expiry) < new Date(spots[uniqueKey].expiry)) {
+            spots[uniqueKey] = { token: item.token, symbol: item.symbol, name: item.name, exchange: item.exch_seg, expiry: item.expiry };
+          }
+        } else {
+          spots[uniqueKey] = { token: item.token, symbol: item.symbol, name: item.name, exchange: item.exch_seg };
+        }
+      }
     }
 
     // Sort expiries for each name
@@ -66,6 +81,9 @@ async function updateOptionsMaster() {
 
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(options));
     console.log(`Saved ${count} Option contracts to options.json!`);
+
+    fs.writeFileSync(path.join(__dirname, 'spots.json'), JSON.stringify(spots));
+    console.log(`Saved ${Object.keys(spots).length} Spot contracts to spots.json!`);
 
   } catch (err) {
     console.error('Error updating options master:', err.message);

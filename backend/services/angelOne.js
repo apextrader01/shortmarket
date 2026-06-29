@@ -64,6 +64,25 @@ async function loadInstrumentMaster() {
                 symbolToToken[uniqueSymbol] = stock.token;
             }
 
+            // Load dynamically generated Spot Tokens for all options (handles commodities & obscure indices)
+            try {
+                const spotsData = fs.readFileSync(path.join(__dirname, '../database/spots.json'), 'utf8');
+                const spots = JSON.parse(spotsData);
+                for (const [uniqueKey, info] of Object.entries(spots)) {
+                    // Override or add to master
+                    STOCK_MASTER[info.token] = {
+                        symbol: info.symbol,
+                        name: info.name,
+                        exchange: info.exchange,
+                        uniqueSymbol: uniqueKey
+                    };
+                    symbolToToken[uniqueKey] = info.token;
+                }
+                console.log(`✅ Loaded ${Object.keys(spots).length} Spot mappings from spots.json`);
+            } catch (spotErr) {
+                console.warn('⚠️ Could not load spots.json - some Spot Prices for Options might fail.');
+            }
+
             allTokens = Object.keys(STOCK_MASTER);
             console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} total stocks)`);
             resolve();
