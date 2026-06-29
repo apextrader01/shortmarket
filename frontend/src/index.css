@@ -433,3 +433,140 @@ tbody tr:hover {
   .dashboard-grid { grid-template-columns: 1fr; padding: 12px; height: 50vh; }
   .logo-text { font-size: 20px; }
 }
+
+/* Option Chain Styles */
+.option-chain-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  min-height: 0;
+  min-width: 0;
+}
+
+.option-chain-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  background: var(--bg-panel);
+}
+
+.option-chain-select {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  color: var(--text-primary);
+  outline: none;
+  font-size: 14px;
+}
+
+.option-chain-table-container {
+  flex: 1;
+  overflow: auto;
+}
+
+.option-chain-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.option-chain-table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #161616;
+  color: #888;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: right;
+}
+
+.option-chain-table th.center {
+  text-align: center;
+}
+
+.option-chain-table th.header-call {
+  background: #1a2016;
+  color: var(--color-green-light);
+  border-right: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.option-chain-table th.header-put {
+  background: #201616;
+  color: var(--color-red-light);
+  text-align: center;
+}
+
+.option-chain-table th.header-strike {
+  background: #111;
+  text-align: center;
+  border-right: 1px solid var(--border-color);
+}
+
+.option-chain-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #222;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.option-chain-table td.center {
+  text-align: center;
+}
+
+.option-chain-table td.border-right {
+  border-right: 1px solid var(--border-color);
+}
+
+.option-chain-table tr:hover {
+  background: #1a1a1a;
+}
+
+.option-chain-table tr .action-buttons {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.option-chain-table tr:hover .action-buttons {
+  opacity: 1;
+}
+
+.btn-mini {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-mini.buy { background: #2563eb; }
+.btn-mini.buy:hover { background: #1d4ed8; }
+.btn-mini.sell { background: #dc2626; }
+.btn-mini.sell:hover { background: #b91c1c; }
+
+.bg-itm-call { background: rgba(34, 197, 94, 0.04); }
+.bg-itm-put { background: rgba(239, 68, 68, 0.04); }
+
+.strike-cell {
+  background: #111;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  border-right: 1px solid var(--border-color);
+}
+

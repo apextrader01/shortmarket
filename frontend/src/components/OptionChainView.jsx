@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 
 const API = '';
 
@@ -11,10 +12,9 @@ const OptionChainView = () => {
   const [loading, setLoading] = useState(false);
 
   const prices = useStore((state) => state.prices);
-  const fetchBatchPrices = useStore((state) => state.fetchBatchPrices);
   const openOrderModal = useStore((state) => state.openOrderModal);
-  const subscribeToOption = useStore((state) => state.subscribeToOption);
-  const unsubscribeFromOption = useStore((state) => state.unsubscribeFromOption);
+  const subscribeToOptionBatch = useStore((state) => state.subscribeToOptionBatch);
+  const unsubscribeFromOptionBatch = useStore((state) => state.unsubscribeFromOptionBatch);
 
   useEffect(() => {
     const fetchChain = async () => {
@@ -45,40 +45,57 @@ const OptionChainView = () => {
     const strikes = Object.keys(optionsData[expiry]);
     const tokensToSub = [];
 
+    // Also subscribe to the underlying index for Spot Price
+    tokensToSub.push({ token: symbol, exchange: 'NSE', name: symbol });
+
     strikes.forEach((strike) => {
       const data = optionsData[expiry][strike];
       if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
       if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
     });
 
-    const subscribeToOptionBatch = useStore.getState().subscribeToOptionBatch;
-    const unsubscribeFromOptionBatch = useStore.getState().unsubscribeFromOptionBatch;
-
     subscribeToOptionBatch(tokensToSub);
 
     return () => {
       unsubscribeFromOptionBatch(tokensToSub);
     };
-  }, [expiry, optionsData, symbol]);
+  }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch]);
 
   const handleTrade = (opt, type) => {
     if (!opt) return;
-    openOrderModal(opt.symbol, type === 'B' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
+    openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-400">Loading Option Chain...</div>;
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain...</div>;
   }
 
   const chain = optionsData[expiry] || {};
   const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  
+  // Spot Price
+  const spotPrice = prices[symbol]?.ltp || 0;
+  
+  // Time to Expiry (T in years)
+  let T = 0.01; // Default to a small fraction if we can't parse
+  if (expiry) {
+    const expDate = new Date(expiry);
+    if (!isNaN(expDate.getTime())) {
+      const now = new Date();
+      expDate.setHours(15, 30, 0, 0); // Indian market close
+      const diffMs = expDate.getTime() - now.getTime();
+      T = Math.max(diffMs / (1000 * 60 * 60 * 24 * 365), 0.0001); // Prevent zero T
+    }
+  }
+
+  const r = 0.07; // 7% risk-free rate
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0a] text-gray-200 min-h-0 min-w-0">
-      {/* Header Controls */}
-      <div className="p-4 border-b border-[#222] flex gap-4 items-center bg-[#111]">
+    <div className="option-chain-container">
+      {/* Header */}
+      <div className="option-chain-header">
         <select 
-          className="bg-[#222] border border-[#333] rounded px-4 py-2 text-white outline-none"
+          className="option-chain-select"
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
         >
@@ -88,7 +105,7 @@ const OptionChainView = () => {
         </select>
         
         <select 
-          className="bg-[#222] border border-[#333] rounded px-4 py-2 text-white outline-none"
+          className="option-chain-select"
           value={expiry}
           onChange={(e) => setExpiry(e.target.value)}
         >
@@ -96,63 +113,109 @@ const OptionChainView = () => {
             <option key={exp} value={exp}>{exp}</option>
           ))}
         </select>
+        
+        <div style={{ marginLeft: 'auto', fontWeight: '600', color: 'var(--color-blue)', display: 'flex', gap: '16px' }}>
+          <span>SPOT: {spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', alignSelf: 'center' }}>Live Greeks (BS Model)</span>
+        </div>
       </div>
 
-      {/* Option Chain Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm text-left">
-          <thead className="sticky top-0 bg-[#161616] text-[#888] uppercase font-semibold text-xs border-b border-[#333] shadow-md z-10">
+      {/* Table */}
+      <div className="option-chain-table-container">
+        <table className="option-chain-table">
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-center border-r border-[#333] bg-[#1a2016] text-green-500" colSpan="3">CALLS</th>
-              <th className="px-4 py-3 text-center border-r border-[#333] w-32">STRIKE</th>
-              <th className="px-4 py-3 text-center bg-[#201616] text-red-500" colSpan="3">PUTS</th>
+              <th className="header-call" colSpan="8">CALLS</th>
+              <th className="header-strike">STRIKE</th>
+              <th className="header-put" colSpan="8">PUTS</th>
             </tr>
-            <tr className="border-t border-[#333]">
-              <th className="px-2 py-2 w-16 text-center border-r border-[#333] bg-[#1a2016]">Vol</th>
-              <th className="px-2 py-2 w-24 text-right border-r border-[#333] bg-[#1a2016]">LTP</th>
-              <th className="px-2 py-2 w-20 text-center border-r border-[#333] bg-[#1a2016]">Trade</th>
-              <th className="px-2 py-2 text-center border-r border-[#333] bg-[#111] font-bold text-white">Strike</th>
-              <th className="px-2 py-2 w-20 text-center border-r border-[#333] bg-[#201616]">Trade</th>
-              <th className="px-2 py-2 w-24 text-right border-r border-[#333] bg-[#201616]">LTP</th>
-              <th className="px-2 py-2 w-16 text-center bg-[#201616]">Vol</th>
+            <tr>
+              {/* Calls */}
+              <th className="center">Delta</th>
+              <th className="center">Theta</th>
+              <th className="center">Vega</th>
+              <th className="center">IV</th>
+              <th className="center">Vol</th>
+              <th className="center">Chg</th>
+              <th className="center">LTP</th>
+              <th className="center border-right">Trade</th>
+              {/* Strike */}
+              <th className="header-strike" style={{ background: '#111' }}>Strike</th>
+              {/* Puts */}
+              <th className="center">Trade</th>
+              <th className="center">LTP</th>
+              <th className="center">Chg</th>
+              <th className="center">Vol</th>
+              <th className="center">IV</th>
+              <th className="center">Vega</th>
+              <th className="center">Theta</th>
+              <th className="center">Delta</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#222]">
-            {strikes.map((strike, i) => {
+          <tbody>
+            {strikes.map((strike) => {
               const call = chain[strike].CE;
               const put = chain[strike].PE;
 
-              const callPrice = call ? prices[call.symbol] : null;
-              const putPrice = put ? prices[put.symbol] : null;
+              const callPriceData = call ? prices[call.symbol] : null;
+              const putPriceData = put ? prices[put.symbol] : null;
+
+              const cLtp = callPriceData?.ltp || 0;
+              const pLtp = putPriceData?.ltp || 0;
+
+              // Calculate IV
+              const cIV = (cLtp > 0 && spotPrice > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
+              const pIV = (pLtp > 0 && spotPrice > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
+
+              // Calculate Greeks
+              const cGreeks = (cIV > 0) ? calculateGreeks('CE', spotPrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
+              const pGreeks = (pIV > 0) ? calculateGreeks('PE', spotPrice, strike, T, r, pIV) : { delta: 0, theta: 0, vega: 0 };
+
+              const isCallITM = spotPrice > 0 && strike < spotPrice;
+              const isPutITM = spotPrice > 0 && strike > spotPrice;
 
               return (
-                <tr key={strike} className="hover:bg-[#1a1a1a] transition-colors group">
+                <tr key={strike}>
                   {/* Calls */}
-                  <td className="px-2 py-2 text-center border-r border-[#333] text-gray-500">{callPrice?.volume || '-'}</td>
-                  <td className={`px-2 py-2 text-right border-r border-[#333] font-mono ${callPrice?.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {callPrice?.ltp ? callPrice.ltp.toFixed(2) : '-'}
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(2) : '-'}</td>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>{callPriceData?.volume || '-'}</td>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                    {callPriceData?.change ? callPriceData.change.toFixed(2) : '-'}
                   </td>
-                  <td className="px-2 py-1 text-center border-r border-[#333]">
-                    <div className="opacity-0 group-hover:opacity-100 flex justify-center gap-1">
-                      <button onClick={() => handleTrade(call, 'BUY')} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">B</button>
-                      <button onClick={() => handleTrade(call, 'SELL')} className="bg-red-600 hover:bg-red-500 text-white text-[10px] px-2 py-1 rounded">S</button>
+                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                    {cLtp > 0 ? cLtp.toFixed(2) : '-'}
+                  </td>
+                  <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
+                    <div className="action-buttons">
+                      <button onClick={() => handleTrade(call, 'BUY')} className="btn-mini buy">B</button>
+                      <button onClick={() => handleTrade(call, 'SELL')} className="btn-mini sell">S</button>
                     </div>
                   </td>
 
                   {/* Strike */}
-                  <td className="px-4 py-2 text-center font-bold text-gray-200 border-r border-[#333] bg-[#111]">{strike}</td>
+                  <td className="strike-cell">{strike}</td>
 
                   {/* Puts */}
-                  <td className="px-2 py-1 text-center border-r border-[#333]">
-                    <div className="opacity-0 group-hover:opacity-100 flex justify-center gap-1">
-                      <button onClick={() => handleTrade(put, 'BUY')} className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] px-2 py-1 rounded">B</button>
-                      <button onClick={() => handleTrade(put, 'SELL')} className="bg-red-600 hover:bg-red-500 text-white text-[10px] px-2 py-1 rounded">S</button>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>
+                    <div className="action-buttons">
+                      <button onClick={() => handleTrade(put, 'BUY')} className="btn-mini buy">B</button>
+                      <button onClick={() => handleTrade(put, 'SELL')} className="btn-mini sell">S</button>
                     </div>
                   </td>
-                  <td className={`px-2 py-2 text-right border-r border-[#333] font-mono ${putPrice?.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {putPrice?.ltp ? putPrice.ltp.toFixed(2) : '-'}
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                    {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                   </td>
-                  <td className="px-2 py-2 text-center text-gray-500">{putPrice?.volume || '-'}</td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                    {putPriceData?.change ? putPriceData.change.toFixed(2) : '-'}
+                  </td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>{putPriceData?.volume || '-'}</td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(2) : '-'}</td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(2) : '-'}</td>
+                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
                 </tr>
               );
             })}
