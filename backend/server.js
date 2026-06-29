@@ -899,6 +899,109 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Place Basket Order ───────────────────────────────────────────────────────
+app.post('/api/basket-order', authenticateToken, async (req, res) => {
+  const { items, total_margin } = req.body;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Basket is empty' });
+  }
+
+  // Block Intraday cutoff
+  for (const item of items) {
+    if (item.product_type === 'INT') {
+      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => item.symbol.startsWith(c));
+      if (!isCommodity) {
+        const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+        const hours = istTime.getHours();
+        const minutes = istTime.getMinutes();
+        if (hours > 15 || (hours === 15 && minutes >= 15)) {
+          return res.status(400).json({ error: 'Intraday trading for Equities is blocked after 3:15 PM IST.' });
+        }
+      }
+    }
+  }
+
+  try {
+    await db.transaction(async (trx) => {
+      // 1. Verify total margin
+      const requiredMargin = parseFloat(total_margin) || 0;
+      const user = await trx('users').where({ id: req.user.id }).first();
+      
+      if (requiredMargin > 0 && parseFloat(user.balance) < requiredMargin) {
+        throw new Error(`Insufficient balance. Requires ₹${requiredMargin.toFixed(2)}`);
+      }
+
+      // 2. Deduct total margin
+      if (requiredMargin > 0) {
+        await trx('users')
+          .where({ id: req.user.id })
+          .update({ balance: parseFloat(user.balance) - requiredMargin });
+      }
+
+      // 3. Process each item
+      const executedOrders = [];
+      for (const item of items) {
+        const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin } = item;
+        const isMarket = type === 'MARKET';
+        const status = isMarket ? 'EXECUTED' : 'PENDING';
+        
+        const [orderId] = await trx('orders').insert({
+          user_id: req.user.id,
+          symbol, type, side, quantity, price, sl_price, tgt_price,
+          status,
+          margin: margin || 0, // Individual margin recorded for cancellations
+          product_type: product_type || 'INT'
+        });
+
+        executedOrders.push({ id: orderId, symbol, status });
+
+        // If executed immediately, create positions
+        if (isMarket) {
+          const pos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: product_type || 'INT' }).first();
+          
+          if (pos) {
+            let newQty = pos.quantity;
+            let newAvgPrice = pos.average_price;
+            
+            if (side === 'BUY') {
+              if (pos.quantity >= 0) {
+                newAvgPrice = ((pos.quantity * pos.average_price) + (quantity * price)) / (pos.quantity + quantity);
+                newQty += quantity;
+              } else {
+                newQty += quantity;
+              }
+            } else {
+              if (pos.quantity <= 0) {
+                newAvgPrice = ((Math.abs(pos.quantity) * pos.average_price) + (quantity * price)) / (Math.abs(pos.quantity) + quantity);
+                newQty -= quantity;
+              } else {
+                newQty -= quantity;
+              }
+            }
+
+            if (newQty === 0) {
+              await trx('positions').where({ id: pos.id }).del();
+            } else {
+              await trx('positions').where({ id: pos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+            }
+          } else {
+            await trx('positions').insert({
+              user_id: req.user.id,
+              symbol,
+              quantity: side === 'BUY' ? quantity : -quantity,
+              average_price: price,
+              product_type: product_type || 'INT'
+            });
+          }
+        }
+      }
+      res.json({ success: true, orders: executedOrders });
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // ─── Cancel Order ─────────────────────────────────────────────────────────
 app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
   try {

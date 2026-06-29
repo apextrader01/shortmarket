@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
+import BasketModal from './BasketModal';
 
 const API = '';
 
@@ -94,6 +95,12 @@ const OptionChainView = () => {
   const unsubscribeFromOptionBatch = useStore((state) => state.unsubscribeFromOptionBatch);
   const subscribeToSymbol = useStore((state) => state.subscribeToSymbol);
   const unsubscribeFromSymbol = useStore((state) => state.unsubscribeFromSymbol);
+  
+  const basketMode = useStore((state) => state.basketMode);
+  const setBasketMode = useStore((state) => state.setBasketMode);
+  const addToBasket = useStore((state) => state.addToBasket);
+  const setBasketModalOpen = useStore((state) => state.setBasketModalOpen);
+  const basketItems = useStore((state) => state.basketItems);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -261,7 +268,19 @@ const OptionChainView = () => {
 
   const handleTrade = (opt, type) => {
     if (!opt) return;
-    openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
+    if (basketMode) {
+      addToBasket({
+        symbol: opt.symbol,
+        side: type === 'BUY' ? 'BUY' : 'SELL',
+        quantity: 1,
+        lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
+        orderType: 'MARKET',
+        price: ''
+      });
+      setBasketModalOpen(true);
+    } else {
+      openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
+    }
   };
 
   // Loading and error states handled in the table container to keep top bar visible
@@ -354,7 +373,22 @@ const OptionChainView = () => {
 
         <div className="top-bar-divider"></div>
 
-        {/* Section 5: Per Lot Toggle */}
+        {/* Section 5: Basket Mode Toggle */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">Basket Order</span>
+          <label className="toggle-switch">
+            <input 
+              type="checkbox" 
+              checked={basketMode}
+              onChange={(e) => setBasketMode(e.target.checked)}
+            />
+            <span className="slider round"></span>
+          </label>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 6: Per Lot Toggle */}
         <div className="top-bar-section">
           <label className="toggle-switch">
             <input type="checkbox" />
@@ -528,6 +562,9 @@ const OptionChainView = () => {
         </table>
         )}
       </div>
+      
+      {/* Modals */}
+      <BasketModal />
     </div>
   );
 };

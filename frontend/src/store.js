@@ -193,6 +193,42 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Order Modal ─────────────────────────────────────────────────────────────
+  // ── Basket Modal & State ───────────────────────────────────────────────────
+  basketMode: false,
+  setBasketMode: (mode) => set({ basketMode: mode }),
+  
+  basketItems: [],
+  addToBasket: (item) => set((state) => ({ basketItems: [...state.basketItems, item] })),
+  removeFromBasket: (index) => set((state) => ({ basketItems: state.basketItems.filter((_, i) => i !== index) })),
+  updateBasketItem: (index, updates) => set((state) => {
+    const newItems = [...state.basketItems];
+    newItems[index] = { ...newItems[index], ...updates };
+    return { basketItems: newItems };
+  }),
+  clearBasket: () => set({ basketItems: [] }),
+  
+  basketModalOpen: false,
+  setBasketModalOpen: (isOpen) => set({ basketModalOpen: isOpen }),
+
+  placeBasketOrder: async (basketPayload) => {
+    const { token } = get();
+    try {
+      const res = await fetch(`${API}/api/basket-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(basketPayload),
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        get().clearBasket();
+        get().setBasketModalOpen(false);
+        return true; 
+      }
+      return false;
+    } catch (_) { return false; }
+  },
+
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1 },
 
   openOrderModal:  (symbol, type = 'BUY', lotsize = 1) => set({ orderModal: { isOpen: true, symbol, type, lotsize } }),
