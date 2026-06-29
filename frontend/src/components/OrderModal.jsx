@@ -34,10 +34,10 @@ export default function OrderModal() {
 
   const balanceNum = Number(user?.balance) || 0;
   const totalQuantity = quantity * (orderModal.lotsize || 1);
-  const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0; // 4x Leverage for Intraday
-
   const isBuy = side === 'BUY';
   const isOption = symbol.includes('CE') || symbol.includes('PE');
+  
+  const leverageMultiplier = (productType === 'INT' && !isOption) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
   
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
   
