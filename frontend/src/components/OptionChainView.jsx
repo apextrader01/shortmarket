@@ -73,8 +73,14 @@ const OptionChainView = () => {
   const chain = optionsData[expiry] || {};
   const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
   
-  // Spot Price
-  const spotPrice = prices[symbol]?.ltp || 0;
+  const getIndexKey = (sym) => {
+    if (sym === 'NIFTY' || sym === 'BANKNIFTY') return `${sym}-NSE`;
+    if (sym === 'SENSEX') return `${sym}-BSE`;
+    return sym;
+  };
+  
+  const indexKey = getIndexKey(symbol);
+  const spotPrice = prices[indexKey]?.ltp || 0;
   
   // Time to Expiry (T in years)
   let T = 0.01; // Default to a small fraction if we can't parse
