@@ -1,5 +1,5 @@
 const schedule = require('node-schedule');
-const fetch = require('node-fetch'); // assuming node-fetch is installed
+
 
 async function fetchRiskyStocks() {
     try {
