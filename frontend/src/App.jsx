@@ -214,7 +214,7 @@ function App() {
           </div>
         </header>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
+      <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
         <MarketWatch className={activeTab !== 'Markets' ? 'mobile-hidden' : ''} />
         <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
