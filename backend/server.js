@@ -925,20 +925,18 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         // 5. Update User Balance (Taxes, P&L, Margin Refund)
         const userAfterExec = await trx('users').where({ id: req.user.id }).first();
         let balanceChange = -totalTaxes;
+        
         if (realizedPnl !== 0) {
             balanceChange += realizedPnl;
             await trx('orders').where({ id: orderId }).update({ realized_pnl: realizedPnl });
         }
         
-        // If a margin was deducted for this order, but it was actually closing a position,
-        // we need to refund that margin AND the margin of the original position.
-        // Wait! The user already paid the margin when opening. When closing, we just refund whatever 
-        // they might have temporarily put down for this closing order.
-        // The *actual* closing of a position frees up the original margin, but in our simple system, 
-        // users' balance represents "Available Balance". When they bought, balance went down.
-        // When they close, their balance should go UP by the Entry Price * Qty (the original margin)
-        // AND the PnL.
-        // In orderExecutor we did NOT refund original margin. Let me rethink this...
+        if (marginRefund > 0) {
+           balanceChange += marginRefund;
+        }
+
+        await trx('users').where({ id: req.user.id }).update({ balance: userAfterExec.balance + balanceChange });
+      }
 
       res.json({ success: true, orderId, status });
     });
