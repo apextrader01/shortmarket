@@ -152,9 +152,9 @@ const OptionChainView = () => {
         <table className="option-chain-table">
           <thead>
             <tr>
-              <th className="header-call" colSpan="8">CALLS</th>
+              <th className="header-call" colSpan="7">CALLS</th>
               <th className="header-strike">STRIKE</th>
-              <th className="header-put" colSpan="8">PUTS</th>
+              <th className="header-put" colSpan="7">PUTS</th>
             </tr>
             <tr>
               {/* Calls */}
@@ -164,12 +164,10 @@ const OptionChainView = () => {
               <th className="center">IV</th>
               <th className="center">Vol</th>
               <th className="center">Chg</th>
-              <th className="center">LTP</th>
-              <th className="center border-right">Trade</th>
+              <th className="center border-right">LTP</th>
               {/* Strike */}
               <th className="header-strike" style={{ background: '#111' }}>Strike</th>
               {/* Puts */}
-              <th className="center">Trade</th>
               <th className="center">LTP</th>
               <th className="center">Chg</th>
               <th className="center">Vol</th>
@@ -217,13 +215,15 @@ const OptionChainView = () => {
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                     {callPriceData?.change ? callPriceData.change.toFixed(2) : '-'}
                   </td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {cLtp > 0 ? cLtp.toFixed(2) : '-'}
-                  </td>
                   <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
-                    <div className="action-buttons">
-                      <button onClick={() => handleTrade(call, 'BUY')} className="btn-mini buy">B</button>
-                      <button onClick={() => handleTrade(call, 'SELL')} className="btn-mini sell">S</button>
+                    <div className="ltp-container">
+                      <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {cLtp > 0 ? cLtp.toFixed(2) : '-'}
+                      </span>
+                      <div className="action-buttons">
+                        <button onClick={() => handleTrade(call, 'BUY')} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(call, 'SELL')} className="btn-mini sell">S</button>
+                      </div>
                     </div>
                   </td>
 
@@ -232,13 +232,15 @@ const OptionChainView = () => {
 
                   {/* Puts */}
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>
-                    <div className="action-buttons">
-                      <button onClick={() => handleTrade(put, 'BUY')} className="btn-mini buy">B</button>
-                      <button onClick={() => handleTrade(put, 'SELL')} className="btn-mini sell">S</button>
+                    <div className="ltp-container">
+                      <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {pLtp > 0 ? pLtp.toFixed(2) : '-'}
+                      </span>
+                      <div className="action-buttons">
+                        <button onClick={() => handleTrade(put, 'BUY')} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(put, 'SELL')} className="btn-mini sell">S</button>
+                      </div>
                     </div>
-                  </td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                   </td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                     {putPriceData?.change ? putPriceData.change.toFixed(2) : '-'}

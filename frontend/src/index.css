@@ -532,7 +532,28 @@ tbody tr:hover {
   background: #1a1a1a;
 }
 
+.ltp-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 20px;
+}
+
+.ltp-value {
+  transition: opacity 0.15s ease;
+}
+
+.option-chain-table tr:hover .ltp-value {
+  opacity: 0;
+}
+
 .option-chain-table tr .action-buttons {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity 0.15s ease;
   display: flex;
