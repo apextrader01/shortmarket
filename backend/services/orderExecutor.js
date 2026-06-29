@@ -53,13 +53,21 @@ function initOrderExecutor(priceCache) {
   }, 2000); // Check every 2 seconds
 }
 
+const { calculateTaxes } = require('./taxCalculator');
+
 async function executeOrder(order, execPrice) {
   try {
     await db.transaction(async (trx) => {
+      // Calculate Taxes
+      const taxesObj = calculateTaxes(order.symbol, order.product_type, order.side, Number(order.quantity), execPrice);
+      const totalTaxes = taxesObj.totalTaxes;
+      let realizedPnl = 0;
+
       // 1. Mark as executed
       await trx('orders').where({ id: order.id }).update({ 
         status: 'EXECUTED',
-        price: execPrice 
+        price: execPrice,
+        taxes: totalTaxes
       });
 
       // 2. Update Positions
@@ -69,26 +77,51 @@ async function executeOrder(order, execPrice) {
       if (existingPos) {
         const newQty = existingPos.quantity + qtyChange;
         let newAvgPrice = existingPos.average_price;
+        let newMargin = existingPos.margin || 0;
+        let marginRefund = 0;
         
         // Average up/down only if we are increasing the position on the SAME side
         if ((existingPos.quantity > 0 && order.side === 'BUY') || (existingPos.quantity < 0 && order.side === 'SELL')) {
             const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
             const newTotal = Number(order.quantity) * execPrice;
             newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
+            // In a real execution engine, executing an automated entry order would use margin.
+            // But since the margin was locked when placing the order, we add it to the position.
+            newMargin += Number(order.margin || 0);
+        }
+
+        // Are we CLOSING a position?
+        if ((existingPos.quantity > 0 && order.side === 'SELL') || (existingPos.quantity < 0 && order.side === 'BUY')) {
+             if (existingPos.quantity > 0) {
+                 realizedPnl = (execPrice - existingPos.average_price) * Number(order.quantity);
+             } else {
+                 realizedPnl = (existingPos.average_price - execPrice) * Number(order.quantity);
+             }
+             
+             const proportionClosed = Math.abs(Number(order.quantity)) / Math.abs(existingPos.quantity);
+             marginRefund = (existingPos.margin || 0) * proportionClosed;
+             newMargin -= marginRefund;
         }
 
         if (newQty === 0) {
             // Position closed! Delete it to keep table clean.
             await trx('positions').where({ id: existingPos.id }).delete();
-            
-            // Release margin back to user if applicable
-            if (order.margin > 0) {
-                const user = await trx('users').where({ id: order.user_id }).first();
-                await trx('users').where({ id: order.user_id }).update({ balance: user.balance + Number(order.margin) });
-            }
         } else {
-            await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+            await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
         }
+        
+        // 3. Update User Balance
+        const user = await trx('users').where({ id: order.user_id }).first();
+        let balanceChange = -totalTaxes;
+        if (realizedPnl !== 0) {
+            balanceChange += realizedPnl;
+            await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
+        }
+        if (marginRefund > 0) {
+            balanceChange += marginRefund;
+        }
+        await trx('users').where({ id: order.user_id }).update({ balance: user.balance + balanceChange });
+        
       } else {
         // Create new position
         await trx('positions').insert({
@@ -96,11 +129,16 @@ async function executeOrder(order, execPrice) {
           symbol: order.symbol,
           quantity: qtyChange,
           average_price: execPrice,
-          product_type: order.product_type || 'DEL'
+          product_type: order.product_type || 'DEL',
+          margin: Number(order.margin || 0)
         });
+        
+        // Update user balance to deduct taxes for this new position
+        const user = await trx('users').where({ id: order.user_id }).first();
+        await trx('users').where({ id: order.user_id }).update({ balance: user.balance - totalTaxes });
       }
 
-      console.log(`Executed Order ${order.id} for ${order.symbol} at ${execPrice}`);
+      console.log(`Executed Order ${order.id} for ${order.symbol} at ${execPrice} | PnL: ${realizedPnl} | Taxes: ${totalTaxes}`);
     });
   } catch (err) {
     console.error(`Failed to execute order ${order.id}:`, err);

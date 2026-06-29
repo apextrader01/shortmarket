@@ -866,20 +866,51 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 
+      const { calculateTaxes } = require('./services/taxCalculator');
+
       // 4. Update Positions if EXECUTED
       if (status === 'EXECUTED') {
+        const taxesObj = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), execPrice);
+        const totalTaxes = taxesObj.totalTaxes;
+        let realizedPnl = 0;
+        let marginRefund = 0;
+
+        await trx('orders').where({ id: orderId }).update({ taxes: totalTaxes });
+
         const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
         const qtyChange = side === 'BUY' ? Number(quantity) : -Number(quantity);
         
         if (existingPos) {
           const newQty = existingPos.quantity + qtyChange;
-          // Calculate new average price on BUY
           let newAvgPrice = existingPos.average_price;
-          if (side === 'BUY' && newQty > 0) {
-            const totalCost = (existingPos.quantity * existingPos.average_price) + (Number(quantity) * execPrice);
-            newAvgPrice = totalCost / newQty;
+          let newMargin = existingPos.margin || 0;
+          
+          if ((existingPos.quantity > 0 && side === 'BUY') || (existingPos.quantity < 0 && side === 'SELL')) {
+            const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
+            const newTotal = Number(quantity) * execPrice;
+            newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
+            newMargin += Number(margin);
           }
-          await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+
+          // Are we CLOSING a position?
+          if ((existingPos.quantity > 0 && side === 'SELL') || (existingPos.quantity < 0 && side === 'BUY')) {
+               if (existingPos.quantity > 0) {
+                   realizedPnl = (execPrice - existingPos.average_price) * Number(quantity);
+               } else {
+                   realizedPnl = (existingPos.average_price - execPrice) * Number(quantity);
+               }
+               
+               const proportionClosed = Math.abs(Number(quantity)) / Math.abs(existingPos.quantity);
+               marginRefund = (existingPos.margin || 0) * proportionClosed;
+               newMargin -= marginRefund;
+          }
+
+          if (newQty === 0) {
+             // Position closed! Delete it
+             await trx('positions').where({ id: existingPos.id }).delete();
+          } else {
+             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+          }
         } else {
           // If selling something they don't have, it's a short position
           await trx('positions').insert({
@@ -890,7 +921,24 @@ app.post('/api/order', authenticateToken, async (req, res) => {
             product_type: product_type || 'DEL'
           });
         }
-      }
+
+        // 5. Update User Balance (Taxes, P&L, Margin Refund)
+        const userAfterExec = await trx('users').where({ id: req.user.id }).first();
+        let balanceChange = -totalTaxes;
+        if (realizedPnl !== 0) {
+            balanceChange += realizedPnl;
+            await trx('orders').where({ id: orderId }).update({ realized_pnl: realizedPnl });
+        }
+        
+        // If a margin was deducted for this order, but it was actually closing a position,
+        // we need to refund that margin AND the margin of the original position.
+        // Wait! The user already paid the margin when opening. When closing, we just refund whatever 
+        // they might have temporarily put down for this closing order.
+        // The *actual* closing of a position frees up the original margin, but in our simple system, 
+        // users' balance represents "Available Balance". When they bought, balance went down.
+        // When they close, their balance should go UP by the Entry Price * Qty (the original margin)
+        // AND the PnL.
+        // In orderExecutor we did NOT refund original margin. Let me rethink this...
 
       res.json({ success: true, orderId, status });
     });

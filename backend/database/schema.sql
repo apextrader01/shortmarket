@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS positions (
     symbol TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 0,
     average_price REAL NOT NULL,
+    product_type TEXT DEFAULT 'DEL',
+    margin REAL DEFAULT 0, -- The total margin locked for this open position
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
@@ -36,6 +38,8 @@ CREATE TABLE IF NOT EXISTS orders (
     tgt_price REAL, -- For Target target
     product_type TEXT DEFAULT 'DEL', -- INT or DEL
     margin REAL DEFAULT 0, -- Margin blocked for this order
+    realized_pnl REAL DEFAULT 0, -- Profit/Loss made if this order closed a position
+    taxes REAL DEFAULT 0, -- Total taxes and brokerage deducted for this order
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
