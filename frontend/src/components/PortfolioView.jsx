@@ -12,6 +12,8 @@ export default function PortfolioView() {
   let totalInvestedETFs = 0;
   let unrealizedPnl = 0;
 
+  const deliveryPositions = (positions || []).filter(p => p && p.product_type === 'DEL');
+
   (positions || []).forEach(pos => {
       if (!pos) return;
       const priceData = prices[pos.symbol] || {};
@@ -227,13 +229,14 @@ export default function PortfolioView() {
                     const pnl = current - invested;
                     const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
                     const isProfit = pnl >= 0;
+                    const safeSymbol = pos.symbol || '';
                     
                     return (
                       <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '16px', fontWeight: '600' }}>
-                          {pos.symbol.split('-')[0]}
+                          {safeSymbol.split('-')[0]}
                           <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>
-                            {pos.symbol.split('-')[1] || 'NSE'}
+                            {safeSymbol.split('-')[1] || 'NSE'}
                           </span>
                         </td>
                         <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>{qty}</td>
