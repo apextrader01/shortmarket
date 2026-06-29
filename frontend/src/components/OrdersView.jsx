@@ -69,6 +69,7 @@ export default function OrdersView() {
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Time</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
+                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
@@ -86,8 +87,9 @@ export default function OrdersView() {
                         <span style={{ fontSize: '10px', opacity: 0.8 }}>({order.product_type || 'DEL'})</span>
                       </span>
                     </td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.type || (order.price ? 'LIMIT' : 'MARKET')}</td>
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
-                    <td style={{ padding: '12px 16px' }}>{order.price ? `₹${parseFloat(order.price).toFixed(2)}` : 'MARKET'}</td>
+                    <td style={{ padding: '12px 16px' }}>{order.price ? `₹${parseFloat(order.price).toFixed(2)}` : '—'}</td>
                     <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                       {order.status}
                     </td>
