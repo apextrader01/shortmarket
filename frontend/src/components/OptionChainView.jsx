@@ -71,6 +71,7 @@ const OptionChainView = () => {
   const [error, setError] = useState(null);
   const [futureData, setFutureData] = useState(null);
   const [futureTokenKey, setFutureTokenKey] = useState(null);
+  const [initialSpotPrice, setInitialSpotPrice] = useState(null);
 
   useEffect(() => {
     const fetchSymbols = async () => {
@@ -139,22 +140,35 @@ const OptionChainView = () => {
     };
     fetchChainAndFuture();
     setHasScrolled(false); // Reset scroll on symbol change
+    setInitialSpotPrice(null); // Reset spot price anchor
   }, [symbol]);
+
+  const indexKey = getIndexKey(symbol);
+  const spotPriceData = prices[indexKey] || {};
+  const spotPrice = spotPriceData.ltp || 0;
+  const spotPct = spotPriceData.pct || 0;
+  
+  const futPriceData = futureTokenKey ? prices[futureTokenKey] : null;
+  const futPrice = futPriceData?.ltp || 0;
+  const futPct = futPriceData?.pct || 0;
+
+  const vixData = prices['INDIA VIX-NSE'] || {};
+  const vixPrice = vixData.ltp || 0;
+  const vixPct = vixData.pct || 0;
+  const vixChange = vixData.change || 0;
+
+  const basePrice = spotPrice > 0 ? spotPrice : (futPrice > 0 ? futPrice : null);
+
+  useEffect(() => {
+    if (basePrice !== null && initialSpotPrice === null) {
+      setInitialSpotPrice(basePrice);
+    }
+  }, [basePrice, initialSpotPrice]);
 
   useEffect(() => {
     if (!expiry || !optionsData[expiry]) return;
 
-    const strikes = Object.keys(optionsData[expiry]);
-    const tokensToSub = [];
-
     // Also subscribe to the underlying index for Spot Price
-    const getIndexKey = (sym) => {
-      if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
-      if (sym === 'CRUDEOIL' || sym === 'GOLD' || sym === 'SILVER' || sym === 'NATURALGAS') return `${sym}-MCX`;
-      return `${sym}-NSE`;
-    };
-    
-    const indexKey = getIndexKey(symbol);
     subscribeToSymbol(indexKey);
     subscribeToSymbol('INDIA VIX-NSE');
 
@@ -162,44 +176,59 @@ const OptionChainView = () => {
       subscribeToOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
     }
 
-    strikes.forEach((strike) => {
-      const data = optionsData[expiry][strike];
-      if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
-      if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
-    });
+    const tokensToSub = [];
 
-    subscribeToOptionBatch(tokensToSub);
+    if (initialSpotPrice !== null) {
+      const allStrikes = Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b);
+      let atmStrike = allStrikes.reduce((prev, curr) => 
+        Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+      );
+      
+      const atmIndex = allStrikes.indexOf(atmStrike);
+      // Take 25 strikes below and 25 strikes above ATM (50 total strikes)
+      const startIndex = Math.max(0, atmIndex - 25);
+      const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
+      
+      const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
+
+      visibleStrikes.forEach((strike) => {
+        const data = optionsData[expiry][strike];
+        if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
+        if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
+      });
+
+      if (tokensToSub.length > 0) {
+        subscribeToOptionBatch(tokensToSub);
+      }
+    }
 
     setHasScrolled(false); // Reset scroll on expiry change
 
     return () => {
-      unsubscribeFromOptionBatch(tokensToSub);
       unsubscribeFromSymbol(indexKey);
       unsubscribeFromSymbol('INDIA VIX-NSE');
       if (futureData) {
         unsubscribeFromOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
       }
+      if (tokensToSub.length > 0) {
+        unsubscribeFromOptionBatch(tokensToSub);
+      }
     };
-  }, [expiry, optionsData, symbol, futureData, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
-
-  const getIndexKey = (sym) => {
-    if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
-    if (sym === 'CRUDEOIL' || sym === 'GOLD' || sym === 'SILVER' || sym === 'NATURALGAS') return `${sym}-MCX`;
-    return `${sym}-NSE`;
-  };
-  
-  const indexKey = getIndexKey(symbol);
-  const spotPriceData = prices[indexKey] || {};
-  const spotPrice = spotPriceData.ltp || 0;
-  const spotPct = spotPriceData.pct || 0;
-  
-  const vixData = prices['INDIA VIX-NSE'] || {};
-  const vixPrice = vixData.ltp || 0;
-  const vixPct = vixData.pct || 0;
-  const vixChange = vixData.change || 0;
+  }, [expiry, optionsData, symbol, futureData, initialSpotPrice, indexKey, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const chain = optionsData[expiry] || {};
-  const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  
+  let strikes = [];
+  if (initialSpotPrice !== null && Object.keys(chain).length > 0) {
+    const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+    let atmStrike = allStrikes.reduce((prev, curr) => 
+      Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+    );
+    const atmIndex = allStrikes.indexOf(atmStrike);
+    const startIndex = Math.max(0, atmIndex - 25);
+    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
+    strikes = allStrikes.slice(startIndex, endIndex + 1);
+  }
 
   // Auto-scroll to ATM strike when data is available
   useEffect(() => {
@@ -235,15 +264,11 @@ const OptionChainView = () => {
 
   // Find ATM strike (closest to spotPrice)
   let atmStrike = null;
-  if (spotPrice > 0 && strikes.length > 0) {
+  if (basePrice > 0 && strikes.length > 0) {
     atmStrike = strikes.reduce((prev, curr) => 
-      Math.abs(curr - spotPrice) < Math.abs(prev - spotPrice) ? curr : prev
+      Math.abs(curr - basePrice) < Math.abs(prev - basePrice) ? curr : prev
     );
   }
-
-  const futPriceData = futureTokenKey ? prices[futureTokenKey] : null;
-  const futPrice = futPriceData?.ltp || 0;
-  const futPct = futPriceData?.pct || 0;
 
   return (
     <div className="option-chain-container">
@@ -333,6 +358,8 @@ const OptionChainView = () => {
           </div>
         ) : expiries.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>No option chain data available for {symbol}</div>
+        ) : initialSpotPrice === null ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Waiting for market data...</div>
         ) : (
         <table className="option-chain-table">
           <thead>
