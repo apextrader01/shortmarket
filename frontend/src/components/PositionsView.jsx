@@ -31,7 +31,40 @@ export default function PositionsView() {
 
   return (
     <div style={{ padding: '24px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto' }}>
-      <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Positions</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Positions</h2>
+        <button
+          onClick={async () => {
+            if (window.confirm('Are you sure you want to EXIT ALL open positions at market price?')) {
+              const store = useStore.getState();
+              // Iterate through positions and place market orders for each
+              for (const pos of positions) {
+                if (pos.quantity === 0) continue;
+                const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+                const payload = {
+                  symbol: pos.symbol,
+                  type: 'MARKET',
+                  side: exitSide,
+                  quantity: Math.abs(pos.quantity),
+                  price: 0,
+                  sl_price: null,
+                  tgt_price: null,
+                  margin: 0,
+                  product_type: pos.product_type || 'DEL'
+                };
+                await store.placeOrder(payload);
+              }
+            }
+          }}
+          style={{
+            background: 'var(--color-red-light)', color: '#fff', border: 'none',
+            padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+          }}
+        >
+          EXIT ALL OPEN POSITIONS
+        </button>
+      </div>
       
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>

@@ -62,7 +62,27 @@ export default function OrdersView() {
           </div>
         ) : (
           <div style={{ padding: '24px', width: '100%', height: '100%', overflowY: 'auto' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>{activeTab}</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{activeTab}</h2>
+              {activeTab === 'Open Orders' && displayOrders.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (window.confirm('Are you sure you want to cancel ALL open orders?')) {
+                      for (const order of displayOrders) {
+                        await useStore.getState().cancelOrder(order.id);
+                      }
+                    }
+                  }}
+                  style={{
+                    background: 'var(--color-red-light)', color: '#fff', border: 'none',
+                    padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  CANCEL ALL OPEN ORDERS
+                </button>
+              )}
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
