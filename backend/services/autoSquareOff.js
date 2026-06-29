@@ -22,11 +22,17 @@ async function processSquareOff(positionsToSquareOff, label) {
                     type: 'MARKET',
                     side: side,
                     quantity: quantity,
-                    price: null,
-                    status: 'PENDING',
+                    price: 0,
+                    status: 'EXECUTED',
                     product_type: 'INT'
                 }).returning('id');
                 const orderId = typeof id === 'object' ? id.id : id;
+                
+                // Update the position quantity to 0 to actually close it
+                await trx('positions')
+                    .where({ id: position.id })
+                    .update({ quantity: 0 });
+
                 console.log(`Auto Square-Off generated ${side} order #${orderId} for ${quantity}x ${position.symbol} (User: ${position.user_id})`);
             });
         } catch (err) {
