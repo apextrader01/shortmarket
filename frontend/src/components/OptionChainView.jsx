@@ -255,7 +255,14 @@ const OptionChainView = () => {
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>{callPriceData?.volume || '-'}</td>
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {callPriceData?.change ? callPriceData.change.toFixed(2) : '-'}
+                    {callPriceData?.change ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '11px' }}>{callPriceData.change > 0 ? '+' : ''}{callPriceData.change.toFixed(2)}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                          ({callPriceData.pct > 0 ? '+' : ''}{callPriceData.pct?.toFixed(1) || '0.0'}%)
+                        </span>
+                      </div>
+                    ) : '-'}
                   </td>
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
                     <div className="ltp-container">
@@ -305,7 +312,14 @@ const OptionChainView = () => {
                     </div>
                   </td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {putPriceData?.change ? putPriceData.change.toFixed(2) : '-'}
+                    {putPriceData?.change ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '11px' }}>{putPriceData.change > 0 ? '+' : ''}{putPriceData.change.toFixed(2)}</span>
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                          ({putPriceData.pct > 0 ? '+' : ''}{putPriceData.pct?.toFixed(1) || '0.0'}%)
+                        </span>
+                      </div>
+                    ) : '-'}
                   </td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>{putPriceData?.volume || '-'}</td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
