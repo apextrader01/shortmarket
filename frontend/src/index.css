@@ -454,8 +454,7 @@ tbody tr:hover {
   color: var(--text-primary);
   font-family: inherit;
   gap: 20px;
-  overflow-x: auto;
-  white-space: nowrap;
+  flex-wrap: wrap; /* allow wrapping on small screens instead of horizontal scroll which breaks absolute dropdowns */
 }
 
 .top-bar-section {

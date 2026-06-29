@@ -25,7 +25,10 @@ const SymbolDropdown = ({ value, options, onChange }) => {
   return (
     <div className="custom-dropdown" ref={dropdownRef}>
       <div className="custom-dropdown-header" onClick={() => { setIsOpen(!isOpen); setSearch(''); }}>
-        <span>{value}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <i className="fi fi-rr-search" style={{ color: '#94a3b8' }}></i>
+          <span>{value}</span>
+        </div>
         <i className="fi fi-rr-angle-small-down" style={{ fontSize: '12px' }}></i>
       </div>
       {isOpen && (
