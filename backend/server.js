@@ -766,6 +766,44 @@ app.get('/api/options/symbols', async (req, res) => {
   }
 });
 
+app.get('/api/options/futures/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  const futuresPath = path.join(__dirname, 'database', 'futures.json');
+  
+  if (!fs.existsSync(futuresPath)) {
+    return res.status(503).json({ error: 'Futures database not ready.' });
+  }
+
+  try {
+    const fileData = fs.readFileSync(futuresPath, 'utf8');
+    const data = JSON.parse(fileData);
+    
+    if (data[symbol] && data[symbol].length > 0) {
+      // Find the first future that hasn't expired yet
+      const now = new Date();
+      // Reset time to start of day for accurate expiry comparison
+      now.setHours(0, 0, 0, 0); 
+      
+      const validFutures = data[symbol].filter(f => {
+        const expDate = new Date(f.expiry);
+        return expDate >= now;
+      });
+
+      if (validFutures.length > 0) {
+        res.json(validFutures[0]);
+      } else {
+        // Fallback to the last expired future if no active ones exist (e.g. edge cases)
+        res.json(data[symbol][data[symbol].length - 1]);
+      }
+    } else {
+      res.status(404).json({ error: 'No futures found for symbol' });
+    }
+  } catch (err) {
+    console.error('Error fetching futures:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
