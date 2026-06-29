@@ -219,14 +219,14 @@ function App() {
         <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ display: 'flex', minWidth: 0 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {activeTab === 'Markets' && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
+            <div className="dashboard-grid" style={{ width: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ChartWidget />
               </div>
             </div>
           )}
           {activeTab === 'Options' && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
               <OptionChainView />
             </div>
           )}
@@ -235,17 +235,17 @@ function App() {
           {activeTab === 'Positions' && <PositionsView />}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} />
             </div>
           )}
           {activeTab === 'Settings' && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
               <SettingsView />
             </div>
           )}
           {activeTab === 'AdminPanel' && user?.is_admin && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
+            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
               <AdminDashboard />
             </div>
           )}
