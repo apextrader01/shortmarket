@@ -109,6 +109,7 @@ const OptionChainView = () => {
     const fetchChainAndFuture = async () => {
       setLoading(true);
       setError(null);
+      setOptionsData({}); // Clear old chain data
       try {
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
         if (!res.ok) {
@@ -148,7 +149,8 @@ const OptionChainView = () => {
     fetchChainAndFuture();
     setHasScrolled(false); // Reset scroll on symbol change
     setInitialSpotPrice(null); // Reset spot price anchor
-  }, [symbol]);
+    setFutureData(null); // Clear old future data so it doesn't anchor to previous symbol's price
+  }, [symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const getIndexKey = (sym) => {
     const commodities = [
