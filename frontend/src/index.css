@@ -620,19 +620,22 @@ input:checked + .slider:before {
 .custom-dropdown-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: transparent;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  gap: 12px;
+  background: #0f172a; /* Slate 900 */
+  padding: 8px 16px;
+  border: 1px solid #334155;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
-  min-width: 80px;
+  color: #f8fafc;
+  min-width: 110px;
   justify-content: space-between;
+  transition: all 0.2s ease;
 }
 .custom-dropdown-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: #1e293b;
+  border-color: #475569;
 }
 .custom-dropdown-list-container {
   position: absolute;

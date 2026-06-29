@@ -205,16 +205,13 @@ const OptionChainView = () => {
       <div className="option-chain-top-bar">
         {/* Section 1: Search & Spot */}
         <div className="top-bar-section">
-          <div className="symbol-selector-wrapper">
-            <i className="fi fi-rr-search" style={{ color: 'var(--text-secondary)' }}></i>
-            <SymbolDropdown 
-              value={symbol}
-              options={availableSymbols.length > 0 ? availableSymbols : [symbol]}
-              onChange={setSymbol}
-            />
-          </div>
+          <SymbolDropdown 
+            value={symbol}
+            options={availableSymbols.length > 0 ? availableSymbols : [symbol]}
+            onChange={setSymbol}
+          />
           
-          <span className="top-bar-price">{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
+          <span className="top-bar-price" style={{ marginLeft: '4px' }}>{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
           <span className={`top-bar-pct ${spotPct >= 0 ? 'positive' : 'negative'}`}>
             {spotPct > 0 ? '+' : ''}{spotPct.toFixed(2)}%
           </span>
