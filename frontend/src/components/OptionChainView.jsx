@@ -157,7 +157,7 @@ const OptionChainView = () => {
   };
 
   const indexKey = getIndexKey(symbol);
-  const spotPriceData = prices[indexKey] || {};
+  const spotPriceData = indexKey ? (prices[indexKey] || {}) : {};
   const spotPrice = spotPriceData.ltp || 0;
   const spotPct = spotPriceData.pct || 0;
   
@@ -201,9 +201,9 @@ const OptionChainView = () => {
         );
         
         const atmIndex = allStrikes.indexOf(atmStrike);
-        // Take 20 strikes below and 20 strikes above ATM (40 total strikes)
-        const startIndex = Math.max(0, atmIndex - 20);
-        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 20);
+        // Take 15 strikes below and 15 strikes above ATM (30 total strikes)
+        const startIndex = Math.max(0, atmIndex - 15);
+        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
         
         const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
 
@@ -242,8 +242,8 @@ const OptionChainView = () => {
       Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
-    const startIndex = Math.max(0, atmIndex - 20);
-    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 20);
+    const startIndex = Math.max(0, atmIndex - 15);
+    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 15);
     strikes = allStrikes.slice(startIndex, endIndex + 1);
   }
 
