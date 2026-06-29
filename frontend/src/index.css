@@ -442,10 +442,10 @@ tbody tr:hover {
 .option-chain-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: var(--bg-main);
   color: var(--text-primary);
-  min-height: 0;
   min-width: 0;
   border-radius: var(--radius-lg, 12px);
   border: 1px solid var(--border-color);
