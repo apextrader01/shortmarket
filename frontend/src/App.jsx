@@ -216,8 +216,8 @@ function App() {
 
       <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
         <MarketWatch className={activeTab !== 'Markets' ? 'mobile-hidden' : ''} />
-        <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
-          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ display: 'flex', minWidth: 0 }}>
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {activeTab === 'Markets' && (
             <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
