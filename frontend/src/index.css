@@ -444,6 +444,9 @@ tbody tr:hover {
   color: var(--text-primary);
   min-height: 0;
   min-width: 0;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
 }
 
 .option-chain-top-bar {
