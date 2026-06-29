@@ -52,7 +52,7 @@ export default function OrderModal() {
              setEstimatedTaxes(0);
              return;
          }
-         const token = localStorage.getItem('token');
+         const token = useStore.getState().token;
          const res = await fetch(`/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });
