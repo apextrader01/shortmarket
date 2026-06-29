@@ -180,25 +180,27 @@ const OptionChainView = () => {
 
     if (initialSpotPrice !== null) {
       const allStrikes = Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b);
-      let atmStrike = allStrikes.reduce((prev, curr) => 
-        Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
-      );
-      
-      const atmIndex = allStrikes.indexOf(atmStrike);
-      // Take 25 strikes below and 25 strikes above ATM (50 total strikes)
-      const startIndex = Math.max(0, atmIndex - 25);
-      const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
-      
-      const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
+      if (allStrikes.length > 0) {
+        let atmStrike = allStrikes.reduce((prev, curr) => 
+          Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+        );
+        
+        const atmIndex = allStrikes.indexOf(atmStrike);
+        // Take 25 strikes below and 25 strikes above ATM (50 total strikes)
+        const startIndex = Math.max(0, atmIndex - 25);
+        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
+        
+        const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
 
-      visibleStrikes.forEach((strike) => {
-        const data = optionsData[expiry][strike];
-        if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
-        if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
-      });
+        visibleStrikes.forEach((strike) => {
+          const data = optionsData[expiry][strike];
+          if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
+          if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
+        });
 
-      if (tokensToSub.length > 0) {
-        subscribeToOptionBatch(tokensToSub);
+        if (tokensToSub.length > 0) {
+          subscribeToOptionBatch(tokensToSub);
+        }
       }
     }
 
