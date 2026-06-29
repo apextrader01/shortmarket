@@ -109,11 +109,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr;
   grid-template-rows: auto 1fr;
   gap: 20px;
   padding: 24px;
   height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px - 60px) !important;
   overflow-y: auto;
 }
 
