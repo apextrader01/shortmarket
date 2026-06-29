@@ -820,6 +820,20 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+
+  // Block new Intraday orders for non-commodities after 3:15 PM IST
+  if (product_type === 'INT') {
+    const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+    if (!isCommodity) {
+      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      if (hours > 15 || (hours === 15 && minutes >= 15)) {
+        return res.status(400).json({ error: 'Intraday trading for Equities is blocked after 3:15 PM IST.' });
+      }
+    }
+  }
+
   try {
     await db.transaction(async (trx) => {
       // 1. Determine execution status

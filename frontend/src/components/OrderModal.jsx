@@ -76,7 +76,19 @@ export default function OrderModal() {
   const isInsufficient = balanceNum < requiredMargin;
 
   const isRestricted = restrictedStocks.includes(symbol);
-  const isIntradayBlocked = isRestricted && productType === 'INT';
+  
+  const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+  
+  const isPastIntradayCutoff = () => {
+    if (isCommodity) return false;
+    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const hours = istTime.getHours();
+    const minutes = istTime.getMinutes();
+    return (hours > 15 || (hours === 15 && minutes >= 15));
+  };
+
+  const isTimeBlocked = isPastIntradayCutoff();
+  const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
 
   const handlePlaceOrder = async () => {
     if (isIntradayBlocked) return;
