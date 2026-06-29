@@ -92,6 +92,8 @@ export default function OrdersView() {
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
+                  {activeTab === 'Executed Orders' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Charges</th>}
+                  {activeTab === 'Executed Orders' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Realized P&L</th>}
                   <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
                   {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
                 </tr>
@@ -110,6 +112,16 @@ export default function OrdersView() {
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
                     <td style={{ padding: '12px 16px' }}>{order.price ? `₹${parseFloat(order.price).toFixed(2)}` : '—'}</td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.type || (order.price ? 'LIMIT' : 'MARKET')}</td>
+                    {activeTab === 'Executed Orders' && (
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                        {order.taxes ? `₹${parseFloat(order.taxes).toFixed(2)}` : '₹0.00'}
+                      </td>
+                    )}
+                    {activeTab === 'Executed Orders' && (
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: !order.realized_pnl ? 'var(--text-secondary)' : parseFloat(order.realized_pnl) > 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {order.realized_pnl ? `${parseFloat(order.realized_pnl) > 0 ? '+' : ''}₹${parseFloat(order.realized_pnl).toFixed(2)}` : '—'}
+                      </td>
+                    )}
                     <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                       {order.status}
                     </td>

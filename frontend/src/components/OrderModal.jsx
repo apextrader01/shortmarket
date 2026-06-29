@@ -14,6 +14,10 @@ export default function OrderModal() {
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
+  
+  // Tax estimates
+  const [estimatedTaxes, setEstimatedTaxes] = useState(0);
+  const [isEstimating, setIsEstimating] = useState(false);
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
@@ -37,6 +41,36 @@ export default function OrderModal() {
   const isBuy = side === 'BUY';
   const isOption = symbol.includes('CE') || symbol.includes('PE');
   
+  // Fetch Estimated Charges
+  useEffect(() => {
+    if (!symbol || !totalQuantity) return;
+    const fetchEst = async () => {
+       setIsEstimating(true);
+       try {
+         const p = orderType === 'MARKET' ? livePrice : parseFloat(price);
+         if (!p) {
+             setEstimatedTaxes(0);
+             return;
+         }
+         const token = localStorage.getItem('token');
+         const res = await fetch(`/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+         });
+         const data = await res.json();
+         if (data.totalTaxes !== undefined) {
+             setEstimatedTaxes(data.totalTaxes);
+         }
+       } catch (err) {
+         console.error('Failed to estimate taxes', err);
+       } finally {
+         setIsEstimating(false);
+       }
+    };
+    
+    const timer = setTimeout(fetchEst, 400); // Debounce
+    return () => clearTimeout(timer);
+  }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
+
   const leverageMultiplier = (productType === 'INT' && !isOption) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
   
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
@@ -279,12 +313,14 @@ export default function OrderModal() {
         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: '24px' }}>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Available</div>
-              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{balanceNum.toFixed(2)}</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Required</div>
+              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{requiredMargin.toFixed(2)}</div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Required</div>
-              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{requiredMargin.toFixed(2)}</div>
+              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Estimated Charges</div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                 {isEstimating ? '...' : `₹${estimatedTaxes.toFixed(2)}`}
+              </div>
             </div>
           </div>
           <button 

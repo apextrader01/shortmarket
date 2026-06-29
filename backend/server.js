@@ -945,7 +945,24 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
 });
 
-// ── Place Basket Order ───────────────────────────────────────────────────────
+// 🧮 Estimate Charges 🧮
+app.get('/api/estimate-charges', authenticateToken, (req, res) => {
+  try {
+    const { symbol, product_type, side, quantity, price } = req.query;
+    if (!symbol || !side || !quantity || !price) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    const { calculateTaxes } = require('./services/taxCalculator');
+    const taxes = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), Number(price));
+    
+    res.json(taxes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 🧺 Place Basket Order 🧺───────────────────────────────────────────────────────
 app.post('/api/basket-order', authenticateToken, async (req, res) => {
   const { items, total_margin } = req.body;
   if (!items || !Array.isArray(items) || items.length === 0) {
