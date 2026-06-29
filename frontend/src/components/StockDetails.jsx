@@ -88,7 +88,7 @@ export default function StockDetails({ symbol, price, candles }) {
     const formatNum = (num) => num ? (num >= 1e7 ? (num / 1e7).toFixed(2) + ' Cr' : num.toLocaleString('en-IN')) : '-';
     
     return (
-      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
         
         {/* Performance */}
         <div>
@@ -228,9 +228,9 @@ export default function StockDetails({ symbol, price, candles }) {
         )}
 
         {financials.length > 0 && (
-          <div style={{ marginTop: '16px' }}>
+          <div style={{ marginTop: '16px', minWidth: 0 }}>
             <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Financial Performance (Yearly)</h4>
-            <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch' }} className="scrollbar-hide">
+            <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch', minWidth: 0, width: '100%' }} className="scrollbar-hide">
               {financials.map(fin => (
                 <div key={fin.title} className="glass-panel" style={{ padding: '12px', minWidth: '240px', flexShrink: 0 }}>
                   <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#E2E8F0' }}>{fin.title}</div>
@@ -371,7 +371,7 @@ export default function StockDetails({ symbol, price, candles }) {
     );
 
     return (
-      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Indicators</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
@@ -400,7 +400,7 @@ export default function StockDetails({ symbol, price, candles }) {
     if (news.length === 0) return <div style={{ padding: '20px', color: '#94A3B8' }}>No recent news found.</div>;
 
     return (
-      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
         {news.map((item, i) => (
           <a key={i} href={item.link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
             <div className="glass-panel hoverable" style={{ padding: '16px', transition: 'all 0.2s', cursor: 'pointer' }}>
@@ -425,7 +425,7 @@ export default function StockDetails({ symbol, price, candles }) {
         <div onClick={() => setActiveTab('News')} style={tabStyle('News')}>News</div>
       </div>
       
-      <div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minWidth: 0, overflowX: 'hidden' }}>
         {activeTab === 'Overview' && renderOverview()}
         {activeTab === 'Technicals' && renderTechnicals()}
         {activeTab === 'News' && renderNews()}
