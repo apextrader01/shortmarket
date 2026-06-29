@@ -56,16 +56,19 @@ export default function OrderModal() {
          if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
          optionStrike = parseFloat(rawStrikeStr);
       }
-    }
+    // Index vs Stock differentiation
+    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
     
-    // User requested 9.50x leverage for option selling
-    const marginRate = 1 / 9.5; 
+    // 10% (10x leverage) for Index Options, 20% (5x leverage) for highly volatile Stock Options
+    const marginRate = isIndex ? 0.10 : 0.20; 
     
     if (optionStrike > 0) {
-      baseMargin = optionStrike * totalQuantity * marginRate;
+      const grossMargin = optionStrike * totalQuantity * marginRate;
+      // Subtract the premium you collect from the buyer (baseMargin holds the premium value initially)
+      baseMargin = Math.max(grossMargin - baseMargin, 0); 
     } else {
       // Fallback
-      baseMargin = totalQuantity * 4000;
+      baseMargin = totalQuantity * (isIndex ? 4000 : 8000);
     }
   }
 
