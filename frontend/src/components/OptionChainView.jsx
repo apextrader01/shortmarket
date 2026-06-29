@@ -16,6 +16,9 @@ const OptionChainView = () => {
   const subscribeToOptionBatch = useStore((state) => state.subscribeToOptionBatch);
   const unsubscribeFromOptionBatch = useStore((state) => state.unsubscribeFromOptionBatch);
 
+  const atmRowRef = useRef(null);
+  const [hasScrolled, setHasScrolled] = useState(false);
+
   useEffect(() => {
     const fetchChain = async () => {
       setLoading(true);
@@ -64,18 +67,6 @@ const OptionChainView = () => {
     };
   }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch]);
 
-  const handleTrade = (opt, type) => {
-    if (!opt) return;
-    openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
-  };
-
-  if (loading) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain...</div>;
-  }
-
-  const chain = optionsData[expiry] || {};
-  const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
-  
   const getIndexKey = (sym) => {
     if (sym === 'NIFTY' || sym === 'BANKNIFTY') return `${sym}-NSE`;
     if (sym === 'SENSEX') return `${sym}-BSE`;
@@ -84,6 +75,25 @@ const OptionChainView = () => {
   
   const indexKey = getIndexKey(symbol);
   const spotPrice = prices[indexKey]?.ltp || 0;
+  const chain = optionsData[expiry] || {};
+  const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+
+  // Auto-scroll to ATM strike when data is available
+  useEffect(() => {
+    if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
+      atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHasScrolled(true);
+    }
+  }, [spotPrice, hasScrolled, strikes]);
+
+  const handleTrade = (opt, type) => {
+    if (!opt) return;
+    openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
+  };
+
+  if (loading) {
+    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain...</div>;
+  }
   
   // Time to Expiry (T in years)
   let T = 0.01; // Default to a small fraction if we can't parse
@@ -106,17 +116,6 @@ const OptionChainView = () => {
       Math.abs(curr - spotPrice) < Math.abs(prev - spotPrice) ? curr : prev
     );
   }
-
-  const atmRowRef = useRef(null);
-  const [hasScrolled, setHasScrolled] = useState(false);
-
-  // Auto-scroll to ATM strike when data is available
-  useEffect(() => {
-    if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
-      atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHasScrolled(true);
-    }
-  }, [spotPrice, hasScrolled, strikes]);
 
   return (
     <div className="option-chain-container">
