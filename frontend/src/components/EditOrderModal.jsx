@@ -8,6 +8,7 @@ export default function EditOrderModal() {
   
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
+  const [productType, setProductType] = useState('INT');
 
   const symbol = order ? order.symbol : null;
   const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
@@ -17,6 +18,7 @@ export default function EditOrderModal() {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
       setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
+      if (order.productType) setProductType(order.productType);
     }
   }, [editOrderModal.isOpen, order]);
 
