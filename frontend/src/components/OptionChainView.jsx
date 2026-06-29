@@ -94,7 +94,7 @@ const OptionChainView = () => {
     }
   }
 
-  const r = 0.07; // 7% risk-free rate
+  const r = 0.10; // 10% risk-free rate (NSE Standard for IV calculations)
 
   return (
     <div className="option-chain-container">

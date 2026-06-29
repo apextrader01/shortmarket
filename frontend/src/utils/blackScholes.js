@@ -74,30 +74,25 @@ export function calculateIV(type, marketPrice, S, K, T, r) {
   if (type === 'CE' && marketPrice < (S - K) * Math.exp(-r*T)) return 0;
   if (type === 'PE' && marketPrice < (K - S) * Math.exp(-r*T)) return 0;
 
-  const MAX_ITER = 100;
-  const PRECISION = 0.0001;
-  let sigma = 0.3; // Initial guess: 30% volatility
+  let low = 0.0001;
+  let high = 5.0;
+  let mid = 0.3;
 
-  for (let i = 0; i < MAX_ITER; i++) {
-    const greeks = calculateGreeks(type, S, K, T, r, sigma);
+  for (let i = 0; i < 60; i++) {
+    mid = (low + high) / 2;
+    const greeks = calculateGreeks(type, S, K, T, r, mid);
     const diff = greeks.price - marketPrice;
     
-    if (Math.abs(diff) < PRECISION) {
-      return sigma;
+    if (Math.abs(diff) < 0.001) {
+      return mid;
     }
     
-    // If Vega is essentially zero, we can't accurately divide to find the next step
-    if (Math.abs(greeks.vega) < 0.00001) {
-      break; 
+    if (greeks.price > marketPrice) {
+      high = mid;
+    } else {
+      low = mid;
     }
-    
-    // Note: vega from calculateGreeks is divided by 100, so we multiply by 100 for the exact derivative
-    sigma = sigma - (diff / (greeks.vega * 100));
-    
-    // Bounds limit to prevent extreme divergence
-    if (sigma <= 0.001) sigma = 0.001; 
-    if (sigma > 5.0) sigma = 5.0; // 500% cap
   }
 
-  return sigma;
+  return mid;
 }
