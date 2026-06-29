@@ -102,12 +102,17 @@ export default function OrderModal() {
        return;
     }
 
+    let finalType = orderType;
+    if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
+    if (tab === 'GTT') finalType = 'GTT';
+
     const payload = {
       symbol,
-      type: orderType,
+      type: finalType,
       side,
       quantity: totalQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
+      trigger_price: (tab === 'Stop Loss' || tab === 'GTT') && slTrigger ? parseFloat(slTrigger) : null,
       sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
       tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
@@ -168,7 +173,7 @@ export default function OrderModal() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 20px', gap: '24px' }}>
-          {['Regular', 'Stop Loss'].map(t => (
+          {['Regular', 'Stop Loss', 'GTT'].map(t => (
             <div key={t} onClick={() => setTab(t)} style={{ 
               padding: '12px 0', fontSize: '13px', fontWeight: tab === t ? '600' : '500', 
               color: tab === t ? 'var(--color-blue)' : 'var(--text-secondary)',
@@ -223,11 +228,11 @@ export default function OrderModal() {
 
           </div>
 
-          {/* Stop Loss Tab specific inputs */}
-          {tab === 'Stop Loss' && (
+          {/* Stop Loss & GTT Tab specific inputs */}
+          {(tab === 'Stop Loss' || tab === 'GTT') && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>SL Trigger Price</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{tab === 'GTT' ? 'GTT Trigger Price' : 'SL Trigger Price'}</div>
                 <input type="text" value={slTrigger} onChange={e => setSlTrigger(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
               </div>
             </div>
