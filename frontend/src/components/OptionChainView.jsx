@@ -4,6 +4,60 @@ import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 
 const API = '';
 
+// Custom Searchable Dropdown
+const SymbolDropdown = ({ value, options, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="custom-dropdown" ref={dropdownRef}>
+      <div className="custom-dropdown-header" onClick={() => { setIsOpen(!isOpen); setSearch(''); }}>
+        <span>{value}</span>
+        <i className="fi fi-rr-angle-small-down" style={{ fontSize: '12px' }}></i>
+      </div>
+      {isOpen && (
+        <div className="custom-dropdown-list-container">
+          <input 
+            type="text" 
+            placeholder="Search symbols..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoFocus
+            className="custom-dropdown-search"
+          />
+          <div className="custom-dropdown-list">
+            {filteredOptions.length > 0 ? filteredOptions.map(opt => (
+              <div 
+                key={opt} 
+                className="custom-dropdown-item"
+                onClick={() => {
+                  onChange(opt);
+                  setIsOpen(false);
+                }}
+              >
+                {opt}
+              </div>
+            )) : <div className="custom-dropdown-item text-muted">No results found</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const OptionChainView = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState([]);
@@ -151,22 +205,13 @@ const OptionChainView = () => {
       <div className="option-chain-top-bar">
         {/* Section 1: Search & Spot */}
         <div className="top-bar-section">
-          <div className="symbol-selector-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div className="symbol-selector-wrapper">
             <i className="fi fi-rr-search" style={{ color: 'var(--text-secondary)' }}></i>
-            <select 
-              className="expiry-select-minimal"
-              style={{ fontSize: '14px', paddingLeft: '4px', paddingRight: '16px' }}
+            <SymbolDropdown 
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
-            >
-              {availableSymbols.length > 0 ? (
-                availableSymbols.map(sym => (
-                  <option key={sym} value={sym}>{sym}</option>
-                ))
-              ) : (
-                <option value={symbol}>{symbol}</option>
-              )}
-            </select>
+              options={availableSymbols.length > 0 ? availableSymbols : [symbol]}
+              onChange={setSymbol}
+            />
           </div>
           
           <span className="top-bar-price">{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
