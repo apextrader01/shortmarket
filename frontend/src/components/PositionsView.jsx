@@ -79,12 +79,11 @@ export default function PositionsView() {
                   }}>
                     {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
                   </td>
-                  <td style={{ textAlign: 'center' }}>
+                  <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                     <button 
                       onClick={async () => {
                         const isInt = pos.product_type === 'INT';
                         const newType = isInt ? 'DEL' : 'INT';
-                        // if INT -> DEL, user needs to pay remaining 75% margin. If DEL -> INT, user gets 75% margin back.
                         const requiredMargin = avg * Math.abs(qty) * 0.75;
                         const confirmMsg = isInt 
                            ? `Convert to Delivery? This requires ₹${requiredMargin.toFixed(2)} available cash.` 
@@ -100,6 +99,19 @@ export default function PositionsView() {
                       }}
                     >
                       Convert to {pos.product_type === 'INT' ? 'DEL' : 'INT'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const exitSide = qty > 0 ? 'SELL' : 'BUY';
+                        useStore.getState().openOrderModal(pos.symbol, exitSide, Math.abs(qty));
+                      }}
+                      style={{
+                        background: 'var(--color-red-light)', color: '#fff', border: 'none',
+                        padding: '4px 14px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      EXIT
                     </button>
                   </td>
                 </tr>
