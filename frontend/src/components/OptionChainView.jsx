@@ -31,6 +31,8 @@ const OptionChainView = () => {
   const openOrderModal = useStore((state) => state.openOrderModal);
   const subscribeToOptionBatch = useStore((state) => state.subscribeToOptionBatch);
   const unsubscribeFromOptionBatch = useStore((state) => state.unsubscribeFromOptionBatch);
+  const subscribeToSymbol = useStore((state) => state.subscribeToSymbol);
+  const unsubscribeFromSymbol = useStore((state) => state.unsubscribeFromSymbol);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -66,7 +68,14 @@ const OptionChainView = () => {
     const tokensToSub = [];
 
     // Also subscribe to the underlying index for Spot Price
-    tokensToSub.push({ token: symbol, exchange: 'NSE', name: symbol });
+    const getIndexKey = (sym) => {
+      if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
+      if (sym === 'CRUDEOIL' || sym === 'GOLD' || sym === 'SILVER' || sym === 'NATURALGAS') return `${sym}-MCX`;
+      return `${sym}-NSE`;
+    };
+    
+    const indexKey = getIndexKey(symbol);
+    subscribeToSymbol(indexKey);
 
     strikes.forEach((strike) => {
       const data = optionsData[expiry][strike];
@@ -80,13 +89,14 @@ const OptionChainView = () => {
 
     return () => {
       unsubscribeFromOptionBatch(tokensToSub);
+      unsubscribeFromSymbol(indexKey);
     };
-  }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch]);
+  }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const getIndexKey = (sym) => {
-    if (sym === 'NIFTY' || sym === 'BANKNIFTY') return `${sym}-NSE`;
-    if (sym === 'SENSEX') return `${sym}-BSE`;
-    return sym;
+    if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
+    if (sym === 'CRUDEOIL' || sym === 'GOLD' || sym === 'SILVER' || sym === 'NATURALGAS') return `${sym}-MCX`;
+    return `${sym}-NSE`;
   };
   
   const indexKey = getIndexKey(symbol);

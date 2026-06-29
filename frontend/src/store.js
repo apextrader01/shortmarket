@@ -474,6 +474,9 @@ export const useStore = create(persist((set, get) => ({
     socket.emit('subscribe', symbol);
   },
 
+  subscribeToSymbol: (symbol) => socket.emit('subscribe', symbol),
+  unsubscribeFromSymbol: (symbol) => socket.emit('unsubscribe', symbol),
+
   subscribeToOption: (data) => socket.emit('subscribe', data),
   subscribeToOptionBatch: (dataArray) => socket.emit('subscribe_batch', dataArray),
   unsubscribeFromOption: (data) => socket.emit('unsubscribe', data),
