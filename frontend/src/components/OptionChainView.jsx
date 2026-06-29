@@ -100,7 +100,9 @@ const OptionChainView = () => {
   };
   
   const indexKey = getIndexKey(symbol);
-  const spotPrice = prices[indexKey]?.ltp || 0;
+  const spotPriceData = prices[indexKey] || {};
+  const spotPrice = spotPriceData.ltp || 0;
+  const spotPct = spotPriceData.pct || 0;
   const chain = optionsData[expiry] || {};
   const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
 
@@ -146,38 +148,88 @@ const OptionChainView = () => {
   return (
     <div className="option-chain-container">
       {/* Header */}
-      <div className="option-chain-header">
-        <select 
-          className="option-chain-select"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-        >
-          {availableSymbols.length > 0 ? (
-            availableSymbols.map(sym => (
-              <option key={sym} value={sym}>{sym}</option>
-            ))
-          ) : (
-            <>
-              <option value="NIFTY">NIFTY</option>
-              <option value="BANKNIFTY">BANKNIFTY</option>
-              <option value="SENSEX">SENSEX</option>
-            </>
-          )}
-        </select>
-        
-        <select 
-          className="option-chain-select"
-          value={expiry}
-          onChange={(e) => setExpiry(e.target.value)}
-        >
-          {expiries.map(exp => (
-            <option key={exp} value={exp}>{exp}</option>
-          ))}
-        </select>
-        
-        <div style={{ marginLeft: 'auto', fontWeight: '600', color: 'var(--color-blue)', display: 'flex', gap: '16px' }}>
-          <span>SPOT: {spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
-          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', alignSelf: 'center' }}>Live Greeks (BS Model)</span>
+      <div className="option-chain-top-bar">
+        {/* Section 1: Search & Spot */}
+        <div className="top-bar-section">
+          <div className="symbol-selector-wrapper">
+            <i className="fi fi-rr-search"></i>
+            <select 
+              className="symbol-select-invisible"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+            >
+              {availableSymbols.length > 0 ? (
+                availableSymbols.map(sym => (
+                  <option key={sym} value={sym}>{sym}</option>
+                ))
+              ) : (
+                <option value={symbol}>{symbol}</option>
+              )}
+            </select>
+            <span className="selected-symbol-text">{symbol}</span>
+          </div>
+          
+          <span className="top-bar-price">{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
+          <span className={`top-bar-pct ${spotPct >= 0 ? 'positive' : 'negative'}`}>
+            {spotPct > 0 ? '+' : ''}{spotPct.toFixed(2)}%
+          </span>
+
+          <div className="top-bar-icons">
+            <button className="icon-btn" title="View Chart"><i className="fi fi-rr-chart-line-up"></i></button>
+            <button className="icon-btn info-btn" title="Information">Info</button>
+          </div>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 2: Expiry */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">Expiry</span>
+          <select 
+            className="expiry-select-minimal"
+            value={expiry}
+            onChange={(e) => setExpiry(e.target.value)}
+          >
+            {expiries.map(exp => (
+              <option key={exp} value={exp}>{exp}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 3: Fut Price */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">Fut Price</span>
+          <span className="top-bar-value">-</span>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 4: INDIAVIX */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">INDIAVIX</span>
+          <span className="top-bar-value">-</span>
+          <span className="top-bar-pct positive"></span>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 5: IVP */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">IVP</span>
+          <span className="top-bar-value">-</span>
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 6: Toggle */}
+        <div className="top-bar-section">
+          <label className="toggle-switch">
+            <input type="checkbox" />
+            <span className="slider round"></span>
+          </label>
+          <span className="top-bar-label">Per Lot</span>
         </div>
       </div>
 
