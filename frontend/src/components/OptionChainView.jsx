@@ -68,6 +68,7 @@ const OptionChainView = () => {
   const [expiries, setExpiries] = useState([]);
   const [optionsData, setOptionsData] = useState({});
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [futureData, setFutureData] = useState(null);
   const [futureTokenKey, setFutureTokenKey] = useState(null);
 
@@ -99,9 +100,13 @@ const OptionChainView = () => {
   useEffect(() => {
     const fetchChainAndFuture = async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
-        if (!res.ok) throw new Error('Failed to fetch option chain');
+        if (!res.ok) {
+          const errBody = await res.json().catch(()=>({}));
+          throw new Error(errBody.error || 'Failed to fetch option chain');
+        }
         const data = await res.json();
         
         setOptionsData(data);
@@ -124,6 +129,10 @@ const OptionChainView = () => {
 
       } catch (err) {
         console.error(err);
+        setError(err.message);
+        setOptionsData({});
+        setExpiries([]);
+        setExpiry('');
       } finally {
         setLoading(false);
       }
@@ -195,7 +204,11 @@ const OptionChainView = () => {
   // Auto-scroll to ATM strike when data is available
   useEffect(() => {
     if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
-      atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        if (atmRowRef.current) {
+          atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
       setHasScrolled(true);
     }
   }, [spotPrice, hasScrolled, strikes]);
@@ -205,10 +218,7 @@ const OptionChainView = () => {
     openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
   };
 
-  if (loading) {
-    return <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain...</div>;
-  }
-  
+  // Loading and error states handled in the table container to keep top bar visible
   // Time to Expiry (T in years)
   let T = 0.01; // Default to a small fraction if we can't parse
   if (expiry) {
@@ -314,6 +324,16 @@ const OptionChainView = () => {
 
       {/* Table */}
       <div className="option-chain-table-container">
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Option Chain for {symbol}...</div>
+        ) : error ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--color-red)' }}>
+            Error: {error}
+            <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>Try selecting a different symbol from the dropdown above.</div>
+          </div>
+        ) : expiries.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>No option chain data available for {symbol}</div>
+        ) : (
         <table className="option-chain-table">
           <thead>
             <tr>
@@ -462,6 +482,7 @@ const OptionChainView = () => {
             })}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
