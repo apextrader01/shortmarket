@@ -143,6 +143,13 @@ const OptionChainView = () => {
     setInitialSpotPrice(null); // Reset spot price anchor
   }, [symbol]);
 
+  const getIndexKey = (sym) => {
+    const commodities = ['CRUDEOIL', 'GOLD', 'GOLDM', 'SILVER', 'SILVERM', 'SILVERMIC', 'NATURALGAS'];
+    if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
+    if (commodities.includes(sym)) return null; // Commodities use futures price, not spot
+    return `${sym}-NSE`;
+  };
+
   const indexKey = getIndexKey(symbol);
   const spotPriceData = prices[indexKey] || {};
   const spotPrice = spotPriceData.ltp || 0;
@@ -169,7 +176,9 @@ const OptionChainView = () => {
     if (!expiry || !optionsData[expiry]) return;
 
     // Also subscribe to the underlying index for Spot Price
-    subscribeToSymbol(indexKey);
+    if (indexKey) {
+      subscribeToSymbol(indexKey);
+    }
     subscribeToSymbol('INDIA VIX-NSE');
 
     if (futureData) {
@@ -186,9 +195,9 @@ const OptionChainView = () => {
         );
         
         const atmIndex = allStrikes.indexOf(atmStrike);
-        // Take 25 strikes below and 25 strikes above ATM (50 total strikes)
-        const startIndex = Math.max(0, atmIndex - 25);
-        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
+        // Take 20 strikes below and 20 strikes above ATM (40 total strikes)
+        const startIndex = Math.max(0, atmIndex - 20);
+        const endIndex = Math.min(allStrikes.length - 1, atmIndex + 20);
         
         const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
 
@@ -207,7 +216,7 @@ const OptionChainView = () => {
     setHasScrolled(false); // Reset scroll on expiry change
 
     return () => {
-      unsubscribeFromSymbol(indexKey);
+      if (indexKey) unsubscribeFromSymbol(indexKey);
       unsubscribeFromSymbol('INDIA VIX-NSE');
       if (futureData) {
         unsubscribeFromOptionBatch([{ token: futureData.token, exchange: futureData.exchange }]);
@@ -227,8 +236,8 @@ const OptionChainView = () => {
       Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
-    const startIndex = Math.max(0, atmIndex - 25);
-    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 25);
+    const startIndex = Math.max(0, atmIndex - 20);
+    const endIndex = Math.min(allStrikes.length - 1, atmIndex + 20);
     strikes = allStrikes.slice(startIndex, endIndex + 1);
   }
 
@@ -405,8 +414,8 @@ const OptionChainView = () => {
               const pLtp = putPriceData?.ltp || 0;
 
               // Calculate IV
-              let cIV = (cLtp > 0 && spotPrice > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
-              let pIV = (pLtp > 0 && spotPrice > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
+              let cIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r) : 0;
+              let pIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r) : 0;
 
               // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
               // We mirror the IV from the OTM side (which is always valid) for the same strike.
@@ -414,17 +423,17 @@ const OptionChainView = () => {
               if (pIV === 0 && cIV > 0) pIV = cIV;
 
               // Calculate Greeks
-              const cGreeks = (cIV > 0) ? calculateGreeks('CE', spotPrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
-              const pGreeks = (pIV > 0) ? calculateGreeks('PE', spotPrice, strike, T, r, pIV) : { delta: 0, theta: 0, vega: 0 };
+              const cGreeks = (cIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
+              const pGreeks = (pIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, pIV) : { delta: 0, theta: 0, vega: 0 };
 
-              const isCallITM = spotPrice > 0 && strike < spotPrice;
-              const isPutITM = spotPrice > 0 && strike > spotPrice;
+              const isCallITM = basePrice > 0 && strike < basePrice;
+              const isPutITM = basePrice > 0 && strike > basePrice;
 
               const cBreakeven = cLtp > 0 ? strike + cLtp : 0;
               const pBreakeven = pLtp > 0 ? strike - pLtp : 0;
               
-              const cBreakPct = (cBreakeven > 0 && spotPrice > 0) ? ((cBreakeven / spotPrice) - 1) * 100 : 0;
-              const pBreakPct = (pBreakeven > 0 && spotPrice > 0) ? ((pBreakeven / spotPrice) - 1) * 100 : 0;
+              const cBreakPct = (cBreakeven > 0 && basePrice > 0) ? ((cBreakeven / basePrice) - 1) * 100 : 0;
+              const pBreakPct = (pBreakeven > 0 && basePrice > 0) ? ((pBreakeven / basePrice) - 1) * 100 : 0;
 
               return (
                 <tr key={strike} ref={strike === atmStrike ? atmRowRef : null}>
