@@ -144,7 +144,13 @@ const OptionChainView = () => {
   }, [symbol]);
 
   const getIndexKey = (sym) => {
-    const commodities = ['CRUDEOIL', 'GOLD', 'GOLDM', 'SILVER', 'SILVERM', 'SILVERMIC', 'NATURALGAS'];
+    const commodities = [
+      'CRUDEOIL', 'CRUDEOILM', 
+      'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 
+      'SILVER', 'SILVERM', 'SILVERMIC', 
+      'NATURALGAS', 'NATURALGASM', 
+      'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
+    ];
     if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
     if (commodities.includes(sym)) return null; // Commodities use futures price, not spot
     return `${sym}-NSE`;
