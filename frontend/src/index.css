@@ -114,7 +114,6 @@ h1, h2, h3, h4, h5, h6 {
   gap: 20px;
   padding: 24px;
   height: calc(100vh - 64px);
-  max-height: calc(100vh - 64px - 60px) !important;
   overflow-y: auto;
 }
 
