@@ -765,7 +765,15 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       const execPrice = price || 0; // In a real app, fetch live LTP here for market orders
       
       // 2. Deduct Margin from User Balance
-      if (margin && Number(margin) > 0 && side === 'BUY') {
+      let requiresMargin = true;
+      if (side === 'SELL') {
+          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
+          if (existingPos && existingPos.quantity >= Number(quantity)) {
+              requiresMargin = false;
+          }
+      }
+
+      if (margin && Number(margin) > 0 && requiresMargin) {
         const user = await trx('users').where({ id: req.user.id }).first();
         if (user.balance < Number(margin)) {
            throw new Error('Insufficient funds');
@@ -777,7 +785,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL'
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 
@@ -825,7 +833,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
       
       // Refund Margin
-      const refundAmount = order.quantity * parseFloat(order.price || 0);
+      const refundAmount = order.margin ? parseFloat(order.margin) : (order.quantity * parseFloat(order.price || 0));
       if (refundAmount > 0) {
           const user = await trx('users').where({ id: req.user.id }).first();
           await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });

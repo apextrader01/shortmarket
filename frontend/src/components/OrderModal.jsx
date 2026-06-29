@@ -35,13 +35,29 @@ export default function OrderModal() {
   const balanceNum = Number(user?.balance) || 0;
   const totalQuantity = quantity * (orderModal.lotsize || 1);
   const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0; // 4x Leverage for Intraday
-  const requiredMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0)) * leverageMultiplier;
+
+  const isBuy = side === 'BUY';
+  const isOption = symbol.includes('CE') || symbol.includes('PE');
+  
+  let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
+  
+  if (isOption && !isBuy) {
+    if (symbol.includes('BANKNIFTY')) {
+      baseMargin = totalQuantity * 6666; // Approx 1,00,000 for 15 qty
+    } else if (symbol.includes('NIFTY')) {
+      baseMargin = totalQuantity * 4000; // Approx 1,00,000 for 25 qty
+    } else if (symbol.includes('SENSEX')) {
+      baseMargin = totalQuantity * 10000; // Approx 1,00,000 for 10 qty
+    } else {
+      baseMargin = totalQuantity * 4000;
+    }
+  }
+
+  const requiredMargin = baseMargin * leverageMultiplier;
   const isInsufficient = balanceNum < requiredMargin;
 
   const isRestricted = restrictedStocks.includes(symbol);
   const isIntradayBlocked = isRestricted && productType === 'INT';
-
-  const isBuy = side === 'BUY';
 
   const handlePlaceOrder = async () => {
     if (isIntradayBlocked) return;
