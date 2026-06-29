@@ -42,9 +42,21 @@ export default function OrderModal() {
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
   
   if (isOption && !isBuy) {
-    // Extract strike price from symbol (e.g., NIFTY26JUN24000CE -> 24000)
-    const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
-    const optionStrike = strikeMatch ? parseFloat(strikeMatch[1]) : 0;
+    // Extract strike price robustly. Broker symbols often look like NIFTY30JUN2623900PE
+    // This regex looks for a 3-letter month and 2-digit year before the strike digits.
+    let optionStrike = 0;
+    const robustMatch = symbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
+    if (robustMatch) {
+      optionStrike = parseFloat(robustMatch[1]);
+    } else {
+      // Fallback regex if format is different
+      const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
+      if (strikeMatch) {
+         let rawStrikeStr = strikeMatch[1];
+         if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
+         optionStrike = parseFloat(rawStrikeStr);
+      }
+    }
     
     // Exchange Margin Leverage is typically ~15% of contract value
     const marginRate = 0.15; 
