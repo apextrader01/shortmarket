@@ -27,9 +27,16 @@ async function updateOptionsMaster() {
     for (const item of data) {
       // 1. Gather Option Contracts
       if (OPTION_TYPES.includes(item.instrumenttype)) {
+        const name = item.name;
+        const commodities = ['CRUDEOIL', 'CRUDEOILM', 'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 'SILVER', 'SILVERM', 'SILVERMIC', 'NATURALGAS', 'NATURALGASM', 'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'];
+        
+        // Skip NSE/NFO for commodities to avoid mixing MCX and NSE strikes
+        if (commodities.includes(name) && item.exch_seg !== 'MCX') {
+          continue;
+        }
+
         // Expiry format from Angel One is "27JUN2024"
         const expiry = item.expiry;
-        const name = item.name;
         
         // Strike comes as "2350000.000000". Convert it back.
         const strike = parseInt(parseFloat(item.strike) / 100);
