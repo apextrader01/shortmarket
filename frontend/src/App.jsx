@@ -226,7 +226,7 @@ function App() {
             </div>
           )}
           {activeTab === 'Options' && (
-            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
+            <div style={{ width: '100%', height: '100%', padding: '12px' }}>
               <OptionChainView />
             </div>
           )}
@@ -235,7 +235,7 @@ function App() {
           {activeTab === 'Positions' && <PositionsView />}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
-            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
+            <div style={{ width: '100%', height: '100%', padding: '12px', overflowY: 'auto' }}>
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} />
             </div>
           )}

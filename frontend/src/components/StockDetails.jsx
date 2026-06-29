@@ -133,24 +133,24 @@ export default function StockDetails({ symbol, price, candles }) {
           </div>
 
           {/* Bottom row metrics */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Open price</span>
               <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.open ? price.open.toFixed(2) : '-'}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Previous close</span>
               <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.close ? price.close.toFixed(2) : '-'}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Live volume</span>
               <span style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(vol)}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Lower circuit</span>
               <span style={{ fontSize: '14px', fontWeight: '700' }}>{lowerCircuit ? lowerCircuit.toFixed(2) : '-'}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Upper circuit</span>
               <span style={{ fontSize: '14px', fontWeight: '700' }}>{upperCircuit ? upperCircuit.toFixed(2) : '-'}</span>
             </div>
