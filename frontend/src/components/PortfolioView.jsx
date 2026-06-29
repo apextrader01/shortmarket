@@ -12,7 +12,8 @@ export default function PortfolioView() {
   let totalInvestedETFs = 0;
   let unrealizedPnl = 0;
 
-  positions.forEach(pos => {
+  (positions || []).forEach(pos => {
+      if (!pos) return;
       const priceData = prices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
       const qty = Math.abs(pos.quantity);
@@ -30,7 +31,8 @@ export default function PortfolioView() {
           totalInvested += invested;
           totalCurrent += current;
 
-          const isETF = pos.symbol.includes('ETF') || pos.symbol.includes('BEES') || pos.symbol.includes('LIQUID');
+          const symbolStr = pos.symbol || '';
+          const isETF = symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID');
           if (isETF) {
               totalInvestedETFs += invested;
           } else {
