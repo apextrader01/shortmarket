@@ -42,13 +42,17 @@ export default function OrderModal() {
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
   
   if (isOption && !isBuy) {
-    if (symbol.includes('BANKNIFTY')) {
-      baseMargin = totalQuantity * 6666; // Approx 1,00,000 for 15 qty
-    } else if (symbol.includes('NIFTY')) {
-      baseMargin = totalQuantity * 4000; // Approx 1,00,000 for 25 qty
-    } else if (symbol.includes('SENSEX')) {
-      baseMargin = totalQuantity * 10000; // Approx 1,00,000 for 10 qty
+    // Extract strike price from symbol (e.g., NIFTY26JUN24000CE -> 24000)
+    const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
+    const optionStrike = strikeMatch ? parseFloat(strikeMatch[1]) : 0;
+    
+    // Exchange Margin Leverage is typically ~15% of contract value
+    const marginRate = 0.15; 
+    
+    if (optionStrike > 0) {
+      baseMargin = optionStrike * totalQuantity * marginRate;
     } else {
+      // Fallback
       baseMargin = totalQuantity * 4000;
     }
   }
