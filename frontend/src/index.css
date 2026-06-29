@@ -495,22 +495,40 @@ tbody tr:hover {
 }
 
 .option-chain-table th.header-call {
-  background: #1a2016;
-  color: var(--color-green-light);
+  background: #0d0d0d;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
   border-right: 1px solid var(--border-color);
   text-align: center;
+  padding: 12px;
 }
 
 .option-chain-table th.header-put {
-  background: #201616;
-  color: var(--color-red-light);
+  background: #0d0d0d;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
   text-align: center;
+  padding: 12px;
 }
 
 .option-chain-table th.header-strike {
-  background: #111;
+  background: #0d0d0d;
   text-align: center;
   border-right: 1px solid var(--border-color);
+  padding: 8px;
+}
+
+.view-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--color-blue);
+  font-size: 11px;
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
 }
 
 .option-chain-table td {
