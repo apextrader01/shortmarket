@@ -170,8 +170,13 @@ const OptionChainView = () => {
               const pLtp = putPriceData?.ltp || 0;
 
               // Calculate IV
-              const cIV = (cLtp > 0 && spotPrice > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
-              const pIV = (pLtp > 0 && spotPrice > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
+              let cIV = (cLtp > 0 && spotPrice > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
+              let pIV = (pLtp > 0 && spotPrice > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
+
+              // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
+              // We mirror the IV from the OTM side (which is always valid) for the same strike.
+              if (cIV === 0 && pIV > 0) cIV = pIV;
+              if (pIV === 0 && cIV > 0) pIV = cIV;
 
               // Calculate Greeks
               const cGreeks = (cIV > 0) ? calculateGreeks('CE', spotPrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
