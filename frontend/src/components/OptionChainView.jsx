@@ -151,10 +151,11 @@ const OptionChainView = () => {
       <div className="option-chain-top-bar">
         {/* Section 1: Search & Spot */}
         <div className="top-bar-section">
-          <div className="symbol-selector-wrapper">
-            <i className="fi fi-rr-search"></i>
+          <div className="symbol-selector-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <i className="fi fi-rr-search" style={{ color: 'var(--text-secondary)' }}></i>
             <select 
-              className="symbol-select-invisible"
+              className="expiry-select-minimal"
+              style={{ fontSize: '14px', paddingLeft: '4px', paddingRight: '16px' }}
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
             >
@@ -166,7 +167,6 @@ const OptionChainView = () => {
                 <option value={symbol}>{symbol}</option>
               )}
             </select>
-            <span className="selected-symbol-text">{symbol}</span>
           </div>
           
           <span className="top-bar-price">{spotPrice > 0 ? spotPrice.toFixed(2) : '-'}</span>
