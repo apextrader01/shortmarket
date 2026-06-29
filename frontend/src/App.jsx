@@ -226,7 +226,7 @@ function App() {
             </div>
           )}
           {activeTab === 'Options' && (
-            <div className="dashboard-grid" style={{ width: '100%', height: '100%' }}>
+            <div className="dashboard-grid" style={{ width: '100%', height: '100%', gridTemplateColumns: '1fr' }}>
               <OptionChainView />
             </div>
           )}
