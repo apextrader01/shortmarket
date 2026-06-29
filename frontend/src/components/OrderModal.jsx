@@ -70,6 +70,11 @@ export default function OrderModal() {
       // Fallback
       baseMargin = totalQuantity * (isIndex ? 4000 : 8000);
     }
+  } else if (symbol.includes('FUT')) {
+    // Futures Margin Calculation (Symmetric for Buy and Sell)
+    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
+    const marginRate = isIndex ? 0.10 : 0.15; // 10% for Index Futures, 15% for Stock/Commodity Futures
+    baseMargin = baseMargin * marginRate;
   }
 
   const requiredMargin = baseMargin * leverageMultiplier;
