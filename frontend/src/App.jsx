@@ -226,7 +226,7 @@ function App() {
             </div>
           )}
           {activeTab === 'Options' && (
-            <div style={{ width: '100%', height: '100%', padding: '12px' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
               <OptionChainView />
             </div>
           )}
@@ -235,7 +235,7 @@ function App() {
           {activeTab === 'Positions' && <PositionsView />}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
-            <div style={{ width: '100%', height: '100%', padding: '12px', overflowY: 'auto' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} />
             </div>
           )}
