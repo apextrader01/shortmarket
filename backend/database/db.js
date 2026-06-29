@@ -130,6 +130,14 @@ async function initSchema() {
         });
         console.log('Added product_type to orders table');
       }
+
+      const hasMargin = await db.schema.hasColumn('orders', 'margin');
+      if (!hasMargin) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('margin', 14, 2).defaultTo(0);
+        });
+        console.log('Added margin to orders table');
+      }
     }
 
     // 4. Deposit Requests Table

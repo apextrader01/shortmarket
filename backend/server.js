@@ -872,7 +872,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
             user_id: req.user.id,
             symbol,
             quantity: qtyChange,
-            average_price: execPrice
+            average_price: execPrice,
+            product_type: product_type || 'DEL'
           });
         }
       }
