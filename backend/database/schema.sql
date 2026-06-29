@@ -27,10 +27,15 @@ CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     symbol TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('MARKET', 'LIMIT')),
+    type TEXT NOT NULL CHECK(type IN ('MARKET', 'LIMIT', 'SL-M', 'SL-L')),
     side TEXT NOT NULL CHECK(side IN ('BUY', 'SELL')),
     quantity INTEGER NOT NULL,
     price REAL, -- NULL for MARKET orders
+    trigger_price REAL, -- For GTT and SL orders
+    sl_price REAL, -- For Stop Loss target
+    tgt_price REAL, -- For Target target
+    product_type TEXT DEFAULT 'DEL', -- INT or DEL
+    margin REAL DEFAULT 0, -- Margin blocked for this order
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)

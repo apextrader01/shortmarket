@@ -816,7 +816,7 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 
 // ─── Place Order ─────────────────────────────────────────────────────────
 app.post('/api/order', authenticateToken, async (req, res) => {
-  const { symbol, type, side, quantity, price, sl_price, tgt_price, margin, product_type } = req.body;
+  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -862,7 +862,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 
@@ -1198,8 +1198,10 @@ server.listen(PORT, '0.0.0.0', async () => {
   // Start Cron Jobs
   const { initAutoSquareOff } = require('./services/autoSquareOff');
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
+  const { initOrderExecutor } = require('./services/orderExecutor');
   initAutoSquareOff();
   initRiskyStocksSync();
+  initOrderExecutor(priceCache);
 });
 
 module.exports = { io, priceCache };

@@ -111,14 +111,16 @@ async function initSchema() {
         table.increments('id').primary();
         table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
         table.string('symbol').notNullable();
-        table.string('type').notNullable(); // MARKET, LIMIT
+        table.string('type').notNullable(); // MARKET, LIMIT, SL-M, SL-L
         table.string('side').notNullable(); // BUY, SELL
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.integer('quantity').notNullable();
         table.decimal('price', 14, 2); // Nullable for MARKET orders
         table.string('status').notNullable().defaultTo('PENDING'); // PENDING, EXECUTED, CANCELLED, REJECTED
+        table.decimal('trigger_price', 14, 2);
         table.decimal('sl_price', 14, 2);
         table.decimal('tgt_price', 14, 2);
+        table.decimal('margin', 14, 2).defaultTo(0);
         table.timestamps(true, true);
       });
       console.log('Created orders table');
@@ -138,6 +140,31 @@ async function initSchema() {
         });
         console.log('Added margin to orders table');
       }
+      
+      const hasTriggerPrice = await db.schema.hasColumn('orders', 'trigger_price');
+      if (!hasTriggerPrice) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('trigger_price', 14, 2);
+        });
+        console.log('Added trigger_price to orders table');
+      }
+
+      const hasSlPrice = await db.schema.hasColumn('orders', 'sl_price');
+      if (!hasSlPrice) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('sl_price', 14, 2);
+        });
+        console.log('Added sl_price to orders table');
+      }
+
+      const hasTgtPrice = await db.schema.hasColumn('orders', 'tgt_price');
+      if (!hasTgtPrice) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('tgt_price', 14, 2);
+        });
+        console.log('Added tgt_price to orders table');
+      }
+
     }
 
     // 4. Deposit Requests Table
