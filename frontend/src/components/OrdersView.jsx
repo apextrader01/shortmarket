@@ -83,7 +83,7 @@ export default function OrdersView() {
                     <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                       <span style={{ background: order.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span>{order.side}</span>
-                        {order.product_type && <span style={{ fontSize: '10px', opacity: 0.8 }}>({order.product_type})</span>}
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>({order.product_type || 'DEL'})</span>
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
