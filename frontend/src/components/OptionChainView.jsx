@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 
@@ -37,6 +37,7 @@ const OptionChainView = () => {
       }
     };
     fetchChain();
+    setHasScrolled(false); // Reset scroll on symbol change
   }, [symbol]);
 
   useEffect(() => {
@@ -55,6 +56,8 @@ const OptionChainView = () => {
     });
 
     subscribeToOptionBatch(tokensToSub);
+
+    setHasScrolled(false); // Reset scroll on expiry change
 
     return () => {
       unsubscribeFromOptionBatch(tokensToSub);
@@ -95,6 +98,25 @@ const OptionChainView = () => {
   }
 
   const r = 0.10; // 10% risk-free rate (NSE Standard for IV calculations)
+
+  // Find ATM strike (closest to spotPrice)
+  let atmStrike = null;
+  if (spotPrice > 0 && strikes.length > 0) {
+    atmStrike = strikes.reduce((prev, curr) => 
+      Math.abs(curr - spotPrice) < Math.abs(prev - spotPrice) ? curr : prev
+    );
+  }
+
+  const atmRowRef = useRef(null);
+  const [hasScrolled, setHasScrolled] = useState(false);
+
+  // Auto-scroll to ATM strike when data is available
+  useEffect(() => {
+    if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
+      atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHasScrolled(true);
+    }
+  }, [spotPrice, hasScrolled, strikes]);
 
   return (
     <div className="option-chain-container">
@@ -186,7 +208,7 @@ const OptionChainView = () => {
               const isPutITM = spotPrice > 0 && strike > spotPrice;
 
               return (
-                <tr key={strike}>
+                <tr key={strike} ref={strike === atmStrike ? atmRowRef : null}>
                   {/* Calls */}
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
