@@ -227,13 +227,12 @@ export default function StockDetails({ symbol, price, candles }) {
           </div>
         )}
 
-        {/* Financial Performance */}
         {financials.length > 0 && (
           <div style={{ marginTop: '16px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Financial Performance (Yearly)</h4>
-            <div style={{ display: 'grid', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch' }} className="scrollbar-hide">
               {financials.map(fin => (
-                <div key={fin.title} className="glass-panel" style={{ padding: '12px' }}>
+                <div key={fin.title} className="glass-panel" style={{ padding: '12px', minWidth: '240px', flexShrink: 0 }}>
                   <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#E2E8F0' }}>{fin.title}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: '#94A3B8' }}>Year</span>
