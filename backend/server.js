@@ -525,35 +525,11 @@ app.get('/api/mf/search', async (req, res) => {
         if (!query || query.length < 2) {
             // Default top funds across categories (Equity, Debt, Hybrid) if no search query
             const topKeywords = [
-                // Small Cap
-                'quant small', 'nippon india small cap', 'sbi small cap', 'axis small cap', 'tata small cap', 
-                'kotak small cap', 'hdfc small cap', 'icici prudential smallcap', 'bandhan small cap', 'franklin india smaller',
-                // Mid Cap
-                'motilal oswal midcap', 'hdfc mid-cap', 'quant mid cap', 'nippon india growth', 'kotak emerging equity', 
-                'sbi magnum midcap', 'icici prudential midcap', 'mahindra manulife mid cap', 'pgim india midcap', 'tata mid cap',
-                // Flexi / Multi Cap
-                'parag parikh flexi', 'quant active', 'quant flexi', 'jm flexicap', 'nippon india multi cap', 
-                'hdfc flexi cap', 'icici prudential flexicap', 'kotak flexicap', 'uti flexi cap', 'franklin india flexi',
-                // Large Cap
-                'nippon india large cap', 'icici prudential bluechip', 'sbi bluechip', 'hdfc top 100', 'mirae asset large cap', 
-                'axis bluechip', 'canara robeco bluechip', 'kotak bluechip', 'baroda bnp paribas large',
-                // Sectoral / Thematic (High Returns)
-                'quant infrastructure', 'icici prudential infrastructure', 'sbi infrastructure', 'sbi psu', 
-                'aditya birla sun life psu', 'invesco india psu', 'icici prudential technology', 'tata digital india',
-                'nippon india power', 'tata infrastructure', 'icici prudential pharma', 'nippon india pharma', 
-                'sbi healthcare', 'quant manufacturing', 'hdfc manufacturing', 'aditya birla sun life manufacturing',
-                // ELSS (Tax Saver)
-                'quant elss', 'parag parikh elss', 'sbi long term equity', 'hdfc elss', 'mirae asset elss', 
-                'dsp elss', 'bandhan elss', 'kotak elss', 'nippon india elss',
-                // Hybrid / Balanced
-                'icici prudential equity & debt', 'hdfc balanced advantage', 'sbi equity hybrid', 'edelweiss balanced advantage', 
-                'kotak equity hybrid', 'quant absolute', 'icici prudential asset allocator', 'nippon india asset allocator',
-                // Debt / Liquid
-                'nippon india liquid', 'sbi liquid', 'hdfc liquid', 'icici prudential liquid', 'parag parikh liquid', 
-                'parag parikh conservative', 'sbi magnum gilt', 'bandhan government securities', 'icici prudential gilt',
-                // Index Funds
-                'uti nifty 50 index', 'hdfc index fund - nifty 50', 'sbi nifty index', 'icici prudential nifty 50 index',
-                'nippon india index fund - nifty 50', 'uti nifty next 50', 'motilal oswal nifty midcap 150', 'nippon india nifty smallcap 250'
+                'parag parikh flexi', 'quant small', 'quant active', 'sbi small cap', 
+                'sbi magnum midcap', 'sbi liquid', 'hdfc balanced advantage', 'hdfc mid-cap', 
+                'nippon india liquid', 'nippon india small cap', 'motilal oswal midcap', 
+                'icici prudential equity & debt', 'icici prudential liquid', 'axis bluechip', 
+                'kotak emerging equity', 'mirae asset large cap', 'ppfas', 'edelweiss balanced'
             ];
             matches = allMutualFunds.filter(f => {
                 const n = f.schemeName.toLowerCase();
