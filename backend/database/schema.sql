@@ -48,6 +48,16 @@ CREATE TABLE IF NOT EXISTS orders (
 -- Insert a default mock user if not exists
 INSERT OR IGNORE INTO users (id, username, balance) VALUES (1, 'mock_trader', 1000000.0);
 
+CREATE TABLE IF NOT EXISTS ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    type TEXT NOT NULL, -- 'DEPOSIT', 'WITHDRAWAL', 'MARGIN_BLOCK', 'MARGIN_RELEASE', 'REALIZED_PNL', 'TAXES'
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS deposit_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,

@@ -341,6 +341,13 @@ app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) 
       
       await trx('deposit_requests').where({ id: deposit.id }).update({ status: 'APPROVED' });
       await trx('users').where({ id: deposit.user_id }).increment('balance', deposit.amount);
+      
+      await trx('ledger').insert({
+          user_id: deposit.user_id,
+          amount: deposit.amount,
+          type: 'DEPOSIT',
+          description: `Deposit Approved (ID: ${deposit.id})`
+      });
     });
     
     res.json({ success: true });
@@ -857,6 +864,13 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         }
         const newBalance = Number(user.balance) - Number(margin);
         await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
+        
+        await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: -Number(margin),
+            type: 'MARGIN_BLOCK',
+            description: `Margin blocked for ${side} ${quantity} ${symbol} (${product_type || 'DEL'})`
+        });
       }
 
       // 3. Insert Order
@@ -922,17 +936,38 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           });
         }
 
-        // 5. Update User Balance (Taxes, P&L, Margin Refund)
+        // 5. Update User Balance & Ledger (Taxes, P&L, Margin Refund)
         const userAfterExec = await trx('users').where({ id: req.user.id }).first();
         let balanceChange = -totalTaxes;
+        
+        await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: -totalTaxes,
+            type: 'TAXES',
+            description: `Taxes & Charges for ${side} ${quantity} ${symbol}`
+        });
         
         if (realizedPnl !== 0) {
             balanceChange += realizedPnl;
             await trx('orders').where({ id: orderId }).update({ realized_pnl: realizedPnl });
+            
+            await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L for closing ${quantity} ${symbol}`
+            });
         }
         
         if (marginRefund > 0) {
            balanceChange += marginRefund;
+           
+           await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: marginRefund,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released for closing ${quantity} ${symbol}`
+           });
         }
 
         await trx('users').where({ id: req.user.id }).update({ balance: userAfterExec.balance + balanceChange });
@@ -957,6 +992,19 @@ app.get('/api/estimate-charges', authenticateToken, (req, res) => {
     const taxes = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), Number(price));
     
     res.json(taxes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 📖 Get Ledger History 📖
+app.get('/api/ledger', authenticateToken, async (req, res) => {
+  try {
+    const ledger = await db('ledger')
+      .where({ user_id: req.user.id })
+      .orderBy('created_at', 'desc')
+      .limit(100);
+    res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

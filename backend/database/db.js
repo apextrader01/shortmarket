@@ -193,7 +193,21 @@ async function initSchema() {
       }
     }
 
-    // 4. Deposit Requests Table
+    // 4. Ledger Table
+    const hasLedger = await db.schema.hasTable('ledger');
+    if (!hasLedger) {
+      await db.schema.createTable('ledger', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.decimal('amount', 14, 2).notNullable();
+        table.string('type').notNullable(); // 'DEPOSIT', 'WITHDRAWAL', 'MARGIN_BLOCK', 'MARGIN_RELEASE', 'REALIZED_PNL', 'TAXES'
+        table.string('description');
+        table.timestamps(true, true);
+      });
+      console.log('Created ledger table');
+    }
+
+    // 5. Deposit Requests Table
     const hasDepositRequests = await db.schema.hasTable('deposit_requests');
     if (!hasDepositRequests) {
       await db.schema.createTable('deposit_requests', table => {

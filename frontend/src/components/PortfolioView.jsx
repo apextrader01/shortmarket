@@ -4,16 +4,15 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PortfolioView() {
   const [activeTab, setActiveTab] = useState('Overview');
-  const { positions, prices } = useStore();
-
-  const deliveryPositions = positions.filter(p => p.product_type === 'DEL');
+  const { positions, prices, orders } = useStore();
 
   let totalInvested = 0;
   let totalCurrent = 0;
   let totalInvestedStocks = 0;
   let totalInvestedETFs = 0;
+  let unrealizedPnl = 0;
 
-  deliveryPositions.forEach(pos => {
+  positions.forEach(pos => {
       const priceData = prices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
       const qty = Math.abs(pos.quantity);
@@ -21,16 +20,40 @@ export default function PortfolioView() {
       const invested = parseFloat(pos.average_price) * qty;
       const current = ltp * qty;
       
-      totalInvested += invested;
-      totalCurrent += current;
+      let pnl = 0;
+      if (pos.quantity > 0) pnl = current - invested;
+      else if (pos.quantity < 0) pnl = invested - current;
+      unrealizedPnl += pnl;
 
-      const isETF = pos.symbol.includes('ETF') || pos.symbol.includes('BEES') || pos.symbol.includes('LIQUID');
-      if (isETF) {
-          totalInvestedETFs += invested;
-      } else {
-          totalInvestedStocks += invested;
+      // For portfolio breakdown, only include Delivery investments
+      if (pos.product_type === 'DEL') {
+          totalInvested += invested;
+          totalCurrent += current;
+
+          const isETF = pos.symbol.includes('ETF') || pos.symbol.includes('BEES') || pos.symbol.includes('LIQUID');
+          if (isETF) {
+              totalInvestedETFs += invested;
+          } else {
+              totalInvestedStocks += invested;
+          }
       }
   });
+
+  const isToday = (dateString) => {
+     if (!dateString) return false;
+     const d = new Date(dateString);
+     const today = new Date();
+     return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  };
+
+  let todayRealizedPnl = 0;
+  if (orders) {
+      orders.forEach(o => {
+          if (o.status === 'EXECUTED' && o.realized_pnl && isToday(o.created_at)) {
+              todayRealizedPnl += parseFloat(o.realized_pnl);
+          }
+      });
+  }
 
   const overallGain = totalCurrent - totalInvested;
   const overallPct = totalInvested > 0 ? (overallGain / totalInvested) * 100 : 0;
@@ -78,10 +101,10 @@ export default function PortfolioView() {
         {/* Top Stats Cards */}
         <div className="stats-grid">
           {[
-            { label: 'Invested Amount', value: `₹ ${totalInvested.toFixed(2)}`, color: 'var(--text-primary)' },
-            { label: 'Current Value', value: `₹ ${totalCurrent.toFixed(2)}`, color: 'var(--text-primary)' },
-            { label: 'Overall Gain', value: `${isGain ? '+' : ''}₹ ${overallGain.toFixed(2)}`, sub: `${overallPct.toFixed(2)}%`, color: isGain ? 'var(--color-green-light)' : 'var(--color-red-light)' },
-            { label: 'Today\'s Gain', value: '₹ 0.00', sub: '0%', color: 'var(--text-primary)' }
+            { label: 'Invested Amount (DEL)', value: `₹ ${totalInvested.toFixed(2)}`, color: 'var(--text-primary)' },
+            { label: 'Current Value (DEL)', value: `₹ ${totalCurrent.toFixed(2)}`, color: 'var(--text-primary)' },
+            { label: 'Unrealized P&L (Live)', value: `${unrealizedPnl >= 0 ? '+' : ''}₹ ${unrealizedPnl.toFixed(2)}`, sub: 'All Open Positions', color: unrealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' },
+            { label: 'Today\'s Realized P&L', value: `${todayRealizedPnl >= 0 ? '+' : ''}₹ ${todayRealizedPnl.toFixed(2)}`, sub: 'Booked Today', color: todayRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }
           ].map((stat, i) => (
             <div key={i} style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>

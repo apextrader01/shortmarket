@@ -110,15 +110,35 @@ async function executeOrder(order, execPrice) {
             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
         }
         
-        // 3. Update User Balance
+        // 3. Update User Balance & Ledger
         const user = await trx('users').where({ id: order.user_id }).first();
         let balanceChange = -totalTaxes;
+        
+        await trx('ledger').insert({
+            user_id: order.user_id,
+            amount: -totalTaxes,
+            type: 'TAXES',
+            description: `Taxes & Charges for ${order.side} ${order.quantity} ${order.symbol}`
+        });
+
         if (realizedPnl !== 0) {
             balanceChange += realizedPnl;
             await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
+            await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L for closing ${order.quantity} ${order.symbol}`
+            });
         }
         if (marginRefund > 0) {
             balanceChange += marginRefund;
+            await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: marginRefund,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released for closing ${order.quantity} ${order.symbol}`
+           });
         }
         await trx('users').where({ id: order.user_id }).update({ balance: user.balance + balanceChange });
         
@@ -136,6 +156,13 @@ async function executeOrder(order, execPrice) {
         // Update user balance to deduct taxes for this new position
         const user = await trx('users').where({ id: order.user_id }).first();
         await trx('users').where({ id: order.user_id }).update({ balance: user.balance - totalTaxes });
+        
+        await trx('ledger').insert({
+            user_id: order.user_id,
+            amount: -totalTaxes,
+            type: 'TAXES',
+            description: `Taxes & Charges for ${order.side} ${order.quantity} ${order.symbol}`
+        });
       }
 
       console.log(`Executed Order ${order.id} for ${order.symbol} at ${execPrice} | PnL: ${realizedPnl} | Taxes: ${totalTaxes}`);
