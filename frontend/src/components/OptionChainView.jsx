@@ -231,44 +231,6 @@ const OptionChainView = () => {
     );
   }
 
-  // Pre-calculate IVs for IVP
-  let minIV = Infinity;
-  let maxIV = 0;
-  let atmIV = 0;
-
-  if (spotPrice > 0 && strikes.length > 0) {
-    strikes.forEach(strike => {
-      const call = chain[strike].CE;
-      const put = chain[strike].PE;
-      const cLtp = call ? (prices[call.symbol]?.ltp || 0) : 0;
-      const pLtp = put ? (prices[put.symbol]?.ltp || 0) : 0;
-
-      let cIV = (cLtp > 0) ? calculateIV('CE', cLtp, spotPrice, strike, T, r) : 0;
-      let pIV = (pLtp > 0) ? calculateIV('PE', pLtp, spotPrice, strike, T, r) : 0;
-
-      if (cIV === 0 && pIV > 0) cIV = pIV;
-      if (pIV === 0 && cIV > 0) pIV = cIV;
-
-      if (cIV > 0) {
-        if (cIV < minIV) minIV = cIV;
-        if (cIV > maxIV) maxIV = cIV;
-      }
-      if (pIV > 0) {
-        if (pIV < minIV) minIV = pIV;
-        if (pIV > maxIV) maxIV = pIV;
-      }
-
-      if (strike === atmStrike) {
-        atmIV = Math.max(cIV, pIV); // Use the highest active IV for ATM
-      }
-    });
-  }
-
-  let ivp = 0;
-  if (atmIV > 0 && maxIV > minIV && minIV !== Infinity) {
-    ivp = ((atmIV - minIV) / (maxIV - minIV)) * 100;
-  }
-
   const futPriceData = futureTokenKey ? prices[futureTokenKey] : null;
   const futPrice = futPriceData?.ltp || 0;
   const futPct = futPriceData?.pct || 0;
@@ -340,15 +302,7 @@ const OptionChainView = () => {
 
         <div className="top-bar-divider"></div>
 
-        {/* Section 5: IVP */}
-        <div className="top-bar-section">
-          <span className="top-bar-label" title="Implied Volatility Percentile (Skew Rank)">IVP</span>
-          <span className="top-bar-value">{ivp > 0 ? ivp.toFixed(1) : '-'}</span>
-        </div>
-
-        <div className="top-bar-divider"></div>
-
-        {/* Section 6: Toggle */}
+        {/* Section 5: Per Lot Toggle */}
         <div className="top-bar-section">
           <label className="toggle-switch">
             <input type="checkbox" />

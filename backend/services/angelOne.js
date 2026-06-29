@@ -83,6 +83,28 @@ async function loadInstrumentMaster() {
                 console.warn('⚠️ Could not load spots.json - some Spot Prices for Options might fail.');
             }
 
+            // Load dynamically generated Future Tokens
+            try {
+                const futuresData = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
+                const futures = JSON.parse(futuresData);
+                let futCount = 0;
+                for (const symbolFutures of Object.values(futures)) {
+                    for (const info of symbolFutures) {
+                        STOCK_MASTER[info.token] = {
+                            symbol: info.symbol,
+                            name: info.symbol,
+                            exchange: info.exchange,
+                            uniqueSymbol: info.symbol
+                        };
+                        symbolToToken[info.symbol] = info.token;
+                        futCount++;
+                    }
+                }
+                console.log(`✅ Loaded ${futCount} Future mappings from futures.json`);
+            } catch (futErr) {
+                console.warn('⚠️ Could not load futures.json');
+            }
+
             allTokens = Object.keys(STOCK_MASTER);
             console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} total stocks)`);
             resolve();
