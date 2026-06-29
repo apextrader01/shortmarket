@@ -599,7 +599,9 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
         console.log(`Fetching candles for ${uniqueSymbol} with payload:`, payload);
 
         // Bypass SDK to ensure no token/header dropping bugs
+        if (!smart_api.access_token) return [];
         const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
+            signal: AbortSignal.timeout(5000),
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${smart_api.access_token}`,
