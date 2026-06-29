@@ -385,17 +385,6 @@ const OptionChainView = () => {
             <span className="slider round"></span>
           </label>
         </div>
-
-        <div className="top-bar-divider"></div>
-
-        {/* Section 6: Per Lot Toggle */}
-        <div className="top-bar-section">
-          <label className="toggle-switch">
-            <input type="checkbox" />
-            <span className="slider round"></span>
-          </label>
-          <span className="top-bar-label">Per Lot</span>
-        </div>
       </div>
 
       {/* Table */}
