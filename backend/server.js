@@ -741,6 +741,31 @@ app.get('/api/options/chain/:symbol', async (req, res) => {
   }
 });
 
+// Endpoint to fetch all available underlying symbols for options (e.g., NIFTY, RELIANCE, CRUDEOIL)
+app.get('/api/options/symbols', async (req, res) => {
+  const optionsPath = path.join(__dirname, 'database', 'options.json');
+  
+  if (!fs.existsSync(optionsPath)) {
+    return res.status(503).json({ error: 'Options database is currently being built.' });
+  }
+
+  try {
+    const stat = fs.statSync(optionsPath);
+    if (!cachedOptionsData || stat.mtimeMs > lastOptionsReadTime) {
+      const rawData = fs.readFileSync(optionsPath, 'utf8');
+      cachedOptionsData = JSON.parse(rawData);
+      lastOptionsReadTime = stat.mtimeMs;
+    }
+    
+    // Extract and sort the list of available symbols
+    const symbols = Object.keys(cachedOptionsData).sort();
+    res.json(symbols);
+  } catch (err) {
+    console.error('Error fetching option symbols:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {

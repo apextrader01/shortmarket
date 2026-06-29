@@ -6,10 +6,26 @@ const API = '';
 
 const OptionChainView = () => {
   const [symbol, setSymbol] = useState('NIFTY');
+  const [availableSymbols, setAvailableSymbols] = useState([]);
   const [expiry, setExpiry] = useState('');
   const [expiries, setExpiries] = useState([]);
   const [optionsData, setOptionsData] = useState({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      try {
+        const res = await fetch(`${API}/api/options/symbols`);
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableSymbols(data);
+        }
+      } catch (err) {
+        console.error('Error fetching symbols', err);
+      }
+    };
+    fetchSymbols();
+  }, []);
 
   const prices = useStore((state) => state.prices);
   const openOrderModal = useStore((state) => state.openOrderModal);
@@ -126,9 +142,17 @@ const OptionChainView = () => {
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
         >
-          <option value="NIFTY">NIFTY 50</option>
-          <option value="BANKNIFTY">BANKNIFTY</option>
-          <option value="SENSEX">SENSEX</option>
+          {availableSymbols.length > 0 ? (
+            availableSymbols.map(sym => (
+              <option key={sym} value={sym}>{sym}</option>
+            ))
+          ) : (
+            <>
+              <option value="NIFTY">NIFTY</option>
+              <option value="BANKNIFTY">BANKNIFTY</option>
+              <option value="SENSEX">SENSEX</option>
+            </>
+          )}
         </select>
         
         <select 

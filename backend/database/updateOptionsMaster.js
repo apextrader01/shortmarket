@@ -4,8 +4,8 @@ const path = require('path');
 const URL = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
 const OUTPUT_FILE = path.join(__dirname, 'options.json');
 
-// We want NIFTY, BANKNIFTY, SENSEX
-const TARGET_INDICES = ['NIFTY', 'BANKNIFTY', 'SENSEX'];
+// We want ALL options (Index, Stock, Commodity, Currency)
+const OPTION_TYPES = ['OPTIDX', 'OPTSTK', 'OPTFUT', 'OPTCOM', 'OPTFOC', 'OPTCUR'];
 
 async function updateOptionsMaster() {
   console.log('Downloading Angel One Script Master...');
@@ -22,7 +22,7 @@ async function updateOptionsMaster() {
     let count = 0;
 
     for (const item of data) {
-      if (item.instrumenttype === 'OPTIDX' && TARGET_INDICES.includes(item.name)) {
+      if (OPTION_TYPES.includes(item.instrumenttype)) {
         // Expiry format from Angel One is "27JUN2024"
         const expiry = item.expiry;
         const name = item.name;
