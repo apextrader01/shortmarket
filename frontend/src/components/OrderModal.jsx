@@ -49,13 +49,13 @@ export default function OrderModal() {
     if (robustMatch) {
       optionStrike = parseFloat(robustMatch[1]);
     } else {
-      // Fallback regex if format is different
       const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
       if (strikeMatch) {
          let rawStrikeStr = strikeMatch[1];
          if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
          optionStrike = parseFloat(rawStrikeStr);
       }
+    }
     // Index vs Stock differentiation
     const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
     
