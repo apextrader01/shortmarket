@@ -219,8 +219,8 @@ function App() {
         <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           {activeTab === 'Markets' && (
-            <div className="dashboard-grid" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="dashboard-grid" style={{ width: '100%', minWidth: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
                 <ChartWidget />
               </div>
             </div>
