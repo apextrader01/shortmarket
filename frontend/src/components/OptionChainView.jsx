@@ -133,6 +133,7 @@ const OptionChainView = () => {
     
     const indexKey = getIndexKey(symbol);
     subscribeToSymbol(indexKey);
+    subscribeToSymbol('INDIA VIX-NSE');
 
     strikes.forEach((strike) => {
       const data = optionsData[expiry][strike];
@@ -147,6 +148,7 @@ const OptionChainView = () => {
     return () => {
       unsubscribeFromOptionBatch(tokensToSub);
       unsubscribeFromSymbol(indexKey);
+      unsubscribeFromSymbol('INDIA VIX-NSE');
     };
   }, [expiry, optionsData, symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
@@ -160,6 +162,12 @@ const OptionChainView = () => {
   const spotPriceData = prices[indexKey] || {};
   const spotPrice = spotPriceData.ltp || 0;
   const spotPct = spotPriceData.pct || 0;
+  
+  const vixData = prices['INDIA VIX-NSE'] || {};
+  const vixPrice = vixData.ltp || 0;
+  const vixPct = vixData.pct || 0;
+  const vixChange = vixData.change || 0;
+
   const chain = optionsData[expiry] || {};
   const strikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
 
@@ -254,8 +262,12 @@ const OptionChainView = () => {
         {/* Section 4: INDIAVIX */}
         <div className="top-bar-section">
           <span className="top-bar-label">INDIAVIX</span>
-          <span className="top-bar-value">-</span>
-          <span className="top-bar-pct positive"></span>
+          <span className="top-bar-value">{vixPrice > 0 ? vixPrice.toFixed(2) : '-'}</span>
+          {vixChange !== 0 && (
+            <span className={`top-bar-pct ${vixChange >= 0 ? 'positive' : 'negative'}`}>
+              {vixChange > 0 ? '+' : ''}{vixChange.toFixed(2)}
+            </span>
+          )}
         </div>
 
         <div className="top-bar-divider"></div>
