@@ -261,7 +261,15 @@ const OptionChainView = () => {
     if (!hasScrolled && atmRowRef.current && spotPrice > 0) {
       setTimeout(() => {
         if (atmRowRef.current) {
-          atmRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const container = document.querySelector('.option-chain-table-container');
+          if (container) {
+            const containerRect = container.getBoundingClientRect();
+            const rowRect = atmRowRef.current.getBoundingClientRect();
+            container.scrollBy({
+              top: (rowRect.top - containerRect.top) - (containerRect.height / 2) + (rowRect.height / 2),
+              behavior: 'smooth'
+            });
+          }
         }
       }, 100);
       setHasScrolled(true);
