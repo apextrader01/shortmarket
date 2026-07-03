@@ -58,7 +58,32 @@ export default function MarketDepthModal() {
     // Initial generate
     generateDepth();
 
-    // Pulse every 800ms
+    // Check if market is closed
+    const isMarketClosed = () => {
+      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      const day = istTime.getDay();
+      
+      // Weekends closed
+      if (day === 0 || day === 6) return true;
+      
+      if (!isCommodity) {
+        // Equity options: 9:15 AM to 3:30 PM
+        if (hours < 9 || (hours === 9 && minutes < 15)) return true;
+        if (hours > 15 || (hours === 15 && minutes >= 30)) return true;
+      } else {
+        // Commodity options: 9:00 AM to 11:30 PM
+        if (hours < 9) return true;
+        if (hours === 23 && minutes >= 30) return true;
+      }
+      return false;
+    };
+
+    if (isMarketClosed()) return;
+
+    // Pulse every 800ms only if market is open
     const interval = setInterval(generateDepth, 800);
     return () => clearInterval(interval);
   }, [marketDepthModal.isOpen, ltp]);
