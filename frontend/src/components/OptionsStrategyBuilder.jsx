@@ -37,10 +37,27 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     // Calculate DTE
     const today = new Date();
     today.setHours(0,0,0,0);
-    const exp = expiryDate ? new Date(expiryDate) : new Date();
+    
+    let exp = new Date();
+    if (expiryDate) {
+      const match = expiryDate.match(/^(\d{2})([A-Z]{3})(\d{2,4})$/i);
+      if (match) {
+        const day = parseInt(match[1]);
+        const months = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+        const month = months[match[2].toUpperCase()];
+        const year = match[3].length === 2 ? 2000 + parseInt(match[3]) : parseInt(match[3]);
+        if (month !== undefined) {
+          exp = new Date(year, month, day);
+        }
+      } else {
+        const parsed = new Date(expiryDate);
+        if (!isNaN(parsed)) exp = parsed;
+      }
+    }
     exp.setHours(0,0,0,0);
+    
     let diffDays = Math.max(0, Math.floor((exp - today) / (1000 * 60 * 60 * 24)));
-    if (diffDays === 0) diffDays = 0.01; // Avoid 0 DTE math errors
+    if (diffDays === 0 || isNaN(diffDays)) diffDays = 0.01; // Avoid 0 DTE math errors
     
     const targetDaysLeft = Math.max(0.001, diffDays - targetDteOffset);
     const T = targetDaysLeft / 365.0; // Time in years for Black-Scholes
@@ -237,7 +254,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
         <MetricCard title="Max Profit" value={maxProfit === Infinity ? 'Unlimited' : `₹${maxProfit.toFixed(2)}`} color={maxProfit === Infinity ? 'var(--color-green)' : 'var(--text-primary)'} />
         <MetricCard title="Max Loss" value={maxLoss === -Infinity ? 'Unlimited' : `-₹${Math.abs(maxLoss).toFixed(2)}`} color={maxLoss === -Infinity ? 'var(--color-red)' : 'var(--text-primary)'} />
-        <MetricCard title="Risk / Reward" value={maxLoss === -Infinity || maxLoss === 0 ? 'N/A' : `1 : ${(Math.abs(maxProfit) / Math.abs(maxLoss)).toFixed(1)}`} />
+        <MetricCard title="Risk / Reward" value={maxLoss === -Infinity || maxLoss === 0 || maxProfit === Infinity ? 'N/A' : `1 : ${(Math.abs(maxProfit) / Math.abs(maxLoss)).toFixed(1)}`} />
         <MetricCard title="POP" value={`${pop.toFixed(1)}%`} color={pop > 50 ? 'var(--color-green)' : 'var(--color-yellow)'} />
         <MetricCard title="Net Premium" value={netPremium > 0 ? `+ ₹${netPremium.toFixed(0)}` : `- ₹${Math.abs(netPremium).toFixed(0)}`} color={netPremium > 0 ? 'var(--color-green)' : 'var(--color-red)'} />
       </div>
