@@ -601,7 +601,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
         // Bypass SDK to ensure no token/header dropping bugs
         if (!smart_api.access_token) return [];
         const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
-            signal: AbortSignal.timeout(5000),
+            signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined,
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${smart_api.access_token}`,
@@ -620,12 +620,12 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
         const res = await response.json();
         
         if (!res) {
-            console.error(`fetchCandleData returned empty for ${symbol}`);
+            console.error(`fetchCandleData returned empty for ${uniqueSymbol}`);
             return [];
         }
         
         if (!res.status || !res.data) {
-            console.error(`Angel One historical API error for ${symbol}:`, res);
+            console.error(`Angel One historical API error for ${uniqueSymbol}:`, res);
             return [];
         }
         
@@ -639,7 +639,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             };
         });
     } catch (e) {
-        console.error(`fetchCandleData exception for ${symbol}:`, e.message);
+        console.error(`fetchCandleData exception for ${uniqueSymbol}:`, e.message);
         return [];
     }
 }
