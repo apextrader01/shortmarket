@@ -3,6 +3,8 @@ import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
+import ChartModal from './ChartModal';
+import { BarChart2 } from 'lucide-react';
 
 const API = '';
 
@@ -102,6 +104,7 @@ const OptionChainView = () => {
   const addToBasket = useStore((state) => state.addToBasket);
   const setBasketModalOpen = useStore((state) => state.setBasketModalOpen);
   const basketItems = useStore((state) => state.basketItems);
+  const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -557,6 +560,13 @@ const OptionChainView = () => {
                       <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                         {cLtp > 0 ? cLtp.toFixed(2) : '-'}
                       </span>
+                      <button 
+                        onClick={() => setChartModalSymbol(call.symbol)}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+                        title="View Chart"
+                      >
+                        <BarChart2 size={14} />
+                      </button>
                       <div className="action-buttons">
                         <button onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} className="btn-mini buy">B</button>
                         <button onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} className="btn-mini sell">S</button>
@@ -593,6 +603,13 @@ const OptionChainView = () => {
                       <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                         {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                       </span>
+                      <button 
+                        onClick={() => setChartModalSymbol(put.symbol)}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+                        title="View Chart"
+                      >
+                        <BarChart2 size={14} />
+                      </button>
                       <div className="action-buttons">
                         <button onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} className="btn-mini buy">B</button>
                         <button onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} className="btn-mini sell">S</button>
@@ -624,6 +641,7 @@ const OptionChainView = () => {
       
       {/* Modals */}
       <BasketModal />
+      <ChartModal />
     </div>
   );
 };

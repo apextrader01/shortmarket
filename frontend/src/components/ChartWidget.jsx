@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
+import { SMA, EMA, RSI, MACD } from 'technicalindicators';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import StockDetails from './StockDetails';
@@ -21,9 +22,21 @@ export default function ChartWidget() {
   const candleSeriesRef   = useRef(null);
   const volumeSeriesRef   = useRef(null);
   const liveLineRef       = useRef(null);
+  const smaSeriesRef      = useRef(null);
+  const emaSeriesRef      = useRef(null);
+  const rsiSeriesRef      = useRef(null);
+  const macdSeriesRef     = useRef(null);
+  const macdSignalSeriesRef = useRef(null);
+  const macdHistSeriesRef = useRef(null);
   const mountedRef        = useRef(true);
 
   const [hoveredCandle, setHoveredCandle] = useState(null);
+  
+  // Indicator Toggles
+  const [showSMA, setShowSMA] = useState(false);
+  const [showEMA, setShowEMA] = useState(false);
+  const [showRSI, setShowRSI] = useState(false);
+  const [showMACD, setShowMACD] = useState(false);
 
   const {
     selectedSymbol, prices, candleData,
@@ -39,14 +52,23 @@ export default function ChartWidget() {
   const buildChart = useCallback(() => {
     if (!chartContainerRef.current) return;
 
-    // Tear down existing chart
     if (chartRef.current) {
       try { chartRef.current.remove(); } catch (_) {}
-      chartRef.current    = null;
-      candleSeriesRef.current = null;
-      volumeSeriesRef.current = null;
-      liveLineRef.current = null;
+      chartRef.current = null;
     }
+
+    // Adjust chart height based on active oscillators
+    let numOscillators = 0;
+    if (showRSI) numOscillators++;
+    if (showMACD) numOscillators++;
+    
+    // Main chart gets 60% if 2 oscillators, 75% if 1, 100% if 0
+    const mainBottom = numOscillators === 2 ? 0.4 : (numOscillators === 1 ? 0.25 : 0);
+    const rsiTop = mainBottom;
+    const rsiBottom = showMACD ? 0.2 : 0;
+    const macdTop = numOscillators === 2 ? 0.8 : (showMACD ? 0.75 : 0);
+
+    const chartHeight = 400 + (numOscillators * 150);
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -66,7 +88,7 @@ export default function ChartWidget() {
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.07)',
-        scaleMargins: { top: 0.06, bottom: 0.22 },
+        scaleMargins: { top: 0.05, bottom: mainBottom + 0.05 },
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.07)',
@@ -74,7 +96,7 @@ export default function ChartWidget() {
         secondsVisible: false,
       },
       width:  chartContainerRef.current.clientWidth,
-      height: 400,
+      height: chartHeight,
       handleScroll: true,
       handleScale:  true,
     });
@@ -87,14 +109,32 @@ export default function ChartWidget() {
       wickUpColor: '#26a69a', wickDownColor: '#ef5350',
     });
 
-    // Volume histogram on separate scale
+    // Volume histogram on main scale
     volumeSeriesRef.current = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: 'vol',
     });
     chart.priceScale('vol').applyOptions({
-      scaleMargins: { top: 0.80, bottom: 0 },
+      scaleMargins: { top: 0.9 - mainBottom, bottom: mainBottom },
     });
+
+    // Indicators on Main Chart
+    smaSeriesRef.current = chart.addSeries(LineSeries, { color: '#F59E0B', lineWidth: 2, crosshairMarkerVisible: false, visible: showSMA });
+    emaSeriesRef.current = chart.addSeries(LineSeries, { color: '#8B5CF6', lineWidth: 2, crosshairMarkerVisible: false, visible: showEMA });
+
+    // RSI Pane
+    if (showRSI) {
+      rsiSeriesRef.current = chart.addSeries(LineSeries, { color: '#EAB308', lineWidth: 2, priceScaleId: 'rsi', crosshairMarkerVisible: false });
+      chart.priceScale('rsi').applyOptions({ scaleMargins: { top: rsiTop + 0.05, bottom: rsiBottom + 0.05 } });
+    }
+
+    // MACD Pane
+    if (showMACD) {
+      macdSeriesRef.current = chart.addSeries(LineSeries, { color: '#3B82F6', lineWidth: 2, priceScaleId: 'macd', crosshairMarkerVisible: false });
+      macdSignalSeriesRef.current = chart.addSeries(LineSeries, { color: '#EF4444', lineWidth: 2, priceScaleId: 'macd', crosshairMarkerVisible: false });
+      macdHistSeriesRef.current = chart.addSeries(HistogramSeries, { priceScaleId: 'macd' });
+      chart.priceScale('macd').applyOptions({ scaleMargins: { top: macdTop + 0.05, bottom: 0.05 } });
+    }
 
     // Dotted live-price line
     liveLineRef.current = chart.addSeries(LineSeries, {
@@ -103,7 +143,6 @@ export default function ChartWidget() {
       crosshairMarkerVisible: false,
     });
 
-    // Resize observer
     const ro = new ResizeObserver(() => {
       if (chartRef.current && chartContainerRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -111,7 +150,6 @@ export default function ChartWidget() {
     });
     ro.observe(chartContainerRef.current);
 
-    // Crosshair hover for OHLC
     chart.subscribeCrosshairMove((param) => {
       if (
         !param.time || 
@@ -129,9 +167,9 @@ export default function ChartWidget() {
     });
 
     return () => { ro.disconnect(); };
-  }, []);
+  }, [showSMA, showEMA, showRSI, showMACD]);
 
-  // Rebuild chart when symbol or interval changes
+  // Rebuild chart when symbol, interval, or indicators change
   useEffect(() => {
     mountedRef.current = true;
     const cleanup = buildChart();
@@ -144,9 +182,9 @@ export default function ChartWidget() {
         chartRef.current = null;
       }
     };
-  }, [selectedSymbol, chartInterval]); // eslint-disable-line
+  }, [selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD]);
 
-  // Push candle data into chart whenever it arrives
+  // Push candle and indicator data into chart
   useEffect(() => {
     if (!mountedRef.current || !candleSeriesRef.current || candles.length === 0) return;
 
@@ -160,12 +198,78 @@ export default function ChartWidget() {
       }));
       volumeSeriesRef.current?.setData(volData);
 
+      // Compute Indicators
+      const closePrices = candles.map(c => c.close);
+      const times = candles.map(c => c.time);
+
+      if (showSMA && smaSeriesRef.current) {
+        const smaPeriod = 20;
+        const smaVals = SMA.calculate({ period: smaPeriod, values: closePrices });
+        const smaData = [];
+        for (let i = 0; i < smaVals.length; i++) {
+          smaData.push({ time: times[i + (smaPeriod - 1)], value: smaVals[i] });
+        }
+        smaSeriesRef.current.setData(smaData);
+      }
+
+      if (showEMA && emaSeriesRef.current) {
+        const emaPeriod = 20;
+        const emaVals = EMA.calculate({ period: emaPeriod, values: closePrices });
+        const emaData = [];
+        for (let i = 0; i < emaVals.length; i++) {
+          emaData.push({ time: times[i + (emaPeriod - 1)], value: emaVals[i] });
+        }
+        emaSeriesRef.current.setData(emaData);
+      }
+
+      if (showRSI && rsiSeriesRef.current) {
+        const rsiPeriod = 14;
+        const rsiVals = RSI.calculate({ period: rsiPeriod, values: closePrices });
+        const rsiData = [];
+        for (let i = 0; i < rsiVals.length; i++) {
+          rsiData.push({ time: times[i + rsiPeriod], value: rsiVals[i] });
+        }
+        rsiSeriesRef.current.setData(rsiData);
+      }
+
+      if (showMACD && macdSeriesRef.current && macdSignalSeriesRef.current && macdHistSeriesRef.current) {
+        const macdVals = MACD.calculate({
+          values: closePrices,
+          fastPeriod: 12,
+          slowPeriod: 26,
+          signalPeriod: 9,
+          SimpleMAOscillator: false,
+          SimpleMASignal: false
+        });
+        
+        const macdLine = [];
+        const signalLine = [];
+        const histLine = [];
+        
+        // MACD calculation requires 26 periods to start
+        for (let i = 0; i < macdVals.length; i++) {
+          const t = times[i + 25]; 
+          if (!t) continue;
+          macdLine.push({ time: t, value: macdVals[i].MACD });
+          signalLine.push({ time: t, value: macdVals[i].signal });
+          histLine.push({ 
+            time: t, 
+            value: macdVals[i].histogram, 
+            color: macdVals[i].histogram >= 0 ? 'rgba(38,166,154,0.7)' : 'rgba(239,83,80,0.7)'
+          });
+        }
+        
+        macdSeriesRef.current.setData(macdLine);
+        macdSignalSeriesRef.current.setData(signalLine);
+        macdHistSeriesRef.current.setData(histLine);
+      }
+
       const last = candles[candles.length - 1];
       if (last) liveLineRef.current?.setData([{ time: last.time, value: last.close }]);
 
       chartRef.current?.timeScale().fitContent();
-    } catch (_) {}
-  }, [candles]); // fires every time candles array reference changes
+    } catch (e) { console.error(e) }
+  }, [candles, showSMA, showEMA, showRSI, showMACD]);
 
   // Live tick update
   useEffect(() => {
@@ -183,8 +287,7 @@ export default function ChartWidget() {
 
   return (
     <div className="glass-panel" style={{ padding: '16px 20px' }}>
-
-      {/* ── Row 1: symbol + price + change ── */}
+      {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
           <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px' }}>
@@ -212,7 +315,7 @@ export default function ChartWidget() {
           )}
         </div>
 
-        {/* Timeframe row */}
+        {/* Timeframes */}
         <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '8px', flexShrink: 0 }}>
           {TIMEFRAMES.map(tf => {
             const active = chartInterval === tf.value;
@@ -235,7 +338,15 @@ export default function ChartWidget() {
         </div>
       </div>
 
-      {/* ── Row 2: OHLC ── */}
+      {/* ── Indicators Bar ── */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <IndicatorButton label="SMA (20)" active={showSMA} onClick={() => setShowSMA(!showSMA)} color="#F59E0B" />
+        <IndicatorButton label="EMA (20)" active={showEMA} onClick={() => setShowEMA(!showEMA)} color="#8B5CF6" />
+        <IndicatorButton label="RSI (14)" active={showRSI} onClick={() => setShowRSI(!showRSI)} color="#EAB308" />
+        <IndicatorButton label="MACD" active={showMACD} onClick={() => setShowMACD(!showMACD)} color="#3B82F6" />
+      </div>
+
+      {/* ── OHLC Overlay ── */}
       {(hoveredCandle || price) && (
         <div style={{ display: 'flex', gap: '16px', fontSize: '11px', marginBottom: '8px' }}>
           {[['O', hoveredCandle?.open ?? price?.open], 
@@ -256,8 +367,8 @@ export default function ChartWidget() {
         </div>
       )}
 
-      {/* ── Chart area (always mounted so createChart never breaks) ── */}
-      <div style={{ position: 'relative', width: '100%', height: '400px' }}>
+      {/* ── Chart area ── */}
+      <div style={{ position: 'relative', width: '100%', minHeight: '400px', height: 'auto' }}>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
 
         {/* Quick Order Buttons Overlay */}
@@ -310,7 +421,7 @@ export default function ChartWidget() {
           </div>
         )}
 
-        {/* Error / no-data overlay */}
+        {/* Error overlay */}
         {!isLoadingCandles && (candleError || candles.length === 0) && (
           <div style={{
             position: 'absolute', inset: 0,
@@ -342,5 +453,24 @@ export default function ChartWidget() {
         <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
       )}
     </div>
+  );
+}
+
+function IndicatorButton({ label, active, onClick, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        background: active ? `${color}20` : 'transparent',
+        color: active ? color : '#64748B',
+        border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 'bold',
+        cursor: 'pointer', transition: 'all 0.2s'
+      }}
+    >
+      {active && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />}
+      {label}
+    </button>
   );
 }

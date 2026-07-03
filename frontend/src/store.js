@@ -210,6 +210,9 @@ export const useStore = create(persist((set, get) => ({
   basketModalOpen: false,
   setBasketModalOpen: (isOpen) => set({ basketModalOpen: isOpen }),
 
+  chartModalSymbol: null,
+  setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
+
   placeBasketOrder: async (basketPayload) => {
     const { token } = get();
     try {
