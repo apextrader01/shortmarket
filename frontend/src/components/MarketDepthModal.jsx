@@ -133,7 +133,7 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.high ? marketDepthData.high : (basicData.high || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Volume</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.volume ? marketDepthData.volume.toLocaleString() : (basicData.volume ? basicData.volume.toLocaleString() : '-')}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.volume !== undefined && marketDepthData.volume !== null ? marketDepthData.volume.toLocaleString() : (basicData.volume !== undefined ? basicData.volume.toLocaleString() : '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Change</span>
               <span style={{ textAlign: 'right', fontWeight: '500', color: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) > (marketDepthData?.symbol === symbol ? marketDepthData.close : basicData.close) ? 'var(--color-blue)' : 'var(--color-red)' }}>
@@ -148,10 +148,10 @@ export default function MarketDepthModal() {
               </span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LTQ</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltq ? marketDepthData.ltq : (basicData.ltq || '-')}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltq !== undefined && marketDepthData.ltq !== null ? marketDepthData.ltq : (basicData.ltq !== undefined ? basicData.ltq : '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LC</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.lowerCircuit ? marketDepthData.lowerCircuit : (basicData.lowerCircuit || '-')}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.lowerCircuit !== undefined && marketDepthData.lowerCircuit !== null ? marketDepthData.lowerCircuit : (basicData.lowerCircuit !== undefined ? basicData.lowerCircuit : '-')}</span>
             </div>
 
             {/* Right Column */}
@@ -163,7 +163,7 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.low ? marketDepthData.low : (basicData.low || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Avg. Price</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.avgPrice ? marketDepthData.avgPrice : (basicData.avgPrice || '-')}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.avgPrice !== undefined && marketDepthData.avgPrice !== null ? marketDepthData.avgPrice : (basicData.avgPrice !== undefined ? basicData.avgPrice : '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LTP</span>
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : (basicData.ltp || '-')}</span>
@@ -172,7 +172,7 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltt ? marketDepthData.ltt : (basicData.ltt || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>UC</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.upperCircuit ? marketDepthData.upperCircuit : (basicData.upperCircuit || '-')}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.upperCircuit !== undefined && marketDepthData.upperCircuit !== null ? marketDepthData.upperCircuit : (basicData.upperCircuit !== undefined ? basicData.upperCircuit : '-')}</span>
             </div>
 
           </div>
