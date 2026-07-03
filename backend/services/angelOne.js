@@ -495,7 +495,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
     if (tokensRequested.length === 0) return result;
 
     try {
-        const res = await smart_api.marketData({ mode: 'LTP', exchangeTokens: exchangeMap });
+        const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap });
         if (res?.status && res.data?.fetched) {
             for (const item of res.data.fetched) {
                 const info = STOCK_MASTER[item.symbolToken];
@@ -509,7 +509,13 @@ async function fetchBatchLTPs(uniqueSymbols) {
                         close: item.close || item.ltp,
                         change: item.netChange || 0,
                         pct: item.percentChange || 0,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        volume: item.volumeTradeForTheDay || item.volume || 0,
+                        ltq: item.lastTradeQty || item.last_traded_quantity || 0,
+                        avgPrice: item.averageTradePrice || item.average_traded_price || 0,
+                        ltt: item.lastTradeTime || item.last_traded_timestamp || '',
+                        lowerCircuit: item.lowerCircuitLimit || item.lower_circuit_limit || 0,
+                        upperCircuit: item.upperCircuitLimit || item.upper_circuit_limit || 0,
                     };
                 }
             }
