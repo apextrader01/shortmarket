@@ -398,8 +398,10 @@ const OptionChainView = () => {
           )}
         </div>
 
-        <div className="option-chain-controls">
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <div className="top-bar-divider"></div>
+
+        {/* Section 5: Strategy and Basket Controls */}
+        <div className="top-bar-section" style={{ flexDirection: 'row', gap: '16px', alignItems: 'center' }}>
           <div className="toggle-container" title="Clicking Buy/Sell will add to Basket instead of directly executing">
             <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Basket Mode</span>
             <label className="toggle-switch">
@@ -430,7 +432,6 @@ const OptionChainView = () => {
             </label>
           </div>
         </div>
-      </div>
       </div>
 
       {strategyMode && (
