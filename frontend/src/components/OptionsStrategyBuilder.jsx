@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { calculateGreeks } from '../utils/blackScholes';
 
 // Normal CDF approximation for POP
@@ -201,6 +201,17 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     };
   }, [legs, spotPrice, expiryDate, targetDteOffset]);
 
+  const gradientOffset = useMemo(() => {
+    if (!data || data.length === 0) return 0;
+    const dataMax = Math.max(...data.map(i => i.pnlExpiry));
+    const dataMin = Math.min(...data.map(i => i.pnlExpiry));
+
+    if (dataMax <= 0) return 0;
+    if (dataMin >= 0) return 1;
+
+    return dataMax / (dataMax - dataMin);
+  }, [data]);
+
   if (!legs || legs.length === 0) {
     return (
       <div style={{ padding: '24px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -348,11 +359,11 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
         {/* RIGHT PANE: CHART */}
         <div style={{ flex: '2', minWidth: '400px', height: '450px', background: 'rgba(255,255,255,0.01)', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-color)' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+            <ComposedChart data={data} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
               <defs>
-                <linearGradient id="pnlTargetGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-blue)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="var(--color-blue)" stopOpacity={0} />
+                <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset={gradientOffset} stopColor="#10B981" stopOpacity={0.6} />
+                  <stop offset={gradientOffset} stopColor="#EF4444" stopOpacity={0.6} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -371,7 +382,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                 tickFormatter={(val) => val >= 0 ? `+${val}` : val}
               />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={0} stroke="rgba(255,255,255,0.3)" />
+              <ReferenceLine y={0} stroke="rgba(255,255,255,0.5)" strokeWidth={2} />
               {spotPrice && (
                 <ReferenceLine x={spotPrice} stroke="var(--color-blue)" strokeDasharray="3 3" label={{ position: 'top', value: 'Spot', fill: 'var(--color-blue)', fontSize: 12 }} />
               )}
@@ -379,14 +390,13 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                 <ReferenceLine key={i} x={b} stroke="var(--text-secondary)" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: 'BE', fill: 'var(--text-secondary)', fontSize: 10 }} />
               ))}
               
-              {/* Expiry Payoff (Rigid Dashed) */}
-              <Line 
+              {/* Expiry Payoff (Shaded Area) */}
+              <Area 
                 type="linear" 
                 dataKey="pnlExpiry" 
-                stroke="var(--text-secondary)" 
+                stroke="url(#splitColor)" 
                 strokeWidth={2} 
-                strokeDasharray="5 5"
-                dot={false}
+                fill="url(#splitColor)"
                 activeDot={false}
                 name="Expiry P&L"
               />
@@ -397,11 +407,12 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                 dataKey="pnlTarget" 
                 stroke="var(--color-blue)" 
                 strokeWidth={3} 
+                strokeDasharray="5 5"
                 dot={false}
                 activeDot={{ r: 6, fill: 'var(--color-blue)' }}
                 name="Target Date P&L"
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
