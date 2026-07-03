@@ -431,6 +431,7 @@ const OptionChainView = () => {
           </div>
         </div>
       </div>
+      </div>
 
       {strategyMode && (
         <OptionsStrategyBuilder 
