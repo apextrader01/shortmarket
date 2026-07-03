@@ -3,10 +3,11 @@ import { useStore } from '../store';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit } = useStore();
-  const [activeTab, setActiveTab] = useState('users');
+  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics } = useStore();
+  const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
   const [deposits, setDeposits] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
@@ -20,9 +21,12 @@ export default function AdminDashboard() {
     if (activeTab === 'users') {
       const res = await fetchAdminUsers();
       if (res.success) setUsers(res.users);
-    } else {
+    } else if (activeTab === 'deposits') {
       const res = await fetchDepositRequests();
       if (res.success) setDeposits(res.deposits);
+    } else if (activeTab === 'analytics') {
+      const res = await fetchAdminAnalytics();
+      if (res.success) setAnalytics(res.data);
     }
     setLoading(false);
   };
@@ -82,6 +86,12 @@ export default function AdminDashboard() {
             >
               Deposit Requests
             </button>
+            <button 
+              onClick={() => setActiveTab('analytics')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer' }}
+            >
+              Analytics & Insights
+            </button>
           </div>
         </div>
         
@@ -110,6 +120,40 @@ export default function AdminDashboard() {
       <div style={{ background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+        ) : activeTab === 'analytics' ? (
+          <div style={{ padding: '24px' }}>
+            {analytics ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Total Platform AUM</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>₹{analytics.totalAum.toFixed(2)}</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Today's Realized P&L</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: analytics.todayRealizedPnl >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                    {analytics.todayRealizedPnl >= 0 ? '+' : '-'}₹{Math.abs(analytics.todayRealizedPnl).toFixed(2)}
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Today's Total Volume</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-blue)' }}>₹{analytics.todayVolume.toFixed(2)}</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Top Traded Symbols</div>
+                  {analytics.topSymbols.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {analytics.topSymbols.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                          <span style={{ fontWeight: '500' }}>{item.symbol}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>₹{item.volume.toFixed(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>No trades today.</div>}
+                </div>
+              </div>
+            ) : <div style={{ color: 'var(--text-secondary)' }}>No analytics data available.</div>}
+          </div>
         ) : activeTab === 'users' ? (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>

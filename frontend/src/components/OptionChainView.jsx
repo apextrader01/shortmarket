@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import BasketModal from './BasketModal';
+import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 
 const API = '';
 
@@ -104,6 +105,8 @@ const OptionChainView = () => {
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [strategyMode, setStrategyMode] = useState(false);
+  const [strategyLegs, setStrategyLegs] = useState([]);
 
   useEffect(() => {
     const fetchChainAndFuture = async () => {
@@ -276,8 +279,22 @@ const OptionChainView = () => {
     }
   }, [spotPrice, hasScrolled, strikes]);
 
-  const handleTrade = (opt, type) => {
+  const handleTrade = (opt, type, optionType) => {
     if (!opt) return;
+    
+    // Add to strategy builder if in strategy mode
+    if (strategyMode) {
+      const price = prices[opt.symbol] || 0;
+      setStrategyLegs(prev => [...prev, {
+        optionType,
+        strike: parseFloat(opt.strike),
+        price: parseFloat(price),
+        side: type === 'BUY' ? 'BUY' : 'SELL',
+        quantity: opt.lotsize ? parseInt(opt.lotsize) : 1
+      }]);
+      return;
+    }
+    
     if (basketMode) {
       addToBasket({
         symbol: opt.symbol,
@@ -381,21 +398,47 @@ const OptionChainView = () => {
           )}
         </div>
 
-        <div className="top-bar-divider"></div>
-
-        {/* Section 5: Basket Mode Toggle */}
-        <div className="top-bar-section">
-          <span className="top-bar-label">Basket Order</span>
-          <label className="toggle-switch">
-            <input 
-              type="checkbox" 
-              checked={basketMode}
-              onChange={(e) => setBasketMode(e.target.checked)}
-            />
-            <span className="slider round"></span>
-          </label>
+        <div className="option-chain-controls">
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div className="toggle-container" title="Clicking Buy/Sell will add to Basket instead of directly executing">
+            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Basket Mode</span>
+            <label className="toggle-switch">
+              <input 
+                type="checkbox" 
+                checked={basketMode}
+                onChange={(e) => {
+                  setBasketMode(e.target.checked);
+                  if (e.target.checked) setStrategyMode(false);
+                }}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
+          
+          <div className="toggle-container" title="Clicking Buy/Sell will add to Strategy Builder">
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-blue)' }}>Strategy Builder</span>
+            <label className="toggle-switch">
+              <input 
+                type="checkbox" 
+                checked={strategyMode}
+                onChange={(e) => {
+                  setStrategyMode(e.target.checked);
+                  if (e.target.checked) setBasketMode(false);
+                }}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
         </div>
       </div>
+
+      {strategyMode && (
+        <OptionsStrategyBuilder 
+          legs={strategyLegs}
+          spotPrice={spotPrice}
+          onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
+        />
+      )}
 
       {/* Table */}
       <div className="option-chain-table-container">
@@ -498,8 +541,8 @@ const OptionChainView = () => {
                         {cLtp > 0 ? cLtp.toFixed(2) : '-'}
                       </span>
                       <div className="action-buttons">
-                        <button onClick={() => handleTrade(call, 'BUY')} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(call, 'SELL')} className="btn-mini sell">S</button>
+                        <button onClick={() => handleTrade(call, 'BUY', 'CE')} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(call, 'SELL', 'CE')} className="btn-mini sell">S</button>
                       </div>
                     </div>
                   </td>
@@ -534,8 +577,8 @@ const OptionChainView = () => {
                         {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                       </span>
                       <div className="action-buttons">
-                        <button onClick={() => handleTrade(put, 'BUY')} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(put, 'SELL')} className="btn-mini sell">S</button>
+                        <button onClick={() => handleTrade(put, 'BUY', 'PE')} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(put, 'SELL', 'PE')} className="btn-mini sell">S</button>
                       </div>
                     </div>
                   </td>

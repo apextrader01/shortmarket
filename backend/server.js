@@ -371,6 +371,60 @@ app.post('/api/admin/deposits/:id/reject', authenticateToken, async (req, res) =
   }
 });
 
+app.get('/api/admin/analytics', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    // 1. Total AUM (Sum of all user balances)
+    const { sum: totalAumRow } = await db('users').sum('balance as sum').first();
+    const totalAum = parseFloat(totalAumRow || 0);
+
+    // 2. Today's Volume and Realized P&L
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayOrders = await db('orders')
+      .where('status', 'EXECUTED')
+      .andWhere('created_at', '>=', today);
+
+    let todayVolume = 0;
+    let todayRealizedPnl = 0;
+    const symbolVolume = {};
+
+    todayOrders.forEach(o => {
+      const vol = Math.abs(parseFloat(o.quantity)) * parseFloat(o.average_price || o.price);
+      todayVolume += vol;
+      
+      const pnl = parseFloat(o.realized_pnl || 0);
+      todayRealizedPnl += pnl;
+
+      if (!symbolVolume[o.symbol]) symbolVolume[o.symbol] = 0;
+      symbolVolume[o.symbol] += vol;
+    });
+
+    // 3. Top Traded Symbols
+    const topSymbols = Object.entries(symbolVolume)
+      .map(([symbol, volume]) => ({ symbol, volume }))
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 5);
+
+    // 4. All Open Positions (Frontend will calculate Unrealized P&L using live prices)
+    const openPositions = await db('positions').where('quantity', '!=', 0);
+
+    res.json({
+      success: true,
+      totalAum,
+      todayVolume,
+      todayRealizedPnl,
+      topSymbols,
+      openPositions
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;

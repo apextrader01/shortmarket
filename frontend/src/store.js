@@ -894,6 +894,24 @@ export const useStore = create(persist((set, get) => ({
     } catch (err) {}
   },
 
+  // ─── Admin ───────────────────────────────────────────────────────────────
+  fetchAdminAnalytics: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/analytics`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, data };
+      }
+      return { success: false, error: 'Failed' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
   // ── Admin ───────────────────────────────────────────────────────────────────
   fetchAdminUsers: async () => {
     const { token } = get();
