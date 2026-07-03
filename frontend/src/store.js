@@ -225,6 +225,22 @@ export const useStore = create(persist((set, get) => ({
   alertModalSymbol: null,
   setAlertModalSymbol: (symbol) => set({ alertModalSymbol: symbol }),
 
+  // ── Advanced Order Triggers (SL, TSL, GTT) ──────────────────────────────────
+  pendingTriggers: [],
+  addPendingTrigger: (trigger) => set((state) => ({
+    pendingTriggers: [...state.pendingTriggers, { 
+      id: `TRG_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date().toISOString(),
+      ...trigger 
+    }]
+  })),
+  removePendingTrigger: (id) => set((state) => ({
+    pendingTriggers: state.pendingTriggers.filter(t => t.id !== id)
+  })),
+  updatePendingTrigger: (id, updates) => set((state) => ({
+    pendingTriggers: state.pendingTriggers.map(t => t.id === id ? { ...t, ...updates } : t)
+  })),
+
   placeBasketOrder: async (basketPayload) => {
     const { token } = get();
     try {
@@ -1018,5 +1034,6 @@ export const useStore = create(persist((set, get) => ({
     token:             state.token,
     user:              state.user,
     theme:             state.theme,
+    pendingTriggers:   state.pendingTriggers,
   }),
 }));

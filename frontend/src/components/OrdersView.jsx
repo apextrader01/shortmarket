@@ -3,10 +3,10 @@ import { useStore } from '../store';
 import { Box } from 'lucide-react';
 
 export default function OrdersView() {
-  const { orders } = useStore();
+  const { orders, pendingTriggers, removePendingTrigger } = useStore();
   const [activeTab, setActiveTab] = useState('Open Orders');
 
-  const tabs = ['Open Orders', 'Order History', 'Basket Orders', 'Alerts'];
+  const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
   // Filter orders based on active tab
   const displayOrders = orders.filter(order => {
@@ -14,6 +14,8 @@ export default function OrdersView() {
     if (activeTab === 'Order History') return order.status !== 'PENDING';
     return false;
   });
+  
+  const displayTriggers = pendingTriggers || [];
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
@@ -39,8 +41,8 @@ export default function OrdersView() {
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: displayOrders.length === 0 ? 'center' : 'flex-start' }}>
-        {displayOrders.length === 0 ? (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start' }}>
+        {(activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{ 
               width: '120px', height: '100px', background: 'var(--bg-panel)', 
@@ -85,21 +87,70 @@ export default function OrdersView() {
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Time</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
-                  {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Charges</th>}
-                  {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Realized P&L</th>}
-                  <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
-                  {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
-                </tr>
+                {activeTab === 'Pending Triggers' ? (
+                  <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Time</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Trigger Price</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Trailing Jump</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                ) : (
+                  <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Time</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Price</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
+                    {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Charges</th>}
+                    {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Realized P&L</th>}
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
+                    {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
+                  </tr>
+                )}
               </thead>
               <tbody>
-                {displayOrders.map(order => (
+                {activeTab === 'Pending Triggers' ? (
+                  displayTriggers.map(trigger => (
+                    <tr key={trigger.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '12px 16px' }}>{new Date(trigger.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.symbol.split('-')[0]}</td>
+                      <td style={{ padding: '12px 16px', color: trigger.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
+                        <span style={{ background: trigger.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{trigger.side}</span>
+                          <span style={{ fontSize: '10px', opacity: 0.8 }}>({trigger.productType})</span>
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>{trigger.quantity}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-blue)' }}>₹{trigger.triggerPrice?.toFixed(2)}</td>
+                      <td style={{ padding: '12px 16px' }}>{trigger.trailingJump ? `₹${trigger.trailingJump}` : '—'}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.type.replace('_', ' ')}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: trigger.status === 'PENDING_TRIGGER' ? 'var(--color-yellow)' : 'var(--color-green-light)' }}>
+                        {trigger.status.replace('_', ' ')}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        {trigger.status === 'PENDING_TRIGGER' && (
+                           <button 
+                             onClick={() => {
+                               if (window.confirm('Cancel this pending trigger?')) {
+                                 removePendingTrigger(trigger.id);
+                               }
+                             }}
+                             style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                           >
+                             CANCEL
+                           </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  displayOrders.map(order => (
                   <tr key={order.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '12px 16px' }}>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.symbol.split('-')[0]}</td>
@@ -147,8 +198,9 @@ export default function OrdersView() {
                         </div>
                       </td>
                     )}
-                  </tr>
-                ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

@@ -10,6 +10,7 @@ export default function OrderModal() {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
   const [slTrigger, setSlTrigger] = useState('');
+  const [trailingJump, setTrailingJump] = useState('');
   const [showSlTgt, setShowSlTgt] = useState(false);
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
@@ -153,6 +154,23 @@ export default function OrderModal() {
       product_type: productType
     };
 
+    if (tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') {
+      const triggerPayload = {
+        symbol,
+        type: tab === 'GTT' ? 'GTT' : (tab === 'Trailing SL' ? 'TRAILING_SL' : 'SL'),
+        side,
+        quantity: totalQuantity,
+        limitPrice: orderType === 'MARKET' ? null : parseFloat(price),
+        triggerPrice: parseFloat(slTrigger),
+        trailingJump: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
+        productType,
+        status: 'PENDING_TRIGGER'
+      };
+      useStore.getState().addPendingTrigger(triggerPayload);
+      closeOrderModal();
+      return;
+    }
+
     const success = await useStore.getState().placeOrder(payload);
     if (success) {
       closeOrderModal();
@@ -207,7 +225,7 @@ export default function OrderModal() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 20px', gap: '24px' }}>
-          {['Regular', 'Stop Loss', 'GTT'].map(t => (
+          {['Regular', 'Stop Loss', 'Trailing SL', 'GTT'].map(t => (
             <div key={t} onClick={() => setTab(t)} style={{ 
               padding: '12px 0', fontSize: '13px', fontWeight: tab === t ? '600' : '500', 
               color: tab === t ? 'var(--color-blue)' : 'var(--text-secondary)',
@@ -263,12 +281,18 @@ export default function OrderModal() {
           </div>
 
           {/* Stop Loss & GTT Tab specific inputs */}
-          {(tab === 'Stop Loss' || tab === 'GTT') && (
+          {(tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{tab === 'GTT' ? 'GTT Trigger Price' : 'SL Trigger Price'}</div>
-                <input type="text" value={slTrigger} onChange={e => setSlTrigger(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                <input type="number" value={slTrigger} onChange={e => setSlTrigger(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
               </div>
+              {tab === 'Trailing SL' && (
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Trailing Jump (₹)</div>
+                  <input type="number" value={trailingJump} onChange={e => setTrailingJump(e.target.value)} placeholder="e.g. 5" style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                </div>
+              )}
             </div>
           )}
 
