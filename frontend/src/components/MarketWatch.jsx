@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight } from 'lucide-react';
 
 export default function MarketWatch({ className = '' }) {
   const { 
     prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices,
     watchlists, activeWatchlistId, setActiveWatchlist, 
-    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal 
+    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal
   } = useStore();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,8 +200,16 @@ export default function MarketWatch({ className = '' }) {
                       <div 
                         onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
                         style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
+                        title="Remove"
                       >
                         <Trash2 size={12} color="var(--color-red-light)" />
+                      </div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); openMarketDepthModal(stock.uniqueSymbol); }}
+                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
+                        title="Market Depth"
+                      >
+                        <AlignRight size={12} color="var(--color-blue)" />
                       </div>
                     </div>
                   )}

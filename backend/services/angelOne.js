@@ -511,11 +511,11 @@ async function fetchBatchLTPs(uniqueSymbols) {
                         pct: item.percentChange || 0,
                         timestamp: new Date().toISOString(),
                         volume: item.tradeVolume || item.volumeTradeForTheDay || item.volume || 0,
-                        ltq: item.lastTradeQty || item.last_traded_quantity || 0,
-                        avgPrice: item.averageTradePrice || item.average_traded_price || 0,
-                        ltt: item.lastTradeTime || item.last_traded_timestamp || '',
-                        lowerCircuit: item.lowerCircuitLimit || item.lower_circuit_limit || 0,
-                        upperCircuit: item.upperCircuitLimit || item.upper_circuit_limit || 0,
+                        ltq: item.lastTradeQty || item.last_traded_quantity || item.ltq || 0,
+                        avgPrice: item.averageTradePrice || item.avgTradePrice || item.average_traded_price || item.atp || 0,
+                        ltt: item.lastTradeTime || item.lastUpdateTime || item.lastTradeTimestamp || item.last_traded_timestamp || item.ltt || '',
+                        lowerCircuit: item.lowerCircuitLimit || item.lowerCircuit || item.lower_circuit_limit || item.lc || 0,
+                        upperCircuit: item.upperCircuitLimit || item.upperCircuit || item.upper_circuit_limit || item.uc || 0,
                     };
                 }
             }
@@ -560,11 +560,11 @@ async function fetchAllLTPs() {
                             change: item.netChange || 0,
                             pct: item.percentChange || 0,
                             volume: item.tradeVolume || item.volumeTradeForTheDay || item.volume || 0,
-                            ltq: item.lastTradeQty || item.last_traded_quantity || 0,
-                            avgPrice: item.averageTradePrice || item.average_traded_price || 0,
-                            ltt: item.lastTradeTime || item.last_traded_timestamp || '',
-                            lowerCircuit: item.lowerCircuitLimit || item.lower_circuit_limit || 0,
-                            upperCircuit: item.upperCircuitLimit || item.upper_circuit_limit || 0,
+                            ltq: item.lastTradeQty || item.last_traded_quantity || item.ltq || 0,
+                            avgPrice: item.averageTradePrice || item.avgTradePrice || item.average_traded_price || item.atp || 0,
+                            ltt: item.lastTradeTime || item.lastUpdateTime || item.lastTradeTimestamp || item.last_traded_timestamp || item.ltt || '',
+                            lowerCircuit: item.lowerCircuitLimit || item.lowerCircuit || item.lower_circuit_limit || item.lc || 0,
+                            upperCircuit: item.upperCircuitLimit || item.upperCircuit || item.upper_circuit_limit || item.uc || 0,
                         };
                     }
                 }
