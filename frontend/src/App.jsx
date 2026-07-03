@@ -14,6 +14,7 @@ import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
 import MarketDepthModal from './components/MarketDepthModal';
+import DOMLadderModal from './components/DOMLadderModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign } from 'lucide-react';
@@ -354,6 +355,7 @@ function App() {
       {editOrderModal?.isOpen && <EditOrderModal />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       <MarketDepthModal />
+      <DOMLadderModal />
       
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">

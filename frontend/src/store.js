@@ -217,6 +217,10 @@ export const useStore = create(persist((set, get) => ({
   openMarketDepthModal: (symbol) => set({ marketDepthModal: { isOpen: true, symbol } }),
   closeMarketDepthModal: () => set({ marketDepthModal: { isOpen: false, symbol: null } }),
 
+  domLadderModal: { isOpen: false, symbol: null, lotsize: 1 },
+  openDomLadderModal: (symbol, lotsize) => set({ domLadderModal: { isOpen: true, symbol, lotsize: lotsize || 1 } }),
+  closeDomLadderModal: () => set({ domLadderModal: { isOpen: false, symbol: null, lotsize: 1 } }),
+
   marketDepthData: { symbol: null, bids: [], asks: [] },
   setMarketDepthData: (data) => set({ marketDepthData: data }),
 

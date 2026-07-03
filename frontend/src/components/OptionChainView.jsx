@@ -5,7 +5,7 @@ import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import ChartModal from './ChartModal';
 import AlertModal from './AlertModal';
-import { BarChart2, Bell, AlignLeft } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
 
 const API = '';
 
@@ -107,6 +107,7 @@ const OptionChainView = () => {
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
   const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
   const openMarketDepthModal = useStore((state) => state.openMarketDepthModal);
+  const openDomLadderModal = useStore((state) => state.openDomLadderModal);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -619,6 +620,13 @@ const OptionChainView = () => {
                         >
                           <AlignLeft size={14} />
                         </button>
+                        <button 
+                          onClick={() => openDomLadderModal(call.symbol, parseInt(opt.lotsize) || 1)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="DOM Ladder"
+                        >
+                          <List size={14} />
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -687,6 +695,13 @@ const OptionChainView = () => {
                           title="Market Depth"
                         >
                           <AlignLeft size={14} />
+                        </button>
+                        <button 
+                          onClick={() => openDomLadderModal(put.symbol, parseInt(opt.lotsize) || 1)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="DOM Ladder"
+                        >
+                          <List size={14} />
                         </button>
                       </div>
                     </div>
