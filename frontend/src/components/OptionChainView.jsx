@@ -558,27 +558,31 @@ const OptionChainView = () => {
                     ) : '-'}
                   </td>
                   <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
-                    <div className="ltp-container">
-                      <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                        {cLtp > 0 ? cLtp.toFixed(2) : '-'}
-                      </span>
-                      <button 
-                        onClick={() => setAlertModalSymbol(call.symbol)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
-                        title="Set Price Alert"
-                      >
-                        <Bell size={14} />
-                      </button>
-                      <button 
-                        onClick={() => setChartModalSymbol(call.symbol)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
-                        title="View Chart"
-                      >
-                        <BarChart2 size={14} />
-                      </button>
-                      <div className="action-buttons">
-                        <button onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} className="btn-mini sell">S</button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                      <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
+                        <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {cLtp > 0 ? cLtp.toFixed(2) : '-'}
+                        </span>
+                        <div className="action-buttons">
+                          <button onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} className="btn-mini buy">B</button>
+                          <button onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} className="btn-mini sell">S</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <button 
+                          onClick={() => setAlertModalSymbol(call.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="Set Price Alert"
+                        >
+                          <Bell size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setChartModalSymbol(call.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="View Chart"
+                        >
+                          <BarChart2 size={14} />
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -608,27 +612,31 @@ const OptionChainView = () => {
                     ) : '-'}
                   </td>
                   <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>
-                    <div className="ltp-container">
-                      <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                        {pLtp > 0 ? pLtp.toFixed(2) : '-'}
-                      </span>
-                      <button 
-                        onClick={() => setAlertModalSymbol(put.symbol)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
-                        title="Set Price Alert"
-                      >
-                        <Bell size={14} />
-                      </button>
-                      <button 
-                        onClick={() => setChartModalSymbol(put.symbol)}
-                        style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
-                        title="View Chart"
-                      >
-                        <BarChart2 size={14} />
-                      </button>
-                      <div className="action-buttons">
-                        <button onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} className="btn-mini sell">S</button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                      <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
+                        <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {pLtp > 0 ? pLtp.toFixed(2) : '-'}
+                        </span>
+                        <div className="action-buttons">
+                          <button onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} className="btn-mini buy">B</button>
+                          <button onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} className="btn-mini sell">S</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        <button 
+                          onClick={() => setAlertModalSymbol(put.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="Set Price Alert"
+                        >
+                          <Bell size={14} />
+                        </button>
+                        <button 
+                          onClick={() => setChartModalSymbol(put.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="View Chart"
+                        >
+                          <BarChart2 size={14} />
+                        </button>
                       </div>
                     </div>
                   </td>
