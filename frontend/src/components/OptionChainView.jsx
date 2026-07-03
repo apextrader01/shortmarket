@@ -307,7 +307,7 @@ const OptionChainView = () => {
         orderType: 'MARKET',
         price: ''
       });
-      setBasketModalOpen(true);
+      // Modal opens manually via the "View Basket" button
     } else {
       openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
     }
@@ -418,6 +418,15 @@ const OptionChainView = () => {
               />
               <span className="slider round"></span>
             </label>
+            {basketMode && basketItems.length > 0 && (
+              <button 
+                onClick={() => setBasketModalOpen(true)}
+                className="btn-mini buy" 
+                style={{ marginLeft: '12px', padding: '4px 8px', borderRadius: '4px' }}
+              >
+                View Basket ({basketItems.length})
+              </button>
+            )}
           </div>
           
           <div className="toggle-container" title="Clicking Buy/Sell will add to Strategy Builder">
