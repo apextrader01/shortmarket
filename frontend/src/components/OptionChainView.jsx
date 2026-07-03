@@ -279,7 +279,7 @@ const OptionChainView = () => {
     }
   }, [spotPrice, hasScrolled, strikes]);
 
-  const handleTrade = (opt, type, optionType) => {
+  const handleTrade = (opt, type, optionType, iv) => {
     if (!opt) return;
     
     // Add to strategy builder if in strategy mode
@@ -290,7 +290,9 @@ const OptionChainView = () => {
         strike: parseFloat(opt.strike),
         price: parseFloat(price),
         side: type === 'BUY' ? 'BUY' : 'SELL',
-        quantity: opt.lotsize ? parseInt(opt.lotsize) : 1
+        quantity: opt.lotsize ? parseInt(opt.lotsize) : 1,
+        iv: iv || 0,
+        symbol: opt.symbol
       }]);
       return;
     }
@@ -438,8 +440,10 @@ const OptionChainView = () => {
         <OptionsStrategyBuilder 
           legs={strategyLegs}
           spotPrice={spotPrice}
+          expiryDate={expiry}
           onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
           onClear={() => setStrategyLegs([])}
+          onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
         />
       )}
 
@@ -544,8 +548,8 @@ const OptionChainView = () => {
                         {cLtp > 0 ? cLtp.toFixed(2) : '-'}
                       </span>
                       <div className="action-buttons">
-                        <button onClick={() => handleTrade(call, 'BUY', 'CE')} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(call, 'SELL', 'CE')} className="btn-mini sell">S</button>
+                        <button onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} className="btn-mini sell">S</button>
                       </div>
                     </div>
                   </td>
@@ -580,8 +584,8 @@ const OptionChainView = () => {
                         {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                       </span>
                       <div className="action-buttons">
-                        <button onClick={() => handleTrade(put, 'BUY', 'PE')} className="btn-mini buy">B</button>
-                        <button onClick={() => handleTrade(put, 'SELL', 'PE')} className="btn-mini sell">S</button>
+                        <button onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} className="btn-mini buy">B</button>
+                        <button onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} className="btn-mini sell">S</button>
                       </div>
                     </div>
                   </td>
