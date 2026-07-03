@@ -553,6 +553,12 @@ async function fetchAllLTPs() {
                             close: item.close || item.ltp,
                             change: item.netChange || 0,
                             pct: item.percentChange || 0,
+                            volume: item.volumeTradeForTheDay || item.volume || 0,
+                            ltq: item.lastTradeQty || item.last_traded_quantity || 0,
+                            avgPrice: item.averageTradePrice || item.average_traded_price || 0,
+                            ltt: item.lastTradeTime || item.last_traded_timestamp || '',
+                            lowerCircuit: item.lowerCircuitLimit || item.lower_circuit_limit || 0,
+                            upperCircuit: item.upperCircuitLimit || item.upper_circuit_limit || 0,
                         };
                     }
                 }

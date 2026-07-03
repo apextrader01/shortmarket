@@ -133,7 +133,7 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.high ? marketDepthData.high : (basicData.high || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Volume</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.volume ? marketDepthData.volume.toLocaleString() : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.volume ? marketDepthData.volume.toLocaleString() : (basicData.volume ? basicData.volume.toLocaleString() : '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Change</span>
               <span style={{ textAlign: 'right', fontWeight: '500', color: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) > (marketDepthData?.symbol === symbol ? marketDepthData.close : basicData.close) ? 'var(--color-blue)' : 'var(--color-red)' }}>
@@ -148,10 +148,10 @@ export default function MarketDepthModal() {
               </span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LTQ</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltq ? marketDepthData.ltq : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltq ? marketDepthData.ltq : (basicData.ltq || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LC</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.lowerCircuit ? marketDepthData.lowerCircuit : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.lowerCircuit ? marketDepthData.lowerCircuit : (basicData.lowerCircuit || '-')}</span>
             </div>
 
             {/* Right Column */}
@@ -163,16 +163,16 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.low ? marketDepthData.low : (basicData.low || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>Avg. Price</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.avgPrice ? marketDepthData.avgPrice : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.avgPrice ? marketDepthData.avgPrice : (basicData.avgPrice || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LTP</span>
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : (basicData.ltp || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>LTT</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltt ? marketDepthData.ltt : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.ltt ? marketDepthData.ltt : (basicData.ltt || '-')}</span>
               
               <span style={{ color: 'var(--text-secondary)' }}>UC</span>
-              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.upperCircuit ? marketDepthData.upperCircuit : '-'}</span>
+              <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.upperCircuit ? marketDepthData.upperCircuit : (basicData.upperCircuit || '-')}</span>
             </div>
 
           </div>
