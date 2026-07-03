@@ -132,6 +132,7 @@ async function initSchema() {
         table.decimal('margin', 14, 2).defaultTo(0);
         table.decimal('realized_pnl', 14, 2).defaultTo(0);
         table.decimal('taxes', 14, 2).defaultTo(0);
+        table.integer('parent_order_id').unsigned().references('id').inTable('orders').onDelete('CASCADE');
         table.timestamps(true, true);
       });
       console.log('Created orders table');
@@ -190,6 +191,14 @@ async function initSchema() {
           table.decimal('taxes', 14, 2).defaultTo(0);
         });
         console.log('Added taxes to orders table');
+      }
+
+      const hasParentOrderId = await db.schema.hasColumn('orders', 'parent_order_id');
+      if (!hasParentOrderId) {
+        await db.schema.alterTable('orders', table => {
+          table.integer('parent_order_id').unsigned().references('id').inTable('orders').onDelete('CASCADE');
+        });
+        console.log('Added parent_order_id to orders table');
       }
     }
 

@@ -55,6 +55,50 @@ function initOrderExecutor(priceCache) {
 
 const { calculateTaxes } = require('./taxCalculator');
 
+async function spawnBracketOrders(trx, order) {
+  // Check if SL or Target prices were provided on the parent order
+  const hasSL = order.sl_price !== null && order.sl_price !== undefined && Number(order.sl_price) > 0;
+  const hasTgt = order.tgt_price !== null && order.tgt_price !== undefined && Number(order.tgt_price) > 0;
+  
+  if (!hasSL && !hasTgt) return; // Not a bracket order
+  
+  // The side of the child orders is OPPOSITE to the parent order's side
+  const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
+
+  // OCO (One Cancels Other) requires a parent_order_id link
+  if (hasSL) {
+    await trx('orders').insert({
+      user_id: order.user_id,
+      symbol: order.symbol,
+      type: 'SL-M', // Stop Loss Market
+      side: childSide,
+      quantity: order.quantity,
+      price: null,
+      status: 'PENDING',
+      trigger_price: order.sl_price,
+      product_type: order.product_type,
+      parent_order_id: order.id,
+      margin: 0 // Brackets usually don't block additional margin since they close a position
+    });
+  }
+
+  if (hasTgt) {
+    await trx('orders').insert({
+      user_id: order.user_id,
+      symbol: order.symbol,
+      type: 'LIMIT',
+      side: childSide,
+      quantity: order.quantity,
+      price: order.tgt_price,
+      status: 'PENDING',
+      trigger_price: null,
+      product_type: order.product_type,
+      parent_order_id: order.id,
+      margin: 0
+    });
+  }
+}
+
 async function executeOrder(order, execPrice) {
   try {
     await db.transaction(async (trx) => {
@@ -165,6 +209,20 @@ async function executeOrder(order, execPrice) {
         });
       }
 
+      // Spawning Brackets if any (only applies to parent orders)
+      await spawnBracketOrders(trx, order);
+      
+      // OCO (One Cancels Other) Logic
+      if (order.parent_order_id) {
+        // This is a child bracket order. Cancel its sibling!
+        await trx('orders')
+          .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
+          .whereNot({ id: order.id }) // Don't cancel itself
+          .update({ status: 'CANCELLED' });
+          
+        console.log(`Bracket OCO: Order ${order.id} executed, cancelled siblings for parent ${order.parent_order_id}`);
+      }
+
       console.log(`Executed Order ${order.id} for ${order.symbol} at ${execPrice} | PnL: ${realizedPnl} | Taxes: ${totalTaxes}`);
     });
   } catch (err) {
@@ -172,4 +230,4 @@ async function executeOrder(order, execPrice) {
   }
 }
 
-module.exports = { initOrderExecutor };
+module.exports = { initOrderExecutor, spawnBracketOrders };

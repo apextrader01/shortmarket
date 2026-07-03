@@ -876,6 +876,8 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 });
 
 // ─── Place Order ─────────────────────────────────────────────────────────
+const { spawnBracketOrders } = require('./services/orderExecutor');
+
 app.post('/api/order', authenticateToken, async (req, res) => {
   const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
@@ -1025,6 +1027,12 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         }
 
         await trx('users').where({ id: req.user.id }).update({ balance: userAfterExec.balance + balanceChange });
+        
+        // Spawn Bracket Orders (SL & TP) if any
+        await spawnBracketOrders(trx, {
+          id: orderId, user_id: req.user.id, symbol, side, quantity,
+          sl_price, tgt_price, product_type: product_type || 'DEL'
+        });
       }
 
       res.json({ success: true, orderId, status });
