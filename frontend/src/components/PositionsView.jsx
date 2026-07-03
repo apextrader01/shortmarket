@@ -1,11 +1,46 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useStore } from '../store';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
+
+const extractUnderlying = (symbol) => {
+  const match = symbol.match(/^[A-Z]+/);
+  return match ? match[0] : symbol;
+};
 
 export default function PositionsView() {
   const { positions, prices } = useStore();
 
-  if (positions.length === 0) {
+  // Group positions by underlying asset
+  const { groupedStrategies, globalMTM } = useMemo(() => {
+    let globalMTM = 0;
+    const groups = {};
+
+    positions.forEach(pos => {
+      if (pos.quantity === 0) return;
+      const underlying = extractUnderlying(pos.symbol);
+      if (!groups[underlying]) {
+        groups[underlying] = { underlying, positions: [], netPnl: 0, totalInvested: 0 };
+      }
+      
+      const priceData = prices[pos.symbol] || {};
+      const ltp = priceData.ltp || 0;
+      const avg = parseFloat(pos.average_price) || 0;
+      const qty = pos.quantity || 0;
+      
+      const invested = avg * Math.abs(qty);
+      const currentValue = ltp * Math.abs(qty);
+      const pnl = qty > 0 ? (currentValue - invested) : (invested - currentValue);
+      
+      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested });
+      groups[underlying].netPnl += pnl;
+      groups[underlying].totalInvested += invested;
+      globalMTM += pnl;
+    });
+
+    return { groupedStrategies: Object.values(groups), globalMTM };
+  }, [positions, prices]);
+
+  if (positions.length === 0 || groupedStrategies.length === 0) {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark)' }}>
         <div style={{ 
@@ -18,140 +53,196 @@ export default function PositionsView() {
         </div>
         <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You do not have any positions</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>List of all your positions for today will appear here.</p>
-        <button style={{
-          background: 'var(--color-blue)', color: 'white', padding: '10px 24px', 
-          borderRadius: '4px', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px',
-          border: 'none', cursor: 'pointer'
-        }}>
-          VIEW TRADING IDEAS
-        </button>
       </div>
     );
   }
 
+  const exitAllPositions = async () => {
+    if (window.confirm('Are you sure you want to EXIT ALL open positions at market price?')) {
+      const store = useStore.getState();
+      for (const pos of positions) {
+        if (pos.quantity === 0) continue;
+        const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+        const payload = {
+          symbol: pos.symbol,
+          type: 'MARKET',
+          side: exitSide,
+          quantity: Math.abs(pos.quantity),
+          price: 0,
+          sl_price: null,
+          tgt_price: null,
+          margin: 0,
+          product_type: pos.product_type || 'DEL'
+        };
+        await store.placeOrder(payload);
+      }
+    }
+  };
+
+  const exitStrategyGroup = async (groupPositions) => {
+    if (window.confirm('Are you sure you want to exit all positions in this strategy?')) {
+      const store = useStore.getState();
+      for (const pos of groupPositions) {
+        if (pos.quantity === 0) continue;
+        const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+        await store.placeOrder({
+          symbol: pos.symbol,
+          type: 'MARKET',
+          side: exitSide,
+          quantity: Math.abs(pos.quantity),
+          price: 0,
+          sl_price: null,
+          tgt_price: null,
+          margin: 0,
+          product_type: pos.product_type || 'DEL'
+        });
+      }
+    }
+  };
+
   return (
-    <div style={{ padding: '24px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>Positions</h2>
+    <div style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Live Strategies</h2>
         <button
-          onClick={async () => {
-            if (window.confirm('Are you sure you want to EXIT ALL open positions at market price?')) {
-              const store = useStore.getState();
-              // Iterate through positions and place market orders for each
-              for (const pos of positions) {
-                if (pos.quantity === 0) continue;
-                const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-                const payload = {
-                  symbol: pos.symbol,
-                  type: 'MARKET',
-                  side: exitSide,
-                  quantity: Math.abs(pos.quantity),
-                  price: 0,
-                  sl_price: null,
-                  tgt_price: null,
-                  margin: 0,
-                  product_type: pos.product_type || 'DEL'
-                };
-                await store.placeOrder(payload);
-              }
-            }
-          }}
+          onClick={exitAllPositions}
           style={{
             background: 'var(--color-red-light)', color: '#fff', border: 'none',
             padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
           }}
         >
-          EXIT ALL OPEN POSITIONS
+          EXIT ALL POSITIONS
         </button>
       </div>
       
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr>
-              <th>Instrument</th>
-              <th>Type</th>
-              <th style={{ textAlign: 'right' }}>Qty.</th>
-              <th style={{ textAlign: 'right' }}>Avg. Price</th>
-              <th style={{ textAlign: 'right' }}>LTP</th>
-              <th style={{ textAlign: 'right' }}>P&L</th>
-              <th style={{ textAlign: 'center' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map(pos => {
-              const priceData = prices[pos.symbol] || {};
-              const ltp = priceData.ltp || 0;
-              const avg = parseFloat(pos.average_price) || 0;
-              const qty = pos.quantity || 0;
-              
-              // Calculate PnL
-              const invested = avg * Math.abs(qty);
-              const currentValue = ltp * Math.abs(qty);
-              const pnl = qty > 0 ? (currentValue - invested) : (invested - currentValue);
-              const isProfit = pnl >= 0;
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {groupedStrategies.map((group, idx) => {
+          const isGroupProfit = group.netPnl >= 0;
+          // Simple visual width for the P&L bar (capped at 100%)
+          const barWidth = Math.min(Math.abs(group.netPnl) / (group.totalInvested || 1) * 100, 100);
 
-              return (
-                <tr key={pos.id || pos.symbol}>
-                  <td style={{ fontWeight: '600' }}>{pos.symbol}</td>
-                  <td>
-                    <span style={{ 
-                      background: pos.product_type === 'INT' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                      color: pos.product_type === 'INT' ? '#fef08a' : 'var(--color-green-light)',
-                      padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
-                    }}>{pos.product_type || 'DEL'}</span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>{qty}</td>
-                  <td style={{ textAlign: 'right' }}>₹{avg.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: '600' }}>{ltp > 0 ? `₹${ltp.toFixed(2)}` : '—'}</td>
-                  <td style={{ 
-                    textAlign: 'right', 
-                    fontWeight: '700',
-                    color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)'
+          return (
+            <div key={group.underlying + idx} className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+              {/* Group Header */}
+              <div style={{ 
+                padding: '16px 20px', 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ 
+                    background: 'rgba(96, 165, 250, 0.15)', color: '#60A5FA', 
+                    padding: '8px', borderRadius: '8px' 
                   }}>
-                    {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
-                  </td>
-                  <td style={{ textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                    <button 
-                      onClick={async () => {
-                        const isInt = pos.product_type === 'INT';
-                        const newType = isInt ? 'DEL' : 'INT';
-                        const requiredMargin = avg * Math.abs(qty) * 0.75;
-                        const confirmMsg = isInt 
-                           ? `Convert to Delivery? This requires ₹${requiredMargin.toFixed(2)} available cash.` 
-                           : `Convert to Intraday? This will free up ₹${requiredMargin.toFixed(2)} cash.`;
-                        if (window.confirm(confirmMsg)) {
-                           const res = await useStore.getState().convertPosition(pos.id, newType, requiredMargin);
-                           if (!res.success) alert(res.error);
-                        }
-                      }}
-                      style={{ 
-                        background: 'transparent', color: 'var(--color-blue)', border: '1px solid var(--color-blue)', 
-                        padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' 
-                      }}
-                    >
-                      Convert to {pos.product_type === 'INT' ? 'DEL' : 'INT'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const exitSide = qty > 0 ? 'SELL' : 'BUY';
-                        useStore.getState().openOrderModal(pos.symbol, exitSide, Math.abs(qty));
-                      }}
-                      style={{
-                        background: 'var(--color-red-light)', color: '#fff', border: 'none',
-                        padding: '4px 14px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      EXIT
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <Target size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0, letterSpacing: '0.5px' }}>{group.underlying} Strategy</h3>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{group.positions.length} active legs</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                  {/* Visual Strategy P&L Bar */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <span style={{ 
+                      fontSize: '18px', fontWeight: '800', 
+                      color: isGroupProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' 
+                    }}>
+                      {isGroupProfit ? '+' : ''}₹{group.netPnl.toFixed(2)}
+                    </span>
+                    <div style={{ width: '120px', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', display: 'flex', justifyContent: isGroupProfit ? 'flex-start' : 'flex-end' }}>
+                      <div style={{ 
+                        height: '100%', width: `${barWidth}%`, 
+                        background: isGroupProfit ? 'var(--color-green-light)' : 'var(--color-red-light)',
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => exitStrategyGroup(group.positions)}
+                    style={{ 
+                      background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', 
+                      border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', 
+                      borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' 
+                    }}
+                  >
+                    EXIT STRATEGY
+                  </button>
+                </div>
+              </div>
+
+              {/* Legs Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <th style={{ padding: '12px 20px', textAlign: 'left' }}>Instrument</th>
+                    <th style={{ textAlign: 'left' }}>Type</th>
+                    <th style={{ textAlign: 'right' }}>Qty.</th>
+                    <th style={{ textAlign: 'right' }}>Avg. Price</th>
+                    <th style={{ textAlign: 'right' }}>LTP</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.positions.map(pos => {
+                    const isProfit = pos.pnl >= 0;
+                    return (
+                      <tr key={pos.id || pos.symbol} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <td style={{ padding: '12px 20px', fontWeight: '600' }}>{pos.symbol}</td>
+                        <td>
+                          <span style={{ 
+                            background: pos.product_type === 'INT' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                            color: pos.product_type === 'INT' ? '#fef08a' : 'var(--color-green-light)',
+                            padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
+                          }}>{pos.product_type || 'DEL'}</span>
+                        </td>
+                        <td style={{ textAlign: 'right', color: pos.qty > 0 ? '#60A5FA' : '#F87171', fontWeight: 'bold' }}>
+                          {pos.qty > 0 ? '+' : ''}{pos.qty}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>₹{pos.avg.toFixed(2)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: '600' }}>{pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—'}</td>
+                        <td style={{ 
+                          textAlign: 'right', paddingRight: '20px',
+                          fontWeight: '700',
+                          color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)'
+                        }}>
+                          {pos.pnl > 0 ? '+' : ''}{pos.pnl.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Global MTM Banner */}
+      <div style={{
+        position: 'fixed', bottom: '0', left: '0', right: '0', 
+        background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+        backdropFilter: 'blur(10px)', borderTop: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+        padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        zIndex: 50, transition: 'all 0.3s ease'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Live updates based on market ticks</div>
+          </div>
+        </div>
+        <div style={{ 
+          fontSize: '32px', fontWeight: '900', letterSpacing: '-0.5px',
+          color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
+        }}>
+          {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </div>
       </div>
     </div>
   );
