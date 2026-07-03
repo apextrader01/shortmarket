@@ -439,6 +439,7 @@ const OptionChainView = () => {
           legs={strategyLegs}
           spotPrice={spotPrice}
           onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
+          onClear={() => setStrategyLegs([])}
         />
       )}
 

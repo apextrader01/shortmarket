@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 
-export default function OptionsStrategyBuilder({ legs, spotPrice, onRemoveLeg }) {
+export default function OptionsStrategyBuilder({ legs, spotPrice, onRemoveLeg, onClear }) {
   const { data, maxProfit, maxLoss, breakevens, netPremium } = useMemo(() => {
     if (!legs || legs.length === 0) {
       return { data: [], maxProfit: 0, maxLoss: 0, breakevens: [], netPremium: 0 };
@@ -113,6 +113,9 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, onRemoveLeg })
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>Strategy Builder</h3>
+        <button onClick={onClear} className="btn-mini sell" style={{ padding: '6px 12px', borderRadius: '4px' }}>
+          Clear Strategy
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
