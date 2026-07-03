@@ -3,41 +3,51 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 export default function OptionsStrategyBuilder({ legs, spotPrice, onRemoveLeg }) {
   const { data, maxProfit, maxLoss, breakevens, netPremium } = useMemo(() => {
-    if (!legs || legs.length === 0 || !spotPrice) {
+    if (!legs || legs.length === 0) {
       return { data: [], maxProfit: 0, maxLoss: 0, breakevens: [], netPremium: 0 };
     }
 
     // Determine the range for X-axis based on strikes
-    const strikes = legs.map(l => l.strike);
+    const strikes = legs.map(l => l.strike || 0);
     const minStrike = Math.min(...strikes);
     const maxStrike = Math.max(...strikes);
-    const rangeBuffer = spotPrice * 0.05; // 5% buffer
-    const minPrice = Math.floor(Math.min(minStrike, spotPrice) - rangeBuffer);
-    const maxPrice = Math.ceil(Math.max(maxStrike, spotPrice) + rangeBuffer);
+    
+    // If spotPrice is falsy, fallback to the ATM/first strike
+    const effectiveSpot = spotPrice || strikes[0] || 10000;
+    
+    const rangeBuffer = effectiveSpot * 0.05; // 5% buffer
+    const minPrice = Math.floor(Math.min(minStrike, effectiveSpot) - rangeBuffer);
+    const maxPrice = Math.ceil(Math.max(maxStrike, effectiveSpot) + rangeBuffer);
     
     // Step size based on typical index/stock intervals
     const step = (maxPrice - minPrice) / 100;
     
     let netPrem = 0;
     legs.forEach(leg => {
-      const val = leg.price * leg.quantity;
+      const price = leg.price || 0;
+      const qty = leg.quantity || 1;
+      const val = price * qty;
       netPrem += leg.side === 'BUY' ? -val : val;
     });
 
     const calculatePayoff = (priceAtExpiry) => {
       let totalPnl = 0;
       legs.forEach(leg => {
+        const strike = leg.strike || 0;
+        const price = leg.price || 0;
+        const qty = leg.quantity || 1;
+
         let intrinsic = 0;
         if (leg.optionType === 'CE') {
-          intrinsic = Math.max(0, priceAtExpiry - leg.strike);
+          intrinsic = Math.max(0, priceAtExpiry - strike);
         } else {
-          intrinsic = Math.max(0, leg.strike - priceAtExpiry);
+          intrinsic = Math.max(0, strike - priceAtExpiry);
         }
         
         if (leg.side === 'BUY') {
-          totalPnl += (intrinsic - leg.price) * leg.quantity;
+          totalPnl += (intrinsic - price) * qty;
         } else {
-          totalPnl += (leg.price - intrinsic) * leg.quantity;
+          totalPnl += (price - intrinsic) * qty;
         }
       });
       return totalPnl;
