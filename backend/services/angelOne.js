@@ -755,7 +755,19 @@ function startLiveWebSocket(io) {
                 const depthData = {
                     symbol: info.uniqueSymbol,
                     bids: data.best_5_buy_data.map(mapDepthItem),
-                    asks: data.best_5_sell_data.map(mapDepthItem)
+                    asks: data.best_5_sell_data.map(mapDepthItem),
+                    // Extra SnapQuote details
+                    open: data.open_price_of_the_day ? (data.open_price_of_the_day / 100).toFixed(2) : null,
+                    high: data.high_price_of_the_day ? (data.high_price_of_the_day / 100).toFixed(2) : null,
+                    low: data.low_price_of_the_day ? (data.low_price_of_the_day / 100).toFixed(2) : null,
+                    close: data.closed_price ? (data.closed_price / 100).toFixed(2) : null,
+                    ltp: data.last_traded_price ? (data.last_traded_price / 100).toFixed(2) : null,
+                    ltq: data.last_traded_quantity || null,
+                    volume: data.volume_trade_for_the_day || 0,
+                    avgPrice: data.average_traded_price ? (data.average_traded_price / 100).toFixed(2) : null,
+                    ltt: data.last_traded_timestamp ? new Date(data.last_traded_timestamp * 1000).toLocaleString('en-GB') : null,
+                    lowerCircuit: data.lower_circuit_limit ? (data.lower_circuit_limit / 100).toFixed(2) : null,
+                    upperCircuit: data.upper_circuit_limit ? (data.upper_circuit_limit / 100).toFixed(2) : null,
                 };
                 
                 io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);

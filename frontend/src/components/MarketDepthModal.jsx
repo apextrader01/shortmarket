@@ -120,6 +120,59 @@ export default function MarketDepthModal() {
              </div>
           </div>
 
+          {/* Market Stats Grid */}
+          {marketDepthData?.symbol === symbol && (
+            <div style={{ marginTop: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'x 16px', fontSize: '13px', rowGap: '12px' }}>
+              
+              {/* Left Column */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>P. Close</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.close || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>High</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.high || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>Volume</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.volume?.toLocaleString() || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>Change</span>
+                <span style={{ textAlign: 'right', fontWeight: '500', color: marketDepthData.ltp > marketDepthData.close ? 'var(--color-blue)' : 'var(--color-red)' }}>
+                  {marketDepthData.close && marketDepthData.ltp 
+                    ? `${(marketDepthData.ltp - marketDepthData.close).toFixed(2)} (${(((marketDepthData.ltp - marketDepthData.close)/marketDepthData.close)*100).toFixed(2)}%)` 
+                    : '-'}
+                </span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>LTQ</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.ltq || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>LC</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.lowerCircuit || '-'}</span>
+              </div>
+
+              {/* Right Column */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Open</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.open || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>Low</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.low || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>Avg. Price</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.avgPrice || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>LTP</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.ltp || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>LTT</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.ltt || '-'}</span>
+                
+                <span style={{ color: 'var(--text-secondary)' }}>UC</span>
+                <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData.upperCircuit || '-'}</span>
+              </div>
+
+            </div>
+          )}
+
         </div>
       </div>
     </div>
