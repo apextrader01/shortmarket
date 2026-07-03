@@ -41,7 +41,14 @@ export default function MarketWatch({ className = '' }) {
         name: s.name
       }));
       
+      // 1. Subscribe to WebSocket for live ticks
       subscribeBatch(tokensToSub);
+      
+      // 2. Instantly fetch REST snapshot (crucial for weekends/after-hours)
+      const symbolsToFetch = visibleStocks.map(s => s.uniqueSymbol);
+      if (symbolsToFetch.length > 0) {
+        useStore.getState().fetchBatchPrices(symbolsToFetch);
+      }
       
       return () => {
         unsubscribeBatch(tokensToSub);
