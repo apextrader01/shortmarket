@@ -213,6 +213,10 @@ export const useStore = create(persist((set, get) => ({
   chartModalSymbol: null,
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
+  marketDepthModal: { isOpen: false, symbol: null },
+  openMarketDepthModal: (symbol) => set({ marketDepthModal: { isOpen: true, symbol } }),
+  closeMarketDepthModal: () => set({ marketDepthModal: { isOpen: false, symbol: null } }),
+
   alerts: [],
   addAlert: (alert) => set((state) => ({ 
     alerts: [...state.alerts, { ...alert, id: Date.now().toString(), triggered: false, createdAt: new Date().toISOString() }] 

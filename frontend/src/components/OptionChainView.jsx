@@ -5,7 +5,7 @@ import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import ChartModal from './ChartModal';
 import AlertModal from './AlertModal';
-import { BarChart2, Bell } from 'lucide-react';
+import { BarChart2, Bell, AlignLeft } from 'lucide-react';
 
 const API = '';
 
@@ -107,6 +107,7 @@ const OptionChainView = () => {
   const basketItems = useStore((state) => state.basketItems);
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
   const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
+  const openMarketDepthModal = useStore((state) => state.openMarketDepthModal);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -583,6 +584,13 @@ const OptionChainView = () => {
                         >
                           <BarChart2 size={14} />
                         </button>
+                        <button 
+                          onClick={() => openMarketDepthModal(call.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="Market Depth"
+                        >
+                          <AlignLeft size={14} />
+                        </button>
                       </div>
                     </div>
                   </td>
@@ -636,6 +644,13 @@ const OptionChainView = () => {
                           title="View Chart"
                         >
                           <BarChart2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => openMarketDepthModal(put.symbol)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
+                          title="Market Depth"
+                        >
+                          <AlignLeft size={14} />
                         </button>
                       </div>
                     </div>

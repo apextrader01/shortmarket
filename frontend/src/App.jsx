@@ -13,6 +13,7 @@ import AlertsView from './components/AlertsView';
 import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
+import MarketDepthModal from './components/MarketDepthModal';
 import LoginView from './components/LoginView';
 import { useStore } from './store';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign } from 'lucide-react';
@@ -375,6 +376,8 @@ function App() {
           <User size={20} />
           <span>Profile</span>
         </div>
+        <DepositModal />
+        <MarketDepthModal />
       </div>
     </div>
   );
