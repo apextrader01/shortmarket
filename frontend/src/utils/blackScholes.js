@@ -32,7 +32,7 @@ function N(x) {
  * @returns {object} { price, delta, gamma, theta, vega }
  */
 export function calculateGreeks(type, S, K, T, r, sigma) {
-  if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0) {
+  if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0 || isNaN(T) || isNaN(sigma) || isNaN(S) || isNaN(K)) {
     return { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0 };
   }
 

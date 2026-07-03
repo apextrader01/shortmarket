@@ -284,7 +284,8 @@ const OptionChainView = () => {
     
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
-      const price = prices[opt.symbol] || 0;
+      const priceData = prices[opt.symbol] || {};
+      const price = priceData.ltp || 0;
       setStrategyLegs(prev => [...prev, {
         optionType,
         strike: parseFloat(opt.strike),
