@@ -4,7 +4,10 @@ import { X } from 'lucide-react';
 import { socket } from '../store'; // Import socket to emit subscribe events
 
 export default function MarketDepthModal() {
-  const { marketDepthModal, closeMarketDepthModal, marketDepthData, prices } = useStore();
+  const { 
+    marketDepthModal, closeMarketDepthModal, marketDepthData, prices, 
+    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal
+  } = useStore();
 
   const symbol = marketDepthModal.symbol;
   const basicData = prices[symbol] || {};
@@ -175,6 +178,64 @@ export default function MarketDepthModal() {
               <span style={{ textAlign: 'right', fontWeight: '500' }}>{marketDepthData?.symbol === symbol && marketDepthData.upperCircuit !== undefined && marketDepthData.upperCircuit !== null ? marketDepthData.upperCircuit : (basicData.upperCircuit !== undefined ? basicData.upperCircuit : '-')}</span>
             </div>
 
+          </div>
+          
+          {/* Action Buttons */}
+          <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+             <button 
+                onClick={() => {
+                  if (oneClickMode) {
+                    const payload = {
+                      symbol,
+                      type: 'MARKET',
+                      side: 'BUY',
+                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
+                      trigger_price: null,
+                      sl_price: null,
+                      tgt_price: null,
+                      margin: 0,
+                      product_type: 'INT'
+                    };
+                    placeOrder(payload);
+                  } else {
+                    closeMarketDepthModal();
+                    openOrderModal(symbol, 'BUY', marketDepthModal.lotsize || 1);
+                  }
+                }}
+                className={`btn btn-primary ${oneClickMode ? 'one-click-active' : ''}`}
+                style={{ flex: 1, background: 'var(--color-blue)', border: 'none' }}
+                title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
+             >
+                {oneClickMode ? `INSTANT BUY (${oneClickMultiplier}x)` : 'BUY'}
+             </button>
+             <button 
+                onClick={() => {
+                  if (oneClickMode) {
+                    const payload = {
+                      symbol,
+                      type: 'MARKET',
+                      side: 'SELL',
+                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
+                      trigger_price: null,
+                      sl_price: null,
+                      tgt_price: null,
+                      margin: 0,
+                      product_type: 'INT'
+                    };
+                    placeOrder(payload);
+                  } else {
+                    closeMarketDepthModal();
+                    openOrderModal(symbol, 'SELL', marketDepthModal.lotsize || 1);
+                  }
+                }}
+                className={`btn btn-secondary ${oneClickMode ? 'one-click-active' : ''}`}
+                style={{ flex: 1, background: 'var(--color-red)', border: 'none', color: '#fff' }}
+                title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
+             >
+                {oneClickMode ? `INSTANT SELL (${oneClickMultiplier}x)` : 'SELL'}
+             </button>
           </div>
 
         </div>

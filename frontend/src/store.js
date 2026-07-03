@@ -1038,6 +1038,12 @@ export const useStore = create(persist((set, get) => ({
     return { theme: newTheme };
   }),
 
+  // ── One-Click Scalper Mode ──────────────────────────────────────────────────
+  oneClickMode: false,
+  oneClickMultiplier: 1,
+  setOneClickMode: (val) => set({ oneClickMode: val }),
+  setOneClickMultiplier: (val) => set({ oneClickMultiplier: val }),
+
 }), {
   name: 'shortmarket-storage',
   partialize: (state) => ({
@@ -1047,5 +1053,7 @@ export const useStore = create(persist((set, get) => ({
     user:              state.user,
     theme:             state.theme,
     pendingTriggers:   state.pendingTriggers,
+    oneClickMode:      state.oneClickMode,
+    oneClickMultiplier: state.oneClickMultiplier,
   }),
 }));

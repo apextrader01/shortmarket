@@ -103,8 +103,7 @@ const OptionChainView = () => {
   const basketMode = useStore((state) => state.basketMode);
   const setBasketMode = useStore((state) => state.setBasketMode);
   const addToBasket = useStore((state) => state.addToBasket);
-  const setBasketModalOpen = useStore((state) => state.setBasketModalOpen);
-  const basketItems = useStore((state) => state.basketItems);
+  const { basketItems, setBasketModalOpen, oneClickMode, oneClickMultiplier, placeOrder } = useStore();
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
   const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
   const openMarketDepthModal = useStore((state) => state.openMarketDepthModal);
@@ -314,6 +313,27 @@ const OptionChainView = () => {
         price: ''
       });
       // Modal opens manually via the "View Basket" button
+      // Modal opens manually via the "View Basket" button
+    } else if (oneClickMode) {
+      // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
+      const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
+      const finalQuantity = lotsize * (oneClickMultiplier || 1);
+      const livePrice = prices[opt.symbol]?.ltp || 0;
+      
+      const payload = {
+        symbol: opt.symbol,
+        type: 'MARKET',
+        side: type === 'BUY' ? 'BUY' : 'SELL',
+        quantity: finalQuantity,
+        price: livePrice,
+        trigger_price: null,
+        sl_price: null,
+        tgt_price: null,
+        margin: 0, // Backend enforces balance anyway
+        product_type: 'INT' // Intraday by default for scalping
+      };
+      
+      placeOrder(payload); // Async, but we don't need to block UI
     } else {
       openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
     }
@@ -565,8 +585,16 @@ const OptionChainView = () => {
                           {cLtp > 0 ? cLtp.toFixed(2) : '-'}
                         </span>
                         <div className="action-buttons">
-                          <button onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} className="btn-mini buy">B</button>
-                          <button onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} className="btn-mini sell">S</button>
+                          <button 
+                            onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} 
+                            className={`btn-mini buy ${oneClickMode ? 'one-click-active' : ''}`}
+                            title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
+                          >B</button>
+                          <button 
+                            onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} 
+                            className={`btn-mini sell ${oneClickMode ? 'one-click-active' : ''}`}
+                            title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
+                          >S</button>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '2px' }}>
@@ -626,8 +654,16 @@ const OptionChainView = () => {
                           {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                         </span>
                         <div className="action-buttons">
-                          <button onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} className="btn-mini buy">B</button>
-                          <button onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} className="btn-mini sell">S</button>
+                          <button 
+                            onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} 
+                            className={`btn-mini buy ${oneClickMode ? 'one-click-active' : ''}`}
+                            title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
+                          >B</button>
+                          <button 
+                            onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} 
+                            className={`btn-mini sell ${oneClickMode ? 'one-click-active' : ''}`}
+                            title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
+                          >S</button>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '2px' }}>

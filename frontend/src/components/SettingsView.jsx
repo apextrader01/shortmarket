@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap } from 'lucide-react';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout } = useStore();
+  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier } = useStore();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -127,6 +127,57 @@ export default function SettingsView() {
         </div>
 
       </div>
+
+      {/* Trading Preferences Card */}
+      <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Zap size={18} color="var(--color-yellow)" /> Trading Preferences
+        </h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="toggle-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px', color: oneClickMode ? 'var(--color-red)' : 'inherit' }}>One-Click Scalper Mode</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Bypass the order confirmation modal to execute market orders instantly. <strong style={{ color: 'var(--color-red)' }}>Use with extreme caution.</strong></div>
+            </div>
+            <label className="toggle-switch">
+              <input 
+                type="checkbox" 
+                checked={oneClickMode}
+                onChange={(e) => setOneClickMode(e.target.checked)}
+              />
+              <span className="slider round"></span>
+            </label>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px', opacity: oneClickMode ? 1 : 0.5, pointerEvents: oneClickMode ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Default Lot Multiplier</label>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+              Multiply the standard lot size by this value when using One-Click Mode. (e.g., 2x BankNifty = 30 Qty)
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[1, 2, 5, 10, 20].map(mult => (
+                <button
+                  key={mult}
+                  onClick={() => setOneClickMultiplier(mult)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: oneClickMultiplier === mult ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                    background: oneClickMultiplier === mult ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
+                    color: oneClickMultiplier === mult ? 'var(--color-blue)' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  {mult}x
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
