@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 
 const API = ''; // Relative path — works for both REST and Socket.IO via Vite proxy
 
-const socket = io(API);
+export const socket = io(API);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -217,6 +217,9 @@ export const useStore = create(persist((set, get) => ({
   openMarketDepthModal: (symbol) => set({ marketDepthModal: { isOpen: true, symbol } }),
   closeMarketDepthModal: () => set({ marketDepthModal: { isOpen: false, symbol: null } }),
 
+  marketDepthData: { symbol: null, bids: [], asks: [] },
+  setMarketDepthData: (data) => set({ marketDepthData: data }),
+
   alerts: [],
   addAlert: (alert) => set((state) => ({ 
     alerts: [...state.alerts, { ...alert, id: Date.now().toString(), triggered: false, createdAt: new Date().toISOString() }] 
@@ -379,6 +382,11 @@ export const useStore = create(persist((set, get) => ({
           : 'flat';
         return { prices: { ...state.prices, [data.symbol]: { ...old, ...data, tick } } };
       });
+    });
+
+    socket.off('market_depth_data');
+    socket.on('market_depth_data', (data) => {
+      get().setMarketDepthData(data);
     });
 
     socket.on('connect', () => get().refreshPrices());

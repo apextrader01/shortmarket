@@ -743,6 +743,25 @@ function startLiveWebSocket(io) {
             const data = Array.isArray(receiveData) ? receiveData[0] : receiveData;
             if (!data?.token) return;
             const info = STOCK_MASTER[data.token];
+            
+            // Handle Mode 3 (SnapQuote) Depth Data
+            if (info && data.best_5_buy_data && data.best_5_sell_data) {
+                const mapDepthItem = (item) => ({
+                    price: (item.price / 100).toFixed(2),
+                    qty: item.quantity,
+                    orders: item.no_of_orders
+                });
+                
+                const depthData = {
+                    symbol: info.uniqueSymbol,
+                    bids: data.best_5_buy_data.map(mapDepthItem),
+                    asks: data.best_5_sell_data.map(mapDepthItem)
+                };
+                
+                io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
+            }
+
+            // Handle Mode 1 (LTP) Data
             if (info && data.last_traded_price) {
                 const ltp = data.last_traded_price / 100;
                 processTick(info.uniqueSymbol, ltp);
@@ -764,6 +783,33 @@ function startLiveWebSocket(io) {
     });
 }
 
+// ─── Market Depth Subscription ──────────────────────────────────────────────
+function subscribeToDepth(uniqueSymbol) {
+    if (!global_web_socket) return;
+    const token = symbolToToken[uniqueSymbol];
+    if (!token) return;
+    const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+    const exchangeType = exch === 'BSE' ? 3 : 1;
+    
+    global_web_socket.fetchData({
+        correlationID: `depth_sub_${token}`,
+        action: 1, mode: 3, exchangeType, tokens: [token]
+    });
+}
+
+function unsubscribeFromDepth(uniqueSymbol) {
+    if (!global_web_socket) return;
+    const token = symbolToToken[uniqueSymbol];
+    if (!token) return;
+    const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+    const exchangeType = exch === 'BSE' ? 3 : 1;
+    
+    global_web_socket.fetchData({
+        correlationID: `depth_unsub_${token}`,
+        action: 0, mode: 3, exchangeType, tokens: [token]
+    });
+}
+
 module.exports = {
     loginAngelOne,
     fetchCandleData,
@@ -775,5 +821,7 @@ module.exports = {
     addSubscription,
     addSubscriptionBatch,
     fetchBatchLTPs,
+    subscribeToDepth,
+    unsubscribeFromDepth,
     smart_api
 };

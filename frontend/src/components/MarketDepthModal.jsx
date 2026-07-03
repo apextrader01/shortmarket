@@ -1,97 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useStore } from '../store';
 import { X } from 'lucide-react';
+import { socket } from '../store'; // Import socket to emit subscribe events
 
 export default function MarketDepthModal() {
-  const { marketDepthModal, closeMarketDepthModal, prices } = useStore();
-  const [bids, setBids] = useState([]);
-  const [asks, setAsks] = useState([]);
+  const { marketDepthModal, closeMarketDepthModal, marketDepthData } = useStore();
 
   const symbol = marketDepthModal.symbol;
-  const priceData = prices[symbol];
-  const ltp = priceData?.ltp || 0;
 
   useEffect(() => {
-    if (!marketDepthModal.isOpen || !ltp) return;
+    if (!marketDepthModal.isOpen || !symbol) return;
 
-    // Level 2 Data Simulator
-    const generateDepth = () => {
-      let currentBids = [];
-      let currentAsks = [];
-      let currentBid = ltp - 0.05;
-      let currentAsk = ltp + 0.05;
+    // Emit subscribe_depth to backend
+    socket.emit('subscribe_depth', symbol);
 
-      for (let i = 0; i < 5; i++) {
-        // Randomize price decrement/increment slightly
-        const bidDec = (Math.random() * 0.5 + 0.1);
-        const askInc = (Math.random() * 0.5 + 0.1);
-        currentBid -= bidDec;
-        currentAsk += askInc;
-
-        // Randomize quantity between 100 and 15000 (often multiples of 15 or 50)
-        const bidQty = Math.floor(Math.random() * 300) * 50;
-        const askQty = Math.floor(Math.random() * 300) * 50;
-
-        // Randomize orders count between 1 and 25
-        const bidOrders = Math.floor(Math.random() * 25) + 1;
-        const askOrders = Math.floor(Math.random() * 25) + 1;
-
-        currentBids.push({
-          orders: bidOrders,
-          qty: bidQty,
-          price: Math.max(0.05, currentBid).toFixed(2),
-          changed: Math.random() > 0.5 // random flash
-        });
-
-        currentAsks.push({
-          orders: askOrders,
-          qty: askQty,
-          price: currentAsk.toFixed(2),
-          changed: Math.random() > 0.5
-        });
-      }
-      
-      setBids(currentBids);
-      setAsks(currentAsks);
+    return () => {
+      // Emit unsubscribe_depth when modal closes
+      socket.emit('unsubscribe_depth', symbol);
     };
-
-    // Initial generate
-    generateDepth();
-
-    // Check if market is closed
-    const isMarketClosed = () => {
-      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
-      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      const hours = istTime.getHours();
-      const minutes = istTime.getMinutes();
-      const day = istTime.getDay();
-      
-      // Weekends closed
-      if (day === 0 || day === 6) return true;
-      
-      if (!isCommodity) {
-        // Equity options: 9:15 AM to 3:30 PM
-        if (hours < 9 || (hours === 9 && minutes < 15)) return true;
-        if (hours > 15 || (hours === 15 && minutes >= 30)) return true;
-      } else {
-        // Commodity options: 9:00 AM to 11:30 PM
-        if (hours < 9) return true;
-        if (hours === 23 && minutes >= 30) return true;
-      }
-      return false;
-    };
-
-    if (isMarketClosed()) return;
-
-    // Pulse every 800ms only if market is open
-    const interval = setInterval(generateDepth, 800);
-    return () => clearInterval(interval);
-  }, [marketDepthModal.isOpen, ltp]);
+  }, [marketDepthModal.isOpen, symbol]);
 
   if (!marketDepthModal.isOpen || !symbol) return null;
 
-  const totalBidQty = bids.reduce((sum, b) => sum + b.qty, 0);
-  const totalAskQty = asks.reduce((sum, a) => sum + a.qty, 0);
+  // Use real data from store, fallback to empty array
+  const bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
+  const asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+
+  const totalBidQty = bids.reduce((sum, b) => sum + (b.qty || 0), 0);
+  const totalAskQty = asks.reduce((sum, a) => sum + (a.qty || 0), 0);
   
   // Calculate width ratio for progress bars
   const totalVol = totalBidQty + totalAskQty;
