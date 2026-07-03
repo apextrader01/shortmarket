@@ -9,6 +9,7 @@ import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
+import AlertsView from './components/AlertsView';
 import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
@@ -22,7 +23,8 @@ function App() {
   const {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
-    selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal
+    selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
+    alerts, updateAlert
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('Markets');
@@ -61,6 +63,34 @@ function App() {
       if (stockRetry) clearTimeout(stockRetry);
     };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Background Alert Checking Engine
+  useEffect(() => {
+    alerts.forEach(alert => {
+      if (alert.triggered) return;
+      const priceData = prices[alert.symbol];
+      if (!priceData) return;
+      
+      const ltp = priceData.ltp;
+      let triggered = false;
+      
+      if (alert.condition === 'ABOVE' && ltp >= alert.targetPrice) {
+        triggered = true;
+      } else if (alert.condition === 'BELOW' && ltp <= alert.targetPrice) {
+        triggered = true;
+      }
+      
+      if (triggered) {
+        updateAlert(alert.id, { triggered: true, triggeredAt: new Date().toISOString(), triggerPrice: ltp });
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Price Alert Triggered! 🚨", {
+            body: `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
+            icon: '/logo.png'
+          });
+        }
+      }
+    });
+  }, [prices, alerts, updateAlert]);
 
   // ── Guard: show login screen when not authenticated ──────────────────────────
   if (!user || !token) {
@@ -127,7 +157,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Mutual Funds',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -233,6 +263,7 @@ function App() {
           {activeTab === 'Portfolio' && <PortfolioView />}
           {activeTab === 'Orders' && <OrdersView />}
           {activeTab === 'Positions' && <PositionsView />}
+          {activeTab === 'Alerts' && <div style={{ flex: 1, padding: '12px' }}><AlertsView /></div>}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>

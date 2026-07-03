@@ -213,6 +213,18 @@ export const useStore = create(persist((set, get) => ({
   chartModalSymbol: null,
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
+  alerts: [],
+  addAlert: (alert) => set((state) => ({ 
+    alerts: [...state.alerts, { ...alert, id: Date.now().toString(), triggered: false, createdAt: new Date().toISOString() }] 
+  })),
+  removeAlert: (id) => set((state) => ({ alerts: state.alerts.filter(a => a.id !== id) })),
+  updateAlert: (id, updates) => set((state) => ({ 
+    alerts: state.alerts.map(a => a.id === id ? { ...a, ...updates } : a) 
+  })),
+  
+  alertModalSymbol: null,
+  setAlertModalSymbol: (symbol) => set({ alertModalSymbol: symbol }),
+
   placeBasketOrder: async (basketPayload) => {
     const { token } = get();
     try {

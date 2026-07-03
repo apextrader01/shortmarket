@@ -4,7 +4,8 @@ import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import ChartModal from './ChartModal';
-import { BarChart2 } from 'lucide-react';
+import AlertModal from './AlertModal';
+import { BarChart2, Bell } from 'lucide-react';
 
 const API = '';
 
@@ -105,6 +106,7 @@ const OptionChainView = () => {
   const setBasketModalOpen = useStore((state) => state.setBasketModalOpen);
   const basketItems = useStore((state) => state.basketItems);
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
+  const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
 
   const atmRowRef = useRef(null);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -561,6 +563,13 @@ const OptionChainView = () => {
                         {cLtp > 0 ? cLtp.toFixed(2) : '-'}
                       </span>
                       <button 
+                        onClick={() => setAlertModalSymbol(call.symbol)}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+                        title="Set Price Alert"
+                      >
+                        <Bell size={14} />
+                      </button>
+                      <button 
                         onClick={() => setChartModalSymbol(call.symbol)}
                         style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
                         title="View Chart"
@@ -604,6 +613,13 @@ const OptionChainView = () => {
                         {pLtp > 0 ? pLtp.toFixed(2) : '-'}
                       </span>
                       <button 
+                        onClick={() => setAlertModalSymbol(put.symbol)}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
+                        title="Set Price Alert"
+                      >
+                        <Bell size={14} />
+                      </button>
+                      <button 
                         onClick={() => setChartModalSymbol(put.symbol)}
                         style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center' }}
                         title="View Chart"
@@ -642,6 +658,7 @@ const OptionChainView = () => {
       {/* Modals */}
       <BasketModal />
       <ChartModal />
+      <AlertModal />
     </div>
   );
 };
