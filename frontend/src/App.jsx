@@ -353,6 +353,7 @@ function App() {
       {orderModal?.isOpen && <OrderModal />}
       {editOrderModal?.isOpen && <EditOrderModal />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
+      <MarketDepthModal />
       
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">
@@ -376,8 +377,6 @@ function App() {
           <User size={20} />
           <span>Profile</span>
         </div>
-        <DepositModal />
-        <MarketDepthModal />
       </div>
     </div>
   );
