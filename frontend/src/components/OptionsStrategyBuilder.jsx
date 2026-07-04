@@ -188,11 +188,24 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
         popSum = 50; // Fallback for complex payoffs
       }
     }
+    // Check for unbounded risk/reward by evaluating beyond the plotted boundaries
+    let isMaxProfitInfinity = false;
+    let isMaxLossInfinity = false;
+    
+    // Check right tail (price goes to infinity)
+    const rightSlope = calculateExpiryPayoff(maxPrice + 1000) - calculateExpiryPayoff(maxPrice);
+    if (rightSlope > 0) isMaxProfitInfinity = true;
+    if (rightSlope < 0) isMaxLossInfinity = true;
+
+    // Check left tail (price drops to 0, though technically bounded by 0, practically treated as unbounded if slope is steep)
+    const leftSlope = calculateExpiryPayoff(minPrice - 1000) - calculateExpiryPayoff(minPrice);
+    if (leftSlope > 0) isMaxProfitInfinity = true;
+    if (leftSlope < 0) isMaxLossInfinity = true;
 
     return {
       data: dataPoints,
-      maxProfit: pMax > 999999 ? Infinity : pMax,
-      maxLoss: pMin < -999999 ? -Infinity : pMin,
+      maxProfit: isMaxProfitInfinity ? Infinity : pMax,
+      maxLoss: isMaxLossInfinity ? -Infinity : pMin,
       breakevens: finalBE,
       netPremium: netPrem,
       pop: popSum,
