@@ -176,6 +176,7 @@ export default function PositionsView() {
               </div>
 
               {/* Legs Table */}
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.2)' }}>
@@ -217,6 +218,7 @@ export default function PositionsView() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           );
         })}

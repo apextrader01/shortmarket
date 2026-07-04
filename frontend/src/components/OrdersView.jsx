@@ -85,6 +85,7 @@ export default function OrdersView() {
                 </button>
               )}
             </div>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 {activeTab === 'Pending Triggers' ? (
@@ -206,6 +207,7 @@ export default function OrdersView() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

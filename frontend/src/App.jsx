@@ -288,7 +288,7 @@ function App() {
             )}
             
             {/* Tab Navigation */}
-            <div style={{
+            <div className="hide-on-mobile" style={{
               display: 'flex', alignItems: 'center', gap: '4px',
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>

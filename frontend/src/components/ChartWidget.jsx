@@ -68,7 +68,10 @@ export default function ChartWidget() {
     const rsiBottom = showMACD ? 0.2 : 0;
     const macdTop = numOscillators === 2 ? 0.8 : (showMACD ? 0.75 : 0);
 
-    const chartHeight = 400 + (numOscillators * 150);
+    // Use available height or fallback to fixed calculation
+    const containerHeight = chartContainerRef.current.clientHeight;
+    const baseHeight = containerHeight > 0 ? containerHeight : 400;
+    const chartHeight = Math.max(300, baseHeight);
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -145,7 +148,10 @@ export default function ChartWidget() {
 
     const ro = new ResizeObserver(() => {
       if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+        chartRef.current.applyOptions({ 
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight > 0 ? chartContainerRef.current.clientHeight : 400
+        });
       }
     });
     ro.observe(chartContainerRef.current);
@@ -286,7 +292,7 @@ export default function ChartWidget() {
   const tfLabel = TIMEFRAMES.find(t => t.value === chartInterval)?.label ?? chartInterval;
 
   return (
-    <div className="glass-panel" style={{ padding: '16px 20px' }}>
+    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
@@ -368,8 +374,8 @@ export default function ChartWidget() {
       )}
 
       {/* ── Chart area ── */}
-      <div style={{ position: 'relative', width: '100%', minHeight: '400px', height: 'auto' }}>
-        <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+      <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: '300px' }}>
+        <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
 
         {/* Quick Order Buttons Overlay */}
         {price && !isLoadingCandles && (
