@@ -134,5 +134,6 @@ async function executeOrder(order, executionPrice) {
 }
 
 module.exports = {
-    processTick
+    processTick,
+    executeOrder
 };

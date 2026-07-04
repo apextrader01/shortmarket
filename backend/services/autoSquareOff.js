@@ -1,5 +1,6 @@
 const schedule = require('node-schedule');
 const db = require('../database/db');
+const { executeOrder } = require('./matchingEngine');
 
 function isCommodity(symbol) {
     const commodities = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'];
@@ -9,12 +10,19 @@ function isCommodity(symbol) {
     return false;
 }
 
-async function processSquareOff(positionsToSquareOff, label) {
+async function processSquareOff(positionsToSquareOff, label, priceCache) {
     console.log(`Found ${positionsToSquareOff.length} open ${label} intraday positions to square off.`);
     for (const position of positionsToSquareOff) {
         try {
             const side = position.quantity > 0 ? 'SELL' : 'BUY';
             const quantity = Math.abs(position.quantity);
+            
+            let currentPrice = position.average_price;
+            if (priceCache && priceCache[position.symbol] && priceCache[position.symbol].ltp) {
+                currentPrice = priceCache[position.symbol].ltp;
+            }
+
+            let orderObj;
             await db.transaction(async (trx) => {
                 const [id] = await trx('orders').insert({
                     user_id: position.user_id,
@@ -22,26 +30,25 @@ async function processSquareOff(positionsToSquareOff, label) {
                     type: 'MARKET',
                     side: side,
                     quantity: quantity,
-                    price: 0,
-                    status: 'EXECUTED',
+                    price: currentPrice,
+                    status: 'PENDING',
                     product_type: 'INT'
-                }).returning('id');
-                const orderId = typeof id === 'object' ? id.id : id;
+                }).returning('*');
                 
-                // Update the position quantity to 0 to actually close it
-                await trx('positions')
-                    .where({ id: position.id })
-                    .update({ quantity: 0 });
-
-                console.log(`Auto Square-Off generated ${side} order #${orderId} for ${quantity}x ${position.symbol} (User: ${position.user_id})`);
+                orderObj = typeof id === 'object' ? id : await trx('orders').where({ id }).first();
             });
+
+            if (orderObj) {
+                console.log(`Auto Square-Off created PENDING ${side} order #${orderObj.id} for ${quantity}x ${position.symbol}. Calling matching engine...`);
+                await executeOrder(orderObj, currentPrice);
+            }
         } catch (err) {
             console.error(`Failed to auto square-off position ${position.id}:`, err);
         }
     }
 }
 
-function initAutoSquareOff() {
+function initAutoSquareOff(priceCache) {
     console.log('🕒 Initializing Auto Square-Off Cron Jobs (3:16 PM for Equities, 11:30 PM for Commodities)...');
 
     // Job 1: 15:16 (3:16 PM) for Equities/Indices
@@ -56,7 +63,7 @@ function initAutoSquareOff() {
         try {
             const allIntraday = await db('positions').where('product_type', 'INT').andWhereNot('quantity', 0);
             const equityPositions = allIntraday.filter(p => !isCommodity(p.symbol));
-            await processSquareOff(equityPositions, 'Equity/Index');
+            await processSquareOff(equityPositions, 'Equity/Index', priceCache);
         } catch (error) {
             console.error('Error during Equity auto square-off routine:', error);
         }
@@ -74,7 +81,7 @@ function initAutoSquareOff() {
         try {
             const allIntraday = await db('positions').where('product_type', 'INT').andWhereNot('quantity', 0);
             const commodityPositions = allIntraday.filter(p => isCommodity(p.symbol));
-            await processSquareOff(commodityPositions, 'Commodity');
+            await processSquareOff(commodityPositions, 'Commodity', priceCache);
         } catch (error) {
             console.error('Error during Commodity auto square-off routine:', error);
         }

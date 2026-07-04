@@ -1437,7 +1437,8 @@ server.listen(PORT, '0.0.0.0', async () => {
   const { initAutoSquareOff } = require('./services/autoSquareOff');
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
   const { initOrderExecutor } = require('./services/orderExecutor');
-  initAutoSquareOff();
+  
+  initAutoSquareOff(priceCache);
   initRiskyStocksSync();
   initOrderExecutor(priceCache);
 });
