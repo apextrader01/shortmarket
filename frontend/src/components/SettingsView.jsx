@@ -173,24 +173,6 @@ export default function SettingsView() {
                   {mult}x
                 </button>
               ))}
-            </div>
-          </div>
-          
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: 'var(--color-blue)' }}>Global Hotkeys</label>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              You can execute Market Orders instantly using keyboard shortcuts. Hotkeys always target the <strong>currently selected symbol</strong> and use your default lot multiplier.
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-dark)', padding: '8px 12px', borderRadius: '4px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Buy (Market)</span>
-                <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>Shift + B</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-dark)', padding: '8px 12px', borderRadius: '4px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Sell (Market)</span>
-                <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.1)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>Shift + S</span>
-              </div>
-            </div>
           </div>
 
         </div>

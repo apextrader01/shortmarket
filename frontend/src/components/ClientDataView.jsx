@@ -86,6 +86,7 @@ export default function ClientDataView({ onDepositClick }) {
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -445,7 +446,11 @@ export default function ClientDataView({ onDepositClick }) {
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>Subscription Plans</span>
             </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <div 
+              className="glass-panel hoverable" 
+              onClick={() => setShowHotkeysModal(true)}
+              style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+            >
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>Keyboard & Shortcut</span>
             </div>
@@ -476,6 +481,38 @@ export default function ClientDataView({ onDepositClick }) {
         <span style={{ fontSize: '14px', fontWeight: '700' }}>Ask Support</span>
       </div>
       
+      {/* Hotkeys Modal */}
+      {showHotkeysModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+            <button 
+              onClick={() => setShowHotkeysModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}
+            >&times;</button>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-blue)' }}>
+              <Keyboard size={20} /> Global Hotkeys
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
+              You can execute Market Orders instantly using keyboard shortcuts. Hotkeys always target the <strong>currently selected symbol</strong> and use your default lot multiplier.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Buy (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Sell (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
