@@ -139,6 +139,7 @@ export default function OrderModal() {
 
     let finalType = orderType;
     if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
+    if (tab === 'Trailing SL') finalType = 'TRAILING_STOP';
     if (tab === 'GTT') finalType = 'GTT';
 
     const payload = {
@@ -147,22 +148,22 @@ export default function OrderModal() {
       side,
       quantity: totalQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
-      trigger_price: (tab === 'Stop Loss' || tab === 'GTT') && slTrigger ? parseFloat(slTrigger) : null,
+      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') && slTrigger ? parseFloat(slTrigger) : null,
+      trail_amount: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
       sl_price: showSlTgt && slPrice ? parseFloat(slPrice) : null,
       tgt_price: showSlTgt && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
       product_type: productType
     };
 
-    if (tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') {
+    if (tab === 'Stop Loss' || tab === 'GTT') {
       const triggerPayload = {
         symbol,
-        type: tab === 'GTT' ? 'GTT' : (tab === 'Trailing SL' ? 'TRAILING_SL' : 'SL'),
+        type: tab === 'GTT' ? 'GTT' : 'SL',
         side,
         quantity: totalQuantity,
         limitPrice: orderType === 'MARKET' ? null : parseFloat(price),
         triggerPrice: parseFloat(slTrigger),
-        trailingJump: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
         productType,
         status: 'PENDING_TRIGGER'
       };

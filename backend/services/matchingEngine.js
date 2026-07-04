@@ -23,6 +23,31 @@ async function processTick(symbol, ltp) {
                     shouldExecute = true;
                     executionPrice = limitPrice;
                 }
+            } else if (order.type === 'TRAILING_STOP') {
+                const triggerPrice = parseFloat(order.trigger_price);
+                const trailAmount = parseFloat(order.trail_amount);
+                
+                if (order.side === 'BUY') {
+                    // For Buy Stop Loss, we buy if price goes ABOVE trigger
+                    if (ltp >= triggerPrice) {
+                        shouldExecute = true;
+                        executionPrice = ltp;
+                    } else if (ltp < (triggerPrice - trailAmount)) {
+                        // Price went down (favorable), so trail the trigger price down
+                        const newTrigger = ltp + trailAmount;
+                        await db('orders').where({ id: order.id }).update({ trigger_price: newTrigger });
+                    }
+                } else if (order.side === 'SELL') {
+                    // For Sell Stop Loss, we sell if price goes BELOW trigger
+                    if (ltp <= triggerPrice) {
+                        shouldExecute = true;
+                        executionPrice = ltp;
+                    } else if (ltp > (triggerPrice + trailAmount)) {
+                        // Price went up (favorable), so trail the trigger price up
+                        const newTrigger = ltp - trailAmount;
+                        await db('orders').where({ id: order.id }).update({ trigger_price: newTrigger });
+                    }
+                }
             }
 
             if (shouldExecute) {

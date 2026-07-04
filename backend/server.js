@@ -879,7 +879,7 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 const { spawnBracketOrders } = require('./services/orderExecutor');
 
 app.post('/api/order', authenticateToken, async (req, res) => {
-  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, margin, product_type } = req.body;
+  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -932,7 +932,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 

@@ -129,6 +129,7 @@ async function initSchema() {
         table.decimal('trigger_price', 14, 2);
         table.decimal('sl_price', 14, 2);
         table.decimal('tgt_price', 14, 2);
+        table.decimal('trail_amount', 14, 2);
         table.decimal('margin', 14, 2).defaultTo(0);
         table.decimal('realized_pnl', 14, 2).defaultTo(0);
         table.decimal('taxes', 14, 2).defaultTo(0);
@@ -175,6 +176,14 @@ async function initSchema() {
           table.decimal('tgt_price', 14, 2);
         });
         console.log('Added tgt_price to orders table');
+      }
+
+      const hasTrailAmount = await db.schema.hasColumn('orders', 'trail_amount');
+      if (!hasTrailAmount) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('trail_amount', 14, 2);
+        });
+        console.log('Added trail_amount to orders table');
       }
 
       const hasRealizedPnl = await db.schema.hasColumn('orders', 'realized_pnl');
