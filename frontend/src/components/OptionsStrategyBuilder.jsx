@@ -20,7 +20,7 @@ function N(x) {
   return 0.5 * (1.0 + sign * y);
 }
 
-export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, onRemoveLeg, onClear, onUpdateLeg }) {
+export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, onRemoveLeg, onClear, onUpdateLeg, onExecute }) {
   const [targetDteOffset, setTargetDteOffset] = useState(0); // 0 = Today, DTE = Expiry
 
   const {
@@ -353,6 +353,15 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
               </tbody>
             </table>
           </div>
+          
+          {/* EXECUTE STRATEGY */}
+          <button 
+            onClick={onExecute}
+            className="btn-primary"
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', background: 'var(--color-blue)' }}
+          >
+            <i className="fi fi-rr-rocket"></i> Execute Strategy
+          </button>
 
         </div>
 

@@ -481,6 +481,20 @@ const OptionChainView = () => {
           onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
           onClear={() => setStrategyLegs([])}
           onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
+          onExecute={() => {
+            if (strategyLegs.length === 0) return;
+            strategyLegs.forEach(leg => {
+              placeOrder({
+                symbol: leg.symbol,
+                side: leg.side,
+                quantity: leg.quantity,
+                orderType: 'MARKET',
+                price: ''
+              });
+            });
+            setStrategyLegs([]); // Clear after execution
+            setStrategyMode(false); // Close strategy builder
+          }}
         />
       )}
 
