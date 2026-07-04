@@ -387,6 +387,7 @@ export default function ChartWidget() {
             >
               <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
               <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>SELL</div>
+              <div style={{ fontSize: '8px', opacity: 0.8 }}>Shift+S</div>
             </button>
             <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
@@ -402,6 +403,7 @@ export default function ChartWidget() {
             >
               <div style={{ fontSize: '11px', fontWeight: '800' }}>{price.ltp.toFixed(2)}</div>
               <div style={{ fontSize: '9px', fontWeight: '600', letterSpacing: '0.5px' }}>BUY</div>
+              <div style={{ fontSize: '8px', opacity: 0.8 }}>Shift+B</div>
             </button>
           </div>
         )}
