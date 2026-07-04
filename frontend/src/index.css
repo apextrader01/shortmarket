@@ -385,6 +385,13 @@ tbody tr:hover {
   100% { background-color: transparent; }
 }
 
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -20px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  90% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -20px); }
+}
+
 .tick-up {
   animation: flash-green 1s ease-out;
   color: var(--color-green-light);

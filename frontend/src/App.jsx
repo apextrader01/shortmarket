@@ -26,8 +26,11 @@ function App() {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
     selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
-    alerts, updateAlert, pendingTriggers, updatePendingTrigger, placeOrder
+    alerts, updateAlert, pendingTriggers, updatePendingTrigger, placeOrder,
+    oneClickMultiplier, stocks
   } = useStore();
+
+  const [hotkeyToast, setHotkeyToast] = useState(null);
 
   const [activeTab, setActiveTab] = useState('Markets');
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -65,6 +68,55 @@ function App() {
       if (stockRetry) clearTimeout(stockRetry);
     };
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Global Hotkey Engine (Shift+B, Shift+S)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.shiftKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        if (!selectedSymbol) return;
+        const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
+        const lotsize = stockInfo.lotsize || 1;
+        
+        placeOrder({
+          symbol: selectedSymbol,
+          type: 'MARKET',
+          side: 'BUY',
+          quantity: lotsize * (oneClickMultiplier || 1),
+          price: 0,
+          product_type: 'INT'
+        });
+        
+        setHotkeyToast('🔥 BUY MARKET: ' + selectedSymbol);
+        setTimeout(() => setHotkeyToast(null), 1500);
+      }
+      
+      if (e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (!selectedSymbol) return;
+        const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
+        const lotsize = stockInfo.lotsize || 1;
+        
+        placeOrder({
+          symbol: selectedSymbol,
+          type: 'MARKET',
+          side: 'SELL',
+          quantity: lotsize * (oneClickMultiplier || 1),
+          price: 0,
+          product_type: 'INT'
+        });
+        
+        setHotkeyToast('🔥 SELL MARKET: ' + selectedSymbol);
+        setTimeout(() => setHotkeyToast(null), 1500);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSymbol, stocks, oneClickMultiplier, placeOrder]);
 
   // Background Alert Checking Engine
   useEffect(() => {
@@ -218,6 +270,22 @@ function App() {
 
           {/* Right: nav tabs + user info */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {/* Background Alerts Engine Audio Output */}
+            {/* (Can put a hidden audio element here if we add sound) */}
+            
+            {/* Hotkey Toast Notification */}
+            {hotkeyToast && (
+              <div style={{
+                position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(234, 179, 8, 0.9)', color: '#000', padding: '12px 24px',
+                borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', zIndex: 9999,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                animation: 'fadeInOut 1.5s forwards'
+              }}>
+                {hotkeyToast}
+              </div>
+            )}
+            
             {/* Tab Navigation */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '4px',
