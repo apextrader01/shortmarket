@@ -113,6 +113,7 @@ const OptionChainView = () => {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [strategyMode, setStrategyMode] = useState(false);
   const [strategyLegs, setStrategyLegs] = useState([]);
+  const [strategyModalOpen, setStrategyModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchChainAndFuture = async () => {
@@ -469,33 +470,52 @@ const OptionChainView = () => {
               />
               <span className="slider round"></span>
             </label>
+            {strategyMode && strategyLegs.length > 0 && (
+              <button 
+                onClick={() => setStrategyModalOpen(true)}
+                className="btn-mini buy" 
+                style={{ marginLeft: '12px', padding: '4px 8px', borderRadius: '4px', background: 'var(--color-blue)', color: '#fff' }}
+              >
+                View Strategy ({strategyLegs.length})
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {strategyMode && (
-        <OptionsStrategyBuilder 
-          legs={strategyLegs}
-          spotPrice={spotPrice}
-          expiryDate={expiry}
-          onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
-          onClear={() => setStrategyLegs([])}
-          onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
-          onExecute={() => {
-            if (strategyLegs.length === 0) return;
-            strategyLegs.forEach(leg => {
-              placeOrder({
-                symbol: leg.symbol,
-                side: leg.side,
-                quantity: leg.quantity,
-                orderType: 'MARKET',
-                price: ''
-              });
-            });
-            setStrategyLegs([]); // Clear after execution
-            setStrategyMode(false); // Close strategy builder
-          }}
-        />
+      {/* Strategy Builder Modal */}
+      {strategyModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '24px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', background: 'var(--bg-dark)' }}>
+            <button 
+              onClick={() => setStrategyModalOpen(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px', zIndex: 10 }}
+            >&times;</button>
+            <OptionsStrategyBuilder 
+              legs={strategyLegs}
+              spotPrice={spotPrice}
+              expiryDate={expiry}
+              onRemoveLeg={(idx) => setStrategyLegs(prev => prev.filter((_, i) => i !== idx))}
+              onClear={() => setStrategyLegs([])}
+              onUpdateLeg={(idx, updatedLeg) => setStrategyLegs(prev => prev.map((l, i) => i === idx ? updatedLeg : l))}
+              onExecute={() => {
+                if (strategyLegs.length === 0) return;
+                strategyLegs.forEach(leg => {
+                  placeOrder({
+                    symbol: leg.symbol,
+                    side: leg.side,
+                    quantity: leg.quantity,
+                    orderType: 'MARKET',
+                    price: ''
+                  });
+                });
+                setStrategyLegs([]); // Clear after execution
+                setStrategyModalOpen(false); // Close modal
+                setStrategyMode(false); // Disable strategy mode
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Table */}
