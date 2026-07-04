@@ -364,6 +364,62 @@ const OptionChainView = () => {
     );
   }
 
+  const applyTemplate = (templateId) => {
+    if (!templateId || !optionsData || Object.keys(optionsData).length === 0 || !atmStrike) return;
+    
+    const atmIndex = strikes.indexOf(atmStrike);
+    let newLegs = [];
+
+    const getLeg = (strikeIdx, type, side) => {
+      if (strikeIdx < 0 || strikeIdx >= strikes.length) return null;
+      const strike = strikes[strikeIdx];
+      const option = optionsData[strike];
+      if (!option) return null;
+      const legData = type === 'CE' ? option.CE : option.PE;
+      if (!legData) return null;
+      return {
+        symbol: legData.symbol,
+        strike,
+        optionType: type,
+        side,
+        quantity: 1,
+        price: legData.ltp,
+        iv: legData.iv || 0.2
+      };
+    };
+
+    if (templateId === 'bull_call_spread') {
+      const buyLeg = getLeg(atmIndex, 'CE', 'BUY');
+      const sellLeg = getLeg(atmIndex + 1, 'CE', 'SELL');
+      if (buyLeg) newLegs.push(buyLeg);
+      if (sellLeg) newLegs.push(sellLeg);
+    } else if (templateId === 'bear_put_spread') {
+      const buyLeg = getLeg(atmIndex, 'PE', 'BUY');
+      const sellLeg = getLeg(atmIndex - 1, 'PE', 'SELL');
+      if (buyLeg) newLegs.push(buyLeg);
+      if (sellLeg) newLegs.push(sellLeg);
+    } else if (templateId === 'straddle') {
+      const ceLeg = getLeg(atmIndex, 'CE', 'SELL');
+      const peLeg = getLeg(atmIndex, 'PE', 'SELL');
+      if (ceLeg) newLegs.push(ceLeg);
+      if (peLeg) newLegs.push(peLeg);
+    } else if (templateId === 'iron_condor') {
+      const sellPe = getLeg(atmIndex - 1, 'PE', 'SELL');
+      const buyPe = getLeg(atmIndex - 2, 'PE', 'BUY');
+      const sellCe = getLeg(atmIndex + 1, 'CE', 'SELL');
+      const buyCe = getLeg(atmIndex + 2, 'CE', 'BUY');
+      if (sellPe) newLegs.push(sellPe);
+      if (buyPe) newLegs.push(buyPe);
+      if (sellCe) newLegs.push(sellCe);
+      if (buyCe) newLegs.push(buyCe);
+    }
+
+    if (newLegs.length > 0) {
+      setStrategyLegs(newLegs);
+      if (!strategyModalOpen) setStrategyModalOpen(true);
+    }
+  };
+
   return (
     <div className="option-chain-container">
       {/* Header */}
@@ -478,6 +534,19 @@ const OptionChainView = () => {
               >
                 View Strategy ({strategyLegs.length})
               </button>
+            )}
+            {strategyMode && (
+              <select 
+                onChange={(e) => { applyTemplate(e.target.value); e.target.value = ""; }}
+                style={{ marginLeft: '12px', background: 'rgba(0,0,0,0.2)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '4px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', outline: 'none' }}
+                value=""
+              >
+                <option value="" disabled>Load Template...</option>
+                <option value="bull_call_spread">Bull Call Spread</option>
+                <option value="bear_put_spread">Bear Put Spread</option>
+                <option value="straddle">Short Straddle</option>
+                <option value="iron_condor">Iron Condor</option>
+              </select>
             )}
           </div>
         </div>
