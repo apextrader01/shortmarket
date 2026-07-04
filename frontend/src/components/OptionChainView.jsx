@@ -403,6 +403,40 @@ const OptionChainView = () => {
       const peLeg = getLeg(atmIndex, 'PE', 'SELL');
       if (ceLeg) newLegs.push(ceLeg);
       if (peLeg) newLegs.push(peLeg);
+    } else if (templateId === 'long_straddle') {
+      const ceLeg = getLeg(atmIndex, 'CE', 'BUY');
+      const peLeg = getLeg(atmIndex, 'PE', 'BUY');
+      if (ceLeg) newLegs.push(ceLeg);
+      if (peLeg) newLegs.push(peLeg);
+    } else if (templateId === 'short_strangle') {
+      const ceLeg = getLeg(atmIndex + 1, 'CE', 'SELL');
+      const peLeg = getLeg(atmIndex - 1, 'PE', 'SELL');
+      if (ceLeg) newLegs.push(ceLeg);
+      if (peLeg) newLegs.push(peLeg);
+    } else if (templateId === 'long_strangle') {
+      const ceLeg = getLeg(atmIndex + 1, 'CE', 'BUY');
+      const peLeg = getLeg(atmIndex - 1, 'PE', 'BUY');
+      if (ceLeg) newLegs.push(ceLeg);
+      if (peLeg) newLegs.push(peLeg);
+    } else if (templateId === 'bull_put_spread') {
+      const sellLeg = getLeg(atmIndex, 'PE', 'SELL');
+      const buyLeg = getLeg(atmIndex - 1, 'PE', 'BUY');
+      if (sellLeg) newLegs.push(sellLeg);
+      if (buyLeg) newLegs.push(buyLeg);
+    } else if (templateId === 'bear_call_spread') {
+      const sellLeg = getLeg(atmIndex, 'CE', 'SELL');
+      const buyLeg = getLeg(atmIndex + 1, 'CE', 'BUY');
+      if (sellLeg) newLegs.push(sellLeg);
+      if (buyLeg) newLegs.push(buyLeg);
+    } else if (templateId === 'iron_butterfly') {
+      const buyPe = getLeg(atmIndex - 1, 'PE', 'BUY');
+      const sellPe = getLeg(atmIndex, 'PE', 'SELL');
+      const sellCe = getLeg(atmIndex, 'CE', 'SELL');
+      const buyCe = getLeg(atmIndex + 1, 'CE', 'BUY');
+      if (buyPe) newLegs.push(buyPe);
+      if (sellPe) newLegs.push(sellPe);
+      if (sellCe) newLegs.push(sellCe);
+      if (buyCe) newLegs.push(buyCe);
     } else if (templateId === 'iron_condor') {
       const sellPe = getLeg(atmIndex - 1, 'PE', 'SELL');
       const buyPe = getLeg(atmIndex - 2, 'PE', 'BUY');
@@ -544,8 +578,14 @@ const OptionChainView = () => {
                 <option value="" disabled>Load Template...</option>
                 <option value="bull_call_spread">Bull Call Spread</option>
                 <option value="bear_put_spread">Bear Put Spread</option>
+                <option value="bull_put_spread">Bull Put Spread (Credit)</option>
+                <option value="bear_call_spread">Bear Call Spread (Credit)</option>
                 <option value="straddle">Short Straddle</option>
+                <option value="long_straddle">Long Straddle</option>
+                <option value="short_strangle">Short Strangle</option>
+                <option value="long_strangle">Long Strangle</option>
                 <option value="iron_condor">Iron Condor</option>
+                <option value="iron_butterfly">Iron Butterfly</option>
               </select>
             )}
           </div>
