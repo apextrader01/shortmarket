@@ -229,6 +229,63 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
   }
 });
 
+// ─── Analytics ─────────────────────────────────────────────────────────────
+app.get('/api/analytics', authenticateToken, async (req, res) => {
+  try {
+    const orders = await db('orders')
+      .where({ user_id: req.user.id })
+      .whereNot('realized_pnl', 0)
+      .orderBy('created_at', 'asc');
+      
+    let totalTrades = orders.length;
+    let winningTrades = 0;
+    let losingTrades = 0;
+    let totalProfit = 0;
+    let totalLoss = 0;
+    
+    // Group by Date for Equity Curve
+    const dailyPnL = {};
+    
+    orders.forEach(o => {
+       const pnl = parseFloat(o.realized_pnl);
+       if (pnl > 0) {
+          winningTrades++;
+          totalProfit += pnl;
+       } else {
+          losingTrades++;
+          totalLoss += Math.abs(pnl);
+       }
+       
+       const date = new Date(o.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD local
+       if (!dailyPnL[date]) dailyPnL[date] = 0;
+       dailyPnL[date] += pnl;
+    });
+    
+    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+    const avgWinner = winningTrades > 0 ? totalProfit / winningTrades : 0;
+    const avgLoser = losingTrades > 0 ? totalLoss / losingTrades : 0;
+    
+    let cumulative = 0;
+    const equityCurve = Object.keys(dailyPnL).sort().map(date => {
+       cumulative += dailyPnL[date];
+       return { date, pnl: dailyPnL[date], cumulative };
+    });
+
+    res.json({
+       totalTrades,
+       winningTrades,
+       losingTrades,
+       winRate: winRate.toFixed(1),
+       avgWinner: avgWinner.toFixed(2),
+       avgLoser: avgLoser.toFixed(2),
+       equityCurve,
+       recentTrades: orders.slice(-50).reverse() // Last 50 trades for the log
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/details', authenticateToken, async (req, res) => {
   try {
     const { phone, pan_card, aadhar_number } = req.body;

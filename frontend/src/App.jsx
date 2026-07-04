@@ -10,6 +10,7 @@ import ClientDataView from './components/ClientDataView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
 import AlertsView from './components/AlertsView';
+import AnalyticsView from './components/AnalyticsView';
 import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
@@ -292,7 +293,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Mutual Funds',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -399,6 +400,7 @@ function App() {
           {activeTab === 'Orders' && <OrdersView />}
           {activeTab === 'Positions' && <PositionsView />}
           {activeTab === 'Alerts' && <div style={{ flex: 1, padding: '12px' }}><AlertsView /></div>}
+          {activeTab === 'Analytics' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}><AnalyticsView /></div>}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
