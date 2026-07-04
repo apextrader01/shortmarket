@@ -173,6 +173,7 @@ export default function SettingsView() {
                   {mult}x
                 </button>
               ))}
+            </div>
           </div>
 
         </div>
