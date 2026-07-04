@@ -14,7 +14,7 @@ async function processTick(symbol, ltp) {
             
             if (order.type === 'MARKET') {
                 shouldExecute = true;
-            } else if (order.type === 'LIMIT') {
+            } else if (order.type === 'LIMIT' || order.type === 'TARGET') {
                 const limitPrice = parseFloat(order.price);
                 if (order.side === 'BUY' && ltp <= limitPrice) {
                     shouldExecute = true;
@@ -22,6 +22,15 @@ async function processTick(symbol, ltp) {
                 } else if (order.side === 'SELL' && ltp >= limitPrice) {
                     shouldExecute = true;
                     executionPrice = limitPrice;
+                }
+            } else if (order.type === 'SL' || order.type === 'SL-M' || order.type === 'SL-L') {
+                const triggerPrice = parseFloat(order.trigger_price);
+                if (order.side === 'BUY' && ltp >= triggerPrice) {
+                    shouldExecute = true;
+                    executionPrice = order.type === 'SL-L' ? parseFloat(order.price) : ltp;
+                } else if (order.side === 'SELL' && ltp <= triggerPrice) {
+                    shouldExecute = true;
+                    executionPrice = order.type === 'SL-L' ? parseFloat(order.price) : ltp;
                 }
             } else if (order.type === 'TRAILING_STOP') {
                 const triggerPrice = parseFloat(order.trigger_price);
@@ -107,6 +116,15 @@ async function executeOrder(order, executionPrice) {
                     // Short selling mock: insert negative position
                     await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL', quantity: -order.quantity, average_price: executionPrice });
                 }
+            }
+            
+            // OCO Logic: Cancel sibling orders linked by parent_order_id
+            if (order.parent_order_id) {
+                await trx('orders')
+                    .where({ parent_order_id: order.parent_order_id })
+                    .whereNot('id', order.id)
+                    .where('status', 'PENDING')
+                    .update({ status: 'CANCELLED' });
             }
         });
         console.log(`✅ Order ${order.id} (${order.side} ${order.quantity} ${order.symbol}) EXECUTED successfully at ₹${executionPrice}`);

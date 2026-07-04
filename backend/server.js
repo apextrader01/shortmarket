@@ -1243,6 +1243,14 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
       
+      // OCO: Cancel sibling if it exists
+      if (order.parent_order_id) {
+          await trx('orders')
+            .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
+            .whereNot({ id: order.id })
+            .update({ status: 'CANCELLED' });
+      }
+      
       // Refund Margin
       const refundAmount = order.margin ? parseFloat(order.margin) : (order.quantity * parseFloat(order.price || 0));
       if (refundAmount > 0) {

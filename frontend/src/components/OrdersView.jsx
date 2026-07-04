@@ -162,7 +162,10 @@ export default function OrdersView() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
                     <td style={{ padding: '12px 16px' }}>{order.type === 'TRAILING_STOP' ? <span title="Trailing Stop Loss" style={{ color: 'var(--color-yellow)' }}>Trg: ₹{parseFloat(order.trigger_price || 0).toFixed(2)}<br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Trail: {order.trail_amount}</span></span> : (order.price ? `₹${parseFloat(order.price).toFixed(2)}` : '—')}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>
+                      {order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}
+                      {order.parent_order_id && <span style={{ fontSize: '9px', background: 'var(--color-blue)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>OCO</span>}
+                    </td>
                     {activeTab === 'Order History' && (
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
                         {order.taxes ? `₹${parseFloat(order.taxes).toFixed(2)}` : '₹0.00'}
