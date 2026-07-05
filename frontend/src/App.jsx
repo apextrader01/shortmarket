@@ -226,10 +226,7 @@ function App() {
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
-              <img src="/logo.png" alt="" style={{ height: '24px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
-              <div className="logo-text" style={{ fontSize: '15px' }}>
-                SH<span>O</span>RT MARKET
-              </div>
+              <img src="/logo.png" alt="Short Market Logo" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
             </div>
 
             <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
