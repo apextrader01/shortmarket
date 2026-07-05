@@ -377,15 +377,28 @@ export const useStore = create(persist((set, get) => ({
       set((state) => ({ prices: applySnapshot(snapshot, state) }));
     });
 
+    let batchedPrices = {};
+    let batchTimeout = null;
+
     socket.off('market_data');
     socket.on('market_data', (data) => {
-      set((state) => {
-        const old  = state.prices[data.symbol];
-        const tick = old
-          ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
-          : 'flat';
-        return { prices: { ...state.prices, [data.symbol]: { ...old, ...data, tick } } };
-      });
+      batchedPrices[data.symbol] = data;
+      if (!batchTimeout) {
+        batchTimeout = setTimeout(() => {
+          set((state) => {
+            const nextPrices = { ...state.prices };
+            for (const sym in batchedPrices) {
+              const d = batchedPrices[sym];
+              const old = nextPrices[sym];
+              const tick = old ? (d.ltp > old.ltp ? 'up' : d.ltp < old.ltp ? 'down' : 'flat') : 'flat';
+              nextPrices[sym] = { ...old, ...d, tick };
+            }
+            batchedPrices = {};
+            batchTimeout = null;
+            return { prices: nextPrices };
+          });
+        }, 150); // Batch state updates to ~6 FPS to prevent UI lag
+      }
     });
 
     socket.off('market_depth_data');
@@ -609,15 +622,28 @@ export const useStore = create(persist((set, get) => ({
       set((state) => ({ prices: applySnapshot(snapshot, state) }));
     });
 
+    let batchedPricesAlt = {};
+    let batchTimeoutAlt = null;
+
     socket.off('market_data');
     socket.on('market_data', (data) => {
-      set((state) => {
-        const old  = state.prices[data.symbol];
-        const tick = old
-          ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
-          : 'flat';
-        return { prices: { ...state.prices, [data.symbol]: { ...old, ...data, tick } } };
-      });
+      batchedPricesAlt[data.symbol] = data;
+      if (!batchTimeoutAlt) {
+        batchTimeoutAlt = setTimeout(() => {
+          set((state) => {
+            const nextPrices = { ...state.prices };
+            for (const sym in batchedPricesAlt) {
+              const d = batchedPricesAlt[sym];
+              const old = nextPrices[sym];
+              const tick = old ? (d.ltp > old.ltp ? 'up' : d.ltp < old.ltp ? 'down' : 'flat') : 'flat';
+              nextPrices[sym] = { ...old, ...d, tick };
+            }
+            batchedPricesAlt = {};
+            batchTimeoutAlt = null;
+            return { prices: nextPrices };
+          });
+        }, 150); // Batch state updates to ~6 FPS to prevent UI lag
+      }
     });
 
     socket.on('connect', () => get().refreshPrices());
