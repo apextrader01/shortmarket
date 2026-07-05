@@ -129,7 +129,11 @@ const OptionChainView = () => {
         const data = await res.json();
         
         setOptionsData(data);
-        const expList = Object.keys(data).sort((a, b) => new Date(a) - new Date(b));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expList = Object.keys(data)
+          .filter(exp => new Date(exp) >= today)
+          .sort((a, b) => new Date(a) - new Date(b));
         setExpiries(expList);
         if (expList.length > 0) {
           setExpiry(expList[0]);

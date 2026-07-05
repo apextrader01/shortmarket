@@ -88,14 +88,16 @@ async function updateOptionsMaster() {
     // Sort expiries for each name
     for (const name of Object.keys(options)) {
       const expiries = Object.keys(options[name]);
-      // Expiries are strings like "27JUN2024". We can sort them by parsing as Date.
-      expiries.sort((a, b) => new Date(a) - new Date(b));
       
-      // We only want to keep upcoming valid expiries (e.g. next 3 weeks) to keep file small
-      // We'll just save all of them for now, it's not too big.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Filter out past expiries to save space
+      const validExpiries = expiries.filter(exp => new Date(exp) >= today);
+      validExpiries.sort((a, b) => new Date(a) - new Date(b));
       
       const sortedOptions = {};
-      for (const exp of expiries) {
+      for (const exp of validExpiries) {
         sortedOptions[exp] = options[name][exp];
       }
       options[name] = sortedOptions;
