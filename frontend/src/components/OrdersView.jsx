@@ -5,6 +5,7 @@ import { Box } from 'lucide-react';
 export default function OrdersView() {
   const { orders, pendingTriggers, removePendingTrigger } = useStore();
   const [activeTab, setActiveTab] = useState('Open Orders');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
@@ -152,7 +153,18 @@ export default function OrdersView() {
                   ))
                 ) : (
                   displayOrders.map(order => (
-                  <tr key={order.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <tr 
+                    key={order.id} 
+                    onClick={() => activeTab === 'Order History' && setSelectedOrder(order)}
+                    style={{ 
+                      borderBottom: '1px solid rgba(255,255,255,0.05)', 
+                      cursor: activeTab === 'Order History' ? 'pointer' : 'default',
+                      transition: 'background 0.2s',
+                      ...(activeTab === 'Order History' ? { '&:hover': { background: 'rgba(255,255,255,0.05)' } } : {})
+                    }}
+                    onMouseEnter={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                    onMouseLeave={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'transparent')}
+                  >
                     <td style={{ padding: '12px 16px' }}>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.symbol.split('-')[0]}</td>
                     <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
@@ -211,6 +223,74 @@ export default function OrdersView() {
           </div>
         )}
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setSelectedOrder(null)}>
+          <div style={{
+            background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px',
+            width: '90%', maxWidth: '400px', border: '1px solid var(--border-color)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Order Details</h3>
+              <button onClick={() => setSelectedOrder(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}>×</button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Order ID:</span>
+                <span style={{ fontWeight: '600' }}>#{selectedOrder.id}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Name:</span>
+                <span style={{ fontWeight: '600' }}>{selectedOrder.symbol}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Placed Time:</span>
+                <span style={{ fontWeight: '600' }}>{new Date(selectedOrder.created_at).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Product Type:</span>
+                <span style={{ fontWeight: '600' }}>{selectedOrder.product_type === 'INT' ? 'INTRADAY (MIS)' : 'DELIVERY (NRML)'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Order Type:</span>
+                <span style={{ fontWeight: '600' }}>{selectedOrder.type === 'TRAILING_STOP' ? 'TRAILING SL' : (selectedOrder.type || (selectedOrder.price ? 'LIMIT' : 'MARKET'))}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>{selectedOrder.type === 'TRAILING_STOP' ? 'Trigger Price:' : 'Average Price:'}</span>
+                <span style={{ fontWeight: '600' }}>₹{parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0).toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
+                <span style={{ fontWeight: '600' }}>{selectedOrder.quantity}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Order Value:</span>
+                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0) * selectedOrder.quantity).toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
+                <span style={{ fontWeight: '700', color: selectedOrder.status === 'EXECUTED' ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' || selectedOrder.status === 'CANCELLED' ? 'var(--color-red-light)' : 'var(--color-yellow)') }}>
+                  {selectedOrder.status}
+                </span>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setSelectedOrder(null)} 
+              style={{ width: '100%', padding: '12px', background: 'var(--color-blue)', color: 'white', border: 'none', borderRadius: '4px', marginTop: '24px', fontWeight: 'bold', cursor: 'pointer' }}
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
