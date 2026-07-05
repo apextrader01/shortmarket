@@ -1446,14 +1446,14 @@ server.listen(PORT, '0.0.0.0', async () => {
   const { initOrderExecutor } = require('./services/orderExecutor');
   const schedule = require('node-schedule');
   
-  // Refresh Angel One Token daily at 8:30 AM IST
+  // Refresh Angel One Token daily at 2:00 AM IST
   const loginRule = new schedule.RecurrenceRule();
   loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
-  loginRule.hour = 8;
-  loginRule.minute = 30;
+  loginRule.hour = 2;
+  loginRule.minute = 0;
   loginRule.tz = 'Asia/Kolkata';
   schedule.scheduleJob(loginRule, async () => {
-    console.log('⏰ Daily 8:30 AM Cron: Refreshing Angel One Token...');
+    console.log('⏰ Daily 2:00 AM Cron: Refreshing Angel One Token...');
     await loginAngelOne(io, priceCache);
   });
 
