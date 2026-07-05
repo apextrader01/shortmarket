@@ -1312,7 +1312,14 @@ app.get('/api/candles/:symbol', async (req, res) => {
   try {
     const { fetchCandleData } = require('./services/angelOne');
     const interval = req.query.interval || 'ONE_DAY';
-    const candles = await fetchCandleData(req.params.symbol, interval);
+    let cleanSymbol = req.params.symbol;
+    if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
+        cleanSymbol = cleanSymbol.replace(/\s+/g, '');
+    }
+    if (cleanSymbol.endsWith('-EQ')) {
+        cleanSymbol = cleanSymbol.replace('-EQ', '');
+    }
+    const candles = await fetchCandleData(cleanSymbol, interval);
     res.json(candles);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1437,7 +1444,19 @@ server.listen(PORT, '0.0.0.0', async () => {
   const { initAutoSquareOff } = require('./services/autoSquareOff');
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
   const { initOrderExecutor } = require('./services/orderExecutor');
+  const schedule = require('node-schedule');
   
+  // Refresh Angel One Token daily at 8:30 AM IST
+  const loginRule = new schedule.RecurrenceRule();
+  loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
+  loginRule.hour = 8;
+  loginRule.minute = 30;
+  loginRule.tz = 'Asia/Kolkata';
+  schedule.scheduleJob(loginRule, async () => {
+    console.log('⏰ Daily 8:30 AM Cron: Refreshing Angel One Token...');
+    await loginAngelOne(io, priceCache);
+  });
+
   initAutoSquareOff(priceCache);
   initRiskyStocksSync();
   initOrderExecutor(priceCache);

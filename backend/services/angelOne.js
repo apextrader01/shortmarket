@@ -589,14 +589,14 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
     const LOOKBACK = {
         'ONE_MINUTE':     5,    
         'THREE_MINUTE':   15,
-        'FIVE_MINUTE':    30,
-        'TEN_MINUTE':     60,
-        'FIFTEEN_MINUTE': 60,
-        'THIRTY_MINUTE':  100,
+        'FIVE_MINUTE':    28,
+        'TEN_MINUTE':     28,
+        'FIFTEEN_MINUTE': 28,
+        'THIRTY_MINUTE':  28,
         'ONE_HOUR':       200,
         'ONE_DAY':        730,  
     };
-    const lookbackDays = LOOKBACK[interval] || 60;
+    const lookbackDays = LOOKBACK[interval] || 28;
     const from = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
     
     try {
