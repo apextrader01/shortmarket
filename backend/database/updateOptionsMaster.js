@@ -25,6 +25,11 @@ async function updateOptionsMaster() {
     let futCount = 0;
 
     for (const item of data) {
+      // Filter out BSE Futures & Options (BFO) to avoid duplicate mixed expiries
+      if (item.exch_seg === 'BFO') {
+        continue;
+      }
+
       // 1. Gather Option Contracts
       if (OPTION_TYPES.includes(item.instrumenttype)) {
         const name = item.name;
