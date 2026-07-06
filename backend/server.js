@@ -1307,7 +1307,10 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 });
 
 
-// ─── Candle Data ──────────────────────────────────────────────────────────
+// ─── Historical Chart Data (Candles) ──────────────────────────────────────────────────
+const candleCache = {}; // Cache to protect Angel One from rate limits (e.g. 1000 users opening charts)
+const CACHE_DURATION_MS = 60 * 1000; // 1 minute cache
+
 app.get('/api/candles/:symbol', async (req, res) => {
   try {
     const { fetchCandleData } = require('./services/angelOne');
@@ -1319,7 +1322,22 @@ app.get('/api/candles/:symbol', async (req, res) => {
     if (cleanSymbol.endsWith('-EQ')) {
         cleanSymbol = cleanSymbol.replace('-EQ', '');
     }
+    const cacheKey = `${cleanSymbol}_${interval}`;
+    const now = Date.now();
+    
+    // Serve from cache if valid
+    if (candleCache[cacheKey] && (now - candleCache[cacheKey].timestamp < CACHE_DURATION_MS)) {
+      return res.json(candleCache[cacheKey].data);
+    }
+
     const candles = await fetchCandleData(cleanSymbol, interval);
+    
+    // Save to cache
+    candleCache[cacheKey] = {
+      timestamp: now,
+      data: candles
+    };
+    
     res.json(candles);
   } catch (err) {
     res.status(500).json({ error: err.message });
