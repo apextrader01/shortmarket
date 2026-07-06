@@ -21,6 +21,10 @@ let STOCK_MASTER = {};   // token -> { symbol, name, exchange }
 let symbolToToken = {};  // symbol -> token
 let allTokens = [];
 
+let globalNfoOptions = {};
+let globalNfoFutures = {};
+let globalBseSpots = {};
+
 // ─── Load all NSE stocks from Angel One master file ──────────────────────────
 async function loadInstrumentMaster() {
     return new Promise((resolve) => {
@@ -61,7 +65,11 @@ async function loadInstrumentMaster() {
                 "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
             };
 
-            STOCK_MASTER = { ...indices, ...nfoOptions, ...nfoFutures, ...bseSpots };
+            globalNfoOptions = nfoOptions;
+            globalNfoFutures = nfoFutures;
+            globalBseSpots = bseSpots;
+
+            STOCK_MASTER = { ...indices };
             symbolToToken = {};
 
             // Add indices to reverse map
@@ -851,6 +859,9 @@ module.exports = {
     getPriceCache,
     setPriceCache,
     get STOCK_MASTER() { return STOCK_MASTER; },
+    get globalNfoOptions() { return globalNfoOptions; },
+    get globalNfoFutures() { return globalNfoFutures; },
+    get globalBseSpots() { return globalBseSpots; },
     get symbolToToken() { return symbolToToken; },
     addSubscription,
     addSubscriptionBatch,
