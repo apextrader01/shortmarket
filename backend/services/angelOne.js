@@ -468,7 +468,7 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
                             }
                         }
                     } catch (e) {}
-                }, chunkIndex * 350); // 350ms delay keeps it safely under 3 req/sec limit
+                }, chunkIndex * 1000); // 1000ms delay strictly enforces rate limit (max 3 req/sec overall)
                 chunkIndex++;
             }
         }
