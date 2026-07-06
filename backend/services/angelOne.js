@@ -61,7 +61,7 @@ async function loadInstrumentMaster() {
                 "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
             };
 
-            STOCK_MASTER = { ...indices, ...nseStocks, ...nfoOptions, ...nfoFutures, ...bseSpots };
+            STOCK_MASTER = { ...indices, ...nfoOptions, ...nfoFutures, ...bseSpots };
             symbolToToken = {};
 
             // Add indices to reverse map
@@ -70,7 +70,28 @@ async function loadInstrumentMaster() {
                 symbolToToken[info.uniqueSymbol] = token;
             }
 
-            allTokens = Object.keys({ ...indices, ...nseStocks }); // Only use indices and equities for base tokens!
+            // Add all stocks (NSE and BSE)
+            if (Array.isArray(nseStocks)) {
+                for (const stock of nseStocks) {
+                    // If the symbol ends with -EQ (NSE), strip it for cleanliness
+                    const rawSymbol = stock.symbol.endsWith('-EQ') ? stock.symbol.replace('-EQ', '') : stock.symbol;
+                    const uniqueSymbol = `${rawSymbol}-${stock.exchange}`;
+                    
+                    STOCK_MASTER[stock.token] = {
+                        symbol: rawSymbol,
+                        name: stock.name,
+                        exchange: stock.exchange,
+                        uniqueSymbol
+                    };
+                    symbolToToken[uniqueSymbol] = stock.token;
+                }
+            }
+
+            // allTokens for base polling should be indices + NSE equities
+            allTokens = [...Object.keys(indices)];
+            if (Array.isArray(nseStocks)) {
+                allTokens = allTokens.concat(nseStocks.map(s => s.token));
+            }
             console.log(`✅ Loaded ${Object.keys(STOCK_MASTER).length} instruments`);
             resolve();
         } catch (e) {
