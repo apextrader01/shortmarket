@@ -83,20 +83,50 @@ app.get('/api/stocks', (req, res) => {
     const query = q.toLowerCase();
     const results = [];
     
-    for (const [token, info] of Object.entries(STOCK_MASTER)) {
-      if (info.symbol.toLowerCase().includes(query) || info.name.toLowerCase().includes(query)) {
-        results.push({
-          token, 
-          symbol: info.symbol, 
-          name: info.name, 
-          exchange: info.exchange, 
-          uniqueSymbol: info.uniqueSymbol
-        });
-        if (results.length >= 100) break;
+    for (const [key, value] of Object.entries(STOCK_MASTER)) {
+      if (!value) continue;
+      
+      if (value.symbol && value.name) {
+        if (value.symbol.toLowerCase().includes(query) || value.name.toLowerCase().includes(query)) {
+          results.push({
+            token: key, 
+            symbol: value.symbol, 
+            name: value.name, 
+            exchange: value.exchange, 
+            uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${value.exchange || 'NSE'}`
+          });
+        }
+      } else if (Array.isArray(value)) {
+        for (const fut of value) {
+          if (fut && fut.symbol && fut.symbol.toLowerCase().includes(query)) {
+             results.push({
+               token: fut.token, symbol: fut.symbol, name: key, 
+               exchange: fut.exchange || 'NFO', uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
+             });
+          }
+        }
+      } else if (typeof value === 'object') {
+        for (const expiry in value) {
+          if (typeof value[expiry] !== 'object') continue;
+          for (const strike in value[expiry]) {
+             if (typeof value[expiry][strike] !== 'object') continue;
+             for (const type in value[expiry][strike]) {
+                const opt = value[expiry][strike][type];
+                if (opt && opt.symbol && opt.symbol.toLowerCase().includes(query)) {
+                   results.push({
+                     token: opt.token, symbol: opt.symbol, name: key, 
+                     exchange: opt.exch_seg || 'NFO', uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
+                   });
+                }
+             }
+          }
+        }
       }
+      
+      if (results.length >= 100) break;
     }
     
-    res.json(results);
+    res.json(results.slice(0, 100));
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
