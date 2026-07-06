@@ -1332,11 +1332,13 @@ app.get('/api/candles/:symbol', async (req, res) => {
 
     const candles = await fetchCandleData(cleanSymbol, interval);
     
-    // Save to cache
-    candleCache[cacheKey] = {
-      timestamp: now,
-      data: candles
-    };
+    // Save to cache only if valid data is returned
+    if (candles && candles.length > 0) {
+      candleCache[cacheKey] = {
+        timestamp: now,
+        data: candles
+      };
+    }
     
     res.json(candles);
   } catch (err) {

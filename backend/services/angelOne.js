@@ -792,19 +792,19 @@ function startLiveWebSocket(io) {
         });
 
         global_web_socket.on('error', () => {
-            console.error('⚠️  WS error! Reconnecting in 5 seconds...');
-            setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
+            console.error('⚠️  WS error! Reconnecting in 2 seconds...');
+            setTimeout(() => startLiveWebSocket(io), 2000);
         });
 
         global_web_socket.on('close', () => {
-            console.warn('⚠️  WS closed! Reconnecting in 5 seconds...');
-            setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
+            console.warn('⚠️  WS closed! Reconnecting in 2 seconds...');
+            setTimeout(() => startLiveWebSocket(io), 2000);
         });
 
     }).catch(err => {
         console.error('WS connect error:', err.message);
-        console.log('🔄 Retrying WS connection in 5 seconds...');
-        setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
+        console.log('🔄 Retrying WS connection in 2 seconds...');
+        setTimeout(() => startLiveWebSocket(io), 2000);
     });
 }
 
