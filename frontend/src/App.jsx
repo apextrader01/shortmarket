@@ -17,6 +17,7 @@ import DepositModal from './components/DepositModal';
 import MarketDepthModal from './components/MarketDepthModal';
 import DOMLadderModal from './components/DOMLadderModal';
 import LoginView from './components/LoginView';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign } from 'lucide-react';
 
@@ -390,7 +391,9 @@ function App() {
           )}
           {activeTab === 'Options' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
-              <OptionChainView />
+              <ErrorBoundary>
+                <OptionChainView />
+              </ErrorBoundary>
             </div>
           )}
           {activeTab === 'Portfolio' && <PortfolioView />}
