@@ -231,9 +231,9 @@ const OptionChainView = () => {
         const visibleStrikes = allStrikes.slice(startIndex, endIndex + 1);
 
         visibleStrikes.forEach((strike) => {
-          const data = optionsData[expiry][strike];
-          if (data.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
-          if (data.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
+          const data = optionsData[expiry]?.[strike];
+          if (data?.CE) tokensToSub.push({ ...data.CE, exchange: data.CE.exch_seg, name: symbol });
+          if (data?.PE) tokensToSub.push({ ...data.PE, exchange: data.PE.exch_seg, name: symbol });
         });
 
         if (tokensToSub.length > 0) {
@@ -379,7 +379,7 @@ const OptionChainView = () => {
     const getLeg = (strikeIdx, type, side) => {
       if (strikeIdx < 0 || strikeIdx >= strikes.length) return null;
       const strike = strikes[strikeIdx];
-      const option = optionsData[strike];
+      const option = optionsData[expiry]?.[strike];
       if (!option) return null;
       const legData = type === 'CE' ? option.CE : option.PE;
       if (!legData) return null;
@@ -682,8 +682,8 @@ const OptionChainView = () => {
               <OptionChainRow
                 key={strike}
                 strike={strike}
-                call={chain[strike].CE}
-                put={chain[strike].PE}
+                call={chain[strike]?.CE}
+                put={chain[strike]?.PE}
                 basePrice={basePrice}
                 atmStrike={atmStrike}
                 atmRowRef={atmRowRef}
