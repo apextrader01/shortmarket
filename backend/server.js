@@ -576,6 +576,91 @@ app.get('/api/admin/analytics', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/admin/orders', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    
+    const orders = await db('orders')
+      .join('users', 'orders.user_id', '=', 'users.id')
+      .select('orders.*', 'users.username', 'users.email')
+      .orderBy('orders.created_at', 'desc')
+      .limit(100);
+    res.json({ success: true, orders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/positions', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    
+    const positions = await db('positions')
+      .join('users', 'positions.user_id', '=', 'users.id')
+      .select('positions.*', 'users.username', 'users.email')
+      .where('positions.quantity', '!=', 0)
+      .orderBy('positions.id', 'desc');
+    res.json({ success: true, positions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    
+    const ledger = await db('ledger')
+      .join('users', 'ledger.user_id', '=', 'users.id')
+      .select('ledger.*', 'users.username', 'users.email')
+      .orderBy('ledger.created_at', 'desc')
+      .limit(100);
+    res.json({ success: true, ledger });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    
+    const { positionId } = req.body;
+    const position = await db('positions').where({ id: positionId }).first();
+    
+    if (!position || position.quantity === 0) {
+      return res.status(400).json({ error: 'Position not found or already closed' });
+    }
+
+    // Simulate a MARKET order to close the position
+    const side = position.quantity > 0 ? 'SELL' : 'BUY';
+    const quantity = Math.abs(position.quantity);
+    
+    // We don't execute it right away, we just insert a market order. 
+    // The order execution logic runs periodically, or we can just mock it here directly.
+    // To be safe and reuse exact P&L logic, we will just insert it as a MARKET order 
+    // and let the orderExecutor pick it up in the next 1-second tick!
+    
+    const [orderId] = await db('orders').insert({
+      user_id: position.user_id,
+      symbol: position.symbol,
+      type: 'MARKET',
+      side: side,
+      quantity: quantity,
+      product_type: position.product_type,
+      status: 'PENDING'
+    }).returning('id');
+
+    res.json({ success: true, message: 'Force close order placed', orderId: typeof orderId === 'object' ? orderId.id : orderId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;

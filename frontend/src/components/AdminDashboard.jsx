@@ -3,11 +3,20 @@ import { useStore } from '../store';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics } = useStore();
+  const { 
+    fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics,
+    fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition
+  } = useStore();
+  
   const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
   const [deposits, setDeposits] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  
+  const [orders, setOrders] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [ledger, setLedger] = useState([]);
+  
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
@@ -27,6 +36,15 @@ export default function AdminDashboard() {
     } else if (activeTab === 'analytics') {
       const res = await fetchAdminAnalytics();
       if (res.success) setAnalytics(res.data);
+    } else if (activeTab === 'orders') {
+      const res = await fetchAdminOrders();
+      if (res.success) setOrders(res.orders);
+    } else if (activeTab === 'positions') {
+      const res = await fetchAdminPositions();
+      if (res.success) setPositions(res.positions);
+    } else if (activeTab === 'ledger') {
+      const res = await fetchAdminLedger();
+      if (res.success) setLedger(res.ledger);
     }
     setLoading(false);
   };
@@ -59,6 +77,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleForceClose = async (id) => {
+    if (!window.confirm("Are you sure you want to force close this position? A market order will be placed to close it.")) return;
+    const res = await forceCloseUserPosition(id);
+    if (res.success) {
+      alert(`Force close order placed (ID: ${res.orderId})`);
+      loadData();
+    } else {
+      alert(`Error: ${res.error}`);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.username.toLowerCase().includes(search.toLowerCase()) || 
     u.email.toLowerCase().includes(search.toLowerCase())
@@ -73,24 +102,42 @@ export default function AdminDashboard() {
             <Shield size={24} style={{ color: 'var(--color-red)' }} />
             Admin Control Center
           </h2>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '16px', overflowX: 'auto' }} className="scrollbar-hide">
+            <button 
+              onClick={() => setActiveTab('analytics')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Analytics & Insights
+            </button>
             <button 
               onClick={() => setActiveTab('users')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Client Management
             </button>
             <button 
-              onClick={() => setActiveTab('deposits')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer' }}
+              onClick={() => setActiveTab('positions')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'positions' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'positions' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'positions' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              Deposit Requests
+              Live Positions
             </button>
             <button 
-              onClick={() => setActiveTab('analytics')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer' }}
+              onClick={() => setActiveTab('orders')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'orders' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'orders' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'orders' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              Analytics & Insights
+              Order Flow
+            </button>
+            <button 
+              onClick={() => setActiveTab('ledger')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'ledger' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'ledger' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'ledger' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Platform Ledger
+            </button>
+            <button 
+              onClick={() => setActiveTab('deposits')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Deposit Requests
             </button>
           </div>
         </div>
@@ -154,6 +201,115 @@ export default function AdminDashboard() {
               </div>
             ) : <div style={{ color: 'var(--text-secondary)' }}>No analytics data available.</div>}
           </div>
+        ) : activeTab === 'orders' ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Type</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Qty @ Price</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders found</td>
+                </tr>
+              ) : (
+                orders.map(o => (
+                  <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{o.username}</div></td>
+                    <td style={{ padding: '16px', fontWeight: '600' }}>{o.symbol}</td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)' }}>{o.side}</span> {o.type}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>{o.quantity} @ ₹{(o.average_price || o.price || 0).toFixed(2)}</td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <span style={{ 
+                        color: o.status === 'EXECUTED' ? 'var(--color-green-light)' : o.status === 'REJECTED' ? 'var(--color-red-light)' : 'var(--color-yellow)',
+                        background: o.status === 'EXECUTED' ? 'rgba(34,197,94,0.1)' : o.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
+                        padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600'
+                      }}>{o.status}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        ) : activeTab === 'positions' ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Qty</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg Price</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {positions.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active positions found</td>
+                </tr>
+              ) : (
+                positions.map(p => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{p.username}</div></td>
+                    <td style={{ padding: '16px', fontWeight: '600' }}>{p.symbol}</td>
+                    <td style={{ padding: '16px', textAlign: 'right', color: p.quantity > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>{p.quantity}</td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{p.average_price.toFixed(2)}</td>
+                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <button 
+                        onClick={() => handleForceClose(p.id)}
+                        className="btn"
+                        style={{ padding: '4px 8px', fontSize: '11px', background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)' }}
+                      >
+                        Force Close
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        ) : activeTab === 'ledger' ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Type</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Description</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No ledger entries found</td>
+                </tr>
+              ) : (
+                ledger.map(l => (
+                  <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Date(l.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{l.username}</div></td>
+                    <td style={{ padding: '16px' }}>
+                      <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
+                    </td>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.description}</td>
+                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                      {l.amount >= 0 ? '+' : ''}₹{l.amount.toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         ) : activeTab === 'users' ? (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>

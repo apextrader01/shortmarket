@@ -786,8 +786,60 @@ export const useStore = create(persist((set, get) => ({
         return { success: true, data };
       }
       return { success: false, error: 'Failed' };
-    } catch (e) {
-      return { success: false, error: e.message };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchAdminOrders: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/orders`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchAdminPositions: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/positions`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchAdminLedger: async () => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/ledger`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  forceCloseUserPosition: async (positionId) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/force-close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ positionId })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
     }
   },
 
