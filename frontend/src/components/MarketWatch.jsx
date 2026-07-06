@@ -22,7 +22,15 @@ export default function MarketWatch({ className = '' }) {
   ).slice(0, 100) : [];
 
   // Watchlist Mode
-  const watchlistStocks = !isSearchMode ? activeWatchlist.symbols.map(sym => stocks.find(s => s.uniqueSymbol === sym)).filter(Boolean) : [];
+  const watchlistStocks = !isSearchMode ? activeWatchlist.symbols.map(sym => {
+    const found = stocks.find(s => s.uniqueSymbol === sym);
+    if (found) return found;
+    // For Options/Futures that are not in the stocks list
+    const parts = sym.split('-');
+    const symbol = parts[0];
+    const exchange = parts[1] || 'NSE';
+    return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, token: '' };
+  }).filter(Boolean) : [];
   const displayStocks = isSearchMode ? searchResults : watchlistStocks;
 
   React.useEffect(() => {
@@ -44,17 +52,14 @@ export default function MarketWatch({ className = '' }) {
       // 1. Subscribe to WebSocket for live ticks
       subscribeBatch(tokensToSub);
       
-      // 2. Instantly fetch REST snapshot (crucial for weekends/after-hours)
-      const symbolsToFetch = visibleStocks.map(s => s.uniqueSymbol);
-      if (symbolsToFetch.length > 0) {
-        useStore.getState().fetchBatchPrices(symbolsToFetch);
-      }
+      // 2. Also fetch latest snapshot manually (fallback)
+      useStore.getState().fetchBatchPrices(visibleStocks.map(s => s.uniqueSymbol));
       
       return () => {
         unsubscribeBatch(tokensToSub);
       };
     }
-  }, [searchQuery, isSearchMode, activeWatchlistId, stocks]);
+  }, [isSearchMode, searchResults.map(s => s.uniqueSymbol).join(','), activeWatchlist.symbols.join(',')]);
 
   return (
     <div className={`sidebar ${className}`}>

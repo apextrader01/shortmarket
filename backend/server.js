@@ -64,9 +64,12 @@ app.get('/api/stocks', (req, res) => {
   const { STOCK_MASTER } = require('./services/angelOne');
   if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
   
-  cachedStocksArray = Object.entries(STOCK_MASTER).map(([token, info]) => ({
-    token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
-  }));
+  // Only send NSE equities and Indices to the frontend to avoid huge payloads (options/futures are massive)
+  cachedStocksArray = Object.entries(STOCK_MASTER)
+    .filter(([token, info]) => info.exchange === 'NSE')
+    .map(([token, info]) => ({
+      token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
+    }));
   res.json(cachedStocksArray);
 });
 

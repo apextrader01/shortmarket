@@ -25,11 +25,33 @@ let allTokens = [];
 async function loadInstrumentMaster() {
     return new Promise((resolve) => {
         try {
-            console.log('📥 Loading Angel One instruments master from local cache...');
+            console.log('🔌 Loading Angel One instruments master from local cache...');
             const fs = require('fs');
             const path = require('path');
-            const data = fs.readFileSync(path.join(__dirname, '../database/stocks.json'), 'utf8');
-            const nseStocks = JSON.parse(data);
+            
+            let nseStocks = {};
+            try {
+                const data = fs.readFileSync(path.join(__dirname, '../database/stocks.json'), 'utf8');
+                nseStocks = JSON.parse(data);
+            } catch(e) {}
+            
+            let nfoOptions = {};
+            try {
+                const data2 = fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8');
+                nfoOptions = JSON.parse(data2);
+            } catch(e) {}
+            
+            let nfoFutures = {};
+            try {
+                const data3 = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
+                nfoFutures = JSON.parse(data3);
+            } catch(e) {}
+            
+            let bseSpots = {};
+            try {
+                const data4 = fs.readFileSync(path.join(__dirname, '../database/spots.json'), 'utf8');
+                bseSpots = JSON.parse(data4);
+            } catch(e) {}
 
             // Add indices manually (not in EQ segment)
             const indices = {
@@ -39,74 +61,17 @@ async function loadInstrumentMaster() {
                 "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
             };
 
-            STOCK_MASTER = { ...indices };
+            STOCK_MASTER = { ...indices, ...nseStocks, ...nfoOptions, ...nfoFutures, ...bseSpots };
             symbolToToken = {};
 
             // Add indices to reverse map
-            for (const [token, info] of Object.entries(indices)) {
-                const uniqueSymbol = `${info.symbol}-${info.exchange}`;
-                info.uniqueSymbol = uniqueSymbol;
-                symbolToToken[uniqueSymbol] = token;
+            for (const [token, info] of Object.entries(STOCK_MASTER)) {
+                info.uniqueSymbol = `${info.symbol}-${info.exchange}`;
+                symbolToToken[info.uniqueSymbol] = token;
             }
 
-            // Add all stocks (NSE and BSE)
-            for (const stock of nseStocks) {
-                // If the symbol ends with -EQ (NSE), strip it for cleanliness
-                const rawSymbol = stock.symbol.endsWith('-EQ') ? stock.symbol.replace('-EQ', '') : stock.symbol;
-                const uniqueSymbol = `${rawSymbol}-${stock.exchange}`;
-                
-                STOCK_MASTER[stock.token] = {
-                    symbol: rawSymbol,
-                    name: stock.name,
-                    exchange: stock.exchange,
-                    uniqueSymbol
-                };
-                symbolToToken[uniqueSymbol] = stock.token;
-            }
-
-            // Load dynamically generated Spot Tokens for all options (handles commodities & obscure indices)
-            try {
-                const spotsData = fs.readFileSync(path.join(__dirname, '../database/spots.json'), 'utf8');
-                const spots = JSON.parse(spotsData);
-                for (const [uniqueKey, info] of Object.entries(spots)) {
-                    // Override or add to master
-                    STOCK_MASTER[info.token] = {
-                        symbol: info.symbol,
-                        name: info.name,
-                        exchange: info.exchange,
-                        uniqueSymbol: uniqueKey
-                    };
-                    symbolToToken[uniqueKey] = info.token;
-                }
-                console.log(`✅ Loaded ${Object.keys(spots).length} Spot mappings from spots.json`);
-            } catch (spotErr) {
-                console.warn('⚠️ Could not load spots.json - some Spot Prices for Options might fail.');
-            }
-
-            // Load dynamically generated Future Tokens
-            try {
-                const futuresData = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
-                const futures = JSON.parse(futuresData);
-                let futCount = 0;
-                for (const symbolFutures of Object.values(futures)) {
-                    for (const info of symbolFutures) {
-                        STOCK_MASTER[info.token] = {
-                            symbol: info.symbol,
-                            name: info.symbol,
-                            exchange: info.exchange,
-                            uniqueSymbol: info.symbol
-                        };
-                        symbolToToken[info.symbol] = info.token;
-                        futCount++;
-                    }
-                }
-                console.log(`✅ Loaded ${futCount} Future mappings from futures.json`);
-            } catch (futErr) {
-                console.warn('⚠️ Could not load futures.json');
-            }
-
-            allTokens = Object.keys(STOCK_MASTER);
-            console.log(`✅ Loaded ${allTokens.length} instruments (${nseStocks.length} total stocks)`);
+            allTokens = Object.keys({ ...indices, ...nseStocks }); // Only use indices and equities for base tokens!
+            console.log(`✅ Loaded ${Object.keys(STOCK_MASTER).length} instruments`);
             resolve();
         } catch (e) {
             console.error('Failed to load local instrument master:', e.message);
@@ -401,10 +366,15 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
     const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
 
     for (const data of dataArray) {
-        if (!data || !data.token) continue;
-        const token = data.token;
+        if (!data) continue;
         const uniqueSymbol = data.symbol;
-        const exchStr = data.exchange || 'NFO';
+        let token = data.token;
+        if (!token && symbolToToken[uniqueSymbol]) {
+            token = symbolToToken[uniqueSymbol];
+        }
+        if (!token) continue;
+
+        const exchStr = data.exchange || 'NFO'; // e.g. 'NFO'
         const exchangeCode = (exchStr === 'BSE' || exchStr === 'BFO') ? 3 : (exchStr === 'MCX' ? 5 : (exchStr === 'NFO' ? 2 : 1));
 
         if (!STOCK_MASTER[token]) {
