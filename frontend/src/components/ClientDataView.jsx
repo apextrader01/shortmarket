@@ -16,9 +16,15 @@ const LedgerSection = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
-        setLedger(data);
+        if (Array.isArray(data)) {
+          setLedger(data);
+        } else {
+          console.error("Ledger API returned non-array:", data);
+          setLedger([]);
+        }
       } catch (err) {
         console.error('Failed to fetch ledger:', err);
+        setLedger([]);
       } finally {
         setLoading(false);
       }
@@ -34,7 +40,7 @@ const LedgerSection = () => {
       
       {loading ? (
         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ledger...</div>
-      ) : ledger.length === 0 ? (
+      ) : (!ledger || !Array.isArray(ledger) || ledger.length === 0) ? (
         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No transactions found.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -274,7 +280,7 @@ export default function ClientDataView({ onDepositClick }) {
             {isUploading ? (
               <Loader2 size={24} className="animate-spin" color="#FFF" />
             ) : !user?.profile_picture_url ? (
-              user?.username ? user.username.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
+              user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
             ) : null}
             
             {!isUploading && (
@@ -300,7 +306,7 @@ export default function ClientDataView({ onDepositClick }) {
               Client ID: {user?.id}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
-              Available Margin: ₹{(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Available Margin: ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
