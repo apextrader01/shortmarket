@@ -599,61 +599,67 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
     const lookbackDays = LOOKBACK[interval] || 28;
     const from = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
     
-    try {
-        const payload = {
-            exchange: exchange,
-            symboltoken: token,
-            interval: interval,
-            fromdate: fmtDate(from),
-            todate: fmtDate(now)
-        };
-        
-        console.log(`Fetching candles for ${uniqueSymbol} with payload:`, payload);
+    let attempts = 0;
+    while (attempts < 3) {
+        try {
+            attempts++;
+            const payload = {
+                exchange: exchange,
+                symboltoken: token,
+                interval: interval,
+                fromdate: fmtDate(from),
+                todate: fmtDate(now)
+            };
+            
+            if (!smart_api.access_token) return [];
+            const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
+                signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${smart_api.access_token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-PrivateKey': process.env.ANGEL_API_KEY,
+                    'X-ClientLocalIP': '127.0.0.1',
+                    'X-ClientPublicIP': '127.0.0.1',
+                    'X-MACAddress': '00-00-00-00-00-00',
+                    'X-UserType': 'USER',
+                    'X-SourceID': 'WEB'
+                },
+                body: JSON.stringify(payload)
+            });
 
-        // Bypass SDK to ensure no token/header dropping bugs
-        if (!smart_api.access_token) return [];
-        const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
-            signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined,
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${smart_api.access_token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-PrivateKey': process.env.ANGEL_API_KEY,
-                'X-ClientLocalIP': '127.0.0.1',
-                'X-ClientPublicIP': '127.0.0.1',
-                'X-MACAddress': '00-00-00-00-00-00',
-                'X-UserType': 'USER',
-                'X-SourceID': 'WEB'
-            },
-            body: JSON.stringify(payload)
-        });
+            const text = await response.text();
+            
+            if (text.includes('Access denied') || text.includes('rate')) {
+                console.warn(`⏳ Rate limit hit for ${uniqueSymbol} chart, retrying in 1s...`);
+                await new Promise(r => setTimeout(r, 1000));
+                continue;
+            }
 
-        const res = await response.json();
-        
-        if (!res) {
-            console.error(`fetchCandleData returned empty for ${uniqueSymbol}`);
-            return [];
-        }
-        
-        if (!res.status || !res.data) {
-            console.error(`Angel One historical API error for ${uniqueSymbol}:`, res);
-            return [];
-        }
-        
-        // Angel One returns timestamps as IST strings ("2024-02-08T09:15:00+05:30")
-        // Shift by 19800 seconds (5h 30m) so Lightweight Charts displays it correctly in IST
-        return res.data.map(c => {
+            const res = JSON.parse(text);
+            
+            if (!res || !res.status || !res.data) {
+                console.error(`Angel One historical API error for ${uniqueSymbol}:`, res);
+                return [];
+            }
+            
+            // Angel One returns timestamps as IST strings ("2024-02-08T09:15:00+05:30")
+            // Shift by 19800 seconds (5h 30m) so Lightweight Charts displays it correctly in IST
+            return res.data.map(c => {
             const utcSeconds = Math.floor(new Date(c[0]).getTime() / 1000);
             return {
                 time: utcSeconds + 19800,
                 open: c[1], high: c[2], low: c[3], close: c[4], volume: c[5]
             };
         });
-    } catch (e) {
-        console.error(`fetchCandleData exception for ${uniqueSymbol}:`, e.message);
-        return [];
+        } catch (e) {
+            console.error(`fetchCandleData exception for ${uniqueSymbol}:`, e.message);
+            if (attempts >= 3) return [];
+            await new Promise(r => setTimeout(r, 1000));
+        }
     }
+    return [];
 }
 
 // ─── Broadcast LTPs to all subscribers & update cache ───────────────────────
