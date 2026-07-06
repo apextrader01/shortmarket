@@ -587,7 +587,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
     const now = new Date();
     // Adjust lookback per Angel One API limits & usefulness
     const LOOKBACK = {
-        'ONE_MINUTE':     30,    
+        'ONE_MINUTE':     28,    
         'THREE_MINUTE':   15,
         'FIVE_MINUTE':    28,
         'TEN_MINUTE':     28,
@@ -793,18 +793,18 @@ function startLiveWebSocket(io) {
 
         global_web_socket.on('error', () => {
             console.error('⚠️  WS error! Reconnecting in 5 seconds...');
-            setTimeout(() => startLiveWebSocket(io), 5000);
+            setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
         });
 
         global_web_socket.on('close', () => {
             console.warn('⚠️  WS closed! Reconnecting in 5 seconds...');
-            setTimeout(() => startLiveWebSocket(io), 5000);
+            setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
         });
 
     }).catch(err => {
         console.error('WS connect error:', err.message);
         console.log('🔄 Retrying WS connection in 5 seconds...');
-        setTimeout(() => startLiveWebSocket(io), 5000);
+        setTimeout(() => loginAngelOne(io, sharedPriceCache), 5000);
     });
 }
 
