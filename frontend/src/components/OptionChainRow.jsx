@@ -172,6 +172,8 @@ const OptionChainRow = React.memo(({
   );
 }, (prev, next) => {
   return prev.strike === next.strike &&
+         prev.call?.symbol === next.call?.symbol &&
+         prev.put?.symbol === next.put?.symbol &&
          prev.basePrice === next.basePrice &&
          prev.atmStrike === next.atmStrike &&
          prev.T === next.T &&
