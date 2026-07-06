@@ -587,7 +587,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
     const now = new Date();
     // Adjust lookback per Angel One API limits & usefulness
     const LOOKBACK = {
-        'ONE_MINUTE':     5,    
+        'ONE_MINUTE':     30,    
         'THREE_MINUTE':   15,
         'FIVE_MINUTE':    28,
         'TEN_MINUTE':     28,
@@ -697,13 +697,8 @@ async function loginAngelOne(io, externalPriceCache) {
 
             await broadcastLTPs(io);
 
-            if (isMarketOpen()) {
-                console.log('📈 Market OPEN → Starting live WebSocket...');
-                startLiveWebSocket(io);
-            } else {
-                console.log('📴 Market CLOSED → REST polling every 10s...');
-                setInterval(() => broadcastLTPs(io), 10000);
-            }
+            console.log('📈 Starting live WebSocket connection...');
+            startLiveWebSocket(io);
         } else {
             console.error('Login Failed:', loginSession.message);
         }
@@ -797,13 +792,19 @@ function startLiveWebSocket(io) {
         });
 
         global_web_socket.on('error', () => {
-            console.log('⚠️  WS error, falling back to REST polling');
-            setInterval(() => broadcastLTPs(io), 10000);
+            console.error('⚠️  WS error! Reconnecting in 5 seconds...');
+            setTimeout(() => startLiveWebSocket(io), 5000);
+        });
+
+        global_web_socket.on('close', () => {
+            console.warn('⚠️  WS closed! Reconnecting in 5 seconds...');
+            setTimeout(() => startLiveWebSocket(io), 5000);
         });
 
     }).catch(err => {
         console.error('WS connect error:', err.message);
-        setInterval(() => broadcastLTPs(io), 10000);
+        console.log('🔄 Retrying WS connection in 5 seconds...');
+        setTimeout(() => startLiveWebSocket(io), 5000);
     });
 }
 
