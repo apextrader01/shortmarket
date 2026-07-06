@@ -478,9 +478,22 @@ export const useStore = create(persist((set, get) => ({
         fetch(`${API}/api/user`,      { headers }),
       ]);
       const [positions, orders, user] = await Promise.all([
-        posRes.json(), ordRes.json(), userRes.json(),
+        posRes.json().catch(() => ({})), 
+        ordRes.json().catch(() => ({})), 
+        userRes.json().catch(() => ({}))
       ]);
-      set({ positions: positions || [], orders: orders || [], user: user || get().user });
+      
+      if (userRes.status === 401 || userRes.status === 403 || user?.error) {
+        console.error("Auth failed during fetchUserData, logging out.", user?.error);
+        get().logout();
+        return;
+      }
+      
+      set({ 
+        positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
+        orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
+        user: (user && !user.error) ? user : get().user 
+      });
       
       const posSymbols = (positions || []).map(p => p.symbol);
       if (posSymbols.length > 0) {
