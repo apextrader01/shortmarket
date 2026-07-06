@@ -345,8 +345,6 @@ export const useStore = create(persist((set, get) => ({
 
   setChartInterval: (interval) => {
     set({ chartInterval: interval });
-    const { selectedSymbol } = get();
-    if (selectedSymbol) get().loadCandleData(selectedSymbol, interval);
   },
 
   loadCandleData: async (symbol, interval) => {
@@ -590,8 +588,6 @@ export const useStore = create(persist((set, get) => ({
 
   setChartInterval: (interval) => {
     set({ chartInterval: interval });
-    const { selectedSymbol } = get();
-    if (selectedSymbol) get().loadCandleData(selectedSymbol, interval);
   },
 
   loadCandleData: async (symbol, interval) => {

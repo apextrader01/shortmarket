@@ -5,6 +5,7 @@ import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import ChartModal from './ChartModal';
 import AlertModal from './AlertModal';
+import OptionChainRow from './OptionChainRow';
 import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
 
 const API = '';
@@ -93,7 +94,6 @@ const OptionChainView = () => {
     fetchSymbols();
   }, []);
 
-  const prices = useStore((state) => state.prices);
   const openOrderModal = useStore((state) => state.openOrderModal);
   const subscribeToOptionBatch = useStore((state) => state.subscribeToOptionBatch);
   const unsubscribeFromOptionBatch = useStore((state) => state.unsubscribeFromOptionBatch);
@@ -180,15 +180,15 @@ const OptionChainView = () => {
   };
 
   const indexKey = getIndexKey(symbol);
-  const spotPriceData = indexKey ? (prices[indexKey] || {}) : {};
+  const spotPriceData = useStore(state => indexKey ? state.prices[indexKey] : undefined) || {};
   const spotPrice = spotPriceData.ltp || 0;
   const spotPct = spotPriceData.pct || 0;
   
-  const futPriceData = futureTokenKey ? prices[futureTokenKey] : null;
+  const futPriceData = useStore(state => futureTokenKey ? state.prices[futureTokenKey] : undefined);
   const futPrice = futPriceData?.ltp || 0;
   const futPct = futPriceData?.pct || 0;
 
-  const vixData = prices['INDIA VIX-NSE'] || {};
+  const vixData = useStore(state => state.prices['INDIA VIX-NSE']) || {};
   const vixPrice = vixData.ltp || 0;
   const vixPct = vixData.pct || 0;
   const vixChange = vixData.change || 0;
@@ -295,7 +295,8 @@ const OptionChainView = () => {
     
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
-      const priceData = prices[opt.symbol] || {};
+      const currentPrices = useStore.getState().prices;
+      const priceData = currentPrices[opt.symbol] || {};
       const price = priceData.ltp || 0;
       setStrategyLegs(prev => [...prev, {
         optionType,
@@ -324,7 +325,8 @@ const OptionChainView = () => {
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
       const finalQuantity = lotsize * (oneClickMultiplier || 1);
-      const livePrice = prices[opt.symbol]?.ltp || 0;
+      const currentPrices = useStore.getState().prices;
+      const livePrice = currentPrices[opt.symbol]?.ltp || 0;
       
       const payload = {
         symbol: opt.symbol,
@@ -676,201 +678,26 @@ const OptionChainView = () => {
             </tr>
           </thead>
           <tbody>
-            {strikes.map((strike) => {
-              const call = chain[strike].CE;
-              const put = chain[strike].PE;
-
-              const callPriceData = call ? prices[call.symbol] : null;
-              const putPriceData = put ? prices[put.symbol] : null;
-
-              const cLtp = callPriceData?.ltp || 0;
-              const pLtp = putPriceData?.ltp || 0;
-
-              // Calculate IV
-              let cIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r) : 0;
-              let pIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r) : 0;
-
-              // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
-              // We mirror the IV from the OTM side (which is always valid) for the same strike.
-              if (cIV === 0 && pIV > 0) cIV = pIV;
-              if (pIV === 0 && cIV > 0) pIV = cIV;
-
-              // Calculate Greeks
-              const cGreeks = (cIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
-              const pGreeks = (pIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, pIV) : { delta: 0, theta: 0, vega: 0 };
-
-              const isCallITM = basePrice > 0 && strike < basePrice;
-              const isPutITM = basePrice > 0 && strike > basePrice;
-
-              const cBreakeven = cLtp > 0 ? strike + cLtp : 0;
-              const pBreakeven = pLtp > 0 ? strike - pLtp : 0;
-              
-              const cBreakPct = (cBreakeven > 0 && basePrice > 0) ? ((cBreakeven / basePrice) - 1) * 100 : 0;
-              const pBreakPct = (pBreakeven > 0 && basePrice > 0) ? ((pBreakeven / basePrice) - 1) * 100 : 0;
-
-              return (
-                <tr key={strike} ref={strike === atmStrike ? atmRowRef : null}>
-                  {/* Calls */}
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(2) : '-'}</td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--color-yellow)' }}>{cIV > 0 ? (cIV * 100).toFixed(1) + '%' : '-'}</td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>{callPriceData?.volume || '-'}</td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {callPriceData?.change ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-                        <span style={{ fontSize: '11px' }}>{callPriceData.change > 0 ? '+' : ''}{callPriceData.change.toFixed(2)}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>
-                          ({callPriceData.pct > 0 ? '+' : ''}{callPriceData.pct?.toFixed(1) || '0.0'}%)
-                        </span>
-                      </div>
-                    ) : '-'}
-                  </td>
-                  <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                      <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-                        <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                          {cLtp > 0 ? cLtp.toFixed(2) : '-'}
-                        </span>
-                        <div className="action-buttons">
-                          <button 
-                            onClick={() => handleTrade(call, 'BUY', 'CE', cIV)} 
-                            className={`btn-mini buy ${oneClickMode ? 'one-click-active' : ''}`}
-                            title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
-                          >B</button>
-                          <button 
-                            onClick={() => handleTrade(call, 'SELL', 'CE', cIV)} 
-                            className={`btn-mini sell ${oneClickMode ? 'one-click-active' : ''}`}
-                            title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
-                          >S</button>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        <button 
-                          onClick={() => setAlertModalSymbol(call.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="Set Price Alert"
-                        >
-                          <Bell size={14} />
-                        </button>
-                        <button 
-                          onClick={() => setChartModalSymbol(call.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="View Chart"
-                        >
-                          <BarChart2 size={14} />
-                        </button>
-                        <button 
-                          onClick={() => openMarketDepthModal(call.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="Market Depth"
-                        >
-                          <AlignLeft size={14} />
-                        </button>
-                        <button 
-                          onClick={() => openDomLadderModal(call.symbol, parseInt(opt.lotsize) || 1)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="DOM Ladder"
-                        >
-                          <List size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                  <td className={`center border-right ${isCallITM ? 'bg-itm-call' : ''}`}>
-                    {cBreakeven > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-                        <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{cBreakeven.toFixed(1)}</span>
-                        <span style={{ fontSize: '10px', color: cBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                          {cBreakPct > 0 ? '+' : ''}{cBreakPct.toFixed(1)}%
-                        </span>
-                      </div>
-                    ) : '-'}
-                  </td>
-
-                  {/* Strike */}
-                  <td className="strike-cell">{strike}</td>
-
-                  {/* Puts */}
-                  <td className={`center border-left ${isPutITM ? 'bg-itm-put' : ''}`}>
-                    {pBreakeven > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-                        <span style={{ fontSize: '11px', color: '#E2E8F0' }}>{pBreakeven.toFixed(1)}</span>
-                        <span style={{ fontSize: '10px', color: pBreakPct >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                          {pBreakPct > 0 ? '+' : ''}{pBreakPct.toFixed(1)}%
-                        </span>
-                      </div>
-                    ) : '-'}
-                  </td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                      <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-                        <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                          {pLtp > 0 ? pLtp.toFixed(2) : '-'}
-                        </span>
-                        <div className="action-buttons">
-                          <button 
-                            onClick={() => handleTrade(put, 'BUY', 'PE', pIV)} 
-                            className={`btn-mini buy ${oneClickMode ? 'one-click-active' : ''}`}
-                            title={oneClickMode ? `INSTANT BUY ${oneClickMultiplier}x LOTS` : 'Buy'}
-                          >B</button>
-                          <button 
-                            onClick={() => handleTrade(put, 'SELL', 'PE', pIV)} 
-                            className={`btn-mini sell ${oneClickMode ? 'one-click-active' : ''}`}
-                            title={oneClickMode ? `INSTANT SELL ${oneClickMultiplier}x LOTS` : 'Sell'}
-                          >S</button>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '2px' }}>
-                        <button 
-                          onClick={() => setAlertModalSymbol(put.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="Set Price Alert"
-                        >
-                          <Bell size={14} />
-                        </button>
-                        <button 
-                          onClick={() => setChartModalSymbol(put.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="View Chart"
-                        >
-                          <BarChart2 size={14} />
-                        </button>
-                        <button 
-                          onClick={() => openMarketDepthModal(put.symbol)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="Market Depth"
-                        >
-                          <AlignLeft size={14} />
-                        </button>
-                        <button 
-                          onClick={() => openDomLadderModal(put.symbol, parseInt(opt.lotsize) || 1)}
-                          style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
-                          title="DOM Ladder"
-                        >
-                          <List size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                    {putPriceData?.change ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.3' }}>
-                        <span style={{ fontSize: '11px' }}>{putPriceData.change > 0 ? '+' : ''}{putPriceData.change.toFixed(2)}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>
-                          ({putPriceData.pct > 0 ? '+' : ''}{putPriceData.pct?.toFixed(1) || '0.0'}%)
-                        </span>
-                      </div>
-                    ) : '-'}
-                  </td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`}>{putPriceData?.volume || '-'}</td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--color-yellow)' }}>{pIV > 0 ? (pIV * 100).toFixed(1) + '%' : '-'}</td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(2) : '-'}</td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(2) : '-'}</td>
-                  <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
-                </tr>
-              );
-            })}
+            {strikes.map((strike) => (
+              <OptionChainRow
+                key={strike}
+                strike={strike}
+                call={chain[strike].CE}
+                put={chain[strike].PE}
+                basePrice={basePrice}
+                atmStrike={atmStrike}
+                atmRowRef={atmRowRef}
+                T={T}
+                r={r}
+                oneClickMode={oneClickMode}
+                oneClickMultiplier={oneClickMultiplier}
+                handleTrade={handleTrade}
+                setAlertModalSymbol={setAlertModalSymbol}
+                setChartModalSymbol={setChartModalSymbol}
+                openMarketDepthModal={openMarketDepthModal}
+                openDomLadderModal={openDomLadderModal}
+              />
+            ))}
           </tbody>
         </table>
         )}
