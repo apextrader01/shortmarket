@@ -404,7 +404,32 @@ export const useStore = create(persist((set, get) => ({
       get().setMarketDepthData(data);
     });
 
-    socket.on('connect', () => get().refreshPrices());
+    socket.on('connect', () => {
+      console.log('Socket connected, refreshing and resubscribing...');
+      get().refreshPrices();
+      
+      // Resubscribe to active watchlist
+      const { watchlists, activeWatchlistId, subscribeToOptionBatch, positions } = get();
+      const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
+      
+      const tokensToSub = [];
+      if (activeWatchlist && activeWatchlist.symbols) {
+        activeWatchlist.symbols.forEach(sym => {
+          tokensToSub.push({ symbol: sym, exchange: sym.split('-')[1] || 'NSE' });
+        });
+      }
+      
+      // Resubscribe to positions
+      if (positions && positions.length > 0) {
+        positions.forEach(pos => {
+          tokensToSub.push({ symbol: pos.symbol, exchange: pos.symbol.split('-')[1] || 'NSE' });
+        });
+      }
+      
+      if (tokensToSub.length > 0) {
+        subscribeToOptionBatch(tokensToSub);
+      }
+    });
   },
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
