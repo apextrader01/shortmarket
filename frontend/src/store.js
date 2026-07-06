@@ -145,21 +145,21 @@ export const useStore = create(persist((set, get) => ({
   },
 
   renameWatchlist: (id, newName) => {
-    if (get().watchlists.some(w => w.id !== id && w.name.toLowerCase() === newName.toLowerCase())) {
+    if (get().watchlists.some(w => String(w.id) !== String(id) && w.name.toLowerCase() === newName.toLowerCase())) {
       alert(`Watchlist "${newName}" already exists!`);
       return;
     }
-    const newWatchlists = get().watchlists.map(w => w.id === id ? { ...w, name: newName } : w);
+    const newWatchlists = get().watchlists.map(w => String(w.id) === String(id) ? { ...w, name: newName } : w);
     set({ watchlists: newWatchlists });
     get().syncWatchlists(newWatchlists);
   },
 
   deleteWatchlist: (id) => {
-    let newWatchlists = get().watchlists.filter(w => w.id !== id);
+    let newWatchlists = get().watchlists.filter(w => String(w.id) !== String(id));
     if (newWatchlists.length === 0) newWatchlists = [{ id: 1, name: 'Watchlist 1', symbols: [] }];
     set({
       watchlists:        newWatchlists,
-      activeWatchlistId: get().activeWatchlistId === id ? newWatchlists[0].id : get().activeWatchlistId,
+      activeWatchlistId: String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId,
     });
     get().syncWatchlists(newWatchlists);
   },
@@ -168,7 +168,7 @@ export const useStore = create(persist((set, get) => ({
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
     const newWatchlists = get().watchlists.map(w => {
-      if (w.id === watchlistId && !w.symbols.includes(uniqueSymbol)) {
+      if (String(w.id) === String(watchlistId) && !w.symbols.includes(uniqueSymbol)) {
         return { ...w, symbols: [...w.symbols, uniqueSymbol] };
       }
       return w;

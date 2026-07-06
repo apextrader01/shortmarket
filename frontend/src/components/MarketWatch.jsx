@@ -14,7 +14,7 @@ export default function MarketWatch({ className = '' }) {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
+  const activeWatchlist = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
   const isSearchMode = searchQuery.trim().length > 0;
 
   React.useEffect(() => {
@@ -86,7 +86,7 @@ export default function MarketWatch({ className = '' }) {
         {watchlists.map(w => (
           <div
             key={w.id}
-            onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); }}
+            onClick={() => { setActiveWatchlist(w.id); setSearchQuery(''); setSearchResults([]); }}
             onDoubleClick={() => { 
               const newName = prompt('Rename watchlist:', w.name); 
               if (newName && newName.trim()) renameWatchlist(w.id, newName.trim()); 
@@ -95,9 +95,9 @@ export default function MarketWatch({ className = '' }) {
             style={{
               padding: '12px 14px',
               fontSize: '12px',
-              fontWeight: activeWatchlistId === w.id ? '600' : '500',
-              color: activeWatchlistId === w.id ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: activeWatchlistId === w.id ? '2px solid var(--color-blue)' : '2px solid transparent',
+              fontWeight: String(activeWatchlistId) === String(w.id) ? '600' : '500',
+              color: String(activeWatchlistId) === String(w.id) ? 'var(--color-blue)' : 'var(--text-secondary)',
+              borderBottom: String(activeWatchlistId) === String(w.id) ? '2px solid var(--color-blue)' : '2px solid transparent',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               transition: 'all 0.2s ease',
@@ -108,7 +108,7 @@ export default function MarketWatch({ className = '' }) {
             }}
           >
             {w.name}
-            {watchlists.length > 1 && activeWatchlistId === w.id && (
+            {watchlists.length > 1 && String(activeWatchlistId) === String(w.id) && (
                <X size={12} onClick={(e) => { e.stopPropagation(); deleteWatchlist(w.id); }} style={{ opacity: 0.5, cursor: 'pointer' }} />
             )}
           </div>
