@@ -422,13 +422,21 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
     }
 
     if (global_web_socket) {
-        for (const [exchCode, tokens] of Object.entries(tokensByExchange)) {
+        let delayMs = 0;
+        for (const [exchCodeStr, tokens] of Object.entries(tokensByExchange)) {
+            const exchCode = parseInt(exchCodeStr);
             if (tokens.length > 0) {
                 for (let i = 0; i < tokens.length; i += 50) {
-                    global_web_socket.fetchData({
-                        correlationID: `batch_sub_${Date.now()}_${i}`,
-                        action: 1, mode: 1, exchangeType: parseInt(exchCode), tokens: tokens.slice(i, i + 50)
-                    });
+                    const batch = tokens.slice(i, i + 50);
+                    setTimeout(() => {
+                        if (global_web_socket) {
+                            global_web_socket.fetchData({
+                                correlationID: `batch_sub_${Date.now()}_${i}`,
+                                action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                            });
+                        }
+                    }, delayMs);
+                    delayMs += 350;
                 }
             }
         }
@@ -728,27 +736,31 @@ function startLiveWebSocket(io) {
     global_web_socket.connect().then(() => {
         console.log('🔌 WebSocket Connected!');
 
-        // Subscribe in batches of 50, but max 300 base + dynamic client subs to avoid websocket overload
         const baseTokens = allTokens.slice(0, 300);
         const tokensToSubscribe = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
         
-        for (let i = 0; i < tokensToSubscribe.length; i += BATCH) {
-            const batch = tokensToSubscribe.slice(i, i + BATCH);
-            // Split into NSE and BSE
-            const nseBatch = batch.filter(t => STOCK_MASTER[t]?.exchange !== 'BSE');
-            const bseBatch = batch.filter(t => STOCK_MASTER[t]?.exchange === 'BSE');
-
-            if (nseBatch.length > 0) {
-                global_web_socket.fetchData({
-                    correlationID: `short_market_nse_${i}`,
-                    action: 1, mode: 1, exchangeType: 1, tokens: nseBatch
-                });
-            }
-            if (bseBatch.length > 0) {
-                global_web_socket.fetchData({
-                    correlationID: `short_market_bse_${i}`,
-                    action: 1, mode: 1, exchangeType: 3, tokens: bseBatch
-                });
+        // Group by exchangeCode
+        const byExch = { 1: [], 2: [], 3: [], 5: [] };
+        tokensToSubscribe.forEach(t => {
+            const exch = STOCK_MASTER[t]?.exchange || 'NSE';
+            const exchCode = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
+            byExch[exchCode].push(t);
+        });
+        
+        let delayMs = 0;
+        for (const [exchCodeStr, tokens] of Object.entries(byExch)) {
+            const exchCode = parseInt(exchCodeStr);
+            for (let i = 0; i < tokens.length; i += 50) {
+                const batch = tokens.slice(i, i + 50);
+                setTimeout(() => {
+                    if (global_web_socket) {
+                        global_web_socket.fetchData({
+                            correlationID: `short_market_init_${exchCode}_${i}`,
+                            action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                        });
+                    }
+                }, delayMs);
+                delayMs += 350; // Delay to prevent WebSocket limit of 3 requests per second
             }
         }
 
@@ -820,7 +832,7 @@ function subscribeToDepth(uniqueSymbol) {
     const token = symbolToToken[uniqueSymbol];
     if (!token) return;
     const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-    const exchangeType = exch === 'BSE' ? 3 : 1;
+    const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
     
     global_web_socket.fetchData({
         correlationID: `depth_sub_${token}`,
@@ -833,7 +845,7 @@ function unsubscribeFromDepth(uniqueSymbol) {
     const token = symbolToToken[uniqueSymbol];
     if (!token) return;
     const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-    const exchangeType = exch === 'BSE' ? 3 : 1;
+    const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
     
     global_web_socket.fetchData({
         correlationID: `depth_unsub_${token}`,
