@@ -27,26 +27,31 @@ export default function AdminDashboard() {
 
   const loadData = async () => {
     setLoading(true);
-    if (activeTab === 'users') {
-      const res = await fetchAdminUsers();
-      if (res.success) setUsers(res.users);
-    } else if (activeTab === 'deposits') {
-      const res = await fetchDepositRequests();
-      if (res.success) setDeposits(res.deposits);
-    } else if (activeTab === 'analytics') {
-      const res = await fetchAdminAnalytics();
-      if (res.success) setAnalytics(res.data);
-    } else if (activeTab === 'orders') {
-      const res = await fetchAdminOrders();
-      if (res.success) setOrders(res.orders);
-    } else if (activeTab === 'positions') {
-      const res = await fetchAdminPositions();
-      if (res.success) setPositions(res.positions);
-    } else if (activeTab === 'ledger') {
-      const res = await fetchAdminLedger();
-      if (res.success) setLedger(res.ledger);
+    try {
+      if (activeTab === 'users') {
+        const res = await fetchAdminUsers?.();
+        if (res?.success) setUsers(res.users || []);
+      } else if (activeTab === 'deposits') {
+        const res = await fetchDepositRequests?.();
+        if (res?.success) setDeposits(res.deposits || []);
+      } else if (activeTab === 'analytics') {
+        const res = await fetchAdminAnalytics?.();
+        if (res?.success) setAnalytics(res.data);
+      } else if (activeTab === 'orders') {
+        const res = await fetchAdminOrders?.();
+        if (res?.success) setOrders(res.orders || []);
+      } else if (activeTab === 'positions') {
+        const res = await fetchAdminPositions?.();
+        if (res?.success) setPositions(res.positions || []);
+      } else if (activeTab === 'ledger') {
+        const res = await fetchAdminLedger?.();
+        if (res?.success) setLedger(res.ledger || []);
+      }
+    } catch (err) {
+      console.error("Error loading admin data:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -214,20 +219,20 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 ? (
+              {(!orders || orders.length === 0) ? (
                 <tr>
                   <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders found</td>
                 </tr>
               ) : (
                 orders.map(o => (
                   <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{o.username}</div></td>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
                     <td style={{ padding: '16px', fontWeight: '600' }}>{o.symbol}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)' }}>{o.side}</span> {o.type}
                     </td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>{o.quantity} @ ₹{(o.average_price || o.price || 0).toFixed(2)}</td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>{o.quantity} @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <span style={{ 
                         color: o.status === 'EXECUTED' ? 'var(--color-green-light)' : o.status === 'REJECTED' ? 'var(--color-red-light)' : 'var(--color-yellow)',
@@ -252,17 +257,17 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {positions.length === 0 ? (
+              {(!positions || positions.length === 0) ? (
                 <tr>
                   <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active positions found</td>
                 </tr>
               ) : (
                 positions.map(p => (
                   <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{p.username}</div></td>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</div></td>
                     <td style={{ padding: '16px', fontWeight: '600' }}>{p.symbol}</td>
                     <td style={{ padding: '16px', textAlign: 'right', color: p.quantity > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>{p.quantity}</td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{p.average_price.toFixed(2)}</td>
+                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(p.average_price || 0).toFixed(2)}</td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <button 
                         onClick={() => handleForceClose(p.id)}
@@ -289,21 +294,21 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {ledger.length === 0 ? (
+              {(!ledger || ledger.length === 0) ? (
                 <tr>
                   <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No ledger entries found</td>
                 </tr>
               ) : (
                 ledger.map(l => (
                   <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{new Date(l.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{l.username}</div></td>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
+                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
                     <td style={{ padding: '16px' }}>
                       <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.description}</td>
                     <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                      {l.amount >= 0 ? '+' : ''}₹{l.amount.toFixed(2)}
+                      {l.amount >= 0 ? '+' : ''}₹{Number(l.amount || 0).toFixed(2)}
                     </td>
                   </tr>
                 ))
