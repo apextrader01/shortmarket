@@ -195,9 +195,22 @@ export default function ChartWidget() {
     if (!mountedRef.current || !candleSeriesRef.current || candles.length === 0) return;
 
     try {
-      candleSeriesRef.current.setData(candles);
+      // Deduplicate candles by time to prevent Lightweight Charts from silently crashing
+      const uniqueCandles = [];
+      const seenTime = new Set();
+      for (const c of candles) {
+        if (!seenTime.has(c.time)) {
+          seenTime.add(c.time);
+          uniqueCandles.push(c);
+        }
+      }
 
-      const volData = candles.map(c => ({
+      // Ensure they are strictly sorted by time just in case
+      uniqueCandles.sort((a, b) => a.time - b.time);
+
+      candleSeriesRef.current.setData(uniqueCandles);
+
+      const volData = uniqueCandles.map(c => ({
         time:  c.time,
         value: c.volume || 0,
         color: c.close >= c.open ? 'rgba(38,166,154,0.45)' : 'rgba(239,83,80,0.45)',
@@ -205,8 +218,8 @@ export default function ChartWidget() {
       volumeSeriesRef.current?.setData(volData);
 
       // Compute Indicators
-      const closePrices = candles.map(c => c.close);
-      const times = candles.map(c => c.time);
+      const closePrices = uniqueCandles.map(c => c.close);
+      const times = uniqueCandles.map(c => c.time);
 
       if (showSMA && smaSeriesRef.current) {
         const smaPeriod = 20;
