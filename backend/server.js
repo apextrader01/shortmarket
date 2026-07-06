@@ -80,14 +80,20 @@ app.get('/api/stocks', (req, res) => {
     const { STOCK_MASTER } = require('./services/angelOne');
     if (!STOCK_MASTER) return res.json([]);
 
-    const query = q.toLowerCase();
+    const queryParts = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const matchesQuery = (str) => {
+      if (!str) return false;
+      const lowerStr = str.toLowerCase();
+      return queryParts.every(part => lowerStr.includes(part));
+    };
+
     const results = [];
     
     for (const [key, value] of Object.entries(STOCK_MASTER)) {
       if (!value) continue;
       
       if (value.symbol && value.name) {
-        if (value.symbol.toLowerCase().includes(query) || value.name.toLowerCase().includes(query)) {
+        if (matchesQuery(value.symbol) || matchesQuery(value.name)) {
           results.push({
             token: key, 
             symbol: value.symbol, 
@@ -98,7 +104,7 @@ app.get('/api/stocks', (req, res) => {
         }
       } else if (Array.isArray(value)) {
         for (const fut of value) {
-          if (fut && fut.symbol && fut.symbol.toLowerCase().includes(query)) {
+          if (fut && fut.symbol && matchesQuery(fut.symbol)) {
              results.push({
                token: fut.token, symbol: fut.symbol, name: key, 
                exchange: fut.exchange || 'NFO', uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
@@ -112,7 +118,7 @@ app.get('/api/stocks', (req, res) => {
              if (typeof value[expiry][strike] !== 'object') continue;
              for (const type in value[expiry][strike]) {
                 const opt = value[expiry][strike][type];
-                if (opt && opt.symbol && opt.symbol.toLowerCase().includes(query)) {
+                if (opt && opt.symbol && matchesQuery(opt.symbol)) {
                    results.push({
                      token: opt.token, symbol: opt.symbol, name: key, 
                      exchange: opt.exch_seg || 'NFO', uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
@@ -126,7 +132,7 @@ app.get('/api/stocks', (req, res) => {
       if (results.length >= 100) break;
     }
     
-    res.json(results.slice(0, 100));
+    res.json(results);
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
