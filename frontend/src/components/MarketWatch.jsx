@@ -11,15 +11,33 @@ export default function MarketWatch({ className = '' }) {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredStock, setHoveredStock] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
   const isSearchMode = searchQuery.trim().length > 0;
 
-  // Search Results Mode
-  const searchResults = isSearchMode ? stocks.filter(s =>
-    s.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 100) : [];
+  React.useEffect(() => {
+    if (!isSearchMode) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (e) {
+        console.error("Search error:", e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, isSearchMode]);
 
   // Watchlist Mode
   const watchlistStocks = !isSearchMode ? activeWatchlist.symbols.map(sym => {

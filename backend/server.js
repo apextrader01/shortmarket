@@ -73,6 +73,32 @@ app.get('/api/stocks', (req, res) => {
   res.json(cachedStocksArray);
 });
 
+  app.get('/api/stocks/search', (req, res) => {
+    const q = req.query.q;
+    if (!q || q.length < 2) return res.json([]);
+    
+    const { STOCK_MASTER } = require('./services/angelOne');
+    if (!STOCK_MASTER) return res.json([]);
+
+    const query = q.toLowerCase();
+    const results = [];
+    
+    for (const [token, info] of Object.entries(STOCK_MASTER)) {
+      if (info.symbol.toLowerCase().includes(query) || info.name.toLowerCase().includes(query)) {
+        results.push({
+          token, 
+          symbol: info.symbol, 
+          name: info.name, 
+          exchange: info.exchange, 
+          uniqueSymbol: info.uniqueSymbol
+        });
+        if (results.length >= 100) break;
+      }
+    }
+    
+    res.json(results);
+  });
+
 // ─── Auth ───────────────────────────────────────────────────────────────────
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
