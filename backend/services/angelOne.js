@@ -764,47 +764,50 @@ function startLiveWebSocket(io) {
         }
 
         global_web_socket.on('tick', (receiveData) => {
-            const data = Array.isArray(receiveData) ? receiveData[0] : receiveData;
-            if (!data?.token) return;
-            const info = STOCK_MASTER[data.token];
+            const dataArray = Array.isArray(receiveData) ? receiveData : [receiveData];
             
-            // Handle Mode 3 (SnapQuote) Depth Data
-            if (info && data.best_5_buy_data && data.best_5_sell_data) {
-                const mapDepthItem = (item) => ({
-                    price: (item.price / 100).toFixed(2),
-                    qty: item.quantity,
-                    orders: item.no_of_orders
-                });
+            for (const data of dataArray) {
+                if (!data?.token) continue;
+                const info = STOCK_MASTER[data.token];
                 
-                const depthData = {
-                    symbol: info.uniqueSymbol,
-                    bids: data.best_5_buy_data.map(mapDepthItem),
-                    asks: data.best_5_sell_data.map(mapDepthItem),
-                    // Extra SnapQuote details
-                    open: data.open_price_of_the_day ? (data.open_price_of_the_day / 100).toFixed(2) : null,
-                    high: data.high_price_of_the_day ? (data.high_price_of_the_day / 100).toFixed(2) : null,
-                    low: data.low_price_of_the_day ? (data.low_price_of_the_day / 100).toFixed(2) : null,
-                    close: data.closed_price ? (data.closed_price / 100).toFixed(2) : null,
-                    ltp: data.last_traded_price ? (data.last_traded_price / 100).toFixed(2) : null,
-                    ltq: data.last_traded_quantity || null,
-                    volume: data.volume_trade_for_the_day || 0,
-                    avgPrice: data.average_traded_price ? (data.average_traded_price / 100).toFixed(2) : null,
-                    ltt: data.last_traded_timestamp ? new Date(data.last_traded_timestamp * 1000).toLocaleString('en-GB') : null,
-                    lowerCircuit: data.lower_circuit_limit ? (data.lower_circuit_limit / 100).toFixed(2) : null,
-                    upperCircuit: data.upper_circuit_limit ? (data.upper_circuit_limit / 100).toFixed(2) : null,
-                };
-                
-                io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
-            }
+                // Handle Mode 3 (SnapQuote) Depth Data
+                if (info && data.best_5_buy_data && data.best_5_sell_data) {
+                    const mapDepthItem = (item) => ({
+                        price: (item.price / 100).toFixed(2),
+                        qty: item.quantity,
+                        orders: item.no_of_orders
+                    });
+                    
+                    const depthData = {
+                        symbol: info.uniqueSymbol,
+                        bids: data.best_5_buy_data.map(mapDepthItem),
+                        asks: data.best_5_sell_data.map(mapDepthItem),
+                        // Extra SnapQuote details
+                        open: data.open_price_of_the_day ? (data.open_price_of_the_day / 100).toFixed(2) : null,
+                        high: data.high_price_of_the_day ? (data.high_price_of_the_day / 100).toFixed(2) : null,
+                        low: data.low_price_of_the_day ? (data.low_price_of_the_day / 100).toFixed(2) : null,
+                        close: data.closed_price ? (data.closed_price / 100).toFixed(2) : null,
+                        ltp: data.last_traded_price ? (data.last_traded_price / 100).toFixed(2) : null,
+                        ltq: data.last_traded_quantity || null,
+                        volume: data.volume_trade_for_the_day || 0,
+                        avgPrice: data.average_traded_price ? (data.average_traded_price / 100).toFixed(2) : null,
+                        ltt: data.last_traded_timestamp ? new Date(data.last_traded_timestamp * 1000).toLocaleString('en-GB') : null,
+                        lowerCircuit: data.lower_circuit_limit ? (data.lower_circuit_limit / 100).toFixed(2) : null,
+                        upperCircuit: data.upper_circuit_limit ? (data.upper_circuit_limit / 100).toFixed(2) : null,
+                    };
+                    
+                    io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
+                }
 
-            // Handle Mode 1 (LTP) Data
-            if (info && data.last_traded_price) {
-                const ltp = data.last_traded_price / 100;
-                processTick(info.uniqueSymbol, ltp);
-                io.to(info.uniqueSymbol).emit('market_data', {
-                    symbol: info.uniqueSymbol, ltp,
-                    timestamp: new Date().toISOString()
-                });
+                // Handle Mode 1 (LTP) Data
+                if (info && data.last_traded_price) {
+                    const ltp = data.last_traded_price / 100;
+                    processTick(info.uniqueSymbol, ltp);
+                    io.to(info.uniqueSymbol).emit('market_data', {
+                        symbol: info.uniqueSymbol, ltp,
+                        timestamp: new Date().toISOString()
+                    });
+                }
             }
         });
 
