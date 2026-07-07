@@ -26,7 +26,8 @@ async function updateOptionsMaster() {
 
     for (const item of data) {
       // Filter out BSE Futures & Options (BFO) to avoid duplicate mixed expiries
-      if (item.exch_seg === 'BFO') {
+      // Keep SENSEX and BANKEX as they are exclusive to BSE
+      if (item.exch_seg === 'BFO' && !['SENSEX', 'BANKEX'].includes(item.name)) {
         continue;
       }
 
