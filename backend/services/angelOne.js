@@ -324,6 +324,7 @@ function fmtDate(d) {
 }
 
 let global_web_socket = null;
+let global_pollInterval = null;
 const clientSubscriptions = new Set();
 
 // Helper: Look up an option/future/commodity token from globalNfoOptions/globalNfoFutures by symbol string
@@ -790,6 +791,22 @@ async function loginAngelOne(io, externalPriceCache) {
 
             console.log('📈 Starting live WebSocket connection...');
             startLiveWebSocket(io);
+            
+            // Periodic REST polling as a fallback (every 10 seconds during market hours)
+            // This ensures derivatives (options/futures/commodities) always get fresh prices,
+            // even if the Angel One WebSocket doesn't deliver ticks for them.
+            if (!global_pollInterval) {
+                global_pollInterval = setInterval(async () => {
+                    if (isMarketOpen() && clientSubscriptions.size > 0) {
+                        try {
+                            await broadcastLTPs(io);
+                        } catch (e) {
+                            console.error('Periodic poll error:', e.message);
+                        }
+                    }
+                }, 10000); // Every 10 seconds
+                console.log('⏱️  Started periodic REST polling (every 10s during market hours)');
+            }
         } else {
             console.error('Login Failed:', loginSession.message);
         }
@@ -881,10 +898,37 @@ function startLiveWebSocket(io) {
                 if (info && data.last_traded_price) {
                     const ltp = data.last_traded_price / 100;
                     processTick(info.uniqueSymbol, ltp);
-                    io.to(info.uniqueSymbol).emit('market_data', {
-                        symbol: info.uniqueSymbol, ltp,
+                    
+                    // Build full price entry with OHLC if available
+                    const entry = {
+                        symbol: info.uniqueSymbol,
+                        ltp,
                         timestamp: new Date().toISOString()
-                    });
+                    };
+                    
+                    // Include OHLC data if present in tick (Mode 2/3 ticks include these)
+                    if (data.open_price_of_the_day) entry.open = data.open_price_of_the_day / 100;
+                    if (data.high_price_of_the_day) entry.high = data.high_price_of_the_day / 100;
+                    if (data.low_price_of_the_day) entry.low = data.low_price_of_the_day / 100;
+                    if (data.closed_price) entry.close = data.closed_price / 100;
+                    if (data.volume_trade_for_the_day) entry.volume = data.volume_trade_for_the_day;
+                    
+                    // Calculate change from close
+                    const closePrice = entry.close || (sharedPriceCache[info.uniqueSymbol]?.close);
+                    if (closePrice) {
+                        entry.change = parseFloat((ltp - closePrice).toFixed(2));
+                        entry.pct = parseFloat(((ltp - closePrice) / closePrice * 100).toFixed(2));
+                    }
+                    
+                    // Update the shared price cache so REST /api/prices also stays fresh
+                    if (sharedPriceCache) {
+                        sharedPriceCache[info.uniqueSymbol] = { 
+                            ...sharedPriceCache[info.uniqueSymbol], 
+                            ...entry 
+                        };
+                    }
+                    
+                    io.to(info.uniqueSymbol).emit('market_data', entry);
                 }
             }
         });
