@@ -445,7 +445,9 @@ async function addSubscription(data, io, priceCache) {
 
     enrichLotsize(token, uniqueSymbol);
 
-    if (!clientSubscriptions.has(token)) {
+    const isNewSub = !clientSubscriptions.has(token);
+
+    if (isNewSub) {
         clientSubscriptions.add(token);
         
         // If websocket is running, dynamically subscribe to the new token
@@ -475,7 +477,7 @@ async function addSubscription(data, io, priceCache) {
         }
     }
 
-    if (!clientSubscriptions.has(token)) {
+    if (isNewSub || !priceCache || !priceCache[uniqueSymbol]?.ltp) {
         // Immediately fetch the price via REST
         try {
             const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
