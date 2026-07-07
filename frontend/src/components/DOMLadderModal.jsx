@@ -34,8 +34,11 @@ export default function DOMLadderModal() {
   if (!domLadderModal.isOpen || !symbol) return null;
 
   // Use real data from store, fallback to empty array
-  const bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  const asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  const rawBids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
+  const rawAsks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+
+  const bids = rawBids.map(b => ({ ...b, qty: Math.round(b.qty / lotsize) }));
+  const asks = rawAsks.map(a => ({ ...a, qty: Math.round(a.qty / lotsize) }));
 
   // Generate a price ladder (e.g., 20 ticks above and 20 ticks below centerPrice)
   // Standard Indian market tick size is 0.05

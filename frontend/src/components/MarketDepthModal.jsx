@@ -10,6 +10,7 @@ export default function MarketDepthModal() {
   } = useStore();
 
   const symbol = marketDepthModal.symbol;
+  const lotSize = marketDepthModal.lotsize || 1;
   const basicData = prices[symbol] || {};
 
   useEffect(() => {
@@ -48,8 +49,11 @@ export default function MarketDepthModal() {
     ];
   }
 
-  const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? marketDepthData.totBuyQuan : bids.reduce((sum, b) => sum + (b.qty || 0), 0);
-  const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? marketDepthData.totSellQuan : asks.reduce((sum, a) => sum + (a.qty || 0), 0);
+  const displayBids = bids.map(b => ({ ...b, qty: Math.round(b.qty / lotSize) }));
+  const displayAsks = asks.map(a => ({ ...a, qty: Math.round(a.qty / lotSize) }));
+
+  const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? Math.round(marketDepthData.totBuyQuan / lotSize) : displayBids.reduce((sum, b) => sum + (b.qty || 0), 0);
+  const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? Math.round(marketDepthData.totSellQuan / lotSize) : displayAsks.reduce((sum, a) => sum + (a.qty || 0), 0);
   
   // Calculate width ratio for progress bars
   const totalVol = totalBidQty + totalAskQty;
@@ -108,7 +112,7 @@ export default function MarketDepthModal() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
              {/* Bids Column */}
              <div>
-                {bids.map((bid, i) => (
+                {displayBids.map((bid, i) => (
                   <div key={i} style={{ 
                     display: 'grid', gridTemplateColumns: '1fr 1.5fr 1.5fr', textAlign: 'right', padding: '6px 0', fontSize: '12px', fontWeight: '500',
                     background: bid.changed ? 'rgba(34, 197, 94, 0.1)' : 'transparent', transition: 'background 0.3s'
@@ -122,7 +126,7 @@ export default function MarketDepthModal() {
              
              {/* Asks Column */}
              <div>
-                {asks.map((ask, i) => (
+                {displayAsks.map((ask, i) => (
                   <div key={i} style={{ 
                     display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', textAlign: 'right', padding: '6px 0', fontSize: '12px', fontWeight: '500',
                     background: ask.changed ? 'rgba(239, 68, 68, 0.1)' : 'transparent', transition: 'background 0.3s'
