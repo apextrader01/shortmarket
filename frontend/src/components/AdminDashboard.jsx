@@ -94,8 +94,8 @@ export default function AdminDashboard() {
   };
 
   const filteredUsers = users.filter(u => 
-    u.username.toLowerCase().includes(search.toLowerCase()) || 
-    u.email.toLowerCase().includes(search.toLowerCase())
+    (u.username?.toLowerCase() || '').includes(search.toLowerCase()) || 
+    (u.email?.toLowerCase() || '').includes(search.toLowerCase())
   );
 
   return (
@@ -343,10 +343,10 @@ export default function AdminDashboard() {
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: u.is_admin ? 'var(--color-red)' : 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>
-                            {u.username.substring(0, 2).toUpperCase()}
+                            {(u.username || 'U').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '600' }}>{u.username} {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}</div>
+                            <div style={{ fontWeight: '600' }}>{u.username || 'Unknown User'} {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {u.id}</div>
                           </div>
                         </div>
