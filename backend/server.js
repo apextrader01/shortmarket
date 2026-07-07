@@ -1629,6 +1629,18 @@ io.on('connection', (socket) => {
   });
 });
 
+app.get('/api/debug-state', (req, res) => {
+  const { getDebugState } = require('./services/angelOne');
+  let state = {};
+  if (getDebugState) {
+    state = getDebugState();
+  }
+  res.json({
+    state,
+    time: new Date().toISOString()
+  });
+});
+
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 app.use((req, res) => {

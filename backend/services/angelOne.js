@@ -16,6 +16,14 @@ function getPriceCache() { return sharedPriceCache; }
 let jwtToken = '';
 let feedToken = '';
 
+let global_io = null;
+
+const debugLogs = [];
+function addDebugLog(msg) {
+    if (debugLogs.length > 100) debugLogs.shift();
+    debugLogs.push(`[${new Date().toISOString()}] ${msg}`);
+}
+
 // Dynamic stock master - loaded from Angel One instrument file
 let STOCK_MASTER = {};   // token -> { symbol, name, exchange }
 let symbolToToken = {};  // symbol -> token
@@ -850,6 +858,7 @@ async function broadcastLTPs(io) {
 
 // ─── Main Login ───────────────────────────────────────────────────────────────
 async function loginAngelOne(io, externalPriceCache) {
+    global_io = io;
     sharedPriceCache = externalPriceCache; // Use the server.js cache object
     try {
         // First load the full instrument master
@@ -1047,31 +1056,29 @@ let activeDepthSymbols = new Set();
 let depthPollInterval = null;
 
 async function pollDepthData() {
+    if (!global_io) addDebugLog(`[pollDepthData] ABORT: global_io is null!`);
+    if (activeDepthSymbols.size === 0) addDebugLog(`[pollDepthData] ABORT: activeDepthSymbols empty!`);
     if (!global_io || activeDepthSymbols.size === 0) return;
     
     // Group tokens by exchange
     const exchangeTokens = {};
     for (const uniqueSymbol of activeDepthSymbols) {
         const token = symbolToToken[uniqueSymbol];
+        if (!token) addDebugLog(`[pollDepthData] ERROR: NO TOKEN for ${uniqueSymbol}`);
         const info = STOCK_MASTER[token];
         if (token && info) {
             let exch = info.exchange || 'NSE';
-            if (exch === 'NFO') exch = 'NFO'; // Assuming NFO
-            else if (exch === 'BSE') exch = 'BSE';
-            else if (exch === 'MCX') exch = 'MCX';
-            else exch = 'NSE';
-            
             if (!exchangeTokens[exch]) exchangeTokens[exch] = [];
             exchangeTokens[exch].push(token);
-        } else {
-            console.log(`[DEBUG] Missing token or info for ${uniqueSymbol}. Token: ${token}, info: ${!!info}`);
         }
     }
     
     if (Object.keys(exchangeTokens).length === 0) {
-        console.log(`[DEBUG] exchangeTokens is empty!`);
+        addDebugLog(`[pollDepthData] ABORT: No exchangeTokens to fetch!`);
         return;
     }
+    
+    addDebugLog(`[pollDepthData] Fetching for ${JSON.stringify(exchangeTokens)}`);
     
     try {
         const payload = {
@@ -1079,16 +1086,20 @@ async function pollDepthData() {
             exchangeTokens
         };
         const response = await smart_api.marketData(payload);
-        if (!response.status) {
-            console.log(`[REST DEPTH] Failed: ${response.message}`);
+        if (!response || !response.status) {
+            addDebugLog(`[REST DEPTH] Failed or missing status: ${response ? response.message : 'null response'}`);
         }
-        if (response.status && response.data && response.data.fetched) {
+        if (response && response.status && response.data && response.data.fetched) {
+            addDebugLog(`[REST DEPTH] Fetched ${response.data.fetched.length} items`);
             for (const item of response.data.fetched) {
                 const uniqueSymbol = item.tradingSymbol && item.exchange ? `${item.tradingSymbol}-${item.exchange}` : null;
                 // If uniqueSymbol mapping is not perfect, find by token
                 const token = item.symbolToken;
                 const info = STOCK_MASTER[token];
-                if (!info) continue;
+                if (!info) {
+                    addDebugLog(`[REST DEPTH] No STOCK_MASTER info for token ${token}`);
+                    continue;
+                }
                 
                 const originalRequestedSymbol = [...activeDepthSymbols].find(sym => symbolToToken[sym] === token) || info.uniqueSymbol;
                 
@@ -1108,11 +1119,12 @@ async function pollDepthData() {
                     upperCircuit: item.upperCircuit ? Number(item.upperCircuit).toFixed(2) : null,
                 };
                 
-                console.log(`[REST DEPTH] Polled depth for ${originalRequestedSymbol}`);
+                addDebugLog(`[REST DEPTH] Polled depth for ${originalRequestedSymbol} with ${depthData.bids.length} bids`);
                 global_io.to(`${originalRequestedSymbol}_depth`).emit('market_depth_data', depthData);
             }
         }
     } catch (err) {
+        addDebugLog(`[REST DEPTH] Catch Error: ${err.message}`);
         console.error('Error polling depth data:', err.message);
     }
 }
@@ -1121,9 +1133,11 @@ function subscribeToDepth(uniqueSymbol) {
     if (!activeDepthSymbols.has(uniqueSymbol)) {
         activeDepthSymbols.add(uniqueSymbol);
     }
+    addDebugLog(`[subscribeToDepth] Added ${uniqueSymbol}, activeSize: ${activeDepthSymbols.size}`);
     
     if (!depthPollInterval) {
         depthPollInterval = setInterval(pollDepthData, 1000); // 1 second poll
+        addDebugLog(`[subscribeToDepth] Created interval`);
     }
     
     // Also trigger immediately once
@@ -1132,9 +1146,11 @@ function subscribeToDepth(uniqueSymbol) {
 
 function unsubscribeFromDepth(uniqueSymbol) {
     activeDepthSymbols.delete(uniqueSymbol);
+    addDebugLog(`[unsubscribeFromDepth] Removed ${uniqueSymbol}, activeSize: ${activeDepthSymbols.size}`);
     if (activeDepthSymbols.size === 0 && depthPollInterval) {
         clearInterval(depthPollInterval);
         depthPollInterval = null;
+        addDebugLog(`[unsubscribeFromDepth] Cleared interval`);
     }
 }
 
@@ -1152,6 +1168,11 @@ module.exports = {
     addSubscription,
     addSubscriptionBatch,
     fetchBatchLTPs,
+    getDebugState: () => ({
+        logs: debugLogs,
+        activeDepthSymbols: [...activeDepthSymbols],
+        symbolToToken: symbolToToken
+    }),
     subscribeToDepth,
     unsubscribeFromDepth,
     smart_api
