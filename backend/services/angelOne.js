@@ -1024,30 +1024,88 @@ function startLiveWebSocket(io) {
 }
 
 // ─── Market Depth Subscription ──────────────────────────────────────────────
-function subscribeToDepth(uniqueSymbol) {
-    if (!global_web_socket) return;
-    const token = symbolToToken[uniqueSymbol];
-    if (!token) return;
-    const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-    const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
+let activeDepthSymbols = new Set();
+let depthPollInterval = null;
+
+async function pollDepthData() {
+    if (!global_io || activeDepthSymbols.size === 0) return;
     
-    global_web_socket.fetchData({
-        correlationID: `d${token}`.slice(0, 10),
-        action: 1, mode: 3, exchangeType, tokens: [token]
-    });
+    // Group tokens by exchange
+    const exchangeTokens = {};
+    for (const uniqueSymbol of activeDepthSymbols) {
+        const token = symbolToToken[uniqueSymbol];
+        const info = STOCK_MASTER[token];
+        if (token && info) {
+            let exch = info.exchange || 'NSE';
+            if (exch === 'NFO') exch = 'NFO'; // Assuming NFO
+            else if (exch === 'BSE') exch = 'BSE';
+            else if (exch === 'MCX') exch = 'MCX';
+            else exch = 'NSE';
+            
+            if (!exchangeTokens[exch]) exchangeTokens[exch] = [];
+            exchangeTokens[exch].push(token);
+        }
+    }
+    
+    if (Object.keys(exchangeTokens).length === 0) return;
+    
+    try {
+        const payload = {
+            mode: "FULL",
+            exchangeTokens
+        };
+        const response = await smart_api.getMarketData(payload);
+        if (response.status && response.data && response.data.fetched) {
+            for (const item of response.data.fetched) {
+                const uniqueSymbol = item.tradingSymbol && item.exchange ? `${item.tradingSymbol}-${item.exchange}` : null;
+                // If uniqueSymbol mapping is not perfect, find by token
+                const token = item.symbolToken;
+                const info = STOCK_MASTER[token];
+                if (!info) continue;
+                
+                const depthData = {
+                    symbol: info.uniqueSymbol,
+                    bids: item.depth?.buy ? item.depth.buy.map(b => ({ price: b.price.toFixed(2), qty: b.quantity, orders: b.orders })) : [],
+                    asks: item.depth?.sell ? item.depth.sell.map(s => ({ price: s.price.toFixed(2), qty: s.quantity, orders: s.orders })) : [],
+                    open: item.open ? item.open.toFixed(2) : null,
+                    high: item.high ? item.high.toFixed(2) : null,
+                    low: item.low ? item.low.toFixed(2) : null,
+                    close: item.close ? item.close.toFixed(2) : null,
+                    ltp: item.ltp ? item.ltp.toFixed(2) : null,
+                    ltq: item.lastTradeQty || null,
+                    volume: item.exchangeVolume || item.volume || 0,
+                    avgPrice: item.averagePrice ? item.averagePrice.toFixed(2) : null,
+                    lowerCircuit: item.lowerCircuit ? item.lowerCircuit.toFixed(2) : null,
+                    upperCircuit: item.upperCircuit ? item.upperCircuit.toFixed(2) : null,
+                };
+                
+                global_io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
+            }
+        }
+    } catch (err) {
+        console.error('Error polling depth data:', err.message);
+    }
+}
+
+function subscribeToDepth(uniqueSymbol) {
+    if (!activeDepthSymbols.has(uniqueSymbol)) {
+        activeDepthSymbols.add(uniqueSymbol);
+    }
+    
+    if (!depthPollInterval) {
+        depthPollInterval = setInterval(pollDepthData, 1000); // 1 second poll
+    }
+    
+    // Also trigger immediately once
+    pollDepthData();
 }
 
 function unsubscribeFromDepth(uniqueSymbol) {
-    if (!global_web_socket) return;
-    const token = symbolToToken[uniqueSymbol];
-    if (!token) return;
-    const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-    const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
-    
-    global_web_socket.fetchData({
-        correlationID: `u${token}`.slice(0, 10),
-        action: 0, mode: 3, exchangeType, tokens: [token]
-    });
+    activeDepthSymbols.delete(uniqueSymbol);
+    if (activeDepthSymbols.size === 0 && depthPollInterval) {
+        clearInterval(depthPollInterval);
+        depthPollInterval = null;
+    }
 }
 
 module.exports = {
