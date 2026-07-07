@@ -49,14 +49,22 @@ export default function DOMLadderModal() {
   const bids = rawBids.map(b => ({ ...b, qty: Math.round(b.qty / lotsize) }));
   const asks = rawAsks.map(a => ({ ...a, qty: Math.round(a.qty / lotsize) }));
 
-  // Generate a price ladder (e.g., 20 ticks above and 20 ticks below centerPrice)
-  // Standard Indian market tick size is 0.05
-  const tickSize = 0.05;
+  // Determine tick size based on exchange/symbol
+  let tickSize = 0.05;
+  if (symbol.includes('-MCX') || basicData.exchange === 'MCX') {
+      if (symbol.includes('CRUDE') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('ZINC') || symbol.includes('LEAD') || symbol.includes('ALUMINIUM')) {
+          tickSize = 1.00;
+      } else if (symbol.includes('NATURALGAS') || symbol.includes('COPPER')) {
+          tickSize = 0.10; // Natural gas tick size is usually 0.10
+      }
+  }
+
   const ladderRows = [];
   
   if (centerPrice > 0) {
-    const startPrice = centerPrice + (30 * tickSize); // Highest price at top
-    const endPrice = centerPrice - (30 * tickSize);   // Lowest price at bottom
+    const numTicks = 200; // Generate 200 ticks above and below to ensure wide coverage
+    const startPrice = centerPrice + (numTicks * tickSize); // Highest price at top
+    const endPrice = centerPrice - (numTicks * tickSize);   // Lowest price at bottom
     
     for (let p = startPrice; p >= endPrice; p -= tickSize) {
       // Fix floating point precision
