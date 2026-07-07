@@ -63,7 +63,7 @@ function App() {
     const interval = setInterval(() => {
       if (token) fetchUserData();
       refreshPrices();
-    }, 1000);
+    }, 2000);
 
     return () => {
       clearInterval(interval);
