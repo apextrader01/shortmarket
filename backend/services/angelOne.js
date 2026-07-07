@@ -382,8 +382,16 @@ function enrichLotsize(token, uniqueSymbol) {
 async function addSubscription(data, io, priceCache) {
     let token, exchangeCode, uniqueSymbol, exchStr;
 
-    if (typeof data === 'string') {
-        uniqueSymbol = data;
+    if (typeof data === 'string' || (typeof data === 'object' && !data.token)) {
+        uniqueSymbol = typeof data === 'string' ? data : data.symbol;
+        
+        if (!symbolToToken[uniqueSymbol]) {
+            // First try to find it in the master list
+            const foundToken = Object.keys(STOCK_MASTER).find(k => STOCK_MASTER[k].uniqueSymbol === uniqueSymbol || STOCK_MASTER[k].symbol === uniqueSymbol);
+            if (foundToken) {
+                symbolToToken[uniqueSymbol] = foundToken;
+            }
+        }
         
         if (!symbolToToken[uniqueSymbol]) {
             // Try to find this derivative in options/futures data
@@ -1055,6 +1063,9 @@ async function pollDepthData() {
             exchangeTokens
         };
         const response = await smart_api.marketData(payload);
+        if (!response.status) {
+            console.log(`[REST DEPTH] Failed: ${response.message}`);
+        }
         if (response.status && response.data && response.data.fetched) {
             for (const item of response.data.fetched) {
                 const uniqueSymbol = item.tradingSymbol && item.exchange ? `${item.tradingSymbol}-${item.exchange}` : null;
