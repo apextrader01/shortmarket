@@ -34,8 +34,9 @@ export default function PositionsView() {
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       const pnl = qty > 0 ? (currentValue - invested) : (invested - currentValue);
+      const lotSize = priceData.ls || 1;
       
-      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested });
+      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize });
       groups[underlying].netPnl += pnl;
       groups[underlying].totalInvested += invested;
       globalMTM += pnl;
@@ -300,13 +301,14 @@ export default function PositionsView() {
               
               <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Qty (Max: {Math.abs(partialExitPos.qty)})</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Qty (Max: {Math.abs(partialExitPos.qty)}, Lot: {partialExitPos.lotSize || 1})</label>
                   <input
                     type="number"
                     value={partialExitQty}
                     onChange={(e) => setPartialExitQty(e.target.value)}
                     max={Math.abs(partialExitPos.qty)}
-                    min="1"
+                    min={partialExitPos.lotSize || 1}
+                    step={partialExitPos.lotSize || 1}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
@@ -338,7 +340,12 @@ export default function PositionsView() {
               <button
                 onClick={async () => {
                   const qtyToExit = parseInt(partialExitQty);
+                  const ls = partialExitPos.lotSize || 1;
                   if (qtyToExit > 0 && qtyToExit <= Math.abs(partialExitPos.qty)) {
+                    if (qtyToExit % ls !== 0) {
+                      alert(`Quantity must be a multiple of the lot size (${ls}).`);
+                      return;
+                    }
                     const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
                     await useStore.getState().placeOrder({
                       symbol: partialExitPos.symbol,
