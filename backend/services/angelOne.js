@@ -796,16 +796,21 @@ async function loginAngelOne(io, externalPriceCache) {
             // This ensures derivatives (options/futures/commodities) always get fresh prices,
             // even if the Angel One WebSocket doesn't deliver ticks for them.
             if (!global_pollInterval) {
+                let isPolling = false; // Mutex to prevent overlapping calls
                 global_pollInterval = setInterval(async () => {
+                    if (isPolling) return; // Skip if previous poll still running
                     if (isMarketOpen() && clientSubscriptions.size > 0) {
+                        isPolling = true;
                         try {
                             await broadcastLTPs(io);
                         } catch (e) {
                             console.error('Periodic poll error:', e.message);
+                        } finally {
+                            isPolling = false;
                         }
                     }
-                }, 10000); // Every 10 seconds
-                console.log('⏱️  Started periodic REST polling (every 10s during market hours)');
+                }, 3000); // Every 3 seconds
+                console.log('⏱️  Started periodic REST polling (every 3s during market hours)');
             }
         } else {
             console.error('Login Failed:', loginSession.message);
