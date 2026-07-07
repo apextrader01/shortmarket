@@ -510,6 +510,16 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
             token = symbolToToken[uniqueSymbol];
         }
         
+        // Try to find it in the master list if token is still missing
+        if (!token) {
+            const stripped = uniqueSymbol.replace('-EQ', '');
+            const foundToken = Object.keys(STOCK_MASTER).find(k => STOCK_MASTER[k].uniqueSymbol === uniqueSymbol || STOCK_MASTER[k].symbol === uniqueSymbol || STOCK_MASTER[k].uniqueSymbol === stripped);
+            if (foundToken) {
+                token = foundToken;
+                symbolToToken[uniqueSymbol] = token;
+            }
+        }
+        
         // Fallback: look up in options/futures data
         if (!token) {
             const parts = uniqueSymbol.split('-');
@@ -1053,10 +1063,15 @@ async function pollDepthData() {
             
             if (!exchangeTokens[exch]) exchangeTokens[exch] = [];
             exchangeTokens[exch].push(token);
+        } else {
+            console.log(`[DEBUG] Missing token or info for ${uniqueSymbol}. Token: ${token}, info: ${!!info}`);
         }
     }
     
-    if (Object.keys(exchangeTokens).length === 0) return;
+    if (Object.keys(exchangeTokens).length === 0) {
+        console.log(`[DEBUG] exchangeTokens is empty!`);
+        return;
+    }
     
     try {
         const payload = {
