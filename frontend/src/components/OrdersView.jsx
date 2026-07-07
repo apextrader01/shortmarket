@@ -7,6 +7,7 @@ export default function OrdersView() {
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
@@ -18,6 +19,11 @@ export default function OrdersView() {
   });
   
   let displayTriggers = pendingTriggers || [];
+
+  if (statusFilter !== 'ALL') {
+    displayOrders = displayOrders.filter(order => order.status === statusFilter);
+    displayTriggers = displayTriggers.filter(trigger => trigger.status === statusFilter);
+  }
 
   if (searchQuery) {
     const lowerQuery = searchQuery.toLowerCase();
@@ -56,7 +62,23 @@ export default function OrdersView() {
             </div>
           ))}
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {activeTab === 'Order History' && (
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{
+                background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
+                padding: '6px 12px', borderRadius: '4px', color: '#fff', fontSize: '13px',
+                outline: 'none', cursor: 'pointer'
+              }}
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="EXECUTED">Executed</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          )}
           <input
             type="text"
             placeholder="Filter orders..."
