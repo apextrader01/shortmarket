@@ -11,10 +11,10 @@
 function calculateTaxes(symbol, productType, side, quantity, price) {
     const turnover = quantity * price;
     
-    const isOption = symbol.endsWith('CE') || symbol.endsWith('PE');
-    const isFuture = symbol.endsWith('FUT') || symbol.endsWith('FUT-MCX') || symbol.includes('FUT');
+    const isOption = /(CE|PE)(?:-[A-Za-z]+)?$/i.test(symbol);
+    const isFuture = /FUT(?:-[A-Za-z]+)?$/i.test(symbol) || symbol.includes('FUT');
     const isEquity = !isOption && !isFuture;
-    const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE');
+    const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE') || symbol.includes('NATURALGAS') || symbol.includes('COPPER') || symbol.includes('ZINC');
 
     let brokerage = 0;
     let stt = 0;
