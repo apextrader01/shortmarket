@@ -410,21 +410,38 @@ export const useStore = create(persist((set, get) => ({
       console.log('Socket connected, refreshing and resubscribing...');
       get().refreshPrices();
       
-      // Resubscribe to active watchlist
-      const { watchlists, activeWatchlistId, subscribeToOptionBatch, positions } = get();
-      const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
+      // Helper to determine exchange from a uniqueSymbol
+      const getExchange = (sym) => {
+        const dashIdx = sym.lastIndexOf('-');
+        if (dashIdx > 0) {
+          return sym.substring(dashIdx + 1);
+        }
+        // No dash — try to detect type from symbol pattern
+        if (/\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/.test(sym)) return 'NFO';
+        return 'NSE';
+      };
+      
+      // Resubscribe to ALL watchlists (not just active)
+      const { watchlists, subscribeToOptionBatch, positions } = get();
       
       const tokensToSub = [];
-      if (activeWatchlist && activeWatchlist.symbols) {
-        activeWatchlist.symbols.forEach(sym => {
-          tokensToSub.push({ symbol: sym, exchange: sym.split('-')[1] || 'NSE' });
-        });
+      const seenSymbols = new Set();
+      
+      for (const wl of watchlists) {
+        if (!wl?.symbols) continue;
+        for (const sym of wl.symbols) {
+          if (seenSymbols.has(sym)) continue;
+          seenSymbols.add(sym);
+          tokensToSub.push({ symbol: sym, exchange: getExchange(sym) });
+        }
       }
       
       // Resubscribe to positions
       if (positions && positions.length > 0) {
         positions.forEach(pos => {
-          tokensToSub.push({ symbol: pos.symbol, exchange: pos.symbol.split('-')[1] || 'NSE' });
+          if (seenSymbols.has(pos.symbol)) return;
+          seenSymbols.add(pos.symbol);
+          tokensToSub.push({ symbol: pos.symbol, exchange: getExchange(pos.symbol) });
         });
       }
       

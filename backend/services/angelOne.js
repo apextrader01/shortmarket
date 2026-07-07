@@ -326,15 +326,77 @@ function fmtDate(d) {
 let global_web_socket = null;
 const clientSubscriptions = new Set();
 
+// Helper: Look up an option/future/commodity token from globalNfoOptions/globalNfoFutures by symbol string
+function lookupDerivativeBySymbol(symbolStr) {
+    // symbolStr is the raw symbol like "NIFTY07JUL2624000CE" (without exchange suffix)
+    
+    // Search futures first (flat array per underlying)
+    if (globalNfoFutures) {
+        for (const [underlying, futures] of Object.entries(globalNfoFutures)) {
+            if (!Array.isArray(futures)) continue;
+            for (const fut of futures) {
+                if (fut && fut.symbol === symbolStr) {
+                    return { token: fut.token, exchange: fut.exchange || 'NFO', lotsize: fut.lotsize, name: underlying };
+                }
+            }
+        }
+    }
+    
+    // Search options (nested: underlying -> expiry -> strike -> CE/PE)
+    if (globalNfoOptions) {
+        for (const [underlying, expiries] of Object.entries(globalNfoOptions)) {
+            if (typeof expiries !== 'object' || !expiries) continue;
+            for (const expiry in expiries) {
+                if (typeof expiries[expiry] !== 'object' || !expiries[expiry]) continue;
+                for (const strike in expiries[expiry]) {
+                    if (typeof expiries[expiry][strike] !== 'object' || !expiries[expiry][strike]) continue;
+                    for (const type in expiries[expiry][strike]) {
+                        const opt = expiries[expiry][strike][type];
+                        if (opt && opt.symbol === symbolStr) {
+                            return { token: opt.token, exchange: opt.exch_seg || 'NFO', lotsize: opt.lotsize, name: underlying };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
 async function addSubscription(data, io, priceCache) {
     let token, exchangeCode, uniqueSymbol, exchStr;
 
     if (typeof data === 'string') {
         uniqueSymbol = data;
-        if (!symbolToToken[uniqueSymbol]) return;
+        
+        if (!symbolToToken[uniqueSymbol]) {
+            // Try to find this derivative in options/futures data
+            // uniqueSymbol format: "SYMBOL-EXCHANGE" e.g. "NIFTY07JUL2624000CE-NFO"
+            const parts = uniqueSymbol.split('-');
+            const rawSymbol = parts.slice(0, -1).join('-') || parts[0]; // Handle symbols that might contain dashes
+            const exchFromSymbol = parts[parts.length - 1];
+            
+            const found = lookupDerivativeBySymbol(rawSymbol);
+            if (found) {
+                // Register it dynamically in STOCK_MASTER and symbolToToken
+                STOCK_MASTER[found.token] = {
+                    symbol: rawSymbol,
+                    uniqueSymbol: uniqueSymbol,
+                    name: found.name || rawSymbol,
+                    exchange: found.exchange || exchFromSymbol || 'NFO'
+                };
+                symbolToToken[uniqueSymbol] = found.token;
+            } else {
+                // Still not found — skip
+                console.warn(`⚠️ addSubscription: Could not find token for "${uniqueSymbol}"`);
+                return;
+            }
+        }
+        
         token = symbolToToken[uniqueSymbol];
         exchStr = STOCK_MASTER[token]?.exchange || 'NSE';
-        exchangeCode = exchStr === 'BSE' ? 3 : 1;
+        exchangeCode = (exchStr === 'BSE' || exchStr === 'BFO') ? 3 : (exchStr === 'MCX' ? 5 : (exchStr === 'NFO' ? 2 : 1));
     } else {
         token = data.token;
         uniqueSymbol = data.symbol;
@@ -359,34 +421,32 @@ async function addSubscription(data, io, priceCache) {
             });
         }
 
-        // Immediately fetch the price via REST to remove the 10-second delay (skip for options to avoid rate limits)
-        if (typeof data === 'string') {
-            try {
-                const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
-                if (exchangeMap[exchStr]) {
-                    exchangeMap[exchStr].push(token);
-                    const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap });
-                    if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
-                        const item = res.data.fetched[0];
-                        if (item.ltp && priceCache) {
-                            const ltpData = {
-                                symbol: uniqueSymbol,
-                                ltp: item.ltp,
-                                open: item.open || item.ltp,
-                                high: item.high || item.ltp,
-                                low: item.low || item.ltp,
-                                close: item.close || item.ltp,
-                                change: item.netChange || 0,
-                                pct: item.percentChange || 0,
-                                timestamp: new Date().toISOString()
-                            };
-                            priceCache[uniqueSymbol] = ltpData;
-                            if (io) io.to(uniqueSymbol).emit('market_data', ltpData);
-                        }
+        // Immediately fetch the price via REST
+        try {
+            const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
+            if (exchangeMap[exchStr]) {
+                exchangeMap[exchStr].push(token);
+                const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap });
+                if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
+                    const item = res.data.fetched[0];
+                    if (item.ltp && priceCache) {
+                        const ltpData = {
+                            symbol: uniqueSymbol,
+                            ltp: item.ltp,
+                            open: item.open || item.ltp,
+                            high: item.high || item.ltp,
+                            low: item.low || item.ltp,
+                            close: item.close || item.ltp,
+                            change: item.netChange || 0,
+                            pct: item.percentChange || 0,
+                            timestamp: new Date().toISOString()
+                        };
+                        priceCache[uniqueSymbol] = ltpData;
+                        if (io) io.to(uniqueSymbol).emit('market_data', ltpData);
                     }
                 }
-            } catch (e) {} // silent on fail
-        }
+            }
+        } catch (e) {} // silent on fail
     }
 }
 
@@ -401,6 +461,24 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
         if (!token && symbolToToken[uniqueSymbol]) {
             token = symbolToToken[uniqueSymbol];
         }
+        
+        // Fallback: look up in options/futures data
+        if (!token) {
+            const parts = uniqueSymbol.split('-');
+            const rawSymbol = parts.slice(0, -1).join('-') || parts[0];
+            const found = lookupDerivativeBySymbol(rawSymbol);
+            if (found) {
+                token = found.token;
+                STOCK_MASTER[found.token] = {
+                    symbol: rawSymbol,
+                    uniqueSymbol: uniqueSymbol,
+                    name: found.name || rawSymbol,
+                    exchange: found.exchange || data.exchange || 'NFO'
+                };
+                symbolToToken[uniqueSymbol] = found.token;
+            }
+        }
+        
         if (!token) continue;
 
         const exchStr = data.exchange || 'NFO'; // e.g. 'NFO'

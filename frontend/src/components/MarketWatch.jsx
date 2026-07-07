@@ -44,9 +44,16 @@ export default function MarketWatch({ className = '' }) {
     const found = stocks.find(s => s.uniqueSymbol === sym);
     if (found) return found;
     // For Options/Futures that are not in the stocks list
-    const parts = sym.split('-');
-    const symbol = parts[0];
-    const exchange = parts[1] || 'NSE';
+    const dashIdx = sym.lastIndexOf('-');
+    let symbol, exchange;
+    if (dashIdx > 0) {
+      symbol = sym.substring(0, dashIdx);
+      exchange = sym.substring(dashIdx + 1);
+    } else {
+      symbol = sym;
+      // Detect derivatives by pattern (e.g. NIFTY07JUL2624000CE)
+      exchange = /\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/.test(sym) ? 'NFO' : 'NSE';
+    }
     return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, token: '' };
   }).filter(Boolean) : [];
   const displayStocks = isSearchMode ? searchResults : watchlistStocks;
