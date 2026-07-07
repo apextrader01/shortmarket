@@ -1231,7 +1231,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
              // Position closed! Delete it
              await trx('positions').where({ id: existingPos.id }).delete();
           } else {
-             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice });
+             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
           }
         } else {
           // If selling something they don't have, it's a short position
@@ -1240,7 +1240,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
             symbol,
             quantity: qtyChange,
             average_price: execPrice,
-            product_type: product_type || 'DEL'
+            product_type: product_type || 'DEL',
+            margin: Number(margin) || 0
           });
         }
 
