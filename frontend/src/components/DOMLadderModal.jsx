@@ -22,14 +22,23 @@ export default function DOMLadderModal() {
     return () => socket.emit('unsubscribe_depth', symbol);
   }, [domLadderModal.isOpen, symbol]);
 
-  const ltp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp;
+  let refPrice = parseFloat(marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp);
+  if (!refPrice || isNaN(refPrice) || refPrice === 0) {
+    refPrice = parseFloat(marketDepthData?.symbol === symbol && marketDepthData.close ? marketDepthData.close : basicData.close);
+  }
+  if (!refPrice || isNaN(refPrice) || refPrice === 0) {
+    if (marketDepthData?.symbol === symbol && marketDepthData.bids?.length > 0) refPrice = parseFloat(marketDepthData.bids[0].price);
+    else if (marketDepthData?.symbol === symbol && marketDepthData.asks?.length > 0) refPrice = parseFloat(marketDepthData.asks[0].price);
+  }
 
-  // Set the initial center price when we first get an LTP
+  const ltp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? parseFloat(marketDepthData.ltp) : parseFloat(basicData.ltp);
+
+  // Set the initial center price when we first get a reference price
   useEffect(() => {
-    if (domLadderModal.isOpen && ltp > 0 && centerPrice === 0) {
-      setCenterPrice(ltp);
+    if (domLadderModal.isOpen && refPrice > 0 && centerPrice === 0) {
+      setCenterPrice(refPrice);
     }
-  }, [domLadderModal.isOpen, ltp, centerPrice]);
+  }, [domLadderModal.isOpen, refPrice, centerPrice]);
 
   if (!domLadderModal.isOpen || !symbol) return null;
 
