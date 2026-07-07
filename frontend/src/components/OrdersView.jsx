@@ -13,12 +13,28 @@ export default function OrdersView() {
 
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
-    if (activeTab === 'Open Orders') return order.status === 'PENDING';
+    if (activeTab === 'Open Orders') return order.status === 'PENDING' && !order.parent_order_id;
     if (activeTab === 'Order History') return order.status !== 'PENDING';
     return false;
   });
   
-  let displayTriggers = pendingTriggers || [];
+  const boLegTriggers = orders
+    .filter(order => order.status === 'PENDING' && order.parent_order_id)
+    .map(order => ({
+      id: order.id,
+      symbol: order.symbol,
+      type: order.type, // 'SL-M' or 'LIMIT'
+      side: order.side,
+      quantity: order.quantity,
+      limitPrice: order.price ? parseFloat(order.price) : null,
+      triggerPrice: order.trigger_price ? parseFloat(order.trigger_price) : null,
+      productType: order.product_type || 'DEL',
+      status: 'PENDING_TRIGGER', // Style it as pending trigger
+      createdAt: order.created_at,
+      isBackendOrder: true
+    }));
+
+  let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
 
   if (statusFilter !== 'ALL') {
     displayOrders = displayOrders.filter(order => order.status === statusFilter);
@@ -192,7 +208,11 @@ export default function OrdersView() {
                            <button 
                              onClick={() => {
                                if (window.confirm('Cancel this pending trigger?')) {
-                                 removePendingTrigger(trigger.id);
+                                 if (trigger.isBackendOrder) {
+                                   useStore.getState().cancelOrder(trigger.id);
+                                 } else {
+                                   removePendingTrigger(trigger.id);
+                                 }
                                }
                              }}
                              style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
