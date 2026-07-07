@@ -1230,6 +1230,10 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           if (newQty === 0) {
              // Position closed! Delete it
              await trx('positions').where({ id: existingPos.id }).delete();
+             // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
+             await trx('orders')
+               .where({ user_id: req.user.id, symbol: symbol, status: 'PENDING' })
+               .update({ status: 'CANCELLED' });
           } else {
              await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
           }
