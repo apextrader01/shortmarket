@@ -247,7 +247,11 @@ export default function OrderModal() {
               Intraday <Info size={12} style={{ opacity: 0.7 }} />
             </div>
             <div 
-              onClick={() => setProductType('DEL')} 
+              onClick={() => {
+                setProductType('DEL');
+                setIsCO(false);
+                setIsBO(false);
+              }} 
               style={{ 
                 padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
                 background: productType === 'DEL' ? 'var(--color-blue)' : 'transparent',
@@ -255,7 +259,7 @@ export default function OrderModal() {
                 fontSize: '13px', fontWeight: '500'
               }}
             >
-              Overnight <Info size={12} style={{ opacity: 0.7 }} />
+              Delivery <Info size={12} style={{ opacity: 0.7 }} />
             </div>
           </div>
         </div>
@@ -264,11 +268,8 @@ export default function OrderModal() {
         <div style={{ padding: '10px 20px 20px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '500' }}>
-              {productType === 'INT' ? 'Intraday' : 'CNC'} - {orderType === 'MARKET' ? 'Market' : 'Limit'}
+              {productType === 'INT' ? 'Intraday' : 'Delivery'} - {orderType === 'MARKET' ? 'Market' : 'Limit'}
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-              <input type="checkbox" style={{ accentColor: 'var(--color-blue)' }} /> Schedule <Info size={12} />
-            </label>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -328,39 +329,43 @@ export default function OrderModal() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            <div style={{ gridColumn: '2' }}>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !(isCO || isBO) ? 0.5 : 1, background: !(isCO || isBO) ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Stoploss</legend>
-                <input 
-                  type="text" 
-                  value={slPrice}
-                  onChange={e => setSlPrice(e.target.value)}
-                  disabled={!(isCO || isBO)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                />
-              </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                CO <Info size={12} />
-              </label>
-            </div>
+            {productType === 'INT' && (
+              <>
+                <div style={{ gridColumn: '2' }}>
+                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !(isCO || isBO) ? 0.5 : 1, background: !(isCO || isBO) ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
+                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Stoploss</legend>
+                    <input 
+                      type="text" 
+                      value={slPrice}
+                      onChange={e => setSlPrice(e.target.value)}
+                      disabled={!(isCO || isBO)}
+                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                    />
+                  </fieldset>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
+                    CO <Info size={12} />
+                  </label>
+                </div>
 
-            <div style={{ gridColumn: '3' }}>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !isBO ? 0.5 : 1, background: !isBO ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Take Profit</legend>
-                <input 
-                  type="text" 
-                  value={tgtPrice}
-                  onChange={e => setTgtPrice(e.target.value)}
-                  disabled={!isBO}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                />
-              </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                BO <Info size={12} />
-              </label>
-            </div>
+                <div style={{ gridColumn: '3' }}>
+                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !isBO ? 0.5 : 1, background: !isBO ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
+                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Take Profit</legend>
+                    <input 
+                      type="text" 
+                      value={tgtPrice}
+                      onChange={e => setTgtPrice(e.target.value)}
+                      disabled={!isBO}
+                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                    />
+                  </fieldset>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
+                    BO <Info size={12} />
+                  </label>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
