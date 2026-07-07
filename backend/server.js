@@ -1115,7 +1115,10 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 // ─── Place Order ─────────────────────────────────────────────────────────
 const { spawnBracketOrders } = require('./services/orderExecutor');
 
+let lastOrderError = null;
+
 app.post('/api/order', authenticateToken, async (req, res) => {
+  lastOrderError = null;
   const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -1275,6 +1278,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       res.json({ success: true, orderId, status });
     });
   } catch (error) {
+    lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
     console.error('[ORDER ERROR]:', error);
     res.status(500).json({ error: error.message, success: false });
   }
@@ -1638,6 +1642,7 @@ app.get('/api/debug-state', (req, res) => {
   }
   res.json({
     state,
+    lastOrderError,
     time: new Date().toISOString()
   });
 });
