@@ -225,99 +225,142 @@ export default function OrderModal() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 20px', gap: '24px' }}>
-          {['Regular', 'Stop Loss', 'Trailing SL', 'GTT'].map(t => (
-            <div key={t} onClick={() => setTab(t)} style={{ 
-              padding: '12px 0', fontSize: '13px', fontWeight: tab === t ? '600' : '500', 
-              color: tab === t ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: tab === t ? '2px solid var(--color-blue)' : '2px solid transparent',
-              cursor: 'pointer' 
-            }}>{t}</div>
-          ))}
+        {/* Intraday / Overnight Tabs */}
+        <div style={{ padding: '20px 20px 10px 20px' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden', width: 'fit-content' }}>
+            <div 
+              onClick={() => setProductType('INT')} 
+              style={{ 
+                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                background: productType === 'INT' ? 'var(--color-blue)' : 'transparent',
+                color: productType === 'INT' ? '#fff' : 'var(--text-primary)',
+                fontSize: '13px', fontWeight: '500'
+              }}
+            >
+              Intraday <Info size={12} style={{ opacity: 0.7 }} />
+            </div>
+            <div 
+              onClick={() => setProductType('DEL')} 
+              style={{ 
+                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                background: productType === 'DEL' ? 'var(--color-blue)' : 'transparent',
+                color: productType === 'DEL' ? '#fff' : 'var(--text-primary)',
+                fontSize: '13px', fontWeight: '500'
+              }}
+            >
+              Overnight <Info size={12} style={{ opacity: 0.7 }} />
+            </div>
+          </div>
         </div>
 
         {/* Form Body */}
-        <div style={{ padding: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-            
-            {/* Product Type */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
-              <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div onClick={() => setProductType('INT')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-                <div onClick={() => setProductType('DEL')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
-              </div>
+        <div style={{ padding: '10px 20px 20px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '500' }}>
+              {productType === 'INT' ? 'Intraday' : 'CNC'} - {orderType === 'MARKET' ? 'Market' : 'Limit'}
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input type="checkbox" style={{ accentColor: 'var(--color-blue)' }} /> Schedule <Info size={12} />
+            </label>
+          </div>
 
-            {/* Quantity / Lots */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            {/* Qty */}
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                {orderModal.lotsize > 1 ? 'Lots' : 'Quantity'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
                   value={quantity} 
                   onChange={e => setQuantity(Math.max(1, Number(e.target.value)))} 
-                  style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                 />
-              </div>
+              </fieldset>
               {orderModal.lotsize > 1 && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  1 Lot = {orderModal.lotsize} Qty (Total: {quantity * orderModal.lotsize})
+                  Total Qty: {quantity * orderModal.lotsize}
                 </div>
               )}
             </div>
 
             {/* Price */}
             <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
-              <input type="text" value={price} onChange={e => setPrice(e.target.value)} disabled={orderType === 'MARKET'} style={{ width: '100%', background: orderType === 'MARKET' ? 'rgba(255,255,255,0.05)' : 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none', opacity: orderType === 'MARKET' ? 0.5 : 1 }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px', fontSize: '12px' }}>
-                <span onClick={() => setOrderType('LIMIT')} style={{ color: orderType === 'LIMIT' ? 'var(--color-blue)' : 'var(--text-secondary)', cursor: 'pointer' }}>Limit</span>
-                <span onClick={() => setOrderType('MARKET')} style={{ color: orderType === 'MARKET' ? 'var(--color-blue)' : 'var(--text-secondary)', cursor: 'pointer' }}>Market</span>
-              </div>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: orderType === 'MARKET' ? 0.5 : 1 }}>
+                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Price(Tick: 0.05)</legend>
+                <input 
+                  type="text" 
+                  value={price} 
+                  onChange={e => setPrice(e.target.value)} 
+                  disabled={orderType === 'MARKET'}
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                />
+              </fieldset>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={orderType === 'MARKET'} onChange={e => setOrderType(e.target.checked ? 'MARKET' : 'LIMIT')} style={{ accentColor: 'var(--color-blue)' }} /> 
+                Market price <Info size={12} />
+              </label>
             </div>
 
-          </div>
-
-          {/* Stop Loss & GTT Tab specific inputs */}
-          {(tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{tab === 'GTT' ? 'GTT Trigger Price' : 'SL Trigger Price'}</div>
-                <input type="number" value={slTrigger} onChange={e => setSlTrigger(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-              </div>
-              {tab === 'Trailing SL' && (
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Trailing Jump (₹)</div>
-                  <input type="number" value={trailingJump} onChange={e => setTrailingJump(e.target.value)} placeholder="e.g. 5" style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-                </div>
-              )}
+            {/* Trigger Price */}
+            <div>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: tab !== 'Stop Loss' ? 0.5 : 1, background: tab !== 'Stop Loss' ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
+                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Trigger Price</legend>
+                <input 
+                  type="text" 
+                  value={slTrigger} 
+                  onChange={e => setSlTrigger(e.target.value)}
+                  disabled={tab !== 'Stop Loss'}
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                />
+              </fieldset>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: 'var(--color-blue)' }} /> 
+                Trigger buy <Info size={12} />
+              </label>
             </div>
-          )}
-
-          {/* Set Stop Loss / Target (Robo Order Logic) */}
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--color-blue)', fontWeight: '600' }}>
-              <input type="checkbox" checked={showSlTgt} onChange={e => setShowSlTgt(e.target.checked)} style={{ accentColor: 'var(--color-blue)' }} />
-              Set Stop Loss / Target <Info size={14} />
-            </label>
-
-            {showSlTgt && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Stop Loss Price</div>
-                  <input type="text" value={slPrice} onChange={e => setSlPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Price</div>
-                  <input type="text" value={tgtPrice} onChange={e => setTgtPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-                </div>
-              </div>
-            )}
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ gridColumn: '2' }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !showSlTgt ? 0.5 : 1, background: !showSlTgt ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
+                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Stoploss</legend>
+                <input 
+                  type="text" 
+                  value={slPrice}
+                  onChange={e => setSlPrice(e.target.value)}
+                  disabled={!showSlTgt}
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                />
+              </fieldset>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" style={{ accentColor: 'var(--color-blue)' }} /> 
+                CO <Info size={12} />
+              </label>
+            </div>
+
+            <div style={{ gridColumn: '3' }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !showSlTgt ? 0.5 : 1, background: !showSlTgt ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
+                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Take Profit</legend>
+                <input 
+                  type="text" 
+                  value={tgtPrice}
+                  onChange={e => setTgtPrice(e.target.value)}
+                  disabled={!showSlTgt}
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                />
+              </fieldset>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={showSlTgt} onChange={e => setShowSlTgt(e.target.checked)} style={{ accentColor: 'var(--color-blue)' }} /> 
+                BO <Info size={12} />
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+            <div style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer' }}>Show More ⏷</div>
+            <div style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>Market Depth <Maximize2 size={12} /></div>
+          </div>
+        </div>
 
           {/* Margin Alert (if insufficient) */}
           {isInsufficient && (
