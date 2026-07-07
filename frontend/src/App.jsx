@@ -222,7 +222,7 @@ function App() {
   const price = prices[selectedSymbol];
 
   return (
-    <div className="app-container" style={{ flexDirection: 'column' }}>
+    <div className="app-container" data-theme={theme} style={{ flexDirection: 'column' }}>
       <header className="topbar" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -341,33 +341,11 @@ function App() {
               </div>
               <div
                 onClick={() => setActiveTab('Settings')}
-                title="Settings"
-                style={{
-                  cursor:       'pointer',
-                  padding:      '6px',
-                  background:   'rgba(255,255,255,0.05)',
-                  borderRadius: '4px',
-                  display:      'flex',
-                  alignItems:   'center',
-                }}
-              >
-                <Settings size={14} color="var(--text-secondary)" />
-              </div>
-              <div
-                onClick={logout}
-                title="Log out"
-                style={{
-                  marginLeft:   '8px',
-                  cursor:       'pointer',
-                  padding:      '6px',
-                  background:   'rgba(255,255,255,0.05)',
-                  borderRadius: '4px',
-                  display:      'flex',
-                  alignItems:   'center',
-                }}
-              >
-                <LogOut size={14} color="var(--text-secondary)" />
-              </div>
+                  onClick={() => setActiveTab('Settings')}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <Settings size={14} color="var(--text-secondary)" />
+                </div>
             </div>
           </div>
         </header>
