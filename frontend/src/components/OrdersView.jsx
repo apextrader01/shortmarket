@@ -6,39 +6,69 @@ export default function OrdersView() {
   const { orders, pendingTriggers, removePendingTrigger } = useStore();
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
   // Filter orders based on active tab
-  const displayOrders = orders.filter(order => {
+  let displayOrders = orders.filter(order => {
     if (activeTab === 'Open Orders') return order.status === 'PENDING';
     if (activeTab === 'Order History') return order.status !== 'PENDING';
     return false;
   });
   
-  const displayTriggers = pendingTriggers || [];
+  let displayTriggers = pendingTriggers || [];
+
+  if (searchQuery) {
+    const lowerQuery = searchQuery.toLowerCase();
+    displayOrders = displayOrders.filter(order => 
+      order.symbol.toLowerCase().includes(lowerQuery) || 
+      order.status.toLowerCase().includes(lowerQuery) ||
+      (order.type || '').toLowerCase().includes(lowerQuery)
+    );
+    displayTriggers = displayTriggers.filter(trigger =>
+      trigger.symbol.toLowerCase().includes(lowerQuery) ||
+      trigger.status.toLowerCase().includes(lowerQuery) ||
+      (trigger.type || '').toLowerCase().includes(lowerQuery)
+    );
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Sub Navigation */}
-      <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
-        {tabs.map(tab => (
-          <div
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+      <div style={{ display: 'flex', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '24px' }}>
+          {tabs.map(tab => (
+            <div
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '16px 4px',
+                fontSize: '13px',
+                fontWeight: activeTab === tab ? '600' : '500',
+                color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
+                borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {tab}
+            </div>
+          ))}
+        </div>
+        <div>
+          <input
+            type="text"
+            placeholder="Filter orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              padding: '16px 4px',
-              fontSize: '13px',
-              fontWeight: activeTab === tab ? '600' : '500',
-              color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
+              background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
+              padding: '6px 12px', borderRadius: '4px', color: '#fff', fontSize: '13px',
+              width: '200px', outline: 'none'
             }}
-          >
-            {tab}
-          </div>
-        ))}
+          />
+        </div>
       </div>
 
       {/* Content Area */}
@@ -174,7 +204,19 @@ export default function OrdersView() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
-                    <td style={{ padding: '12px 16px' }}>{order.type === 'TRAILING_STOP' ? <span title="Trailing Stop Loss" style={{ color: 'var(--color-yellow)' }}>Trg: ₹{parseFloat(order.trigger_price || 0).toFixed(2)}<br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Trail: {order.trail_amount}</span></span> : (order.price ? `₹${parseFloat(order.price).toFixed(2)}` : '—')}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {order.type === 'TRAILING_STOP' ? (
+                        <span title="Trailing Stop Loss" style={{ color: 'var(--color-yellow)' }}>
+                          Trg: ₹{parseFloat(order.trigger_price || 0).toFixed(2)}<br/>
+                          <span style={{ fontSize: '10px', opacity: 0.8 }}>Trail: {order.trail_amount}</span>
+                        </span>
+                      ) : order.trigger_price ? (
+                        <span title="Trigger Price">
+                          Trg: ₹{parseFloat(order.trigger_price).toFixed(2)}
+                          {order.price && parseFloat(order.price) > 0 ? <><br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Lmt: ₹{parseFloat(order.price).toFixed(2)}</span></> : null}
+                        </span>
+                      ) : (order.price && parseFloat(order.price) > 0 ? `₹${parseFloat(order.price).toFixed(2)}` : '—')}
+                    </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
                       {order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}
                       {order.parent_order_id && <span style={{ fontSize: '9px', background: 'var(--color-blue)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>OCO</span>}
