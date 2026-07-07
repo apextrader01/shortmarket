@@ -39,6 +39,11 @@ const LedgerStatement = () => {
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('Broking');
+  
+  // Filter states
+  const [filterPeriod, setFilterPeriod] = useState('Week');
+  const [filterType, setFilterType] = useState('All');
+
   const { token } = useStore();
 
   useEffect(() => {
@@ -61,8 +66,28 @@ const LedgerStatement = () => {
     fetchLedger();
   }, [token]);
 
+  // Apply filters
+  const filteredLedger = ledger.filter(entry => {
+    // Transaction type filter
+    if (filterType === 'Credits' && entry.amount <= 0) return false;
+    if (filterType === 'Debits' && entry.amount >= 0) return false;
+
+    // Period filter
+    const entryDate = new Date(entry.created_at);
+    const now = new Date();
+    const diffTime = Math.abs(now - entryDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (filterPeriod === 'Week' && diffDays > 7) return false;
+    if (filterPeriod === '15 Days' && diffDays > 15) return false;
+    if (filterPeriod === 'Month' && diffDays > 30) return false;
+    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+
+    return true;
+  });
+
   const handleDownload = () => {
-    const formattedData = ledger.map(entry => ({
+    const formattedData = filteredLedger.map(entry => ({
       Date: new Date(entry.created_at).toLocaleString(),
       TransactionType: entry.type,
       Description: entry.description || entry.type,
@@ -94,14 +119,29 @@ const LedgerStatement = () => {
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Period:</span>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
-              <span key={p} style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === 'Week' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === 'Week' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>{p}</span>
+              <span 
+                key={p} 
+                onClick={() => setFilterPeriod(p)}
+                style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === filterPeriod ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === filterPeriod ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                {p}
+              </span>
             ))}
           </div>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}><Calendar size={12} style={{display:'inline', marginRight:'4px'}}/> Custom</span>
-          <select style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}>
-            <option>Transaction Type</option>
-            <option>Credits</option>
-            <option>Debits</option>
+          <span 
+            onClick={() => setFilterPeriod('Custom')}
+            style={{ fontSize: '12px', color: filterPeriod === 'Custom' ? 'var(--color-blue-light)' : 'var(--text-secondary)', padding: '6px 12px', border: filterPeriod === 'Custom' ? '1px solid var(--color-blue-light)' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            <Calendar size={12} style={{display:'inline', marginRight:'4px'}}/> Custom
+          </span>
+          <select 
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+          >
+            <option value="All" style={{ color: '#000' }}>Transaction Type</option>
+            <option value="Credits" style={{ color: '#000' }}>Credits</option>
+            <option value="Debits" style={{ color: '#000' }}>Debits</option>
           </select>
         </div>
         
@@ -111,8 +151,8 @@ const LedgerStatement = () => {
       </div>
 
       <div style={{ fontSize: '14px', fontWeight: '600' }}>
-        Combined Ledger Balance <span style={{ color: 'var(--color-green-light)' }}>₹{activeSubTab === 'MTF' ? '0.00' : (ledger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span> 
-        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400', marginLeft: '8px' }}>(This includes both broking ledger balance of ₹{(ledger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})} and MTF ledger balance of ₹0.00)</span>
+        Combined Ledger Balance <span style={{ color: 'var(--color-green-light)' }}>₹{activeSubTab === 'MTF' ? '0.00' : (filteredLedger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span> 
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400', marginLeft: '8px' }}>(This includes both broking ledger balance of ₹{(filteredLedger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})} and MTF ledger balance of ₹0.00)</span>
       </div>
 
       {/* Table */}
@@ -131,7 +171,7 @@ const LedgerStatement = () => {
           <tbody>
             {loading ? (
               <tr><td colSpan="6" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
-            ) : ledger.length === 0 || activeSubTab === 'MTF' ? (
+            ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
               <tr>
                 <td colSpan="6" style={{ padding: '64px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
@@ -143,7 +183,7 @@ const LedgerStatement = () => {
                 </td>
               </tr>
             ) : (
-              ledger.map((entry) => (
+              filteredLedger.map((entry) => (
                 <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <td style={{ padding: '16px' }}>{new Date(entry.created_at).toLocaleDateString('en-GB')}</td>
                   <td style={{ padding: '16px' }}>{entry.type.replace('_', ' ')}</td>
