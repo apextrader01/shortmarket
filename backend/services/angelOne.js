@@ -1054,7 +1054,7 @@ async function pollDepthData() {
             mode: "FULL",
             exchangeTokens
         };
-        const response = await smart_api.getMarketData(payload);
+        const response = await smart_api.marketData(payload);
         if (response.status && response.data && response.data.fetched) {
             for (const item of response.data.fetched) {
                 const uniqueSymbol = item.tradingSymbol && item.exchange ? `${item.tradingSymbol}-${item.exchange}` : null;
