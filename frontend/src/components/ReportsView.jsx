@@ -208,6 +208,29 @@ const LedgerStatement = () => {
 };
 
 const TradesAndCharges = () => {
+  const [filterPeriod, setFilterPeriod] = useState('15 Days');
+  const { orders } = useStore();
+
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+
+  const filteredOrders = executedOrders.filter(entry => {
+    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
+    const entryDate = new Date(entry.created_at);
+    const now = new Date();
+    const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+
+    if (filterPeriod === 'Week' && diffDays > 7) return false;
+    if (filterPeriod === '15 Days' && diffDays > 15) return false;
+    if (filterPeriod === 'Month' && diffDays > 30) return false;
+    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    return true;
+  });
+
+  const totalTrades = filteredOrders.length;
+  // Assume a dummy flat ₹20 brokerage per trade if not provided by backend
+  const totalBrokerage = filteredOrders.reduce((acc, o) => acc + (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20)), 0);
+  const totalCharges = filteredOrders.reduce((acc, o) => acc + (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)), 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
@@ -216,16 +239,27 @@ const TradesAndCharges = () => {
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
-              <span key={p} style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === '15 Days' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === '15 Days' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>{p}</span>
+              <span 
+                key={p} 
+                onClick={() => setFilterPeriod(p)}
+                style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === filterPeriod ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === filterPeriod ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                {p}
+              </span>
             ))}
           </div>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}>Custom</span>
+          <span 
+            onClick={() => setFilterPeriod('Custom')}
+            style={{ fontSize: '12px', color: filterPeriod === 'Custom' ? 'var(--color-blue-light)' : 'var(--text-secondary)', padding: '6px 12px', border: filterPeriod === 'Custom' ? '1px solid var(--color-blue-light)' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            Custom
+          </span>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Search size={14} color="var(--text-secondary)" /></div>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Filter size={14} color="var(--text-secondary)" /></div>
-          <button onClick={() => downloadCSV([{Message: 'No trades'}], 'Trades_History.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={() => downloadCSV(filteredOrders.length ? filteredOrders : [{Message: 'No trades'}], 'Trades_History.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
             DOWNLOAD TRADE HISTORY
           </button>
         </div>
@@ -239,7 +273,7 @@ const TradesAndCharges = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Trades ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>0</div>
+               <div style={{ fontSize: '16px', fontWeight: '700' }}>{totalTrades}</div>
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
@@ -248,7 +282,7 @@ const TradesAndCharges = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Brokerage ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹0.00</div>
+               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalBrokerage.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
@@ -257,7 +291,7 @@ const TradesAndCharges = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹0.00</div>
+               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
         </div>
@@ -267,7 +301,9 @@ const TradesAndCharges = () => {
           <div style={{ textAlign: 'center' }}>
             <Calendar size={48} style={{ margin: '0 auto 16px auto', color: 'var(--text-secondary)' }} />
             <div style={{ fontSize: '14px' }}>Trading Activity Calendar</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>No trades recorded in this period</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+              {totalTrades > 0 ? `${totalTrades} trades recorded in this period.` : 'No trades recorded in this period'}
+            </div>
           </div>
         </div>
       </div>
@@ -284,6 +320,40 @@ const TradesAndCharges = () => {
 };
 
 const ProfitAndLoss = () => {
+  const [filterPeriod, setFilterPeriod] = useState('Year');
+  const { positions, orders } = useStore();
+
+  const filteredPositions = (positions || []).filter(entry => {
+    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
+    const entryDate = new Date(entry.updated_at || entry.created_at);
+    const now = new Date();
+    const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+
+    if (filterPeriod === 'Week' && diffDays > 7) return false;
+    if (filterPeriod === '15 Days' && diffDays > 15) return false;
+    if (filterPeriod === 'Month' && diffDays > 30) return false;
+    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    return true;
+  });
+
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const filteredOrders = executedOrders.filter(entry => {
+    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
+    const entryDate = new Date(entry.created_at);
+    const now = new Date();
+    const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+
+    if (filterPeriod === 'Week' && diffDays > 7) return false;
+    if (filterPeriod === '15 Days' && diffDays > 15) return false;
+    if (filterPeriod === 'Month' && diffDays > 30) return false;
+    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    return true;
+  });
+
+  const totalCharges = filteredOrders.reduce((acc, o) => acc + (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)), 0);
+  const realizedPnl = filteredPositions.reduce((acc, p) => acc + (Number(p.realized_pnl) || 0), 0);
+  const netRealizedPnl = realizedPnl - totalCharges;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -291,16 +361,27 @@ const ProfitAndLoss = () => {
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months', 'Year'].map(p => (
-              <span key={p} style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === 'Year' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === 'Year' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>{p}</span>
+              <span 
+                key={p} 
+                onClick={() => setFilterPeriod(p)}
+                style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === filterPeriod ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === filterPeriod ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                {p}
+              </span>
             ))}
           </div>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}>Custom</span>
+          <span 
+            onClick={() => setFilterPeriod('Custom')}
+            style={{ fontSize: '12px', color: filterPeriod === 'Custom' ? 'var(--color-blue-light)' : 'var(--text-secondary)', padding: '6px 12px', border: filterPeriod === 'Custom' ? '1px solid var(--color-blue-light)' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            Custom
+          </span>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Search size={14} color="var(--text-secondary)" /></div>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Filter size={14} color="var(--text-secondary)" /></div>
-          <button onClick={() => downloadCSV([{Message: 'No PnL'}], 'PnL_Statement.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={() => downloadCSV(filteredPositions.length ? filteredPositions : [{Message: 'No PnL'}], 'PnL_Statement.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
             DOWNLOAD P/L STATEMENT
           </button>
         </div>
@@ -314,7 +395,9 @@ const ProfitAndLoss = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Realized P/L ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹0.00</div>
+               <div style={{ fontSize: '16px', fontWeight: '700', color: realizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                 {realizedPnl >= 0 ? '+' : ''}₹{realizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+               </div>
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
@@ -323,7 +406,7 @@ const ProfitAndLoss = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹0.00</div>
+               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
@@ -332,7 +415,9 @@ const ProfitAndLoss = () => {
              </div>
              <div>
                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Net Realized P/L ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹0.00</div>
+               <div style={{ fontSize: '16px', fontWeight: '700', color: netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                 {netRealizedPnl >= 0 ? '+' : ''}₹{netRealizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+               </div>
              </div>
           </div>
         </div>
