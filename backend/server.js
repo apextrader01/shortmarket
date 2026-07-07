@@ -1266,7 +1266,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
            });
         }
 
-        await trx('users').where({ id: req.user.id }).update({ balance: userAfterExec.balance + balanceChange });
+        await trx('users').where({ id: req.user.id }).update({ balance: Number(userAfterExec.balance) + balanceChange });
         
         // Spawn Bracket Orders (SL & TP) if any
         await spawnBracketOrders(trx, {
