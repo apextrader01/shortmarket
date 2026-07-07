@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user, restrictedStocks } = useStore();
+  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal } = useStore();
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
@@ -361,9 +361,16 @@ export default function OrderModal() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-            <div style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer' }}>Show More ⏷</div>
-            <div style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>Market Depth <Maximize2 size={12} /></div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
+            <div 
+              onClick={() => {
+                closeOrderModal();
+                openMarketDepthModal(symbol, lotSize);
+              }}
+              style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              Market Depth <Maximize2 size={12} />
+            </div>
           </div>
         </div>
 
