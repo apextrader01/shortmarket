@@ -86,15 +86,27 @@ app.get('/api/stocks', (req, res) => {
       return queryParts.every(part => lowerStr.includes(part));
     };
 
-    const results = [];
+    const resultsMap = new Map();
     
+    // Helper to add to map, preferring higher lotsizes
+    const addResult = (resObj) => {
+      if (resultsMap.has(resObj.uniqueSymbol)) {
+        const existing = resultsMap.get(resObj.uniqueSymbol);
+        if (resObj.lotsize > existing.lotsize) {
+           resultsMap.set(resObj.uniqueSymbol, resObj);
+        }
+      } else {
+        resultsMap.set(resObj.uniqueSymbol, resObj);
+      }
+    };
+
     // 1. Search regular stocks and indices
     if (STOCK_MASTER) {
       for (const [key, value] of Object.entries(STOCK_MASTER)) {
         if (!value) continue;
         if (value.symbol && value.name) {
           if (matchesQuery(value.symbol) || matchesQuery(value.name)) {
-            results.push({
+            addResult({
               token: key, 
               symbol: value.symbol, 
               name: value.name, 
@@ -102,7 +114,7 @@ app.get('/api/stocks', (req, res) => {
               lotsize: Number(value.lotsize || 1),
               uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${value.exchange || 'NSE'}`
             });
-            if (results.length >= 100) return res.json(results);
+            if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
           }
         }
       }
@@ -112,11 +124,11 @@ app.get('/api/stocks', (req, res) => {
     if (globalBseSpots) {
       for (const [key, value] of Object.entries(globalBseSpots)) {
         if (value && value.symbol && matchesQuery(value.symbol)) {
-          results.push({
+          addResult({
             token: value.token, symbol: value.symbol, name: value.name, 
             exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
           });
-          if (results.length >= 100) return res.json(results);
+          if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
         }
       }
     }
@@ -127,11 +139,11 @@ app.get('/api/stocks', (req, res) => {
         if (Array.isArray(value)) {
           for (const fut of value) {
             if (fut && fut.symbol && matchesQuery(fut.symbol)) {
-               results.push({
+               addResult({
                  token: fut.token, symbol: fut.symbol, name: key, 
                  exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
                });
-               if (results.length >= 100) return res.json(results);
+               if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
             }
           }
         }
@@ -149,11 +161,11 @@ app.get('/api/stocks', (req, res) => {
                for (const type in value[expiry][strike]) {
                   const opt = value[expiry][strike][type];
                   if (opt && opt.symbol && matchesQuery(opt.symbol)) {
-                     results.push({
+                     addResult({
                        token: opt.token, symbol: opt.symbol, name: key, 
                        exchange: opt.exch_seg || 'NFO', lotsize: Number(opt.lotsize || 1), uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
                      });
-                     if (results.length >= 100) return res.json(results);
+                     if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
                   }
                }
             }
@@ -162,7 +174,7 @@ app.get('/api/stocks', (req, res) => {
       }
     }
     
-    res.json(results);
+    res.json(Array.from(resultsMap.values()));
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
