@@ -12,8 +12,9 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
     const turnover = quantity * price;
     
     const isOption = symbol.endsWith('CE') || symbol.endsWith('PE');
-    const isFuture = symbol.endsWith('FUT');
+    const isFuture = symbol.endsWith('FUT') || symbol.endsWith('FUT-MCX') || symbol.includes('FUT');
     const isEquity = !isOption && !isFuture;
+    const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE');
 
     let brokerage = 0;
     let stt = 0;
@@ -22,37 +23,40 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
     let dpCharge = 0;
 
     // 1. Brokerage
-    if (isEquity && productType === 'DEL') {
+    if (isOption) {
+        brokerage = 20; // Flat ₹20 for Options
+    } else if (isEquity && productType === 'DEL') {
         brokerage = 0; // Free equity delivery
     } else {
-        brokerage = 20; // Flat ₹20 for Intraday, F&O
+        // Equity Intraday, Futures, Commodity Futures
+        brokerage = Math.min(turnover * 0.0003, 20); 
     }
 
-    // 2. STT (Securities Transaction Tax) - Charged mostly on Sell
+    // 2. STT/CTT
     if (isEquity && productType === 'DEL') {
-        stt = turnover * 0.001; // 0.1% on both Buy and Sell for Delivery
+        stt = turnover * 0.001; // 0.1% on buy & sell
     } else if (side === 'SELL') {
         if (isEquity && productType === 'INT') {
             stt = turnover * 0.00025; // 0.025%
         } else if (isFuture) {
-            stt = turnover * 0.000125; // 0.0125%
+            stt = turnover * (isCommodity ? 0.0001 : 0.000125); // 0.01% for MCX, 0.0125% for NSE
         } else if (isOption) {
-            stt = turnover * 0.00125; // 0.125% on Premium
+            stt = turnover * (isCommodity ? 0.0005 : 0.000625); // 0.05% for MCX, 0.0625% for NSE
         }
     }
 
-    // 3. Exchange Transaction Charge
+    // 3. Transaction Charges
     if (isOption) {
-        exchangeCharge = turnover * 0.0005; // ~0.05% on premium
+        exchangeCharge = turnover * (isCommodity ? 0.000418 : 0.0003553); // MCX: 0.0418%, NSE: 0.03553%
     } else if (isFuture) {
-        exchangeCharge = turnover * 0.000019; // ~0.0019%
+        exchangeCharge = turnover * (isCommodity ? 0.000021 : 0.0000183); // MCX: 0.0021%, NSE: 0.00183%
     } else {
-        exchangeCharge = turnover * 0.0000325; // ~0.00325%
+        exchangeCharge = turnover * 0.0000307; // Equity NSE: 0.00307%
     }
 
     // 4. DP Charges (CDSL/NSDL) - Charged ONLY when selling Equity Delivery
     if (isEquity && productType === 'DEL' && side === 'SELL') {
-        dpCharge = 25; // Flat ₹25 per script per day (simplified per trade here)
+        dpCharge = 15.93; // Standard DP charge ₹13.5 + 18% GST
     }
 
     // 5. Stamp Duty - Charged ONLY on Buy
@@ -69,10 +73,10 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
     }
 
     // 6. SEBI Turnover Charge
-    const sebiCharge = turnover * 0.000001; // ₹10 per crore
+    const sebiCharge = turnover * (isCommodity && !symbol.includes('AGRI') ? 0.000001 : 0.000001); // ₹10 per crore
 
     // 7. GST
-    const gst = (brokerage + exchangeCharge + dpCharge + sebiCharge) * 0.18; // 18% on services
+    const gst = (brokerage + exchangeCharge + sebiCharge) * 0.18; // 18% on services
 
     const totalTaxes = brokerage + stt + exchangeCharge + stampDuty + dpCharge + sebiCharge + gst;
 
