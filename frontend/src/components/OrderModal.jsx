@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { X, Maximize2, Info } from 'lucide-react';
+import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, prices, user, restrictedStocks } = useStore();
@@ -17,8 +17,9 @@ export default function OrderModal() {
   const [showCautionPopup, setShowCautionPopup] = useState(false);
   
   // Tax estimates
-  const [estimatedTaxes, setEstimatedTaxes] = useState(0);
+  const [estimatedTaxes, setEstimatedTaxes] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [showBreakup, setShowBreakup] = useState(false);
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
@@ -59,7 +60,7 @@ export default function OrderModal() {
          });
          const data = await res.json();
          if (data.totalTaxes !== undefined) {
-             setEstimatedTaxes(data.totalTaxes);
+             setEstimatedTaxes(data);
          }
        } catch (err) {
          console.error('Failed to estimate taxes', err);
@@ -336,18 +337,37 @@ export default function OrderModal() {
 
         {/* Footer */}
         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Required</div>
-              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{requiredMargin.toFixed(2)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Estimated Charges</div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                 {isEstimating ? '...' : `₹${estimatedTaxes.toFixed(2)}`}
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
+                <RefreshCw size={14} style={{ color: 'var(--text-secondary)' }} />
+                <span style={{ fontSize: '15px', fontWeight: '700' }}>Margin</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Required:</span>
+                  <span style={{ color: 'var(--text-primary)' }}>₹{requiredMargin.toFixed(2)} ({productType === 'INT' && !isOption ? '4x' : '1x'})</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Available:</span>
+                  <span style={{ color: 'var(--text-primary)' }}>₹{balanceNum.toFixed(2)}</span>
+                </div>
               </div>
             </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginLeft: '22px', marginTop: '4px' }}>
+              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
+                <Plus size={14} /> Add Funds
+              </button>
+              <button 
+                onClick={() => estimatedTaxes && setShowBreakup(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
+                <FileText size={14} /> Price breakup
+              </button>
+            </div>
           </div>
+          
           <button 
             onClick={handlePlaceOrder}
             disabled={isInsufficient || isIntradayBlocked}
@@ -355,7 +375,10 @@ export default function OrderModal() {
               background: (isInsufficient || isIntradayBlocked) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
               color: (isInsufficient || isIntradayBlocked) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
+              alignSelf: 'stretch',
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
             PLACE {isBuy ? 'BUY' : 'SELL'} ORDER
@@ -394,6 +417,67 @@ export default function OrderModal() {
                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowCautionPopup(false)} style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>NO</button>
                   <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {/* Charges Breakup Modal */}
+      {showBreakup && estimatedTaxes && (
+         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
+            <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', width: '380px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', border: '1px solid var(--border-color)' }}>
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                    <FileText size={18} />
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Charges</h3>
+                  </div>
+                  <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowBreakup(false)} />
+               </div>
+               
+               <div style={{ padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
+                     <span>Brokerage</span>
+                     <span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                  </div>
+                  
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>Others</div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                     <span>Transaction (Exch. + Clearing)</span>
+                     <span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                     <span>CTT/STT</span>
+                     <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                     <span>GST</span>
+                     <span>₹{estimatedTaxes.gst.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                     <span>SEBI</span>
+                     <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                     <span>Stamp duty</span>
+                     <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                  </div>
+                  {estimatedTaxes.dpCharge > 0 && (
+                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                        <span>DP Charge</span>
+                        <span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
+                     </div>
+                  )}
+               </div>
+               
+               <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
+                     <span>Total</span>
+                     <span>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                     *Actual charges may vary based on order execution. <span style={{ color: 'var(--color-blue)', cursor: 'pointer' }}>Learn more</span>
+                  </div>
                </div>
             </div>
          </div>
