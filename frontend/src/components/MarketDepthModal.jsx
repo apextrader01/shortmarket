@@ -75,10 +75,10 @@ export default function MarketDepthModal() {
                 <span>Price</span>
              </div>
              {/* Ask Header */}
-             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', textAlign: 'left' }}>
-                <span style={{ textAlign: 'right' }}>Price</span>
+             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', textAlign: 'right' }}>
+                <span style={{ textAlign: 'left' }}>Price</span>
                 <span>Qty</span>
-                <span style={{ textAlign: 'right' }}>Orders</span>
+                <span>Orders</span>
              </div>
           </div>
 
@@ -101,12 +101,12 @@ export default function MarketDepthModal() {
              <div>
                 {asks.map((ask, i) => (
                   <div key={i} style={{ 
-                    display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', textAlign: 'left', padding: '6px 0', fontSize: '12px', fontWeight: '500',
+                    display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr', textAlign: 'right', padding: '6px 0', fontSize: '12px', fontWeight: '500',
                     background: ask.changed ? 'rgba(239, 68, 68, 0.1)' : 'transparent', transition: 'background 0.3s'
                   }}>
-                    <span style={{ color: 'var(--color-red-light)', textAlign: 'right' }}>{ask.price}</span>
-                    <span style={{ color: 'var(--color-red-light)', paddingLeft: '8px' }}>{ask.qty}</span>
-                    <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{ask.orders}</span>
+                    <span style={{ color: 'var(--color-red-light)', textAlign: 'left' }}>{ask.price}</span>
+                    <span style={{ color: 'var(--color-red-light)' }}>{ask.qty}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{ask.orders}</span>
                   </div>
                 ))}
              </div>
