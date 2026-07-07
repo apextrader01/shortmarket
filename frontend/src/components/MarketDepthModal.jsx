@@ -6,7 +6,7 @@ import { socket } from '../store'; // Import socket to emit subscribe events
 export default function MarketDepthModal() {
   const { 
     marketDepthModal, closeMarketDepthModal, marketDepthData, prices, 
-    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal
+    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal, orderModal
   } = useStore();
 
   const symbol = marketDepthModal.symbol;
@@ -59,13 +59,18 @@ export default function MarketDepthModal() {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
+      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.6)', 
+      backdropFilter: orderModal?.isOpen ? 'none' : 'blur(2px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+      pointerEvents: orderModal?.isOpen ? 'none' : 'auto'
     }}>
       <div style={{
         width: '500px', background: 'var(--bg-dark)', borderRadius: '8px', 
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-        overflow: 'hidden', display: 'flex', flexDirection: 'column'
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        transform: orderModal?.isOpen ? 'translateX(260px)' : 'none',
+        transition: 'transform 0.3s ease-in-out',
+        pointerEvents: 'auto'
       }}>
         
         {/* Header */}

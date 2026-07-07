@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal } = useStore();
+  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore();
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
@@ -195,7 +195,9 @@ export default function OrderModal() {
       <div style={{
         width: '520px', background: 'var(--bg-dark)', borderRadius: '8px', 
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-        overflow: 'hidden', display: 'flex', flexDirection: 'column'
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        transform: marketDepthModal?.isOpen ? 'translateX(-260px)' : 'none',
+        transition: 'transform 0.3s ease-in-out'
       }}>
         
         {/* Header */}
