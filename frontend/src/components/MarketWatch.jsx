@@ -247,14 +247,14 @@ export default function MarketWatch({ className = '' }) {
                         <Trash2 size={12} color="var(--color-red-light)" />
                       </div>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openMarketDepthModal(stock.uniqueSymbol); }}
+                        onClick={(e) => { e.stopPropagation(); openMarketDepthModal(stock.uniqueSymbol, stock.lotsize || searchLotsizes.current[stock.uniqueSymbol] || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
                         title="Market Depth"
                       >
                         <AlignRight size={12} color="var(--color-blue)" />
                       </div>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openDomLadderModal(stock.uniqueSymbol, 1); }}
+                        onClick={(e) => { e.stopPropagation(); openDomLadderModal(stock.uniqueSymbol, stock.lotsize || searchLotsizes.current[stock.uniqueSymbol] || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
                         title="DOM Ladder"
                       >
