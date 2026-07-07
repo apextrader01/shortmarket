@@ -336,77 +336,79 @@ export default function OrderModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-               <RefreshCw size={16} color="var(--text-secondary)" />
-               <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>Margin</div>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                   Required: <span style={{ color: 'var(--text-primary)', marginLeft: '8px' }}>₹{requiredMargin.toFixed(2)} ({productType === 'INT' && !isOption ? '4x' : '1x'})</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '32px' }}>
+               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                 <RefreshCw size={16} color="var(--text-secondary)" />
+                 <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>Margin</div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                     Required: <span style={{ color: 'var(--text-primary)', marginLeft: '8px' }}>₹{requiredMargin.toFixed(2)} ({productType === 'INT' && !isOption ? '4x' : '1x'})</span>
+                   </div>
+                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                     Available: <span style={{ color: 'var(--text-primary)', marginLeft: '8px' }}>₹{balanceNum.toFixed(2)}</span>
+                   </div>
                  </div>
-                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                   Available: <span style={{ color: 'var(--text-primary)', marginLeft: '8px' }}>₹{balanceNum.toFixed(2)}</span>
-                 </div>
-               </div>
-             </div>
-             
-             {/* Estimated Charges (Clickable) */}
-             <div style={{ textAlign: 'right', position: 'relative' }}>
-               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Estimated Charges</div>
-               <div 
-                 onClick={() => estimatedTaxes && setShowBreakup(!showBreakup)}
-                 style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-blue)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}
-               >
-                 {isEstimating ? '...' : `₹${estimatedTaxes ? estimatedTaxes.totalTaxes.toFixed(2) : '0.00'}`}
-                 <Info size={14} />
                </div>
                
-               {showBreakup && estimatedTaxes && (
-                 <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', width: '220px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', textAlign: 'left' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--text-primary)' }}>Charges Breakup</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>Brokerage</span><span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>STT/CTT</span><span>₹{estimatedTaxes.stt.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>Transaction</span><span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>DP Charge</span><span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>Stamp Duty</span><span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                       <span>SEBI</span><span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
-                       <span>GST</span><span>₹{estimatedTaxes.gst.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', paddingTop: '8px', borderTop: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
-                       <span>Total</span><span>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
-                    </div>
+               {/* Estimated Charges (Clickable) */}
+               <div style={{ textAlign: 'right', position: 'relative' }}>
+                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Estimated Charges</div>
+                 <div 
+                   onClick={() => estimatedTaxes && setShowBreakup(!showBreakup)}
+                   style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-blue)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}
+                 >
+                   {isEstimating ? '...' : `₹${estimatedTaxes ? estimatedTaxes.totalTaxes.toFixed(2) : '0.00'}`}
+                   <Info size={14} />
                  </div>
-               )}
-             </div>
+                 
+                 {showBreakup && estimatedTaxes && (
+                   <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '12px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', width: '220px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.5)', textAlign: 'left' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--text-primary)' }}>Charges Breakup</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>Brokerage</span><span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>STT/CTT</span><span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>Transaction</span><span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>DP Charge</span><span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>Stamp Duty</span><span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>SEBI</span><span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px', color: 'var(--text-secondary)' }}>
+                         <span>GST</span><span>₹{estimatedTaxes.gst.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', paddingTop: '8px', borderTop: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
+                         <span>Total</span><span>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                      </div>
+                   </div>
+                 )}
+               </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+               <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', padding: 0, fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                 <Plus size={14} /> Add Funds
+               </button>
+               <button 
+                 onClick={() => estimatedTaxes && setShowBreakup(!showBreakup)}
+                 style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', padding: 0, fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+               >
+                 <FileText size={14} /> Price breakup
+               </button>
+            </div>
           </div>
-          
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-             <button style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', padding: 0, fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-               <Plus size={14} /> Add Funds
-             </button>
-             <button 
-               onClick={() => estimatedTaxes && setShowBreakup(!showBreakup)}
-               style={{ background: 'transparent', color: 'var(--color-blue)', border: 'none', padding: 0, fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-             >
-               <FileText size={14} /> Price breakup
-             </button>
-          </div>
-        </div>
+
           <button 
             onClick={handlePlaceOrder}
             disabled={isInsufficient || isIntradayBlocked}
@@ -414,7 +416,8 @@ export default function OrderModal() {
               background: (isInsufficient || isIntradayBlocked) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
               color: (isInsufficient || isIntradayBlocked) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
+              height: 'fit-content'
             }}
           >
             PLACE {isBuy ? 'BUY' : 'SELL'} ORDER
