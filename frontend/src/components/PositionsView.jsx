@@ -226,7 +226,8 @@ export default function PositionsView() {
                           <button
                             onClick={() => {
                               setPartialExitPos(pos);
-                              setPartialExitQty(Math.abs(pos.qty).toString());
+                              const ls = pos.lotSize || 1;
+                              setPartialExitQty((Math.abs(pos.qty) / ls).toString());
                               setPartialExitType('MARKET');
                               setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
                             }}
@@ -301,14 +302,16 @@ export default function PositionsView() {
               
               <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Qty (Max: {Math.abs(partialExitPos.qty)}, Lot: {partialExitPos.lotSize || 1})</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    {partialExitPos.lotSize > 1 ? 'Lots' : 'Qty'} (Max: {Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)})
+                  </label>
                   <input
                     type="number"
                     value={partialExitQty}
                     onChange={(e) => setPartialExitQty(e.target.value)}
-                    max={Math.abs(partialExitPos.qty)}
-                    min={partialExitPos.lotSize || 1}
-                    step={partialExitPos.lotSize || 1}
+                    max={Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)}
+                    min="1"
+                    step="1"
                     style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
@@ -339,13 +342,10 @@ export default function PositionsView() {
 
               <button
                 onClick={async () => {
-                  const qtyToExit = parseInt(partialExitQty);
+                  const inputVal = parseInt(partialExitQty);
                   const ls = partialExitPos.lotSize || 1;
+                  const qtyToExit = inputVal * ls;
                   if (qtyToExit > 0 && qtyToExit <= Math.abs(partialExitPos.qty)) {
-                    if (qtyToExit % ls !== 0) {
-                      alert(`Quantity must be a multiple of the lot size (${ls}).`);
-                      return;
-                    }
                     const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
                     await useStore.getState().placeOrder({
                       symbol: partialExitPos.symbol,
@@ -367,7 +367,7 @@ export default function PositionsView() {
                   fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
                 }}
               >
-                {partialExitPos.qty > 0 ? 'SELL' : 'BUY'} {partialExitQty} QTY
+                {partialExitPos.qty > 0 ? 'SELL' : 'BUY'} {partialExitQty} {partialExitPos.lotSize > 1 ? 'LOTS' : 'QTY'}
               </button>
             </div>
           </div>
