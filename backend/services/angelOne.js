@@ -1074,8 +1074,10 @@ async function pollDepthData() {
                 const info = STOCK_MASTER[token];
                 if (!info) continue;
                 
+                const originalRequestedSymbol = [...activeDepthSymbols].find(sym => symbolToToken[sym] === token) || info.uniqueSymbol;
+                
                 const depthData = {
-                    symbol: info.uniqueSymbol,
+                    symbol: originalRequestedSymbol,
                     bids: item.depth?.buy ? item.depth.buy.map(b => ({ price: Number(b.price || 0).toFixed(2), qty: b.quantity || 0, orders: b.orders || 0 })) : [],
                     asks: item.depth?.sell ? item.depth.sell.map(s => ({ price: Number(s.price || 0).toFixed(2), qty: s.quantity || 0, orders: s.orders || 0 })) : [],
                     open: item.open ? Number(item.open).toFixed(2) : null,
@@ -1090,8 +1092,8 @@ async function pollDepthData() {
                     upperCircuit: item.upperCircuit ? Number(item.upperCircuit).toFixed(2) : null,
                 };
                 
-                console.log(`[REST DEPTH] Polled depth for ${info.uniqueSymbol}`);
-                global_io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
+                console.log(`[REST DEPTH] Polled depth for ${originalRequestedSymbol}`);
+                global_io.to(`${originalRequestedSymbol}_depth`).emit('market_depth_data', depthData);
             }
         }
     } catch (err) {
