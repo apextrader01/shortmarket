@@ -30,8 +30,8 @@ export default function MarketDepthModal() {
   const bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
   const asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
 
-  const totalBidQty = bids.reduce((sum, b) => sum + (b.qty || 0), 0);
-  const totalAskQty = asks.reduce((sum, a) => sum + (a.qty || 0), 0);
+  const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? marketDepthData.totBuyQuan : bids.reduce((sum, b) => sum + (b.qty || 0), 0);
+  const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? marketDepthData.totSellQuan : asks.reduce((sum, a) => sum + (a.qty || 0), 0);
   
   // Calculate width ratio for progress bars
   const totalVol = totalBidQty + totalAskQty;

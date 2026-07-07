@@ -975,6 +975,8 @@ function startLiveWebSocket(io) {
                     
                     const depthData = {
                         symbol: info.uniqueSymbol,
+                        totBuyQuan: data.total_buy_quantity || null,
+                        totSellQuan: data.total_sell_quantity || null,
                         bids: data.best_5_buy_data.map(mapDepthItem),
                         asks: data.best_5_sell_data.map(mapDepthItem),
                         // Extra SnapQuote details
@@ -1105,6 +1107,8 @@ async function pollDepthData() {
                 
                 const depthData = {
                     symbol: originalRequestedSymbol,
+                    totBuyQuan: item.totBuyQuan || null,
+                    totSellQuan: item.totSellQuan || null,
                     bids: item.depth?.buy ? item.depth.buy.map(b => ({ price: Number(b.price || 0).toFixed(2), qty: b.quantity || 0, orders: b.orders || 0 })) : [],
                     asks: item.depth?.sell ? item.depth.sell.map(s => ({ price: Number(s.price || 0).toFixed(2), qty: s.quantity || 0, orders: s.orders || 0 })) : [],
                     open: item.open ? Number(item.open).toFixed(2) : null,
