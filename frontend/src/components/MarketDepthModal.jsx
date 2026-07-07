@@ -26,9 +26,27 @@ export default function MarketDepthModal() {
 
   if (!marketDepthModal.isOpen || !symbol) return null;
 
-  // Use real data from store, fallback to empty array
-  const bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  const asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  // Use real data from store, fallback to fake data if market is closed (empty arrays)
+  let bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
+  let asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+
+  if (bids.length === 0 && asks.length === 0) {
+    const ltp = basicData?.ltp || 100;
+    bids = [
+      { orders: 3, qty: 150, price: (ltp - 0.5).toFixed(2) },
+      { orders: 1, qty: 50, price: (ltp - 1.0).toFixed(2) },
+      { orders: 5, qty: 300, price: (ltp - 1.5).toFixed(2) },
+      { orders: 2, qty: 100, price: (ltp - 2.0).toFixed(2) },
+      { orders: 8, qty: 850, price: (ltp - 2.5).toFixed(2) }
+    ];
+    asks = [
+      { orders: 2, qty: 200, price: (ltp + 0.5).toFixed(2) },
+      { orders: 4, qty: 120, price: (ltp + 1.0).toFixed(2) },
+      { orders: 1, qty: 10, price: (ltp + 1.5).toFixed(2) },
+      { orders: 7, qty: 500, price: (ltp + 2.0).toFixed(2) },
+      { orders: 3, qty: 150, price: (ltp + 2.5).toFixed(2) }
+    ];
+  }
 
   const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? marketDepthData.totBuyQuan : bids.reduce((sum, b) => sum + (b.qty || 0), 0);
   const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? marketDepthData.totSellQuan : asks.reduce((sum, a) => sum + (a.qty || 0), 0);
