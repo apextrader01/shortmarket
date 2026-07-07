@@ -89,6 +89,7 @@ async function loadInstrumentMaster() {
                         symbol: rawSymbol,
                         name: stock.name,
                         exchange: stock.exchange,
+                        lotsize: Number(stock.lotsize || 1),
                         uniqueSymbol
                     };
                     symbolToToken[uniqueSymbol] = stock.token;
@@ -385,7 +386,8 @@ async function addSubscription(data, io, priceCache) {
                     symbol: rawSymbol,
                     uniqueSymbol: uniqueSymbol,
                     name: found.name || rawSymbol,
-                    exchange: found.exchange || exchFromSymbol || 'NFO'
+                    exchange: found.exchange || exchFromSymbol || 'NFO',
+                    lotsize: Number(found.lotsize || 1)
                 };
                 symbolToToken[uniqueSymbol] = found.token;
             } else {
@@ -474,7 +476,8 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
                     symbol: rawSymbol,
                     uniqueSymbol: uniqueSymbol,
                     name: found.name || rawSymbol,
-                    exchange: found.exchange || data.exchange || 'NFO'
+                    exchange: found.exchange || data.exchange || 'NFO',
+                    lotsize: Number(found.lotsize || 1)
                 };
                 symbolToToken[uniqueSymbol] = found.token;
             }
@@ -589,6 +592,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
                     result[info.uniqueSymbol] = {
                         symbol: info.uniqueSymbol,
                         ltp: item.ltp,
+                        lotsize: info.lotsize || 1,
                         open: item.open || item.ltp,
                         high: item.high || item.ltp,
                         low: item.low || item.ltp,
@@ -638,7 +642,9 @@ async function fetchAllLTPs() {
                     const info = STOCK_MASTER[item.symbolToken];
                     if (info && item.ltp) {
                         result[info.uniqueSymbol] = {
+                            symbol: info.uniqueSymbol,
                             ltp: item.ltp,
+                            lotsize: info.lotsize || 1,
                             open: item.open || item.ltp,
                             high: item.high || item.ltp,
                             low: item.low || item.ltp,
@@ -908,6 +914,7 @@ function startLiveWebSocket(io) {
                     const entry = {
                         symbol: info.uniqueSymbol,
                         ltp,
+                        lotsize: info.lotsize || 1,
                         timestamp: new Date().toISOString()
                     };
                     

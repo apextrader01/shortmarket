@@ -99,6 +99,7 @@ app.get('/api/stocks', (req, res) => {
               symbol: value.symbol, 
               name: value.name, 
               exchange: value.exchange, 
+              lotsize: Number(value.lotsize || 1),
               uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${value.exchange || 'NSE'}`
             });
             if (results.length >= 100) return res.json(results);
@@ -113,7 +114,7 @@ app.get('/api/stocks', (req, res) => {
         if (value && value.symbol && matchesQuery(value.symbol)) {
           results.push({
             token: value.token, symbol: value.symbol, name: value.name, 
-            exchange: value.exchange || 'BSE', uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
+            exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
           });
           if (results.length >= 100) return res.json(results);
         }
@@ -128,7 +129,7 @@ app.get('/api/stocks', (req, res) => {
             if (fut && fut.symbol && matchesQuery(fut.symbol)) {
                results.push({
                  token: fut.token, symbol: fut.symbol, name: key, 
-                 exchange: fut.exchange || 'NFO', uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
+                 exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
                });
                if (results.length >= 100) return res.json(results);
             }
@@ -150,7 +151,7 @@ app.get('/api/stocks', (req, res) => {
                   if (opt && opt.symbol && matchesQuery(opt.symbol)) {
                      results.push({
                        token: opt.token, symbol: opt.symbol, name: key, 
-                       exchange: opt.exch_seg || 'NFO', uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
+                       exchange: opt.exch_seg || 'NFO', lotsize: Number(opt.lotsize || 1), uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
                      });
                      if (results.length >= 100) return res.json(results);
                   }

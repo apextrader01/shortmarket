@@ -223,13 +223,13 @@ export default function MarketWatch({ className = '' }) {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY'); }}
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY', stock.lotsize || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         B
                       </div>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL'); }}
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL', stock.lotsize || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         S
