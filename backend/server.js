@@ -1447,6 +1447,30 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
             .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
             .whereNot({ id: order.id })
             .update({ status: 'CANCELLED' });
+            
+          // Bracket order cancelled: Auto-exit the underlying position at market
+          const parentOrder = await trx('orders').where({ id: order.parent_order_id }).first();
+          if (parentOrder && parentOrder.status === 'EXECUTED') {
+              const pos = await trx('positions').where({ user_id: req.user.id, symbol: order.symbol }).first();
+              if (pos && pos.quantity !== 0) {
+                 const exitQty = Math.min(Math.abs(pos.quantity), Number(parentOrder.quantity));
+                 const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+                 
+                 if (exitQty > 0) {
+                   await trx('orders').insert({
+                     user_id: req.user.id,
+                     symbol: pos.symbol,
+                     type: 'MARKET',
+                     side: exitSide,
+                     quantity: exitQty,
+                     price: null,
+                     status: 'PENDING', // orderExecutor will pick this up instantly
+                     product_type: pos.product_type || 'INT',
+                     margin: 0
+                   });
+                 }
+              }
+          }
       }
       
       // Refund Margin
