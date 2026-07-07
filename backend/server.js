@@ -1610,6 +1610,20 @@ io.on('connection', (socket) => {
     socket.leave(symbol);
   });
 
+  socket.on('subscribe_depth', (symbol) => {
+    if (!symbol) return;
+    socket.join(`${symbol}_depth`);
+    const { subscribeToDepth } = require('./services/angelOne');
+    if (subscribeToDepth) subscribeToDepth(symbol);
+  });
+
+  socket.on('unsubscribe_depth', (symbol) => {
+    if (!symbol) return;
+    socket.leave(`${symbol}_depth`);
+    const { unsubscribeFromDepth } = require('./services/angelOne');
+    if (unsubscribeFromDepth) unsubscribeFromDepth(symbol);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
