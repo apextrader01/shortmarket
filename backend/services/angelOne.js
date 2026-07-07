@@ -387,7 +387,8 @@ async function addSubscription(data, io, priceCache) {
         
         if (!symbolToToken[uniqueSymbol]) {
             // First try to find it in the master list
-            const foundToken = Object.keys(STOCK_MASTER).find(k => STOCK_MASTER[k].uniqueSymbol === uniqueSymbol || STOCK_MASTER[k].symbol === uniqueSymbol);
+            const stripped = uniqueSymbol.replace('-EQ', '');
+            const foundToken = Object.keys(STOCK_MASTER).find(k => STOCK_MASTER[k].uniqueSymbol === uniqueSymbol || STOCK_MASTER[k].symbol === uniqueSymbol || STOCK_MASTER[k].uniqueSymbol === stripped);
             if (foundToken) {
                 symbolToToken[uniqueSymbol] = foundToken;
             }
