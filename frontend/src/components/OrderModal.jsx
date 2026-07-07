@@ -15,6 +15,7 @@ export default function OrderModal() {
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
+  const [showIntradayBlockedPopup, setShowIntradayBlockedPopup] = useState(false);
   
   // Tax estimates
   const [estimatedTaxes, setEstimatedTaxes] = useState(null);
@@ -132,7 +133,10 @@ export default function OrderModal() {
   const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
 
   const handlePlaceOrder = async () => {
-    if (isIntradayBlocked) return;
+    if (isIntradayBlocked) {
+       setShowIntradayBlockedPopup(true);
+       return;
+    }
     if (isRestricted && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
@@ -410,12 +414,12 @@ export default function OrderModal() {
           
           <button 
             onClick={handlePlaceOrder}
-            disabled={isInsufficient || isIntradayBlocked}
+            disabled={isInsufficient}
             style={{ 
-              background: (isInsufficient || isIntradayBlocked) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-              color: (isInsufficient || isIntradayBlocked) ? 'var(--text-secondary)' : '#fff', 
+              background: (isInsufficient) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
+              color: (isInsufficient) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient || isIntradayBlocked) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
+              border: 'none', cursor: (isInsufficient) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
               alignSelf: 'stretch',
               display: 'flex',
               alignItems: 'center'
@@ -428,13 +432,14 @@ export default function OrderModal() {
       </div>
 
       {/* Block Intraday Overlay inside Modal */}
-      {isIntradayBlocked && (
+      {showIntradayBlockedPopup && (
          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-            <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '380px', textAlign: 'center' }}>
+            <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', width: '380px', textAlign: 'center', position: 'relative' }}>
+               <X size={20} onClick={() => setShowIntradayBlockedPopup(false)} style={{ position: 'absolute', top: '16px', right: '16px', color: 'var(--text-secondary)', cursor: 'pointer' }} />
                <X size={48} style={{ color: 'var(--color-red)', marginBottom: '16px' }} />
                <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Intraday Unavailable</h3>
                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Intraday trading is not available in {symbol.split('-')[0]}</p>
-               <button onClick={() => setProductType('DEL')} style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '4px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Switch to Delivery</button>
+               <button onClick={() => { setProductType('DEL'); setShowIntradayBlockedPopup(false); }} style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '4px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Switch to Delivery</button>
             </div>
          </div>
       )}
