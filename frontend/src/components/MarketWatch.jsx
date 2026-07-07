@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List } from 'lucide-react';
 
@@ -13,6 +13,7 @@ export default function MarketWatch({ className = '' }) {
   const [hoveredStock, setHoveredStock] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const searchLotsizes = useRef({});
 
   const activeWatchlist = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
   const isSearchMode = searchQuery.trim().length > 0;
@@ -28,6 +29,10 @@ export default function MarketWatch({ className = '' }) {
         const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
           const data = await res.json();
+          // Cache the lotsize locally so we have it instantly if the user adds to watchlist
+          data.forEach(item => {
+            searchLotsizes.current[item.uniqueSymbol] = item.lotsize;
+          });
           setSearchResults(data);
         }
       } catch (e) {
@@ -223,13 +228,13 @@ export default function MarketWatch({ className = '' }) {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY', stock.lotsize || prices[stock.uniqueSymbol]?.lotsize || 1); }}
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY', stock.lotsize || searchLotsizes.current[stock.uniqueSymbol] || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         B
                       </div>
                       <div 
-                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL', stock.lotsize || prices[stock.uniqueSymbol]?.lotsize || 1); }}
+                        onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL', stock.lotsize || searchLotsizes.current[stock.uniqueSymbol] || prices[stock.uniqueSymbol]?.lotsize || 1); }}
                         style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         S
