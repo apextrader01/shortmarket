@@ -1150,11 +1150,11 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
 
   try {
-    await db.transaction(async (trx) => {
-      // 1. Determine execution status
-      const isMarket = type === 'MARKET';
-      const status = isMarket ? 'EXECUTED' : 'PENDING';
-      const execPrice = price || 0; // In a real app, fetch live LTP here for market orders
+      await db.transaction(async (trx) => {
+        // 1. Determine execution status
+        const isMarket = type === 'MARKET';
+        const status = isMarket ? 'EXECUTED' : 'PENDING';
+        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
       
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
