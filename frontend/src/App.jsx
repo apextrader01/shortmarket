@@ -5,8 +5,8 @@ import PositionsView from './components/PositionsView';
 import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
-import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
+import ReportsView from './components/ReportsView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
 import AlertsView from './components/AlertsView';
@@ -404,7 +404,12 @@ function App() {
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
-              <ClientDataView onDepositClick={() => setShowDepositModal(true)} />
+              <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
+            </div>
+          )}
+          {activeTab === 'Reports' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
+              <ReportsView onBack={() => setActiveTab('ClientData')} />
             </div>
           )}
           {activeTab === 'Settings' && (

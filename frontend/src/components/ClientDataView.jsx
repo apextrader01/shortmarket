@@ -4,90 +4,9 @@ import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Us
 import { storage } from '../firebase';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-const LedgerSection = () => {
-  const [ledger, setLedger] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { token } = useStore();
 
-  useEffect(() => {
-    const fetchLedger = async () => {
-      try {
-        const res = await fetch('/api/ledger', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setLedger(data);
-        } else {
-          console.error("Ledger API returned non-array:", data);
-          setLedger([]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch ledger:', err);
-        setLedger([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLedger();
-  }, [token]);
 
-  return (
-    <div className="glass-panel" style={{ padding: '24px', marginBottom: '40px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <FileText size={18} color="var(--color-blue)" /> Funds / Ledger Passbook
-      </h3>
-      
-      {loading ? (
-        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ledger...</div>
-      ) : (!ledger || !Array.isArray(ledger) || ledger.length === 0) ? (
-        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No transactions found.</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                <th style={{ padding: '12px 16px', fontWeight: '500' }}>Date & Time</th>
-                <th style={{ padding: '12px 16px', fontWeight: '500' }}>Description</th>
-                <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
-                <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.map((entry) => (
-                <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '12px 16px' }}>{new Date(entry.created_at).toLocaleString([], { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit' })}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: '500' }}>{entry.description || entry.type}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                     <span style={{ 
-                        background: 'rgba(255,255,255,0.1)', 
-                        padding: '2px 6px', 
-                        borderRadius: '4px', 
-                        fontSize: '11px',
-                        color: 'var(--text-secondary)'
-                     }}>
-                       {entry.type.replace('_', ' ')}
-                     </span>
-                  </td>
-                  <td style={{ 
-                      padding: '12px 16px', 
-                      textAlign: 'right', 
-                      fontWeight: '600',
-                      color: entry.amount >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)'
-                    }}>
-                    {entry.amount > 0 ? '+' : ''}₹{parseFloat(entry.amount).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default function ClientDataView({ onDepositClick }) {
+export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const { user, logout, updateProfilePicture } = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -227,34 +146,36 @@ export default function ClientDataView({ onDepositClick }) {
         </button>
       </div>
 
-      <LedgerSection />
-
 
       {/* Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
         
         {/* Reports */}
-        <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Reports</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <FileText size={18} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Trades & Charges</span>
-            </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <FileText size={18} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Statements</span>
-            </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <PieChart size={18} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Profit & Loss</span>
-            </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <BarChart2 size={18} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Trading Insights</span>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Reports</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trades & Charges</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>Statements</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <PieChart size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>Profit & Loss</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <BarChart2 size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trading Insights</span>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Pledging & Pay Later */}
         <div>
