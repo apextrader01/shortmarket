@@ -394,7 +394,7 @@ export default function ChartWidget() {
         {price && !isLoadingCandles && (
           <div style={{ position: 'absolute', top: '12px', left: '0px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'SELL', 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'SELL', prices[selectedSymbol]?.lotsize || 1)}
               style={{
                 background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -410,7 +410,7 @@ export default function ChartWidget() {
             </button>
             <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'BUY', 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'BUY', prices[selectedSymbol]?.lotsize || 1)}
               style={{
                 background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
