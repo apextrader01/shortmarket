@@ -7,7 +7,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
-  const { user, logout, updateProfilePicture, theme, toggleTheme } = useStore();
+  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme } = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -239,18 +239,23 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
               <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '4px' }}>
                 <span 
-                  onClick={theme === 'dark' ? toggleTheme : undefined} 
+                  onClick={() => setTheme('light')} 
                   style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
                 >
                   Light
                 </span>
                 <span 
-                  onClick={theme === 'light' ? toggleTheme : undefined} 
+                  onClick={() => setTheme('dark')} 
                   style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
                 >
                   Dark
                 </span>
-                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>System</span>
+                <span 
+                  onClick={() => setTheme('system')} 
+                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'system' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'system' ? '#FFF' : 'var(--text-secondary)' }}
+                >
+                  System
+                </span>
               </div>
             </div>
 

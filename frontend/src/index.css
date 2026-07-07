@@ -44,6 +44,19 @@
   --bg-dark: #F1F5F9;
 }
 
+@media (prefers-color-scheme: light) {
+  [data-theme='system'] {
+    --bg-primary: #F8FAFC;
+    --bg-secondary: #FFFFFF;
+    --bg-panel: rgba(255, 255, 255, 0.7);
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --border-highlight: rgba(0, 0, 0, 0.2);
+    --bg-dark: #F1F5F9;
+  }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
