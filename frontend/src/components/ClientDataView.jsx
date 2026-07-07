@@ -7,7 +7,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
-  const { user, logout, updateProfilePicture } = useStore();
+  const { user, logout, updateProfilePicture, theme, toggleTheme } = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -238,9 +238,19 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '4px' }}>
-                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer' }}>Light</span>
-                <span style={{ fontSize: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#FFF' }}>Dark</span>
-                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer' }}>System</span>
+                <span 
+                  onClick={theme === 'dark' ? toggleTheme : undefined} 
+                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
+                >
+                  Light
+                </span>
+                <span 
+                  onClick={theme === 'light' ? toggleTheme : undefined} 
+                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
+                >
+                  Dark
+                </span>
+                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>System</span>
               </div>
             </div>
 

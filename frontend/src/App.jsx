@@ -318,12 +318,6 @@ function App() {
 
             {/* User avatar + logout */}
             <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button 
-                onClick={toggleTheme}
-                style={{ background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '6px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-              </button>
               <div 
                 onClick={() => setActiveTab('ClientData')}
                 style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
