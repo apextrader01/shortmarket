@@ -673,14 +673,14 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
     const now = new Date();
     // Adjust lookback per Angel One API limits & usefulness
     const LOOKBACK = {
-        'ONE_MINUTE':     28,    
-        'THREE_MINUTE':   15,
-        'FIVE_MINUTE':    28,
-        'TEN_MINUTE':     28,
-        'FIFTEEN_MINUTE': 28,
+        'ONE_MINUTE':     7,    
+        'THREE_MINUTE':   7,
+        'FIVE_MINUTE':    14,
+        'TEN_MINUTE':     14,
+        'FIFTEEN_MINUTE': 14,
         'THIRTY_MINUTE':  28,
-        'ONE_HOUR':       200,
-        'ONE_DAY':        730,  
+        'ONE_HOUR':       90,
+        'ONE_DAY':        365,  
     };
     const lookbackDays = LOOKBACK[interval] || 28;
     const from = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
@@ -699,7 +699,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             
             if (!smart_api.access_token) return [];
             const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
-                signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined,
+                signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(3000) : undefined,
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${smart_api.access_token}`,
@@ -718,8 +718,8 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             const text = await response.text();
             
             if (text.includes('Access denied') || text.includes('rate')) {
-                console.warn(`⏳ Rate limit hit for ${uniqueSymbol} chart, retrying in 1s...`);
-                await new Promise(r => setTimeout(r, 1000));
+                console.warn(`⏳ Rate limit hit for ${uniqueSymbol} chart, retrying...`);
+                await new Promise(r => setTimeout(r, 300));
                 continue;
             }
 
@@ -742,7 +742,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
         } catch (e) {
             console.error(`fetchCandleData exception for ${uniqueSymbol}:`, e.message);
             if (attempts >= 3) return [];
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 300));
         }
     }
     return [];
@@ -792,7 +792,7 @@ async function loginAngelOne(io, externalPriceCache) {
             console.log('📈 Starting live WebSocket connection...');
             startLiveWebSocket(io);
             
-            // Periodic REST polling as a fallback (every 10 seconds during market hours)
+            // Periodic REST polling as a fallback (every 1 second during market hours)
             // This ensures derivatives (options/futures/commodities) always get fresh prices,
             // even if the Angel One WebSocket doesn't deliver ticks for them.
             if (!global_pollInterval) {
@@ -809,8 +809,8 @@ async function loginAngelOne(io, externalPriceCache) {
                             isPolling = false;
                         }
                     }
-                }, 3000); // Every 3 seconds
-                console.log('⏱️  Started periodic REST polling (every 3s during market hours)');
+                }, 1000); // Every 1 second
+                console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
             }
         } else {
             console.error('Login Failed:', loginSession.message);
