@@ -1275,7 +1275,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       res.json({ success: true, orderId, status });
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[ORDER ERROR]:', error);
+    res.status(500).json({ error: error.message, success: false });
   }
 });
 
