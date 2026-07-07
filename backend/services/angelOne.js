@@ -433,11 +433,12 @@ async function addSubscription(data, io, priceCache) {
                 if (res?.status && res.data?.fetched && res.data.fetched.length > 0) {
                     const item = res.data.fetched[0];
                     if (item.ltp && priceCache) {
-                        const ltpData = {
-                            symbol: uniqueSymbol,
-                            ltp: item.ltp,
-                            open: item.open || item.ltp,
-                            high: item.high || item.ltp,
+                            const ltpData = {
+                                symbol: uniqueSymbol,
+                                ltp: item.ltp,
+                                lotsize: STOCK_MASTER[token]?.lotsize || 1,
+                                open: item.open || item.ltp,
+                                high: item.high || item.ltp,
                             low: item.low || item.ltp,
                             close: item.close || item.ltp,
                             change: item.netChange || 0,
@@ -543,6 +544,7 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
                                     const ltpData = {
                                         symbol: unique,
                                         ltp: item.ltp,
+                                        lotsize: info.lotsize || 1,
                                         open: item.open || item.ltp,
                                         high: item.high || item.ltp,
                                         low: item.low || item.ltp,
