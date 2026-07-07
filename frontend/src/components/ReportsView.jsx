@@ -185,7 +185,12 @@ const LedgerStatement = () => {
             ) : (
               filteredLedger.map((entry) => (
                 <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '16px' }}>{new Date(entry.created_at).toLocaleDateString('en-GB')}</td>
+                  <td style={{ padding: '16px' }}>
+                    <div>{new Date(entry.created_at).toLocaleDateString('en-GB')}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      {new Date(entry.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </div>
+                  </td>
                   <td style={{ padding: '16px' }}>{entry.type.replace('_', ' ')}</td>
                   <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{entry.description || entry.type}</td>
                   <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)' }}>
