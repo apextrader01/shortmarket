@@ -366,6 +366,19 @@ function lookupDerivativeBySymbol(symbolStr) {
     return null;
 }
 
+function enrichLotsize(token, uniqueSymbol) {
+    if (token && STOCK_MASTER[token] && !STOCK_MASTER[token].lotsize) {
+        const parts = uniqueSymbol.split('-');
+        const rawSymbol = parts.slice(0, -1).join('-') || parts[0];
+        const found = lookupDerivativeBySymbol(rawSymbol);
+        if (found) {
+            STOCK_MASTER[token].lotsize = Number(found.lotsize || 1);
+        } else {
+            STOCK_MASTER[token].lotsize = 1;
+        }
+    }
+}
+
 async function addSubscription(data, io, priceCache) {
     let token, exchangeCode, uniqueSymbol, exchStr;
 
@@ -413,6 +426,8 @@ async function addSubscription(data, io, priceCache) {
         }
     }
 
+    enrichLotsize(token, uniqueSymbol);
+
     if (!clientSubscriptions.has(token)) {
         clientSubscriptions.add(token);
         
@@ -424,23 +439,26 @@ async function addSubscription(data, io, priceCache) {
             });
         }
         
-        // Ensure frontend gets the lotsize immediately even if REST fetch fails/is delayed
-        if (priceCache) {
-            if (!priceCache[uniqueSymbol] || !priceCache[uniqueSymbol].lotsize) {
-                const initialData = priceCache[uniqueSymbol] || {
-                    symbol: uniqueSymbol, ltp: 0,
-                    open: 0, high: 0, low: 0, close: 0, change: 0, pct: 0,
-                    timestamp: new Date().toISOString()
-                };
-                initialData.lotsize = STOCK_MASTER[token]?.lotsize || 1;
-                priceCache[uniqueSymbol] = initialData;
-                if (io) io.to(uniqueSymbol).emit('market_data', initialData);
-            } else if (io) {
-                // If it already exists and has lotsize, still emit it so the newly joined client gets it immediately!
-                io.to(uniqueSymbol).emit('market_data', priceCache[uniqueSymbol]);
-            }
         }
 
+    // Ensure frontend gets the lotsize immediately even if REST fetch fails/is delayed
+    if (priceCache) {
+        if (!priceCache[uniqueSymbol] || !priceCache[uniqueSymbol].lotsize) {
+            const initialData = priceCache[uniqueSymbol] || {
+                symbol: uniqueSymbol, ltp: 0,
+                open: 0, high: 0, low: 0, close: 0, change: 0, pct: 0,
+                timestamp: new Date().toISOString()
+            };
+            initialData.lotsize = STOCK_MASTER[token]?.lotsize || 1;
+            priceCache[uniqueSymbol] = initialData;
+            if (io) io.to(uniqueSymbol).emit('market_data', initialData);
+        } else if (io) {
+            // If it already exists and has lotsize, still emit it so the newly joined client gets it immediately!
+            io.to(uniqueSymbol).emit('market_data', priceCache[uniqueSymbol]);
+        }
+    }
+
+    if (!clientSubscriptions.has(token)) {
         // Immediately fetch the price via REST
         try {
             const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
@@ -510,6 +528,8 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
             STOCK_MASTER[token] = { symbol: data.symbol, uniqueSymbol: data.symbol, name: data.name || data.symbol, exchange: exchStr };
             symbolToToken[uniqueSymbol] = token;
         }
+
+        enrichLotsize(token, uniqueSymbol);
 
         if (socket) socket.join(uniqueSymbol);
 
