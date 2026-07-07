@@ -1032,7 +1032,7 @@ function subscribeToDepth(uniqueSymbol) {
     const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
     
     global_web_socket.fetchData({
-        correlationID: `depth_sub_${token}`,
+        correlationID: `d${token}`.slice(0, 10),
         action: 1, mode: 3, exchangeType, tokens: [token]
     });
 }
@@ -1045,7 +1045,7 @@ function unsubscribeFromDepth(uniqueSymbol) {
     const exchangeType = (exch === 'BSE' || exch === 'BFO') ? 3 : (exch === 'MCX' ? 5 : (exch === 'NFO' ? 2 : 1));
     
     global_web_socket.fetchData({
-        correlationID: `depth_unsub_${token}`,
+        correlationID: `u${token}`.slice(0, 10),
         action: 0, mode: 3, exchangeType, tokens: [token]
     });
 }
