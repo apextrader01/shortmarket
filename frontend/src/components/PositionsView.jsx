@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
-import { Briefcase, TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
+import { Briefcase, TrendingUp, TrendingDown, Target, Activity, X } from 'lucide-react';
 
 const extractUnderlying = (symbol) => {
   const match = symbol.match(/^[A-Z]+/);
@@ -9,6 +9,10 @@ const extractUnderlying = (symbol) => {
 
 export default function PositionsView() {
   const { positions, prices } = useStore();
+  const [partialExitPos, setPartialExitPos] = useState(null);
+  const [partialExitQty, setPartialExitQty] = useState('');
+  const [partialExitType, setPartialExitType] = useState('MARKET');
+  const [partialExitPrice, setPartialExitPrice] = useState('');
 
   // Group positions by underlying asset
   const { groupedStrategies, globalMTM } = useMemo(() => {
@@ -189,6 +193,7 @@ export default function PositionsView() {
                     <th style={{ textAlign: 'right' }}>Avg. Price</th>
                     <th style={{ textAlign: 'right' }}>LTP</th>
                     <th style={{ textAlign: 'right', paddingRight: '20px' }}>P&L</th>
+                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -215,6 +220,28 @@ export default function PositionsView() {
                           color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)'
                         }}>
                           {pos.pnl > 0 ? '+' : ''}{pos.pnl.toFixed(2)}
+                        </td>
+                        <td style={{ textAlign: 'right', paddingRight: '20px' }}>
+                          <button
+                            onClick={() => {
+                              setPartialExitPos(pos);
+                              setPartialExitQty(Math.abs(pos.qty).toString());
+                              setPartialExitType('MARKET');
+                              setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                            }}
+                            style={{
+                              background: 'transparent',
+                              color: 'var(--color-red-light)',
+                              border: '1px solid var(--color-red-light)',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            EXIT
+                          </button>
                         </td>
                       </tr>
                     );
@@ -249,6 +276,96 @@ export default function PositionsView() {
           {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
+
+      {/* Partial Exit Modal */}
+      {partialExitPos && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{
+            background: 'var(--bg-dark)', width: '380px', borderRadius: '12px',
+            border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Partial Exit</h3>
+              <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setPartialExitPos(null)} />
+            </div>
+            <div style={{ padding: '24px 20px' }}>
+              <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+                {partialExitPos.symbol}
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Qty (Max: {Math.abs(partialExitPos.qty)})</label>
+                  <input
+                    type="number"
+                    value={partialExitQty}
+                    onChange={(e) => setPartialExitQty(e.target.value)}
+                    max={Math.abs(partialExitPos.qty)}
+                    min="1"
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order Type</label>
+                  <select
+                    value={partialExitType}
+                    onChange={(e) => setPartialExitType(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                  >
+                    <option value="MARKET" style={{color:'#000'}}>Market</option>
+                    <option value="LIMIT" style={{color:'#000'}}>Limit</option>
+                  </select>
+                </div>
+              </div>
+
+              {partialExitType === 'LIMIT' && (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Limit Price</label>
+                  <input
+                    type="number"
+                    value={partialExitPrice}
+                    onChange={(e) => setPartialExitPrice(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={async () => {
+                  const qtyToExit = parseInt(partialExitQty);
+                  if (qtyToExit > 0 && qtyToExit <= Math.abs(partialExitPos.qty)) {
+                    const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
+                    await useStore.getState().placeOrder({
+                      symbol: partialExitPos.symbol,
+                      type: partialExitType,
+                      side: exitSide,
+                      quantity: qtyToExit,
+                      price: partialExitType === 'MARKET' ? 0 : parseFloat(partialExitPrice),
+                      sl_price: null,
+                      tgt_price: null,
+                      margin: 0,
+                      product_type: partialExitPos.product_type || 'DEL'
+                    });
+                    setPartialExitPos(null);
+                  }
+                }}
+                style={{
+                  width: '100%', background: partialExitPos.qty > 0 ? 'var(--color-red)' : 'var(--color-blue)',
+                  color: '#fff', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
+                  fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
+                }}
+              >
+                {partialExitPos.qty > 0 ? 'SELL' : 'BUY'} {partialExitQty} QTY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
