@@ -1065,20 +1065,21 @@ async function pollDepthData() {
                 
                 const depthData = {
                     symbol: info.uniqueSymbol,
-                    bids: item.depth?.buy ? item.depth.buy.map(b => ({ price: b.price.toFixed(2), qty: b.quantity, orders: b.orders })) : [],
-                    asks: item.depth?.sell ? item.depth.sell.map(s => ({ price: s.price.toFixed(2), qty: s.quantity, orders: s.orders })) : [],
-                    open: item.open ? item.open.toFixed(2) : null,
-                    high: item.high ? item.high.toFixed(2) : null,
-                    low: item.low ? item.low.toFixed(2) : null,
-                    close: item.close ? item.close.toFixed(2) : null,
-                    ltp: item.ltp ? item.ltp.toFixed(2) : null,
+                    bids: item.depth?.buy ? item.depth.buy.map(b => ({ price: Number(b.price || 0).toFixed(2), qty: b.quantity || 0, orders: b.orders || 0 })) : [],
+                    asks: item.depth?.sell ? item.depth.sell.map(s => ({ price: Number(s.price || 0).toFixed(2), qty: s.quantity || 0, orders: s.orders || 0 })) : [],
+                    open: item.open ? Number(item.open).toFixed(2) : null,
+                    high: item.high ? Number(item.high).toFixed(2) : null,
+                    low: item.low ? Number(item.low).toFixed(2) : null,
+                    close: item.close ? Number(item.close).toFixed(2) : null,
+                    ltp: item.ltp ? Number(item.ltp).toFixed(2) : null,
                     ltq: item.lastTradeQty || null,
-                    volume: item.exchangeVolume || item.volume || 0,
-                    avgPrice: item.averagePrice ? item.averagePrice.toFixed(2) : null,
-                    lowerCircuit: item.lowerCircuit ? item.lowerCircuit.toFixed(2) : null,
-                    upperCircuit: item.upperCircuit ? item.upperCircuit.toFixed(2) : null,
+                    volume: item.exchangeVolume || item.volume || item.tradeVolume || 0,
+                    avgPrice: item.averagePrice || item.avgPrice ? Number(item.averagePrice || item.avgPrice).toFixed(2) : null,
+                    lowerCircuit: item.lowerCircuit ? Number(item.lowerCircuit).toFixed(2) : null,
+                    upperCircuit: item.upperCircuit ? Number(item.upperCircuit).toFixed(2) : null,
                 };
                 
+                console.log(`[REST DEPTH] Polled depth for ${info.uniqueSymbol}`);
                 global_io.to(`${info.uniqueSymbol}_depth`).emit('market_depth_data', depthData);
             }
         }
