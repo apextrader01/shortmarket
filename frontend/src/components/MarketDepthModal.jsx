@@ -10,8 +10,8 @@ export default function MarketDepthModal() {
   } = useStore();
 
   const symbol = marketDepthModal.symbol;
-  const lotSize = marketDepthModal.lotsize || 1;
   const basicData = prices[symbol] || {};
+  const lotSize = marketDepthModal.lotsize || basicData.lotsize || 1;
 
   useEffect(() => {
     if (!marketDepthModal.isOpen || !symbol) return;

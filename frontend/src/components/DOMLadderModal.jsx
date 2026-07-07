@@ -9,8 +9,8 @@ export default function DOMLadderModal() {
   } = useStore();
 
   const symbol = domLadderModal.symbol;
-  const lotsize = domLadderModal.lotsize || 1;
   const basicData = prices[symbol] || {};
+  const lotsize = domLadderModal.lotsize || basicData.lotsize || 1;
   
   const [centerPrice, setCenterPrice] = useState(0);
   const scrollRef = useRef(null);
