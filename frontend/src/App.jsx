@@ -5,6 +5,7 @@ import PositionsView from './components/PositionsView';
 import OrdersView from './components/OrdersView';
 import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
+import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
 import ReportsView from './components/ReportsView';
 import AdminDashboard from './components/AdminDashboard';
