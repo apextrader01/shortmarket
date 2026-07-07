@@ -34,7 +34,7 @@ export default function PositionsView() {
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       const pnl = qty > 0 ? (currentValue - invested) : (invested - currentValue);
-      const lotSize = priceData.ls || 1;
+      const lotSize = priceData.lotsize || 1;
       
       groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize });
       groups[underlying].netPnl += pnl;
