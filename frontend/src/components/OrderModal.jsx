@@ -364,7 +364,6 @@ export default function OrderModal() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
             <div 
               onClick={() => {
-                closeOrderModal();
                 openMarketDepthModal(symbol, orderModal.lotsize || 1);
               }}
               style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
