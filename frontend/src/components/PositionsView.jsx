@@ -74,7 +74,10 @@ export default function PositionsView() {
           margin: 0,
           product_type: pos.product_type || 'DEL'
         };
-        await store.placeOrder(payload);
+        const success = await store.placeOrder(payload);
+        if (success) {
+          store.clearPendingTriggersForSymbol(pos.symbol);
+        }
       }
     }
   };

@@ -251,6 +251,9 @@ export const useStore = create(persist((set, get) => ({
   updatePendingTrigger: (id, updates) => set((state) => ({
     pendingTriggers: state.pendingTriggers.map(t => t.id === id ? { ...t, ...updates } : t)
   })),
+  clearPendingTriggersForSymbol: (symbol) => set((state) => ({
+    pendingTriggers: state.pendingTriggers.filter(t => t.symbol !== symbol)
+  })),
 
   placeBasketOrder: async (basketPayload) => {
     const { token } = get();

@@ -150,6 +150,10 @@ async function executeOrder(order, execPrice) {
         if (newQty === 0) {
             // Position closed! Delete it to keep table clean.
             await trx('positions').where({ id: existingPos.id }).delete();
+            // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
+            await trx('orders')
+              .where({ user_id: order.user_id, symbol: order.symbol, status: 'PENDING' })
+              .update({ status: 'CANCELLED' });
         } else {
             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
         }
@@ -184,7 +188,7 @@ async function executeOrder(order, execPrice) {
                 description: `Margin released for closing ${order.quantity} ${order.symbol}`
            });
         }
-        await trx('users').where({ id: order.user_id }).update({ balance: user.balance + balanceChange });
+        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + balanceChange });
         
       } else {
         // Create new position
@@ -199,7 +203,7 @@ async function executeOrder(order, execPrice) {
         
         // Update user balance to deduct taxes for this new position
         const user = await trx('users').where({ id: order.user_id }).first();
-        await trx('users').where({ id: order.user_id }).update({ balance: user.balance - totalTaxes });
+        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) - totalTaxes });
         
         await trx('ledger').insert({
             user_id: order.user_id,
