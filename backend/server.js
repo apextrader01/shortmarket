@@ -1201,7 +1201,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
       if (side === 'SELL') {
-          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
+          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).whereNot({ quantity: 0 }).first();
           if (existingPos && existingPos.quantity >= Number(quantity)) {
               requiresMargin = false;
           }
@@ -1241,7 +1241,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
 
         await trx('orders').where({ id: orderId }).update({ taxes: totalTaxes });
 
-        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).first();
+        // Only find open positions (quantity != 0) — closed position records must not be reused
+        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).whereNot({ quantity: 0 }).first();
         const qtyChange = side === 'BUY' ? Number(quantity) : -Number(quantity);
         
         if (existingPos) {
