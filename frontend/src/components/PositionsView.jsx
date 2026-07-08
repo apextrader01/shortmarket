@@ -56,49 +56,56 @@ export default function PositionsView() {
   // Removed early return to keep the header visible when empty
 
   const exitAllPositions = async () => {
-    if (window.confirm('Are you sure you want to EXIT ALL open positions at market price?')) {
-      const store = useStore.getState();
-      for (const pos of positions) {
-        if (pos.quantity === 0) continue;
-        const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-        const payload = {
-          symbol: pos.symbol,
-          type: 'MARKET',
-          side: exitSide,
-          quantity: Math.abs(pos.quantity),
-          price: 0,
-          sl_price: null,
-          tgt_price: null,
-          margin: 0,
-          product_type: pos.product_type || 'DEL'
-        };
-        const success = await store.placeOrder(payload);
-        if (success) {
-          store.clearPendingTriggersForSymbol(pos.symbol);
-        }
+    const openPositions = positions.filter(p => p.quantity !== 0);
+    if (openPositions.length === 0) return;
+    if (!window.confirm(`Exit ALL ${openPositions.length} open position(s) at market price?`)) return;
+    const store = useStore.getState();
+    let failed = 0;
+    for (const pos of openPositions) {
+      const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+      const payload = {
+        symbol: pos.symbol,
+        type: 'MARKET',
+        side: exitSide,
+        quantity: Math.abs(pos.quantity),
+        price: 0,
+        sl_price: null,
+        tgt_price: null,
+        margin: 0,
+        product_type: pos.product_type || 'DEL'
+      };
+      const success = await store.placeOrder(payload);
+      if (success) {
+        store.clearPendingTriggersForSymbol(pos.symbol);
+      } else {
+        failed++;
       }
     }
+    if (failed > 0) alert(`${failed} order(s) failed. Check browser console for details.`);
   };
 
   const exitStrategyGroup = async (groupPositions) => {
-    if (window.confirm('Are you sure you want to exit all positions in this strategy?')) {
-      const store = useStore.getState();
-      for (const pos of groupPositions) {
-        if (pos.quantity === 0) continue;
-        const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-        await store.placeOrder({
-          symbol: pos.symbol,
-          type: 'MARKET',
-          side: exitSide,
-          quantity: Math.abs(pos.quantity),
-          price: 0,
-          sl_price: null,
-          tgt_price: null,
-          margin: 0,
-          product_type: pos.product_type || 'DEL'
-        });
-      }
+    const openLegs = groupPositions.filter(p => p.quantity !== 0);
+    if (openLegs.length === 0) return;
+    if (!window.confirm(`Exit ${openLegs.length} leg(s) in this strategy at market price?`)) return;
+    const store = useStore.getState();
+    let failed = 0;
+    for (const pos of openLegs) {
+      const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+      const ok = await store.placeOrder({
+        symbol: pos.symbol,
+        type: 'MARKET',
+        side: exitSide,
+        quantity: Math.abs(pos.quantity),
+        price: 0,
+        sl_price: null,
+        tgt_price: null,
+        margin: 0,
+        product_type: pos.product_type || 'DEL'
+      });
+      if (!ok) failed++;
     }
+    if (failed > 0) alert(`${failed} leg(s) failed to exit. Check browser console for details.`);
   };
 
   return (
@@ -379,20 +386,27 @@ export default function PositionsView() {
                   const inputVal = parseInt(partialExitQty);
                   const ls = partialExitPos.lotSize || 1;
                   const qtyToExit = inputVal * ls;
-                  if (qtyToExit > 0 && qtyToExit <= Math.abs(partialExitPos.qty)) {
-                    const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
-                    await useStore.getState().placeOrder({
-                      symbol: partialExitPos.symbol,
-                      type: partialExitType,
-                      side: exitSide,
-                      quantity: qtyToExit,
-                      price: partialExitType === 'MARKET' ? 0 : parseFloat(partialExitPrice),
-                      sl_price: null,
-                      tgt_price: null,
-                      margin: 0,
-                      product_type: partialExitPos.product_type || 'DEL'
-                    });
+                  const maxQty = Math.abs(partialExitPos.qty);
+                  if (!qtyToExit || qtyToExit <= 0 || qtyToExit > maxQty) {
+                    alert(`Invalid quantity. Max allowed: ${maxQty}`);
+                    return;
+                  }
+                  const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
+                  const ok = await useStore.getState().placeOrder({
+                    symbol: partialExitPos.symbol,
+                    type: partialExitType,
+                    side: exitSide,
+                    quantity: qtyToExit,
+                    price: partialExitType === 'MARKET' ? 0 : parseFloat(partialExitPrice),
+                    sl_price: null,
+                    tgt_price: null,
+                    margin: 0,
+                    product_type: partialExitPos.product_type || 'DEL'
+                  });
+                  if (ok) {
                     setPartialExitPos(null);
+                  } else {
+                    alert('Exit failed. Check the browser console (F12) for error details.');
                   }
                 }}
                 style={{
