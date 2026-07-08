@@ -120,6 +120,22 @@ async function initSchema() {
         });
         console.log('Added realized_pnl to positions table');
       }
+
+      const hasClosedQuantity = await db.schema.hasColumn('positions', 'closed_quantity');
+      if (!hasClosedQuantity) {
+        await db.schema.alterTable('positions', table => {
+          table.integer('closed_quantity').defaultTo(0);
+        });
+        console.log('Added closed_quantity to positions table');
+      }
+
+      const hasExitPrice = await db.schema.hasColumn('positions', 'exit_price');
+      if (!hasExitPrice) {
+        await db.schema.alterTable('positions', table => {
+          table.decimal('exit_price', 14, 2);
+        });
+        console.log('Added exit_price to positions table');
+      }
     }
 
     // 3. Orders Table
