@@ -222,7 +222,7 @@ export default function PositionsView() {
                     <th style={{ textAlign: 'left' }}>Type</th>
                     <th style={{ textAlign: 'right' }}>Qty.</th>
                     <th style={{ textAlign: 'right' }}>Avg. Price</th>
-                    <th style={{ textAlign: 'right' }}>LTP</th>
+                    <th style={{ textAlign: 'right' }}>{viewMode === 'CLOSED' ? 'Exit Price' : 'LTP'}</th>
                     <th style={{ textAlign: 'right', paddingRight: '20px' }}>P&L</th>
                     <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                   </tr>
@@ -240,11 +240,13 @@ export default function PositionsView() {
                             padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
                           }}>{pos.product_type || 'DEL'}</span>
                         </td>
-                        <td style={{ textAlign: 'right', color: pos.qty > 0 ? '#60A5FA' : '#F87171', fontWeight: 'bold' }}>
-                          {pos.qty > 0 ? '+' : ''}{pos.qty}
+                        <td style={{ textAlign: 'right', color: viewMode === 'CLOSED' ? 'var(--text-secondary)' : (pos.qty > 0 ? '#60A5FA' : '#F87171'), fontWeight: 'bold' }}>
+                          {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : (pos.qty > 0 ? '+' : '') + pos.qty}
                         </td>
                         <td style={{ textAlign: 'right' }}>₹{pos.avg.toFixed(2)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: '600' }}>{pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: '600' }}>
+                          {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${pos.exit_price.toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
+                        </td>
                         <td style={{ 
                           textAlign: 'right', paddingRight: '20px',
                           fontWeight: '700',

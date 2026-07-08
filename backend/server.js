@@ -1273,7 +1273,13 @@ app.post('/api/order', authenticateToken, async (req, res) => {
 
           if (newQty === 0) {
              // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
-             await trx('positions').where({ id: existingPos.id }).update({ quantity: 0, closed_quantity: Math.abs(existingPos.quantity), exit_price: execPrice, margin: 0 });
+             await trx('positions').where({ id: existingPos.id }).update({ 
+                quantity: 0, 
+                closed_quantity: (existingPos.closed_quantity || 0) + Math.abs(existingPos.quantity), 
+                exit_price: execPrice, 
+                margin: 0,
+                realized_pnl: (existingPos.realized_pnl || 0) + realizedPnl
+             });
              // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
              await trx('orders')
                .where({ user_id: req.user.id, symbol: symbol, status: 'PENDING' })
@@ -1281,8 +1287,9 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           } else {
              const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
              if (isPartialClose) {
-                updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Number(quantity);
+                updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Math.abs(Number(quantity));
                 updateObj.exit_price = execPrice;
+                updateObj.realized_pnl = (existingPos.realized_pnl || 0) + realizedPnl;
              }
              await trx('positions').where({ id: existingPos.id }).update(updateObj);
           }
