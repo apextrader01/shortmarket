@@ -163,7 +163,7 @@ export default function OrdersView() {
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Symbol</th>
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Type</th>
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Qty</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Trigger Price</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '500' }}>Target/Trigger</th>
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Trailing Jump</th>
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
@@ -197,7 +197,7 @@ export default function OrdersView() {
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px' }}>{trigger.quantity}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-blue)' }}>₹{trigger.triggerPrice?.toFixed(2)}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-blue)' }}>₹{(trigger.triggerPrice || trigger.limitPrice || 0).toFixed(2)}</td>
                       <td style={{ padding: '12px 16px' }}>{trigger.trailingJump ? `₹${trigger.trailingJump}` : '—'}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.type.replace('_', ' ')}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600', color: trigger.status === 'PENDING_TRIGGER' ? 'var(--color-yellow)' : 'var(--color-green-light)' }}>
