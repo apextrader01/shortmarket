@@ -252,7 +252,7 @@ export default function PositionsView() {
                         </td>
                         <td style={{ textAlign: 'right' }}>₹{pos.avg.toFixed(2)}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>
-                          {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${pos.exit_price.toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
+                          {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
                         </td>
                         <td style={{ 
                           textAlign: 'right', paddingRight: '20px',
