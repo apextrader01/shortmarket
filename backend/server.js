@@ -1248,7 +1248,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         if (existingPos) {
           const newQty = existingPos.quantity + qtyChange;
           let newAvgPrice = existingPos.average_price;
-          let newMargin = existingPos.margin || 0;
+          let newMargin = parseFloat(existingPos.margin) || 0;
           
           if ((existingPos.quantity > 0 && side === 'BUY') || (existingPos.quantity < 0 && side === 'SELL')) {
             const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
@@ -1276,10 +1276,10 @@ app.post('/api/order', authenticateToken, async (req, res) => {
              // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
              await trx('positions').where({ id: existingPos.id }).update({ 
                 quantity: 0, 
-                closed_quantity: (existingPos.closed_quantity || 0) + Math.abs(existingPos.quantity), 
+                closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + Math.abs(parseInt(existingPos.quantity)), 
                 exit_price: execPrice, 
                 margin: 0,
-                realized_pnl: (existingPos.realized_pnl || 0) + realizedPnl
+                realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl
              });
              // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
              await trx('orders')
@@ -1288,9 +1288,9 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           } else {
              const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
              if (isPartialClose) {
-                updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Math.abs(Number(quantity));
+                updateObj.closed_quantity = (parseInt(existingPos.closed_quantity) || 0) + Math.abs(Number(quantity));
                 updateObj.exit_price = execPrice;
-                updateObj.realized_pnl = (existingPos.realized_pnl || 0) + realizedPnl;
+                updateObj.realized_pnl = (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl;
              }
              await trx('positions').where({ id: existingPos.id }).update(updateObj);
           }

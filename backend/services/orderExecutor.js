@@ -122,7 +122,7 @@ async function executeOrder(order, execPrice) {
       if (existingPos) {
         const newQty = existingPos.quantity + qtyChange;
         let newAvgPrice = existingPos.average_price;
-        let newMargin = existingPos.margin || 0;
+        let newMargin = parseFloat(existingPos.margin) || 0;
         let marginRefund = 0;
         
         // Average up/down only if we are increasing the position on the SAME side
@@ -154,10 +154,10 @@ async function executeOrder(order, execPrice) {
             // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
             await trx('positions').where({ id: existingPos.id }).update({ 
                quantity: 0, 
-               closed_quantity: (existingPos.closed_quantity || 0) + Math.abs(existingPos.quantity), 
+               closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + Math.abs(parseInt(existingPos.quantity)), 
                exit_price: execPrice, 
                margin: 0,
-               realized_pnl: (existingPos.realized_pnl || 0) + realizedPnl
+               realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl
             });
             // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
             await trx('orders')
@@ -166,9 +166,9 @@ async function executeOrder(order, execPrice) {
         } else {
             const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
             if (isPartialClose) {
-               updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Math.abs(Number(order.quantity));
+               updateObj.closed_quantity = (parseInt(existingPos.closed_quantity) || 0) + Math.abs(Number(order.quantity));
                updateObj.exit_price = execPrice;
-               updateObj.realized_pnl = (existingPos.realized_pnl || 0) + realizedPnl;
+               updateObj.realized_pnl = (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl;
             }
             await trx('positions').where({ id: existingPos.id }).update(updateObj);
         }
