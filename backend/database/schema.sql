@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS positions (
     user_id INTEGER NOT NULL,
     symbol TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 0,
+    closed_quantity INTEGER DEFAULT 0,
     average_price REAL NOT NULL,
+    exit_price REAL,
     product_type TEXT DEFAULT 'DEL',
     margin REAL DEFAULT 0, -- The total margin locked for this open position
     FOREIGN KEY(user_id) REFERENCES users(id)

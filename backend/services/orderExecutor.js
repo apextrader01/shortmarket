@@ -135,7 +135,9 @@ async function executeOrder(order, execPrice) {
         }
 
         // Are we CLOSING a position?
+        let isPartialClose = false;
         if ((existingPos.quantity > 0 && order.side === 'SELL') || (existingPos.quantity < 0 && order.side === 'BUY')) {
+             isPartialClose = true;
              if (existingPos.quantity > 0) {
                  realizedPnl = (execPrice - existingPos.average_price) * Number(order.quantity);
              } else {
@@ -148,14 +150,19 @@ async function executeOrder(order, execPrice) {
         }
 
         if (newQty === 0) {
-            // Position closed! Delete it to keep table clean.
-            await trx('positions').where({ id: existingPos.id }).delete();
+            // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
+            await trx('positions').where({ id: existingPos.id }).update({ quantity: 0, closed_quantity: Math.abs(existingPos.quantity), exit_price: execPrice, margin: 0 });
             // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
             await trx('orders')
               .where({ user_id: order.user_id, symbol: order.symbol, status: 'PENDING' })
               .update({ status: 'CANCELLED' });
         } else {
-            await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
+            const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
+            if (isPartialClose) {
+               updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Number(order.quantity);
+               updateObj.exit_price = execPrice;
+            }
+            await trx('positions').where({ id: existingPos.id }).update(updateObj);
         }
         
         // 3. Update User Balance & Ledger

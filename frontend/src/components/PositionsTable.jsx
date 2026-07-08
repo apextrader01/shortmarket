@@ -61,7 +61,7 @@ export default function PositionsTable() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  {['Symbol', 'Qty', 'Avg Price', 'LTP', 'P&L', 'P&L%'].map(h => (
+                  {['Symbol', 'Qty', 'Avg Price', viewMode === 'OPEN' ? 'LTP' : 'Exit Price', 'P&L', 'P&L%'].map(h => (
                     <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Symbol' ? 'left' : 'right', color: 'var(--text-secondary)', fontWeight: '600', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -75,9 +75,9 @@ export default function PositionsTable() {
                         {pos.quantity > 0 ? 'LONG' : (pos.quantity < 0 ? 'SHORT' : 'CLOSED')}
                       </div>
                     </td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600' }}>{Math.abs(pos.quantity)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600' }}>{viewMode === 'CLOSED' && pos.closed_quantity ? Math.abs(pos.closed_quantity) : Math.abs(pos.quantity)}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right' }}>₹{pos.average_price.toFixed(2)}</td>
-                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600' }}>₹{pos.ltp.toFixed(2)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600' }}>₹{viewMode === 'CLOSED' && pos.exit_price ? pos.exit_price.toFixed(2) : pos.ltp.toFixed(2)}</td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '700', color: pos.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                       {pos.pnl >= 0 ? '+' : ''}₹{pos.pnl.toFixed(2)}
                     </td>

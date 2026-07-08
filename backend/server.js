@@ -1257,7 +1257,9 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           }
 
           // Are we CLOSING a position?
+          let isPartialClose = false;
           if ((existingPos.quantity > 0 && side === 'SELL') || (existingPos.quantity < 0 && side === 'BUY')) {
+               isPartialClose = true;
                if (existingPos.quantity > 0) {
                    realizedPnl = (execPrice - existingPos.average_price) * Number(quantity);
                } else {
@@ -1270,14 +1272,19 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           }
 
           if (newQty === 0) {
-             // Position closed! Delete it
-             await trx('positions').where({ id: existingPos.id }).delete();
+             // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
+             await trx('positions').where({ id: existingPos.id }).update({ quantity: 0, closed_quantity: Math.abs(existingPos.quantity), exit_price: execPrice, margin: 0 });
              // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
              await trx('orders')
                .where({ user_id: req.user.id, symbol: symbol, status: 'PENDING' })
                .update({ status: 'CANCELLED' });
           } else {
-             await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvgPrice, margin: newMargin });
+             const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
+             if (isPartialClose) {
+                updateObj.closed_quantity = (existingPos.closed_quantity || 0) + Number(quantity);
+                updateObj.exit_price = execPrice;
+             }
+             await trx('positions').where({ id: existingPos.id }).update(updateObj);
           }
         } else {
           // If selling something they don't have, it's a short position
