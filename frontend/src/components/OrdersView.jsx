@@ -261,6 +261,8 @@ export default function OrdersView() {
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
                       {order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}
+                      {order.tgt_price && order.sl_price && <span style={{ fontSize: '9px', background: '#f59e0b', color: '#000', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px', fontWeight: '700' }}>BO</span>}
+                      {order.sl_price && !order.tgt_price && <span style={{ fontSize: '9px', background: '#8b5cf6', color: '#fff', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px', fontWeight: '700' }}>CO</span>}
                       {order.parent_order_id && <span style={{ fontSize: '9px', background: 'var(--color-blue)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>OCO</span>}
                     </td>
                     {activeTab === 'Order History' && (

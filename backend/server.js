@@ -1535,7 +1535,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
-  const { quantity, price } = req.body;
+  const { quantity, price, sl_price, tgt_price } = req.body;
   if (!quantity || !price) {
     return res.status(400).json({ error: 'Missing quantity or price' });
   }
@@ -1556,12 +1556,38 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
          return res.status(400).json({ error: 'Insufficient balance to increase order size' });
       }
 
-      // Update Order
-      await trx('orders').where({ id: req.params.id }).update({ 
+      // Build update object
+      const updateObj = { 
           quantity: Number(quantity), 
           price: parseFloat(price) 
-      });
+      };
+
+      // Update sl_price and tgt_price if provided
+      if (sl_price !== undefined) updateObj.sl_price = sl_price;
+      if (tgt_price !== undefined) updateObj.tgt_price = tgt_price;
+
+      // Update Order
+      await trx('orders').where({ id: req.params.id }).update(updateObj);
       
+      // Update child OCO orders (SL and Target legs) if sl_price or tgt_price changed
+      if (sl_price !== undefined || tgt_price !== undefined) {
+        const childOrders = await trx('orders')
+          .where({ parent_order_id: req.params.id, status: 'PENDING' });
+        
+        for (const child of childOrders) {
+          if (child.type === 'SL-M' && sl_price !== undefined) {
+            await trx('orders').where({ id: child.id }).update({ 
+              trigger_price: sl_price,
+              price: sl_price 
+            });
+          } else if (child.type === 'LIMIT' && tgt_price !== undefined) {
+            await trx('orders').where({ id: child.id }).update({ 
+              price: tgt_price 
+            });
+          }
+        }
+      }
+
       // Update Balance (deduct difference if positive, refund if negative)
       if (marginDifference !== 0) {
           await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });

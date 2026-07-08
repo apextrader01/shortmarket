@@ -299,7 +299,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  updateOrder: async (id, quantity, price) => {
+  updateOrder: async (id, quantity, price, sl_price, tgt_price) => {
     try {
       const res = await fetch(`${API}/api/order/${id}`, {
         method: 'PUT',
@@ -307,7 +307,7 @@ export const useStore = create(persist((set, get) => ({
           'Authorization': `Bearer ${get().token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ quantity, price })
+        body: JSON.stringify({ quantity, price, sl_price, tgt_price })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -596,7 +596,7 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
-  updateOrder: async (id, quantity, price) => {
+  updateOrder: async (id, quantity, price, sl_price, tgt_price) => {
     try {
       const res = await fetch(`${API}/api/order/${id}`, {
         method: 'PUT',
@@ -604,7 +604,7 @@ export const useStore = create(persist((set, get) => ({
           'Authorization': `Bearer ${get().token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ quantity, price })
+        body: JSON.stringify({ quantity, price, sl_price, tgt_price })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

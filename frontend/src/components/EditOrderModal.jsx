@@ -9,16 +9,24 @@ export default function EditOrderModal() {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
   const [productType, setProductType] = useState('INT');
+  const [slPrice, setSlPrice] = useState('');
+  const [tgtPrice, setTgtPrice] = useState('');
 
   const symbol = order ? order.symbol : null;
   const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
   const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
+
+  // Determine if BO or CO
+  const isBO = order ? (order.sl_price && order.tgt_price) : false;
+  const isCO = order ? (order.sl_price && !order.tgt_price) : false;
 
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
       setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
       if (order.productType) setProductType(order.productType);
+      setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
+      setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
     }
   }, [editOrderModal.isOpen, order]);
 
@@ -35,7 +43,13 @@ export default function EditOrderModal() {
   const isBuy = order.side === 'BUY';
 
   const handleUpdateOrder = async () => {
-    const success = await updateOrder(order.id, quantity, parseFloat(price));
+    const success = await updateOrder(
+      order.id, 
+      quantity, 
+      parseFloat(price),
+      slPrice ? parseFloat(slPrice) : null,
+      tgtPrice ? parseFloat(tgtPrice) : null
+    );
     if (success) {
       closeEditOrderModal();
     } else {
@@ -58,7 +72,11 @@ export default function EditOrderModal() {
         {/* Header */}
         <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>{symbol.split('-')[0]}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>{symbol.split('-')[0]}</h2>
+              {isBO && <span style={{ fontSize: '10px', background: '#f59e0b', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>BO</span>}
+              {isCO && <span style={{ fontSize: '10px', background: '#8b5cf6', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>CO</span>}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 <input type="radio" checked readOnly style={{ accentColor: 'var(--color-blue)' }} />
@@ -72,7 +90,7 @@ export default function EditOrderModal() {
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
             
             {/* Product Type */}
             <div>
@@ -97,7 +115,57 @@ export default function EditOrderModal() {
 
           </div>
 
+          {/* BO/CO Fields */}
+          {(isBO || isCO) && (
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isBO ? '1fr 1fr' : '1fr', 
+              gap: '16px', 
+              marginBottom: '16px',
+              padding: '16px',
+              background: 'rgba(255,255,255,0.02)',
+              borderRadius: '8px',
+              border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
+            }}>
+              {/* SL Price */}
+              <div>
+                <div style={{ fontSize: '12px', color: 'var(--color-red-light)', marginBottom: '8px', fontWeight: '600' }}>
+                  Stop Loss Price
+                </div>
+                <input 
+                  type="text" 
+                  value={slPrice} 
+                  onChange={e => setSlPrice(e.target.value)} 
+                  style={{ 
+                    width: '100%', background: 'var(--bg-panel)', 
+                    border: '1px solid rgba(239, 68, 68, 0.3)', 
+                    padding: '8px 12px', borderRadius: '4px', 
+                    color: '#fff', fontSize: '14px', outline: 'none' 
+                  }} 
+                />
+              </div>
 
+              {/* Target Price (BO only) */}
+              {isBO && (
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-green-light)', marginBottom: '8px', fontWeight: '600' }}>
+                    Target Price
+                  </div>
+                  <input 
+                    type="text" 
+                    value={tgtPrice} 
+                    onChange={e => setTgtPrice(e.target.value)} 
+                    style={{ 
+                      width: '100%', background: 'var(--bg-panel)', 
+                      border: '1px solid rgba(34, 197, 94, 0.3)', 
+                      padding: '8px 12px', borderRadius: '4px', 
+                      color: '#fff', fontSize: '14px', outline: 'none' 
+                    }} 
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Margin Alert (if insufficient) */}
           {isInsufficient && (
