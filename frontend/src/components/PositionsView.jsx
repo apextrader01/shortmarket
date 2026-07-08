@@ -121,16 +121,18 @@ export default function PositionsView() {
             </button>
           </div>
         </div>
-        <button
-          onClick={exitAllPositions}
-          style={{
-            background: 'var(--color-red-light)', color: '#fff', border: 'none',
-            padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-          }}
-        >
-          EXIT ALL POSITIONS
-        </button>
+        {viewMode === 'OPEN' && (
+          <button
+            onClick={exitAllPositions}
+            style={{
+              background: 'var(--color-red-light)', color: '#fff', border: 'none',
+              padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            EXIT ALL POSITIONS
+          </button>
+        )}
       </div>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -196,16 +198,18 @@ export default function PositionsView() {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => exitStrategyGroup(group.positions)}
-                    style={{ 
-                      background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', 
-                      border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', 
-                      borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' 
-                    }}
-                  >
-                    EXIT STRATEGY
-                  </button>
+                  {viewMode === 'OPEN' && (
+                    <button 
+                      onClick={() => exitStrategyGroup(group.positions)}
+                      style={{ 
+                        background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', 
+                        border: '1px solid rgba(239, 68, 68, 0.3)', padding: '6px 12px', 
+                        borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' 
+                      }}
+                    >
+                      EXIT STRATEGY
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -249,27 +253,29 @@ export default function PositionsView() {
                           {pos.pnl > 0 ? '+' : ''}{pos.pnl.toFixed(2)}
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
-                          <button
-                            onClick={() => {
-                              setPartialExitPos(pos);
-                              const ls = pos.lotSize || 1;
-                              setPartialExitQty((Math.abs(pos.qty) / ls).toString());
-                              setPartialExitType('MARKET');
-                              setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
-                            }}
-                            style={{
-                              background: 'transparent',
-                              color: 'var(--color-red-light)',
-                              border: '1px solid var(--color-red-light)',
-                              padding: '4px 10px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            EXIT
-                          </button>
+                          {viewMode === 'OPEN' && (
+                            <button
+                              onClick={() => {
+                                setPartialExitPos(pos);
+                                const ls = pos.lotSize || 1;
+                                setPartialExitQty((Math.abs(pos.qty) / ls).toString());
+                                setPartialExitType('MARKET');
+                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                              }}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--color-red-light)',
+                                border: '1px solid var(--color-red-light)',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              EXIT
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
