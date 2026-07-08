@@ -92,6 +92,7 @@ async function initSchema() {
         table.decimal('average_price', 14, 2).notNullable();
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.decimal('margin', 14, 2).defaultTo(0);
+        table.decimal('realized_pnl', 14, 2).defaultTo(0);
         table.timestamps(true, true);
       });
       console.log('Created positions table');
@@ -110,6 +111,14 @@ async function initSchema() {
           table.decimal('margin', 14, 2).defaultTo(0);
         });
         console.log('Added margin to positions table');
+      }
+
+      const hasPosRealizedPnl = await db.schema.hasColumn('positions', 'realized_pnl');
+      if (!hasPosRealizedPnl) {
+        await db.schema.alterTable('positions', table => {
+          table.decimal('realized_pnl', 14, 2).defaultTo(0);
+        });
+        console.log('Added realized_pnl to positions table');
       }
     }
 

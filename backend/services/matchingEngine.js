@@ -102,7 +102,12 @@ async function executeOrder(order, executionPrice) {
                 const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
                 if (position) {
                     const newQuantity = position.quantity + order.quantity;
-                    const newAvgPrice = ((position.quantity * parseFloat(position.average_price)) + totalCost) / newQuantity;
+                    let newAvgPrice;
+                    if (position.quantity === 0) {
+                        newAvgPrice = executionPrice;
+                    } else {
+                        newAvgPrice = ((position.quantity * parseFloat(position.average_price)) + totalCost) / newQuantity;
+                    }
                     await trx('positions').where({ id: position.id }).update({ quantity: newQuantity, average_price: newAvgPrice });
                 } else {
                     await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL', quantity: order.quantity, average_price: executionPrice });
@@ -110,24 +115,27 @@ async function executeOrder(order, executionPrice) {
             } else if (order.side === 'SELL') {
                 const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
                 if (position) {
-                    const newQuantity = position.quantity - order.quantity;
-                    if (newQuantity === 0) {
-                        await trx('positions').where({ id: position.id }).del();
+                    if (position.quantity === 0) {
+                        // Opening short position from a closed state
+                        await trx('positions').where({ id: position.id }).update({ quantity: -order.quantity, average_price: executionPrice });
                     } else {
-                        await trx('positions').where({ id: position.id }).update({ quantity: newQuantity });
+                        const newQuantity = position.quantity - order.quantity;
+                        const currentRealizedPnl = parseFloat(position.realized_pnl || 0);
+                        
+                        // Add profit/loss back to balance when position is closed (simple PnL)
+                        const entryCost = parseFloat(position.average_price) * order.quantity;
+                        const exitValue = executionPrice * order.quantity;
+                        const pnl = exitValue - entryCost;
+
+                        await trx('positions').where({ id: position.id }).update({ quantity: newQuantity, realized_pnl: currentRealizedPnl + pnl });
+                        
+                        // Add the freed up margin + profit back to balance
+                        // Intraday (INT) only consumes 25% margin initially
+                        const leverageMultiplier = position.product_type === 'INT' ? 0.25 : 1.0;
+                        const user = await trx('users').where({ id: order.user_id }).first();
+                        const marginToReturn = (order.quantity * parseFloat(position.average_price) * leverageMultiplier) + pnl;
+                        await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + marginToReturn });
                     }
-                    
-                    // Add profit/loss back to balance when position is closed (simple PnL)
-                    const entryCost = parseFloat(position.average_price) * order.quantity;
-                    const exitValue = executionPrice * order.quantity;
-                    const pnl = exitValue - entryCost;
-                    
-                    // Add the freed up margin + profit back to balance
-                    // Intraday (INT) only consumes 25% margin initially
-                    const leverageMultiplier = position.product_type === 'INT' ? 0.25 : 1.0;
-                    const user = await trx('users').where({ id: order.user_id }).first();
-                    const marginToReturn = (order.quantity * parseFloat(position.average_price) * leverageMultiplier) + pnl;
-                    await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + marginToReturn });
                 } else {
                     // Short selling mock: insert negative position
                     await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL', quantity: -order.quantity, average_price: executionPrice });

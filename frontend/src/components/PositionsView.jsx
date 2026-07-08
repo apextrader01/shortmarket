@@ -8,6 +8,7 @@ const extractUnderlying = (symbol) => {
 };
 
 export default function PositionsView() {
+  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED'
   const { positions, prices } = useStore();
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
@@ -20,7 +21,10 @@ export default function PositionsView() {
     const groups = {};
 
     positions.forEach(pos => {
-      if (pos.quantity === 0) return;
+      const isOpen = pos.quantity !== 0;
+      if (viewMode === 'OPEN' && !isOpen) return;
+      if (viewMode === 'CLOSED' && isOpen) return;
+
       const underlying = extractUnderlying(pos.symbol);
       if (!groups[underlying]) {
         groups[underlying] = { underlying, positions: [], netPnl: 0, totalInvested: 0 };
@@ -33,34 +37,23 @@ export default function PositionsView() {
       
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
-      const pnl = qty > 0 ? (currentValue - invested) : (invested - currentValue);
+      
+      const pnl = isOpen 
+          ? (qty > 0 ? (currentValue - invested) : (invested - currentValue))
+          : parseFloat(pos.realized_pnl || 0);
+          
       const lotSize = priceData.lotsize || 1;
       
-      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize });
+      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize, isOpen });
       groups[underlying].netPnl += pnl;
       groups[underlying].totalInvested += invested;
       globalMTM += pnl;
     });
 
     return { groupedStrategies: Object.values(groups), globalMTM };
-  }, [positions, prices]);
+  }, [positions, prices, viewMode]);
 
-  if (positions.length === 0 || groupedStrategies.length === 0) {
-    return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-dark)' }}>
-        <div style={{ 
-          width: '120px', height: '100px', background: 'var(--bg-panel)', 
-          borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.2)', marginBottom: '24px', position: 'relative'
-        }}>
-          <Briefcase size={40} color="var(--color-green-light)" />
-          <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
-        </div>
-        <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You do not have any positions</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>List of all your positions for today will appear here.</p>
-      </div>
-    );
-  }
+  // Removed early return to keep the header visible when empty
 
   const exitAllPositions = async () => {
     if (window.confirm('Are you sure you want to EXIT ALL open positions at market price?')) {
@@ -111,7 +104,23 @@ export default function PositionsView() {
   return (
     <div style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Live Strategies</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Strategies</h2>
+          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', padding: '4px' }}>
+            <button
+              onClick={() => setViewMode('OPEN')}
+              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              OPEN
+            </button>
+            <button
+              onClick={() => setViewMode('CLOSED')}
+              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              CLOSED
+            </button>
+          </div>
+        </div>
         <button
           onClick={exitAllPositions}
           style={{
@@ -125,7 +134,24 @@ export default function PositionsView() {
       </div>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {groupedStrategies.map((group, idx) => {
+        {positions.length === 0 || groupedStrategies.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+            <div style={{ 
+              width: '120px', height: '100px', background: 'var(--bg-panel)', 
+              borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)', marginBottom: '24px', position: 'relative'
+            }}>
+              <Briefcase size={40} color="var(--color-green-light)" />
+              <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+              {viewMode === 'CLOSED' ? 'No closed positions yet' : 'You do not have any positions'}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
+              {viewMode === 'CLOSED' ? 'Positions you close today will appear here.' : 'List of all your positions for today will appear here.'}
+            </p>
+          </div>
+        ) : groupedStrategies.map((group, idx) => {
           const isGroupProfit = group.netPnl >= 0;
           // Simple visual width for the P&L bar (capped at 100%)
           const barWidth = Math.min(Math.abs(group.netPnl) / (group.totalInvested || 1) * 100, 100);

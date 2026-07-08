@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function PositionsTable() {
+  const [viewMode, setViewMode] = useState('OPEN');
   const { positions, orders, prices, user } = useStore();
 
-  const positionsWithPnl = positions.map(pos => {
+  const filteredPositions = positions.filter(pos => viewMode === 'OPEN' ? pos.quantity !== 0 : pos.quantity === 0);
+
+  const positionsWithPnl = filteredPositions.map(pos => {
     const ltp = prices[pos.symbol]?.ltp || pos.average_price;
-    const pnl = (ltp - pos.average_price) * pos.quantity;
-    const pnlPct = ((ltp - pos.average_price) / pos.average_price) * 100;
+    const pnl = pos.quantity !== 0 
+        ? (ltp - pos.average_price) * pos.quantity 
+        : parseFloat(pos.realized_pnl || 0);
+    const pnlPct = pos.quantity !== 0 && pos.average_price > 0 
+        ? ((ltp - pos.average_price) / pos.average_price) * 100 
+        : 0;
     return { ...pos, ltp, pnl, pnlPct };
   });
 
@@ -20,7 +27,19 @@ export default function PositionsTable() {
       {/* Positions */}
       <div className="glass-panel" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Open Positions</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Positions</h3>
+            <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', padding: '2px' }}>
+              <button
+                onClick={() => setViewMode('OPEN')}
+                style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
+              >OPEN</button>
+              <button
+                onClick={() => setViewMode('CLOSED')}
+                style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
+              >CLOSED</button>
+            </div>
+          </div>
           {positionsWithPnl.length > 0 && (
             <div style={{
               fontSize: '13px', fontWeight: '700',
@@ -35,7 +54,7 @@ export default function PositionsTable() {
 
         {positionsWithPnl.length === 0 ? (
           <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
-            No open positions. Place your first trade!
+            {viewMode === 'CLOSED' ? 'No closed positions today.' : 'No open positions. Place your first trade!'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -52,8 +71,8 @@ export default function PositionsTable() {
                   <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: '700' }}>
                       <div>{pos.symbol}</div>
-                      <div style={{ fontSize: '10px', color: pos.quantity > 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                        {pos.quantity > 0 ? 'LONG' : 'SHORT'}
+                      <div style={{ fontSize: '10px', color: pos.quantity > 0 ? 'var(--color-green-light)' : (pos.quantity < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
+                        {pos.quantity > 0 ? 'LONG' : (pos.quantity < 0 ? 'SHORT' : 'CLOSED')}
                       </div>
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600' }}>{Math.abs(pos.quantity)}</td>
