@@ -114,7 +114,6 @@ app.get('/api/stocks', (req, res) => {
               lotsize: Number(value.lotsize || 1),
               uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${value.exchange || 'NSE'}`
             });
-            if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
           }
         }
       }
@@ -128,7 +127,6 @@ app.get('/api/stocks', (req, res) => {
             token: value.token, symbol: value.symbol, name: value.name, 
             exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
           });
-          if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
         }
       }
     }
@@ -143,7 +141,6 @@ app.get('/api/stocks', (req, res) => {
                  token: fut.token, symbol: fut.symbol, name: key, 
                  exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
                });
-               if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
             }
           }
         }
@@ -165,7 +162,6 @@ app.get('/api/stocks', (req, res) => {
                        token: opt.token, symbol: opt.symbol, name: key, 
                        exchange: opt.exch_seg || 'NFO', lotsize: Number(opt.lotsize || 1), uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
                      });
-                     if (resultsMap.size >= 100) return res.json(Array.from(resultsMap.values()));
                   }
                }
             }
@@ -174,7 +170,32 @@ app.get('/api/stocks', (req, res) => {
       }
     }
     
-    res.json(Array.from(resultsMap.values()));
+    let finalResults = Array.from(resultsMap.values());
+    
+    // Sort exact matches and indices to the top
+    const qLower = q.toLowerCase();
+    finalResults.sort((a, b) => {
+      const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
+      const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      
+      // Prefer Cash/Indices (NSE/BSE) over derivatives
+      const aIsCash = (a.exchange === 'NSE' || a.exchange === 'BSE');
+      const bIsCash = (b.exchange === 'NSE' || b.exchange === 'BSE');
+      if (aIsCash && !bIsCash) return -1;
+      if (!aIsCash && bIsCash) return 1;
+      
+      // Prefer Futures over Options
+      const aIsFut = a.symbol.includes('FUT');
+      const bIsFut = b.symbol.includes('FUT');
+      if (aIsFut && !bIsFut) return -1;
+      if (!aIsFut && bIsFut) return 1;
+      
+      return 0;
+    });
+
+    res.json(finalResults.slice(0, 100));
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
