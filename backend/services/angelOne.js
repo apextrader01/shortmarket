@@ -321,7 +321,12 @@ function isMarketOpen() {
     const istMins = utcMins + 330; // IST = UTC+5:30
     const t = istMins % (24 * 60);
     
-    return t >= (9 * 60 + 15) && t <= (15 * 60 + 30);
+    // NSE: 9:15 AM - 3:30 PM IST
+    // MCX: 9:00 AM - 11:30 PM IST
+    // Return true if ANY market is open
+    const nseOpen = t >= (9 * 60 + 15) && t <= (15 * 60 + 30);
+    const mcxOpen = t >= (9 * 60) && t <= (23 * 60 + 30);
+    return nseOpen || mcxOpen;
 }
 
 // ─── Format date for API ──────────────────────────────────────────────────────
