@@ -75,6 +75,22 @@ async function executeOrder(order, executionPrice) {
             await trx('orders').where({ id: order.id }).update({ status: 'EXECUTED', price: executionPrice });
 
             const totalCost = executionPrice * order.quantity;
+
+            // Deduct any taxes (e.g. Auto Square-Off Flat Fee)
+            if (parseFloat(order.taxes || 0) > 0) {
+                const taxes = parseFloat(order.taxes);
+                const user = await trx('users').where({ id: order.user_id }).first();
+                if (user) {
+                    await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) - taxes });
+                    await trx('ledger').insert({
+                        user_id: order.user_id,
+                        amount: -taxes,
+                        type: 'TAXES',
+                        description: `Auto Square-Off Fee for Order #${order.id}`
+                    });
+                }
+            }
+
             
             // Note: Since we already deduct margin when the order is placed for both BUY and SELL (in server.js), 
             // we don't need to deduct the balance AGAIN here when the order executes.

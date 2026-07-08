@@ -62,7 +62,9 @@ async function processSquareOff(positionsToSquareOff, label, priceCache) {
                     quantity: quantity,
                     price: currentPrice,
                     status: 'PENDING',
-                    product_type: 'INT'
+                    product_type: 'INT',
+                    remarks: 'Auto-Square-Off',
+                    taxes: 59.00
                 }).returning('*');
                 
                 orderObj = typeof id === 'object' ? id : await trx('orders').where({ id }).first();
