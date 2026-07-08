@@ -131,12 +131,32 @@ app.get('/api/stocks', (req, res) => {
       }
     }
 
+    // Helper to check if a derivative is expired (expiryDate < today midnight)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isExpired = (expiryStr) => {
+      if (!expiryStr) return false;
+      const day = parseInt(expiryStr.slice(0, 2), 10);
+      const monthStr = expiryStr.slice(2, 5).toUpperCase();
+      let year = parseInt(expiryStr.slice(5), 10);
+      if (year < 100) year += 2000;
+      
+      const monthMap = { 'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5, 'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11 };
+      const month = monthMap[monthStr];
+      if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+        const expiryDate = new Date(year, month, day);
+        return expiryDate < today;
+      }
+      return false;
+    };
+
     // 3. Search Futures
     if (globalNfoFutures) {
       for (const [key, value] of Object.entries(globalNfoFutures)) {
         if (Array.isArray(value)) {
           for (const fut of value) {
             if (fut && fut.symbol && matchesQuery(fut.symbol)) {
+               if (fut.expiry && isExpired(fut.expiry)) continue;
                addResult({
                  token: fut.token, symbol: fut.symbol, name: key, 
                  exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
@@ -152,6 +172,7 @@ app.get('/api/stocks', (req, res) => {
       for (const [key, value] of Object.entries(globalNfoOptions)) {
         if (typeof value === 'object') {
           for (const expiry in value) {
+            if (isExpired(expiry)) continue;
             if (typeof value[expiry] !== 'object') continue;
             for (const strike in value[expiry]) {
                if (typeof value[expiry][strike] !== 'object') continue;
