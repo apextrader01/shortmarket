@@ -89,7 +89,9 @@ async function initSchema() {
         table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
         table.string('symbol').notNullable();
         table.integer('quantity').notNullable().defaultTo(0);
+        table.integer('closed_quantity').defaultTo(0);
         table.decimal('average_price', 14, 2).notNullable();
+        table.decimal('exit_price', 14, 2).nullable();
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.decimal('margin', 14, 2).defaultTo(0);
         table.decimal('realized_pnl', 14, 2).defaultTo(0);
@@ -279,6 +281,18 @@ async function initSchema() {
   }
 }
 
-initSchema();
+// Raw SQL fallback — guarantees critical columns exist even if Knex migration missed them
+async function ensureCriticalColumns() {
+  try {
+    await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
+    await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
+    await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
+    console.log('✅ Critical columns verified on positions table');
+  } catch (e) {
+    console.error('ensureCriticalColumns error (non-fatal):', e.message);
+  }
+}
+
+initSchema().then(() => ensureCriticalColumns());
 
 module.exports = db;
