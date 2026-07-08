@@ -322,10 +322,10 @@ function isMarketOpen() {
     const t = istMins % (24 * 60);
     
     // NSE: 9:15 AM - 3:30 PM IST
-    // MCX: 9:00 AM - 11:30 PM IST
+    // MCX: 9:00 AM - 11:59 PM IST
     // Return true if ANY market is open
     const nseOpen = t >= (9 * 60 + 15) && t <= (15 * 60 + 30);
-    const mcxOpen = t >= (9 * 60) && t <= (23 * 60 + 30);
+    const mcxOpen = t >= (9 * 60) && t <= (23 * 60 + 59);
     return nseOpen || mcxOpen;
 }
 
