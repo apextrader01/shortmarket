@@ -29,7 +29,7 @@ function App() {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
     selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
-    alerts, updateAlert, pendingTriggers, updatePendingTrigger, placeOrder,
+    alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder,
     oneClickMultiplier, stocks
   } = useStore();
 
@@ -42,6 +42,7 @@ function App() {
 
   // Pre-fetch top index prices (runs on mount regardless of auth state)
   useEffect(() => {
+    clearOldAlerts();
     fetchBatchPrices(TOP_INDICES);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
