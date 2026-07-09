@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
-import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell } from 'lucide-react';
 
 export default function MarketWatch({ className = '' }) {
   const { 
     prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices,
     watchlists, activeWatchlistId, setActiveWatchlist, 
-    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal, openDomLadderModal
+    addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal, openDomLadderModal, setAlertModalSymbol
   } = useStore();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,6 +238,13 @@ export default function MarketWatch({ className = '' }) {
                         style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}
                       >
                         S
+                      </div>
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); setAlertModalSymbol(stock.uniqueSymbol); }}
+                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }}
+                        title="Set Price Alert"
+                      >
+                        <Bell size={12} color="var(--color-yellow)" />
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
