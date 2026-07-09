@@ -989,5 +989,6 @@ export const useStore = create(persist((set, get) => ({
     pendingTriggers:   state.pendingTriggers,
     oneClickMode:      state.oneClickMode,
     oneClickMultiplier: state.oneClickMultiplier,
+    alerts:            state.alerts,
   }),
 }));
