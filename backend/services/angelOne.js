@@ -321,11 +321,11 @@ function isMarketOpen() {
     const istMins = utcMins + 330; // IST = UTC+5:30
     const t = istMins % (24 * 60);
     
-    // NSE: 9:15 AM - 3:30 PM IST
-    // MCX: 9:00 AM - 11:59 PM IST
+    // NSE/BSE: 8:45 AM - 5:00 PM IST
+    // MCX: 8:45 AM - 12:30 AM IST (next day)
     // Return true if ANY market is open
-    const nseOpen = t >= (9 * 60 + 15) && t <= (15 * 60 + 30);
-    const mcxOpen = t >= (9 * 60) && t <= (23 * 60 + 59);
+    const nseOpen = t >= (8 * 60 + 45) && t <= (17 * 60);
+    const mcxOpen = t >= (8 * 60 + 45) || t <= (0 * 60 + 30);
     return nseOpen || mcxOpen;
 }
 
