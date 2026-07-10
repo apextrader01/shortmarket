@@ -1782,10 +1782,14 @@ const { loginAngelOne, setPriceCache } = require('./services/angelOne');
 setPriceCache(priceCache);
 
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
+const { startExpiryJobs } = require('./services/autoSquareOff');
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
+  
+  // Start automated expiry settlement jobs
+  startExpiryJobs();
   
   // Update options master in background
   updateOptionsMaster().catch(e => console.error(e));
