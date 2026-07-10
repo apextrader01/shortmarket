@@ -1,6 +1,7 @@
 const { SmartAPI, WebSocketV2 } = require('smartapi-javascript');
 const { TOTP } = require('totp-generator');
 const https = require('https');
+const { pubClient } = require('./redis');
 require('dotenv').config();
 
 const smart_api = new SmartAPI({
@@ -853,7 +854,13 @@ async function broadcastLTPs(io) {
     for (const [uniqueSymbol, data] of Object.entries(ltps)) {
         const entry = { symbol: uniqueSymbol, ...data, timestamp: ts };
         // Update the shared cache
-        sharedPriceCache[uniqueSymbol] = entry;
+        if (sharedPriceCache) sharedPriceCache[uniqueSymbol] = entry;
+        
+        // Push to Redis for cross-server scaling
+        if (pubClient && pubClient.isOpen) {
+            pubClient.hSet('priceCache', uniqueSymbol, JSON.stringify(entry)).catch(() => {});
+        }
+
         processTick(uniqueSymbol, data.ltp);
         // Emit to subscribers (socket rooms)
         io.to(uniqueSymbol).emit('market_data', entry);
@@ -1036,6 +1043,11 @@ function startLiveWebSocket(io) {
                             ...sharedPriceCache[info.uniqueSymbol], 
                             ...entry 
                         };
+                    }
+
+                    // Push to Redis for cross-server scaling
+                    if (pubClient && pubClient.isOpen) {
+                        pubClient.hSet('priceCache', info.uniqueSymbol, JSON.stringify(entry)).catch(() => {});
                     }
                     
                     io.to(info.uniqueSymbol).emit('market_data', entry);

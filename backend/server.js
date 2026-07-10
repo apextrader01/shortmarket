@@ -24,6 +24,21 @@ const server = http.createServer(app);
 // ─── Price Cache (lives in server.js to avoid module issues) ─────────────────
 const priceCache = {};
 
+// Background sync from Redis (so non-master API nodes have instant access to prices)
+const { pubClient } = require('./services/redis');
+setInterval(async () => {
+    if (pubClient && pubClient.isOpen) {
+        try {
+            const allPrices = await pubClient.hGetAll('priceCache');
+            if (allPrices) {
+                for (const [symbol, dataStr] of Object.entries(allPrices)) {
+                    priceCache[symbol] = JSON.parse(dataStr);
+                }
+            }
+        } catch (e) {}
+    }
+}, 1000);
+
 const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
