@@ -105,10 +105,10 @@ function startExpiryJobs() {
     schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
         runAutoSquareOff('NSE_NFO');
     });
-    schedule.scheduleJob({ rule: '30 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
         runAutoSquareOff('MCX');
     });
-    console.log('⏰ Auto Square-Off schedules initialized (3:25 PM for NSE/NFO, 11:30 PM for MCX).');
+    console.log('⏰ Auto Square-Off schedules initialized (3:25 PM for NSE/NFO, 3:25 PM for MCX).');
 }
 
 module.exports = { startExpiryJobs, runAutoSquareOff };
