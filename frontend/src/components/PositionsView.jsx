@@ -7,8 +7,16 @@ const extractUnderlying = (symbol) => {
   return match ? match[0] : symbol;
 };
 
+const classifySymbol = (symbol) => {
+  if (symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT') || /\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/i.test(symbol)) return 'DERIVATIVES';
+  if (symbol.includes('BEES') || symbol.includes('ETF')) return 'ETF';
+  if (symbol.includes('MF') || symbol.endsWith('-MF')) return 'MF';
+  return 'STOCK';
+};
+
 export default function PositionsView() {
-  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED'
+  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDING'
+  const [holdingType, setHoldingType] = useState('ALL'); // 'ALL' | 'STOCK' | 'DERIVATIVES' | 'ETF' | 'MF'
   const { positions, prices } = useStore();
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
@@ -27,6 +35,11 @@ export default function PositionsView() {
       if (viewMode === 'OPEN' && (!isOpen || isHolding)) return;
       if (viewMode === 'HOLDING' && (!isOpen || !isHolding)) return;
       if (viewMode === 'CLOSED' && isOpen) return;
+
+      if (viewMode === 'HOLDING' && holdingType !== 'ALL') {
+        const type = classifySymbol(pos.symbol);
+        if (type !== holdingType) return;
+      }
 
       const underlying = extractUnderlying(pos.symbol);
       if (!groups[underlying]) {
@@ -150,6 +163,32 @@ export default function PositionsView() {
           </button>
         )}
       </div>
+
+      {viewMode === 'HOLDING' && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {['ALL', 'STOCK', 'DERIVATIVES', 'ETF', 'MF'].map(type => (
+            <button
+              key={type}
+              onClick={() => setHoldingType(type)}
+              style={{
+                background: holdingType === type ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                color: holdingType === type ? '#fff' : 'var(--text-secondary)',
+                border: '1px solid',
+                borderColor: holdingType === type ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                padding: '6px 16px',
+                borderRadius: '100px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      )}
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {positions.length === 0 || groupedStrategies.length === 0 ? (
