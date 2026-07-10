@@ -1178,21 +1178,44 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // Block new Intraday orders for non-commodities after 3:15 PM IST
-  if (product_type === 'INT') {
-    const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
-    if (!isCommodity) {
-      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      const hours = istTime.getHours();
-      const minutes = istTime.getMinutes();
-      if (hours > 15 || (hours === 15 && minutes >= 15)) {
-        return res.status(400).json({ error: 'Intraday trading for Equities is blocked after 3:15 PM IST.' });
-      }
-    }
-  }
-
   try {
       await db.transaction(async (trx) => {
+        // --- Order Time Blocking Logic ---
+        const existingPosCheck = await trx('positions').where({ user_id: req.user.id, symbol, product_type }).whereNot({ quantity: 0 }).first();
+        const isClosingOrder = existingPosCheck && (
+            (existingPosCheck.quantity > 0 && side === 'SELL') || 
+            (existingPosCheck.quantity < 0 && side === 'BUY')
+        );
+
+        if (!req.body.is_system_close && !isClosingOrder) {
+            const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+            const totalMinutes = istTime.getHours() * 60 + istTime.getMinutes();
+            const isCommodity = symbol.includes('MCX');
+            
+            // 1. Intraday Block
+            if (product_type === 'INT') {
+                if (isCommodity && totalMinutes >= (23 * 60 + 20)) {
+                    throw new Error('Intraday trading for Commodities is blocked after 11:20 PM IST.');
+                } else if (!isCommodity && totalMinutes >= (15 * 60 + 20)) {
+                    throw new Error('Intraday trading for Equities/Derivatives is blocked after 3:20 PM IST.');
+                }
+            }
+            
+            // 2. Expiry Block
+            const { parseExpiryDate, formatDate } = require('./services/autoSquareOff');
+            const expiryDateObj = parseExpiryDate(symbol);
+            if (expiryDateObj) {
+                if (formatDate(expiryDateObj) === formatDate(istTime)) {
+                    if (isCommodity && totalMinutes >= (23 * 60 + 25)) {
+                        throw new Error('Trading for expiring Commodities is blocked after 11:25 PM IST on expiry day.');
+                    } else if (!isCommodity && totalMinutes >= (15 * 60 + 25)) {
+                        throw new Error('Trading for expiring contracts is blocked after 3:25 PM IST on expiry day.');
+                    }
+                }
+            }
+        }
+        // --- End Time Blocking Logic ---
+
         // 1. Determine execution status
         const isMarket = type === 'MARKET';
         const status = isMarket ? 'EXECUTED' : 'PENDING';
