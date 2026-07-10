@@ -101,14 +101,85 @@ async function runAutoSquareOff(exchangeFilter) {
     }
 }
 
-function startExpiryJobs() {
-    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('NSE_NFO');
-    });
-    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('MCX');
-    });
-    console.log('⏰ Auto Square-Off schedules initialized (3:25 PM for NSE/NFO, 3:25 PM for MCX).');
+async function runIntradaySquareOff(exchangeFilter) {
+    console.log(`\n=========================================`);
+    console.log(`🕒 INTRADAY Square-Off Initiated for ${exchangeFilter}`);
+    console.log(`=========================================\n`);
+
+    try {
+        // Find open positions that are explicitly INT
+        const openPositions = await db('positions')
+            .whereRaw('quantity != closed_quantity')
+            .andWhere({ product_type: 'INT' });
+        
+        console.log(`Found ${openPositions.length} open INTRADAY positions total.`);
+        let closedCount = 0;
+        
+        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
+        const port = process.env.PORT || 5000;
+
+        for (const pos of openPositions) {
+            const isMcx = pos.symbol.includes('MCX');
+            if (exchangeFilter === 'MCX' && !isMcx) continue;
+            if (exchangeFilter === 'NSE_NFO' && isMcx) continue;
+
+            console.log(`⚠️ Intraday Auto-Close Triggered: User ${pos.user_id} | ${pos.symbol}`);
+            closedCount++;
+            
+            const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
+            const side = pos.quantity > 0 ? 'SELL' : 'BUY';
+
+            const orderPayload = {
+                symbol: pos.symbol,
+                type: 'MARKET',
+                side: side,
+                quantity: remainingQty,
+                product_type: pos.product_type,
+                is_system_close: true
+            };
+
+            try {
+                const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
+                const res = await fetch(`http://localhost:${port}/api/order`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify(orderPayload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    console.log(`✅ Auto-closed intraday position for User ${pos.user_id} on ${pos.symbol}`);
+                }
+            } catch(e) {
+                console.error(`❌ Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+            }
+        }
+        console.log(`✅ Intraday Square-Off Complete. Closed ${closedCount} positions.\n`);
+    } catch (err) {
+        console.error('❌ Intraday Square-Off Error:', err);
+    }
 }
 
-module.exports = { startExpiryJobs, runAutoSquareOff };
+function startSquareOffJobs() {
+    // EXPIRY JOBS (3:25 PM / 3:25 PM MCX)
+    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runAutoSquareOff('NSE_NFO');
+        runAutoSquareOff('MCX'); // Using identical times based on earlier discussion
+    });
+
+    // INTRADAY JOBS (3:20 PM NSE/NFO)
+    schedule.scheduleJob({ rule: '20 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runIntradaySquareOff('NSE_NFO');
+    });
+
+    // INTRADAY JOBS (11:20 PM MCX)
+    schedule.scheduleJob({ rule: '20 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runIntradaySquareOff('MCX');
+    });
+
+    console.log('⏰ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm).');
+}
+
+module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff };
