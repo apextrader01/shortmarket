@@ -287,7 +287,8 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
-    console.log('✅ Critical columns verified on positions table');
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url VARCHAR(255)`);
+    console.log('✅ Critical columns verified on positions and users tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }
