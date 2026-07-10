@@ -1203,10 +1203,18 @@ app.post('/api/order', authenticateToken, async (req, res) => {
             }
             
             // 2. Expiry Block
-            const { parseExpiryDate, formatDate } = require('./services/autoSquareOff');
-            const expiryDateObj = parseExpiryDate(symbol);
-            if (expiryDateObj) {
-                if (formatDate(expiryDateObj) === formatDate(istTime)) {
+            const expiryRegex = /([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{2})/i;
+            const match = symbol.match(expiryRegex);
+            if (match) {
+                const day = parseInt(match[1], 10);
+                const monthStr = match[2].toUpperCase();
+                const year = 2000 + parseInt(match[3], 10);
+                const months = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+                const expiryDateObj = new Date(year, months[monthStr], day);
+                
+                const formatD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                
+                if (formatD(expiryDateObj) === formatD(istTime)) {
                     if (isCommodity && totalMinutes >= (23 * 60 + 25)) {
                         throw new Error('Trading for expiring Commodities is blocked after 11:25 PM IST on expiry day.');
                     } else if (!isCommodity && totalMinutes >= (15 * 60 + 25)) {
