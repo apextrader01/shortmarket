@@ -28,6 +28,11 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
+const { createAdapter } = require('@socket.io/redis-adapter');
+const { pubClient, subClient } = require('./services/redis');
+io.adapter(createAdapter(pubClient, subClient));
+
+
 app.use(cors());
 app.use(express.json());
 app.use(compression()); // Compress all API responses to fix frontend loading lag

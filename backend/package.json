@@ -12,8 +12,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
+    "bullmq": "^5.80.1",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -24,6 +26,7 @@
     "node-schedule": "^2.1.1",
     "otplib": "^13.4.1",
     "pg": "^8.22.0",
+    "redis": "^6.1.0",
     "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
     "sqlite3": "^6.0.1",
