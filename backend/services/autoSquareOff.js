@@ -182,4 +182,4 @@ function startSquareOffJobs() {
     console.log('⏰ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm).');
 }
 
-module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff };
+module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };
