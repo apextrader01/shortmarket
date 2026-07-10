@@ -22,6 +22,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       return;
     }
 
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadError('Image is too large. Please select a file smaller than 2MB.');
+      return;
+    }
+
     setIsUploading(true);
     setUploadError(null);
 
