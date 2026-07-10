@@ -46,7 +46,7 @@ async function runAutoSquareOff(exchangeFilter) {
         for (const pos of openPositions) {
             const isMcx = pos.symbol.includes('MCX');
             if (exchangeFilter === 'MCX' && !isMcx) continue;
-            if (exchangeFilter === 'NSE_NFO' && isMcx) continue;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) continue;
 
             const expiryDateObj = parseExpiryDate(pos.symbol);
             if (!expiryDateObj) continue; 
@@ -121,7 +121,7 @@ async function runIntradaySquareOff(exchangeFilter) {
         for (const pos of openPositions) {
             const isMcx = pos.symbol.includes('MCX');
             if (exchangeFilter === 'MCX' && !isMcx) continue;
-            if (exchangeFilter === 'NSE_NFO' && isMcx) continue;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) continue;
 
             console.log(`⚠️ Intraday Auto-Close Triggered: User ${pos.user_id} | ${pos.symbol}`);
             closedCount++;
@@ -165,13 +165,13 @@ async function runIntradaySquareOff(exchangeFilter) {
 function startSquareOffJobs() {
     // EXPIRY JOBS (3:25 PM / 3:25 PM MCX)
     schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('NSE_NFO');
+        runAutoSquareOff('NSE_NFO_BFO');
         runAutoSquareOff('MCX'); // Using identical times based on earlier discussion
     });
 
-    // INTRADAY JOBS (3:20 PM NSE/NFO)
+    // INTRADAY JOBS (3:20 PM NSE/NFO/BFO)
     schedule.scheduleJob({ rule: '20 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runIntradaySquareOff('NSE_NFO');
+        runIntradaySquareOff('NSE_NFO_BFO');
     });
 
     // INTRADAY JOBS (11:20 PM MCX)
