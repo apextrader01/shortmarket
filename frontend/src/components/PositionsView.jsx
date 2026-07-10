@@ -22,7 +22,10 @@ export default function PositionsView() {
 
     positions.forEach(pos => {
       const isOpen = pos.quantity !== 0;
-      if (viewMode === 'OPEN' && !isOpen) return;
+      const isHolding = pos.product_type === 'DEL';
+      
+      if (viewMode === 'OPEN' && (!isOpen || isHolding)) return;
+      if (viewMode === 'HOLDING' && (!isOpen || !isHolding)) return;
       if (viewMode === 'CLOSED' && isOpen) return;
 
       const underlying = extractUnderlying(pos.symbol);
@@ -125,6 +128,12 @@ export default function PositionsView() {
               style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
             >
               CLOSED
+            </button>
+            <button
+              onClick={() => setViewMode('HOLDING')}
+              style={{ background: viewMode === 'HOLDING' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              HOLDING
             </button>
           </div>
         </div>
