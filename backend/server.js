@@ -1181,7 +1181,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   try {
       await db.transaction(async (trx) => {
         // --- Order Time Blocking Logic ---
-        const existingPosCheck = await trx('positions').where({ user_id: req.user.id, symbol, product_type }).whereNot({ quantity: 0 }).first();
+        const pType = product_type || 'DEL';
+        const existingPosCheck = await trx('positions').where({ user_id: req.user.id, symbol, product_type: pType }).whereNot({ quantity: 0 }).first();
         const isClosingOrder = existingPosCheck && (
             (existingPosCheck.quantity > 0 && side === 'SELL') || 
             (existingPosCheck.quantity < 0 && side === 'BUY')
