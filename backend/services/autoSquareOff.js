@@ -162,6 +162,63 @@ async function runIntradaySquareOff(exchangeFilter) {
     }
 }
 
+async function runWatchlistCleanup() {
+    console.log(`\n=========================================`);
+    console.log(`🧹 Midnight Watchlist Cleanup Initiated`);
+    console.log(`=========================================\n`);
+
+    try {
+        const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+        // Reset to midnight IST today
+        istTime.setHours(0, 0, 0, 0);
+
+        const users = await db('users').select('id', 'watchlists');
+        let totalRemoved = 0;
+
+        for (const user of users) {
+            if (!user.watchlists) continue;
+            let watchlists = [];
+            try {
+                watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists) : user.watchlists;
+            } catch (e) {
+                continue;
+            }
+
+            let modified = false;
+
+            for (const wl of watchlists) {
+                if (!wl.symbols || !Array.isArray(wl.symbols)) continue;
+                
+                const originalLength = wl.symbols.length;
+                wl.symbols = wl.symbols.filter(symbol => {
+                    const expiryDateObj = parseExpiryDate(symbol);
+                    if (!expiryDateObj) return true; // Keep non-expiring assets
+
+                    // If the expiry date is strictly before today's midnight, it is expired
+                    // E.g., if it expired yesterday, its midnight is < today's midnight
+                    if (expiryDateObj.getTime() < istTime.getTime()) {
+                        return false; // Remove it
+                    }
+                    return true;
+                });
+
+                if (wl.symbols.length !== originalLength) {
+                    modified = true;
+                    totalRemoved += (originalLength - wl.symbols.length);
+                }
+            }
+
+            if (modified) {
+                await db('users').where({ id: user.id }).update({ watchlists: JSON.stringify(watchlists) });
+            }
+        }
+        
+        console.log(`✅ Watchlist Cleanup Complete. Removed ${totalRemoved} expired contracts.\n`);
+    } catch (err) {
+        console.error('❌ Watchlist Cleanup Error:', err);
+    }
+}
+
 function startSquareOffJobs() {
     // EXPIRY JOBS (3:25 PM / 3:25 PM MCX)
     schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
@@ -179,7 +236,12 @@ function startSquareOffJobs() {
         runIntradaySquareOff('MCX');
     });
 
-    console.log('⏰ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm).');
+    // MIDNIGHT WATCHLIST CLEANUP (12:00 AM)
+    schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
+        runWatchlistCleanup();
+    });
+
+    console.log('⏰ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm) (Cleanup: 12:00am).');
 }
 
 module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };
