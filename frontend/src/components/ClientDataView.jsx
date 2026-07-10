@@ -7,11 +7,22 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
-  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme } = useStore();
+  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount } = useStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+
+  const handleResetAccount = async () => {
+    if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to ₹10,00,000. This cannot be undone.')) {
+      const res = await resetAccount();
+      if (!res.success) {
+        alert('Failed to reset account: ' + (res.error || 'Unknown error'));
+      } else {
+        alert('Account successfully reset to ₹10,00,000!');
+      }
+    }
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -146,9 +157,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
           </div>
         </div>
-        <button onClick={onDepositClick} style={{ background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 24px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', width: '100%', maxWidth: '300px' }}>
-          DEPOSIT
-        </button>
+        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+            DEPOSIT
+          </button>
+          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+            RESET ACCOUNT
+          </button>
+        </div>
       </div>
 
 

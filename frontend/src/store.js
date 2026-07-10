@@ -777,8 +777,28 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       return data.success ? { success: true } : { success: false, error: data.error };
-    } catch (err) {
-      return { success: false, error: err.message };
+    } catch (e) {
+      return { success: false, error: 'Network error' };
+    }
+  },
+
+  resetAccount: async () => {
+    const { token, user } = get();
+    if (!token || !user) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/user/reset`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Optimistically update local state to reflect the wipe
+        set({ positions: [], orders: [], user: { ...user, balance: 1000000.0 } });
+        return { success: true };
+      }
+      return { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: 'Network error' };
     }
   },
 

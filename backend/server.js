@@ -726,6 +726,26 @@ app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   }
 });
 
+// 🧹 Account Reset 🧹
+app.post('/api/user/reset', authenticateToken, async (req, res) => {
+  try {
+    await db.transaction(async (trx) => {
+      // 1. Delete all trades (orders)
+      await trx('orders').where({ user_id: req.user.id }).del();
+      // 2. Delete all holdings/positions
+      await trx('positions').where({ user_id: req.user.id }).del();
+      // 3. Delete ledger history
+      await trx('ledger').where({ user_id: req.user.id }).del();
+      // 4. Reset balance to 10 Lakh (1,000,000)
+      await trx('users').where({ id: req.user.id }).update({ balance: 1000000.0 });
+    });
+    res.json({ success: true, message: 'Account successfully reset to ₹10,00,000.' });
+  } catch (err) {
+    console.error('Reset Account Error:', err);
+    res.status(500).json({ error: 'Failed to reset account' });
+  }
+});
+
 // ─── Positions ────────────────────────────────────────────────────────────
 app.get('/api/positions', authenticateToken, async (req, res) => {
   try {
