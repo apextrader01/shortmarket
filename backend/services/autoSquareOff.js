@@ -2,19 +2,49 @@ const schedule = require('node-schedule');
 const db = require('../database/db').default || require('../database/db');
 const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
 
 const MONTH_MAP = {
     'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
     'JUL': 6, 'AUG': 7, 'SEP': 8, 'OCT': 9, 'NOV': 10, 'DEC': 11
 };
 
+let _symbolToExpiryMap = null;
+function getSymbolToExpiryMap() {
+    if (_symbolToExpiryMap) return _symbolToExpiryMap;
+    _symbolToExpiryMap = {};
+    try {
+        const futData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8'));
+        Object.values(futData).flat().forEach(f => _symbolToExpiryMap[f.symbol] = f.expiry);
+        
+        const optData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8'));
+        for (const name in optData) {
+            for (const expiry in optData[name]) {
+                for (const strike in optData[name][expiry]) {
+                    if (optData[name][expiry][strike].CE) _symbolToExpiryMap[optData[name][expiry][strike].CE.symbol] = expiry;
+                    if (optData[name][expiry][strike].PE) _symbolToExpiryMap[optData[name][expiry][strike].PE.symbol] = expiry;
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Error building symbolToExpiryMap", e.message);
+    }
+    return _symbolToExpiryMap;
+}
+
 function parseExpiryDate(symbol) {
-    const match = symbol.match(/([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{2})/i);
+    const map = getSymbolToExpiryMap();
+    const expiryStr = map[symbol];
+    if (!expiryStr) return null;
+    
+    // expiryStr is like "28JUL2026"
+    const match = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
     if (!match) return null;
     
     const day = parseInt(match[1], 10);
     const monthStr = match[2].toUpperCase();
-    const year = 2000 + parseInt(match[3], 10); 
+    const year = parseInt(match[3], 10); 
     
     const month = MONTH_MAP[monthStr];
     return new Date(year, month, day);
@@ -241,7 +271,10 @@ function startSquareOffJobs() {
         runWatchlistCleanup();
     });
 
-    console.log('⏰ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm) (Cleanup: 12:00am).');
+    // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
+    runWatchlistCleanup();
+
+    console.log('✅ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm) (Cleanup: 12:00am).');
 }
 
 module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };
