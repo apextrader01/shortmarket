@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
-const API = import.meta.env.VITE_API_URL || ''; // Relative path for web, absolute for Capacitor
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+const API = rawApiUrl.replace(/\/+$/, ''); // Strip trailing slashes to prevent //api/auth/login
 
 export const socket = io(API);
 
