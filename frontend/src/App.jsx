@@ -29,7 +29,7 @@ const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
 function App() {
   const {
-    user, token, logout,
+    user, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
     selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
     alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder,
@@ -49,33 +49,23 @@ function App() {
     fetchBatchPrices(TOP_INDICES);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise socket, load stocks, and start polling (re-runs when token changes)
+  // Initialise socket, load stocks, and start polling
   useEffect(() => {
     clearOldAlerts();
     initSocket();
-    if (token) fetchUserData();
-
-    let stockRetry = null;
-    const tryLoadStocks = async () => {
-      await loadStocks();
-      if (useStore.getState().stocks.length === 0) {
-        stockRetry = setTimeout(tryLoadStocks, 3000);
-      } else {
-        refreshPrices();
-      }
-    };
-    tryLoadStocks();
+    if (user) fetchUserData();
+    loadStocks();
+    refreshPrices();
 
     const interval = setInterval(() => {
-      if (token) fetchUserData();
+      if (user) fetchUserData();
       refreshPrices();
     }, 2000);
 
     return () => {
       clearInterval(interval);
-      if (stockRetry) clearTimeout(stockRetry);
     };
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Global Hotkey Engine (Shift+B, Shift+S)
   useEffect(() => {
@@ -220,7 +210,7 @@ function App() {
   }, [prices, pendingTriggers, updatePendingTrigger, placeOrder]);
 
   // ── Guard: show login screen when not authenticated ──────────────────────────
-  if (!user || !token) {
+  if (!user) {
     return <LoginView />;
   }
 
