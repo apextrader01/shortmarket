@@ -42,6 +42,8 @@ const LedgerStatement = () => {
   
   // Filter states
   const [filterPeriod, setFilterPeriod] = useState('Week');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
 
   const { token } = useStore();
@@ -78,10 +80,23 @@ const LedgerStatement = () => {
     const diffTime = Math.abs(now - entryDate);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (filterPeriod === 'Week' && diffDays > 7) return false;
-    if (filterPeriod === '15 Days' && diffDays > 15) return false;
-    if (filterPeriod === 'Month' && diffDays > 30) return false;
-    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    if (filterPeriod === 'Custom') {
+      if (customStart) {
+        const start = new Date(customStart);
+        start.setHours(0, 0, 0, 0);
+        if (entryDate < start) return false;
+      }
+      if (customEnd) {
+        const end = new Date(customEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+    } else {
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    }
 
     return true;
   });
@@ -134,6 +149,13 @@ const LedgerStatement = () => {
           >
             <Calendar size={12} style={{display:'inline', marginRight:'4px'}}/> Custom
           </span>
+          {filterPeriod === 'Custom' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+            </div>
+          )}
           <select 
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -214,20 +236,34 @@ const LedgerStatement = () => {
 
 const TradesAndCharges = () => {
   const [filterPeriod, setFilterPeriod] = useState('15 Days');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const { orders } = useStore();
 
   const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
 
   const filteredOrders = executedOrders.filter(entry => {
-    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
     const entryDate = new Date(entry.created_at);
     const now = new Date();
     const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
 
-    if (filterPeriod === 'Week' && diffDays > 7) return false;
-    if (filterPeriod === '15 Days' && diffDays > 15) return false;
-    if (filterPeriod === 'Month' && diffDays > 30) return false;
-    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    if (filterPeriod === 'Custom') {
+      if (customStart) {
+        const start = new Date(customStart);
+        start.setHours(0, 0, 0, 0);
+        if (entryDate < start) return false;
+      }
+      if (customEnd) {
+        const end = new Date(customEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+    } else if (filterPeriod !== 'Year') {
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    }
     return true;
   });
 
@@ -259,6 +295,13 @@ const TradesAndCharges = () => {
           >
             Custom
           </span>
+          {filterPeriod === 'Custom' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+            </div>
+          )}
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -326,32 +369,58 @@ const TradesAndCharges = () => {
 
 const ProfitAndLoss = () => {
   const [filterPeriod, setFilterPeriod] = useState('Year');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const { positions, orders } = useStore();
 
   const filteredPositions = (positions || []).filter(entry => {
-    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
     const entryDate = new Date(entry.updated_at || entry.created_at);
     const now = new Date();
     const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
 
-    if (filterPeriod === 'Week' && diffDays > 7) return false;
-    if (filterPeriod === '15 Days' && diffDays > 15) return false;
-    if (filterPeriod === 'Month' && diffDays > 30) return false;
-    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    if (filterPeriod === 'Custom') {
+      if (customStart) {
+        const start = new Date(customStart);
+        start.setHours(0, 0, 0, 0);
+        if (entryDate < start) return false;
+      }
+      if (customEnd) {
+        const end = new Date(customEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+    } else if (filterPeriod !== 'Year') {
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    }
     return true;
   });
 
   const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
   const filteredOrders = executedOrders.filter(entry => {
-    if (filterPeriod === 'Custom' || filterPeriod === 'Year') return true;
     const entryDate = new Date(entry.created_at);
     const now = new Date();
     const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
 
-    if (filterPeriod === 'Week' && diffDays > 7) return false;
-    if (filterPeriod === '15 Days' && diffDays > 15) return false;
-    if (filterPeriod === 'Month' && diffDays > 30) return false;
-    if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    if (filterPeriod === 'Custom') {
+      if (customStart) {
+        const start = new Date(customStart);
+        start.setHours(0, 0, 0, 0);
+        if (entryDate < start) return false;
+      }
+      if (customEnd) {
+        const end = new Date(customEnd);
+        end.setHours(23, 59, 59, 999);
+        if (entryDate > end) return false;
+      }
+    } else if (filterPeriod !== 'Year') {
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+    }
     return true;
   });
 
@@ -381,6 +450,13 @@ const ProfitAndLoss = () => {
           >
             Custom
           </span>
+          {filterPeriod === 'Custom' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+            </div>
+          )}
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
