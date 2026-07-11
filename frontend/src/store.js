@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
-const API = ''; // Relative path — works for both REST and Socket.IO via Vite proxy
+const API = import.meta.env.VITE_API_URL || ''; // Relative path for web, absolute for Capacitor
 
 export const socket = io(API);
 
