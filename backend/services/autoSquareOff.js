@@ -1,6 +1,5 @@
 const schedule = require('node-schedule');
 const db = require('../database/db').default || require('../database/db');
-const fetch = require('node-fetch');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
