@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">shortmarket</string>
+    <string name="title_activity_main">shortmarket</string>
+    <string name="package_name">com.shortmarket.app</string>
+    <string name="custom_url_scheme">com.shortmarket.app</string>
+</resources>
