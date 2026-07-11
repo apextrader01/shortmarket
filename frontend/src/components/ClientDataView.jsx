@@ -30,11 +30,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
     if (!file.type.startsWith('image/')) {
       setUploadError('Please select an image file.');
+      if (e.target) e.target.value = '';
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
       setUploadError('Image is too large. Please select a file smaller than 2MB.');
+      if (e.target) e.target.value = '';
       return;
     }
 
@@ -56,8 +58,12 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         }, 
         async () => {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          await updateProfilePicture(downloadURL);
+          const res = await updateProfilePicture(downloadURL);
+          if (!res.success) {
+            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+          }
           setIsUploading(false);
+          if (e.target) e.target.value = '';
         }
       );
     } catch (err) {
