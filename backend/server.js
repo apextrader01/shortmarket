@@ -666,7 +666,7 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
       .join('users', 'orders.user_id', '=', 'users.id')
       .select('orders.*', 'users.username', 'users.email')
       .orderBy('orders.created_at', 'desc')
-      .limit(100);
+      .limit(10000);
     res.json({ success: true, orders });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -698,7 +698,7 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
       .join('users', 'ledger.user_id', '=', 'users.id')
       .select('ledger.*', 'users.username', 'users.email')
       .orderBy('ledger.created_at', 'desc')
-      .limit(100);
+      .limit(10000);
     res.json({ success: true, ledger });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1459,7 +1459,7 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
     const ledger = await db('ledger')
       .where({ user_id: req.user.id })
       .orderBy('created_at', 'desc')
-      .limit(100);
+      .limit(10000);
     res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });
