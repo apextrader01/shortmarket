@@ -45,6 +45,13 @@ jobs:
         working-directory: ./frontend
         run: npx cap sync android
 
+      - name: Configure Android Package for Staging
+        if: github.ref_name == 'development'
+        working-directory: ./frontend
+        run: |
+          sed -i 's/applicationId "com.shortmarket.app"/applicationId "com.shortmarket.staging"/g' android/app/build.gradle
+          sed -i 's/<string name="app_name">shortmarket<\/string>/<string name="app_name">ShortMarket (Staging)<\/string>/g' android/app/src/main/res/values/strings.xml
+
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
