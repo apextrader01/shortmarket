@@ -232,6 +232,13 @@ export const useStore = create(persist((set, get) => ({
   updateAlert: (id, updates) => set((state) => ({ 
     alerts: state.alerts.map(a => a.id === id ? { ...a, ...updates } : a) 
   })),
+  clearOldAlerts: () => set((state) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return {
+      alerts: state.alerts.filter(a => new Date(a.createdAt).getTime() >= today.getTime())
+    };
+  }),
   
   alertModalSymbol: null,
   setAlertModalSymbol: (symbol) => set({ alertModalSymbol: symbol }),

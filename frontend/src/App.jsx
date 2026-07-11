@@ -29,7 +29,7 @@ function App() {
     user, token, logout,
     initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
     selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
-    alerts, updateAlert, pendingTriggers, updatePendingTrigger, placeOrder,
+    alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder,
     oneClickMultiplier, stocks
   } = useStore();
 
@@ -47,6 +47,7 @@ function App() {
 
   // Initialise socket, load stocks, and start polling (re-runs when token changes)
   useEffect(() => {
+    clearOldAlerts();
     initSocket();
     if (token) fetchUserData();
 
