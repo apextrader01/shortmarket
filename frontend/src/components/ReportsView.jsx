@@ -234,10 +234,76 @@ const LedgerStatement = () => {
   );
 };
 
+const CalendarHeatmap = ({ orders }) => {
+  if (!orders || orders.length === 0) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
+        <div style={{ textAlign: 'center' }}>
+          <Calendar size={48} style={{ margin: '0 auto 16px auto', color: 'var(--text-secondary)' }} />
+          <div style={{ fontSize: '14px' }}>Trading Activity Calendar</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+            No trades recorded in this period
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const heatmapData = {};
+  orders.forEach(o => {
+    const dStr = new Date(o.created_at).toISOString().split('T')[0];
+    if (!heatmapData[dStr]) heatmapData[dStr] = 0;
+    heatmapData[dStr] += 1;
+  });
+
+  const dates = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d);
+  }
+
+  const getColor = (count) => {
+    if (count === 0) return 'rgba(255,255,255,0.05)';
+    if (count < 3) return 'rgba(59, 130, 246, 0.3)';
+    if (count < 10) return 'rgba(59, 130, 246, 0.6)';
+    return 'rgba(59, 130, 246, 1)';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0' }}>
+       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', fontWeight: '600' }}>30-Day Trading Heatmap</div>
+       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', maxWidth: '400px', justifyContent: 'center' }}>
+          {dates.map((d, i) => {
+            const dStr = d.toISOString().split('T')[0];
+            const count = heatmapData[dStr] || 0;
+            return (
+              <div 
+                key={i} 
+                title={`${dStr}: ${count} trades`}
+                style={{
+                  width: '12px', 
+                  height: '12px', 
+                  borderRadius: '50%', 
+                  background: getColor(count),
+                  cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}
+              />
+            );
+          })}
+       </div>
+    </div>
+  );
+};
+
 const TradesAndCharges = () => {
   const [filterPeriod, setFilterPeriod] = useState('15 Days');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [viewMode, setViewMode] = useState('Date-Wise View');
   const { orders } = useStore();
 
   const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
@@ -271,6 +337,32 @@ const TradesAndCharges = () => {
   // Assume a dummy flat ₹20 brokerage per trade if not provided by backend
   const totalBrokerage = filteredOrders.reduce((acc, o) => acc + (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20)), 0);
   const totalCharges = filteredOrders.reduce((acc, o) => acc + (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)), 0);
+
+  // Date-wise Aggregation
+  const dateWiseMap = {};
+  filteredOrders.forEach(o => {
+    const d = new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (!dateWiseMap[d]) dateWiseMap[d] = { date: d, rawDate: new Date(o.created_at), totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0 };
+    dateWiseMap[d].totalTrades += 1;
+    if (o.type === 'BUY') dateWiseMap[d].buyQty += (o.quantity || 0);
+    if (o.type === 'SELL') dateWiseMap[d].sellQty += (o.quantity || 0);
+    dateWiseMap[d].brokerage += (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20));
+    dateWiseMap[d].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
+  });
+  const dateWiseData = Object.values(dateWiseMap).sort((a, b) => b.rawDate - a.rawDate);
+
+  // Scrip-wise Aggregation
+  const scripWiseMap = {};
+  filteredOrders.forEach(o => {
+    const sym = o.symbol || 'UNKNOWN';
+    if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0 };
+    scripWiseMap[sym].totalTrades += 1;
+    if (o.type === 'BUY') scripWiseMap[sym].buyQty += (o.quantity || 0);
+    if (o.type === 'SELL') scripWiseMap[sym].sellQty += (o.quantity || 0);
+    scripWiseMap[sym].brokerage += (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20));
+    scripWiseMap[sym].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
+  });
+  const scripWiseData = Object.values(scripWiseMap).sort((a, b) => b.totalTrades - a.totalTrades);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -344,23 +436,74 @@ const TradesAndCharges = () => {
           </div>
         </div>
 
-        {/* Heatmap Placeholder */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
-          <div style={{ textAlign: 'center' }}>
-            <Calendar size={48} style={{ margin: '0 auto 16px auto', color: 'var(--text-secondary)' }} />
-            <div style={{ fontSize: '14px' }}>Trading Activity Calendar</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-              {totalTrades > 0 ? `${totalTrades} trades recorded in this period.` : 'No trades recorded in this period'}
-            </div>
-          </div>
-        </div>
+        <CalendarHeatmap orders={filteredOrders} />
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing Trades and Charges Summary for current period</div>
-         <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
-            <span style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-blue-light)' }}>Date-Wise View</span>
-            <span style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>Scrip-Wise View</span>
+      <div className="glass-panel" style={{ padding: '24px' }}>
+         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing Trades and Charges Summary for current period</div>
+           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+              <span 
+                onClick={() => setViewMode('Date-Wise View')}
+                style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Date-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Date-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                Date-Wise View
+              </span>
+              <span 
+                onClick={() => setViewMode('Scrip-Wise View')}
+                style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Scrip-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Scrip-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                Scrip-Wise View
+              </span>
+           </div>
+         </div>
+
+         <div style={{ overflowX: 'auto' }}>
+           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+             <thead>
+               <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                 <th style={{ padding: '12px', fontWeight: '500' }}>{viewMode === 'Date-Wise View' ? 'Date' : 'Scrip'}</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Total Trades</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Buy Qty</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Sell Qty</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Brokerage</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Charges</th>
+               </tr>
+             </thead>
+             <tbody>
+               {viewMode === 'Date-Wise View' ? (
+                 dateWiseData.length === 0 ? (
+                   <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</td></tr>
+                 ) : (
+                   dateWiseData.map((row, idx) => (
+                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                       <td style={{ padding: '12px', fontWeight: '500' }}>{row.date}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>{row.totalTrades}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.buyQty > 0 ? 'var(--color-green-light)' : 'inherit' }}>{row.buyQty}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.sellQty > 0 ? 'var(--color-red-light)' : 'inherit' }}>{row.sellQty}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.brokerage.toFixed(2)}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.charges.toFixed(2)}</td>
+                     </tr>
+                   ))
+                 )
+               ) : (
+                 scripWiseData.length === 0 ? (
+                   <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</td></tr>
+                 ) : (
+                   scripWiseData.map((row, idx) => (
+                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                       <td style={{ padding: '12px', fontWeight: '500' }}>{row.symbol}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>{row.totalTrades}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.buyQty > 0 ? 'var(--color-green-light)' : 'inherit' }}>{row.buyQty}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.sellQty > 0 ? 'var(--color-red-light)' : 'inherit' }}>{row.sellQty}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.brokerage.toFixed(2)}</td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.charges.toFixed(2)}</td>
+                     </tr>
+                   ))
+                 )
+               )}
+             </tbody>
+           </table>
          </div>
       </div>
     </div>
