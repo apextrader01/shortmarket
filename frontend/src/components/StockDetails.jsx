@@ -161,21 +161,10 @@ export default function StockDetails({ symbol, price, candles }) {
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Fundamentals</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
-            {[
-              ['Market Cap', formatNum(stats.marketCap)],
-              ['P/E Ratio (TTM)', stats.peRatio?.toFixed(2) || '-'],
-              ['P/B Ratio', stats.pbRatio?.toFixed(2) || '-'],
-              ['Industry P/E', stats.industryPe?.toFixed(2) || '-'],
-              ['Debt to Equity', stats.debtToEquity?.toFixed(2) || '-'],
-              ['ROE', stats.roe ? stats.roe.toFixed(2) + '%' : '-'],
-              ['EPS (TTM)', stats.epsTtm?.toFixed(2) || '-'],
-              ['Dividend Yield', stats.divYield ? stats.divYield.toFixed(2) + '%' : '-'],
-              ['Book Value', stats.bookValue?.toFixed(2) || '-'],
-              ['Face Value', stats.faceValue || '-'],
-            ].map(([lbl, val]) => (
-              <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
-                <span style={{ color: '#94A3B8', fontSize: '12px' }}>{lbl}</span>
-                <span style={{ fontWeight: '600', fontSize: '13px' }}>{val}</span>
+            {(details.fundamentals || []).map((item) => (
+              <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
+                <span style={{ color: '#94A3B8', fontSize: '12px' }}>{item.name}</span>
+                <span style={{ fontWeight: '600', fontSize: '13px' }}>{item.value}</span>
               </div>
             ))}
           </div>
