@@ -767,10 +767,10 @@ const ProfitAndLoss = () => {
                <div style={{ fontSize: '16px', fontWeight: '700', color: netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                  {netRealizedPnl >= 0 ? '+' : ''}₹{netRealizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
                </div>
-               <PnLCalendarHeatmap positions={filteredPositions} orders={filteredOrders} />
              </div>
           </div>
         </div>
+        <PnLCalendarHeatmap positions={filteredPositions} orders={filteredOrders} />
       </div>
 
       <div className="glass-panel" style={{ padding: '24px' }}>
