@@ -23,7 +23,7 @@ import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X } from 'lucide-react';
 
 const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
@@ -40,6 +40,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState('Markets');
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
 
@@ -321,6 +322,11 @@ function App() {
               )})}
             </div>
 
+            {/* Hamburger Menu (Mobile Only) */}
+            <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
+              <Menu size={24} color="var(--text-primary)" />
+            </div>
+
             {/* User avatar + logout */}
             <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div 
@@ -412,6 +418,46 @@ function App() {
       <ChartModal />
       <BasketModal />
       
+      {/* Mobile Menu Overlay */}
+      <div className={`mobile-menu-overlay ${showMobileMenu ? 'open' : ''}`}>
+        <div className="mobile-menu-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => { setActiveTab('ClientData'); setShowMobileMenu(false); }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              {user?.profile_picture_url ? <img src={user.profile_picture_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={20} />}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
+            </div>
+          </div>
+          <div onClick={() => setShowMobileMenu(false)} style={{ cursor: 'pointer', padding: '8px' }}>
+            <X size={24} color="var(--text-primary)" />
+          </div>
+        </div>
+        <div className="mobile-menu-content">
+          {[
+            { label: 'Markets', icon: TrendingUp },
+            { label: 'Options', icon: LineChart },
+            { label: 'Positions', icon: Briefcase },
+            { label: 'Orders', icon: List },
+            { label: 'Portfolio', icon: Briefcase },
+            { label: 'Alerts', icon: TrendingUp },
+            { label: 'Analytics', icon: LineChart },
+            { label: 'Mutual Funds', icon: CircleDollarSign },
+            ...(user?.is_admin ? [{ label: 'Admin Panel', icon: Settings }] : [])
+          ].map(tab => (
+            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
+              <tab.icon size={20} />
+              {tab.label}
+            </div>
+          ))}
+          <div className="mobile-menu-item" onClick={logout} style={{ color: 'var(--color-red)', marginTop: 'auto' }}>
+            <LogOut size={20} />
+            Logout
+          </div>
+        </div>
+      </div>
+      
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">
         <div className={`mobile-nav-item ${activeTab === 'Markets' ? 'active' : ''}`} onClick={() => setActiveTab('Markets')}>
@@ -430,7 +476,7 @@ function App() {
           <CircleDollarSign size={20} />
           <span>Funds</span>
         </div>
-        <div className={`mobile-nav-item ${activeTab === 'Settings' ? 'active' : ''}`} onClick={() => setActiveTab('Settings')}>
+        <div className={`mobile-nav-item ${activeTab === 'ClientData' ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
           <User size={20} />
           <span>Profile</span>
         </div>
