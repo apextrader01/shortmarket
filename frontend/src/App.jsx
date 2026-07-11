@@ -17,6 +17,9 @@ import EditOrderModal from './components/EditOrderModal';
 import DepositModal from './components/DepositModal';
 import MarketDepthModal from './components/MarketDepthModal';
 import DOMLadderModal from './components/DOMLadderModal';
+import AlertModal from './components/AlertModal';
+import ChartModal from './components/ChartModal';
+import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
@@ -405,6 +408,9 @@ function App() {
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       <MarketDepthModal />
       <DOMLadderModal />
+      <AlertModal />
+      <ChartModal />
+      <BasketModal />
       
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">

@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
-import BasketModal from './BasketModal';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
-import ChartModal from './ChartModal';
-import AlertModal from './AlertModal';
 import OptionChainRow from './OptionChainRow';
 import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
 
@@ -702,11 +699,6 @@ const OptionChainView = () => {
         </table>
         )}
       </div>
-      
-      {/* Modals */}
-      <BasketModal />
-      <ChartModal />
-      <AlertModal />
     </div>
   );
 };
