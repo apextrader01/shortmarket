@@ -26,22 +26,25 @@ export default function AlertsView() {
             Manage your active and triggered notifications
           </div>
         </div>
-        <button onClick={clearOldAlerts} className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600' }}>
-          Clear Old Alerts
-        </button>
-      </div>
-        {/* Ask for permission button if not granted */}
-        {"Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied" && (
-          <button 
-            onClick={() => Notification.requestPermission()}
-            style={{
-              background: 'rgba(96, 165, 250, 0.1)', color: '#60A5FA', border: '1px solid #60A5FA',
-              padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            Enable Browser Push Notifications
+        
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button onClick={clearOldAlerts} className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+            Clear Old Alerts
           </button>
-        )}
+
+          {/* Ask for permission button if not granted */}
+          {"Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied" && (
+            <button 
+              onClick={() => Notification.requestPermission()}
+              style={{
+                background: 'rgba(96, 165, 250, 0.1)', color: '#60A5FA', border: '1px solid #60A5FA',
+                padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'
+              }}
+            >
+              Enable Browser Push Notifications
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
