@@ -52,9 +52,11 @@ async function initSchema() {
       const hasProfilePicture = await db.schema.hasColumn('users', 'profile_picture_url');
       if (!hasProfilePicture) {
         await db.schema.alterTable('users', table => {
-          table.string('profile_picture_url');
+          table.text('profile_picture_url');
         });
         console.log('Added profile_picture_url to users table');
+      } else {
+        await db.raw('ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT').catch(()=>console.log('Ignore alter error on sqlite'));
       }
 
       const hasPhone = await db.schema.hasColumn('users', 'phone');
@@ -287,7 +289,8 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
-    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url VARCHAR(255)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
+    await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     console.log('✅ Critical columns verified on positions and users tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
