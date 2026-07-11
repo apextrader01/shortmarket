@@ -3,8 +3,9 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
 
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer <token>"
+  // Read token from httpOnly cookie, fallback to Authorization header if provided
+  const token = (req.cookies && req.cookies.token) || 
+                (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
 
   if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
 

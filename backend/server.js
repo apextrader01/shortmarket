@@ -24,11 +24,45 @@ const server = http.createServer(app);
 // ─── Price Cache (lives in server.js to avoid module issues) ─────────────────
 const priceCache = {};
 
+const allowedOrigins = [
+  'https://shortmarket-production.up.railway.app',
+  'https://shortmarket-staging.up.railway.app',
+  'http://localhost:5173',
+  'capacitor://localhost',
+  'http://localhost'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+};
+
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: corsOptions
 });
 
-app.use(cors());
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+
+app.use(helmet());
+app.use(cors(corsOptions));
+app.use(cookieParser());
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 app.use(express.json());
 app.use(compression()); // Compress all API responses to fix frontend loading lag
 
@@ -224,7 +258,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', apiLimiter, async (req, res) => {
   const { username, email, password } = req.body;
   if (!username || !email || !password) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -238,7 +272,13 @@ app.post('/api/auth/register', async (req, res) => {
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+    res.json({ success: true, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
@@ -252,7 +292,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', apiLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await db('users').where({ email }).first();
@@ -263,7 +303,13 @@ app.post('/api/auth/login', async (req, res) => {
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+    res.json({ success: true, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
@@ -271,6 +317,12 @@ app.post('/api/auth/login', async (req, res) => {
     }
     res.status(500).json({ error: errorMsg || 'Unknown error occurred during login' });
   }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'lax' });
+  res.json({ success: true });
 });
 // ─── Forgot Password ────────────────────────────────────────────────────────
 app.post('/api/auth/forgot-password', async (req, res) => {
@@ -1217,7 +1269,7 @@ const { spawnBracketOrders } = require('./services/orderExecutor');
 
 let lastOrderError = null;
 
-app.post('/api/order', authenticateToken, async (req, res) => {
+app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
   lastOrderError = null;
   const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
