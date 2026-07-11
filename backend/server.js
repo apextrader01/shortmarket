@@ -309,7 +309,7 @@ app.post('/api/auth/login', apiLimiter, async (req, res) => {
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
+    res.json({ success: true, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, profile_picture_url: user.profile_picture_url, watchlists } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {

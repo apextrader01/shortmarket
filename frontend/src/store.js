@@ -103,15 +103,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  logout: () => {
-    set({
-      user:       null,
-      
-      positions:  [],
-      orders:     [],
-      watchlists: [{ id: 1, name: 'Watchlist 1', symbols: [] }],
-    });
-  },
+
 
   // ── Watchlists ──────────────────────────────────────────────────────────────
   watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
@@ -965,7 +957,7 @@ export const useStore = create(persist((set, get) => ({
 
   setToken: (token) => set({ token }),
   setUser:  (user)  => set({ user }),
-  logout: async () => { try { await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch(err){} set({ user: null }); },
+  logout: () => { set({ user: null, positions: [], orders: [] }); fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{}); },
   
   // ── Theme ───────────────────────────────────────────────────────────────────
   theme: 'dark', // default to dark
