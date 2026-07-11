@@ -919,6 +919,21 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  adminResetUser: async (userId) => {
+    const { token } = get();
+    if (!token) return { success: false };
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}/reset`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: 'Network error' };
+    }
+  },
+
   updateUserBalance: async (userId, balance) => {
     const { token } = get();
     if (!token) return { success: false };

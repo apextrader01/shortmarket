@@ -5,7 +5,7 @@ import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Ch
 export default function AdminDashboard() {
   const { 
     fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics,
-    fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition
+    fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser
   } = useStore();
   
   const [activeTab, setActiveTab] = useState('analytics');
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!selectedUser || !newBalance) return;
     setUpdating(true);
-    const res = await updateUserBalance(selectedUser.id, newBalance);
+    const res = await updateUserBalance(selectedUser.id, parseFloat(newBalance));
     if (res.success) {
       alert('Balance updated successfully!');
       setSelectedUser(null);
@@ -71,6 +71,22 @@ export default function AdminDashboard() {
       alert(`Error updating balance: ${res.error}`);
     }
     setUpdating(false);
+  };
+
+  const handleResetUser = async () => {
+    if (!selectedUser) return;
+    if (window.confirm(`Are you absolutely sure you want to reset ${selectedUser.username}'s account? This will permanently delete ALL their trades, positions, and reset their balance to ₹10,00,000. This CANNOT be undone.`)) {
+      setUpdating(true);
+      const res = await adminResetUser(selectedUser.id);
+      if (res.success) {
+        alert(`${selectedUser.username}'s account successfully reset to ₹10,00,000!`);
+        loadData();
+        setSelectedUser(null);
+      } else {
+        alert(res.error || 'Failed to reset user account');
+      }
+      setUpdating(false);
+    }
   };
 
   const handleProcessDeposit = async (id, action) => {
@@ -508,6 +524,23 @@ export default function AdminDashboard() {
                       <div style={{ height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>No Document</div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginTop: '8px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-red-light)' }}>Danger Zone</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Wipe all trades, positions, ledger, and reset balance to ₹10,00,000.
+                  </div>
+                  <button 
+                    onClick={handleResetUser}
+                    disabled={updating}
+                    style={{ background: 'var(--color-red)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    {updating ? 'RESETTING...' : 'RESET ACCOUNT'}
+                  </button>
                 </div>
               </div>
             </div>

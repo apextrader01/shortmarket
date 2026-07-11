@@ -536,6 +536,32 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
   }
 });
 
+// 🧹 Admin Reset User Account 🧹
+app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const targetUserId = req.params.id;
+    
+    await db.transaction(async (trx) => {
+      // 1. Delete all trades (orders)
+      await trx('orders').where({ user_id: targetUserId }).del();
+      // 2. Delete all holdings/positions
+      await trx('positions').where({ user_id: targetUserId }).del();
+      // 3. Delete ledger history
+      await trx('ledger').where({ user_id: targetUserId }).del();
+      // 4. Reset balance to 10 Lakh (1,000,000)
+      await trx('users').where({ id: targetUserId }).update({ balance: 1000000.0 });
+    });
+    
+    res.json({ success: true, message: 'User account successfully reset to ₹10,00,000.' });
+  } catch (err) {
+    console.error('Admin Reset Account Error:', err);
+    res.status(500).json({ error: 'Failed to reset user account' });
+  }
+});
+
 app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
