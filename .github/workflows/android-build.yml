@@ -44,7 +44,8 @@ jobs:
         working-directory: ./frontend/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          sed -i 's/\r$//' gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
