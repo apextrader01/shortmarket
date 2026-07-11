@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
-const rawApiUrl = import.meta.env.VITE_API_URL || '';
-const API = rawApiUrl.replace(/\/+$/, ''); // Strip trailing slashes to prevent //api/auth/login
+let API = '';
+if (import.meta.env && import.meta.env.VITE_API_URL) {
+  API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+}
 
 export const socket = io(API);
 
