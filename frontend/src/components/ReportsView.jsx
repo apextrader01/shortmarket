@@ -511,6 +511,8 @@ const TradesAndCharges = () => {
 };
 
 const PnLCalendarHeatmap = ({ positions, orders }) => {
+  const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null });
+
   if (!positions || positions.length === 0) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
@@ -567,6 +569,8 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
       days.push({
         dateStr: localDStr,
         netPnl: netPnl,
+        pnl: data.pnl,
+        charges: data.charges,
         hasTrades: hasTrades
       });
     }
@@ -584,13 +588,18 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
                   {m.days.map((d, i) => (
                     <div 
                       key={i} 
-                      title={d.hasTrades ? `${d.dateStr}: Net PnL ₹${d.netPnl.toFixed(2)}` : `${d.dateStr}: No trades`}
+                      onMouseEnter={(e) => {
+                        if (d.hasTrades) {
+                           setTooltip({ visible: true, x: e.clientX, y: e.clientY, data: d });
+                        }
+                      }}
+                      onMouseLeave={() => setTooltip({ visible: false, x: 0, y: 0, data: null })}
                       style={{
                         width: '10px', 
                         height: '10px', 
                         borderRadius: '50%', 
                         background: d.hasTrades ? getColor(d.netPnl) : 'rgba(255,255,255,0.03)',
-                        cursor: 'pointer'
+                        cursor: d.hasTrades ? 'pointer' : 'default'
                       }}
                     />
                   ))}
@@ -598,6 +607,45 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
              </div>
           ))}
        </div>
+       {tooltip.visible && tooltip.data && (
+         <div style={{
+           position: 'fixed',
+           left: tooltip.x + 15,
+           top: tooltip.y + 15,
+           background: 'rgba(15, 23, 42, 0.95)',
+           border: '1px solid var(--border-color)',
+           padding: '12px',
+           borderRadius: '8px',
+           zIndex: 1000,
+           pointerEvents: 'none',
+           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+           display: 'flex',
+           flexDirection: 'column',
+           gap: '4px',
+           backdropFilter: 'blur(8px)',
+           minWidth: '150px'
+         }}>
+           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+             {new Date(tooltip.data.dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+           </div>
+           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+             <span style={{ color: 'var(--text-secondary)' }}>Gross P&L:</span>
+             <span style={{ color: tooltip.data.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+               {tooltip.data.pnl >= 0 ? '+' : ''}₹{tooltip.data.pnl.toFixed(2)}
+             </span>
+           </div>
+           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+             <span style={{ color: 'var(--text-secondary)' }}>Charges:</span>
+             <span>₹{tooltip.data.charges.toFixed(2)}</span>
+           </div>
+           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+             <span>Net P&L:</span>
+             <span style={{ color: tooltip.data.netPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+               {tooltip.data.netPnl >= 0 ? '+' : ''}₹{tooltip.data.netPnl.toFixed(2)}
+             </span>
+           </div>
+         </div>
+       )}
     </div>
   );
 };
