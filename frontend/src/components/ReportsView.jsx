@@ -510,10 +510,103 @@ const TradesAndCharges = () => {
   );
 };
 
+const PnLCalendarHeatmap = ({ positions, orders }) => {
+  if (!positions || positions.length === 0) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
+        <div style={{ textAlign: 'center' }}>
+          <Calendar size={48} style={{ margin: '0 auto 16px auto', color: 'var(--text-secondary)' }} />
+          <div style={{ fontSize: '14px' }}>P&L Activity Calendar</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>No trades recorded in this period</div>
+        </div>
+      </div>
+    );
+  }
+
+  const dailyData = {};
+  
+  (orders || []).forEach(o => {
+    const dt = new Date(o.created_at);
+    const dStr = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    if (!dailyData[dStr]) dailyData[dStr] = { charges: 0, pnl: 0 };
+    dailyData[dStr].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
+  });
+
+  (positions || []).forEach(p => {
+    const dt = new Date(p.updated_at || p.created_at);
+    const dStr = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    if (!dailyData[dStr]) dailyData[dStr] = { charges: 0, pnl: 0 };
+    dailyData[dStr].pnl += (Number(p.realized_pnl) || 0);
+  });
+
+  const getColor = (netPnl) => {
+    if (netPnl === 0) return 'rgba(255,255,255,0.05)';
+    if (netPnl > 0) return 'rgba(16, 185, 129, 0.8)';
+    return 'rgba(239, 68, 68, 0.8)';
+  };
+
+  const months = [];
+  const now = new Date();
+  
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthName = d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    
+    const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const days = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDay = new Date(d.getFullYear(), d.getMonth(), day);
+      if (currentDay > now) break; 
+      
+      const localDStr = new Date(currentDay.getTime() - (currentDay.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      const data = dailyData[localDStr] || { pnl: 0, charges: 0 };
+      const netPnl = data.pnl - data.charges;
+      const hasTrades = data.charges > 0 || data.pnl !== 0;
+      
+      days.push({
+        dateStr: localDStr,
+        netPnl: netPnl,
+        hasTrades: hasTrades
+      });
+    }
+    
+    months.push({ name: monthName, days: days });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', width: '100%' }}>
+       <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', width: '100%', paddingBottom: '8px' }}>
+          {months.map((m, idx) => (
+             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '60px' }}>
+               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>{m.name}</div>
+               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', width: '70px', alignContent: 'flex-start' }}>
+                  {m.days.map((d, i) => (
+                    <div 
+                      key={i} 
+                      title={d.hasTrades ? `${d.dateStr}: Net PnL ₹${d.netPnl.toFixed(2)}` : `${d.dateStr}: No trades`}
+                      style={{
+                        width: '10px', 
+                        height: '10px', 
+                        borderRadius: '50%', 
+                        background: d.hasTrades ? getColor(d.netPnl) : 'rgba(255,255,255,0.03)',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ))}
+               </div>
+             </div>
+          ))}
+       </div>
+    </div>
+  );
+};
+
 const ProfitAndLoss = () => {
   const [filterPeriod, setFilterPeriod] = useState('Year');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [viewMode, setViewMode] = useState('Month-Wise View');
   const { positions, orders } = useStore();
 
   const filteredPositions = (positions || []).filter(entry => {
@@ -570,6 +663,38 @@ const ProfitAndLoss = () => {
   const totalCharges = filteredOrders.reduce((acc, o) => acc + (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)), 0);
   const realizedPnl = filteredPositions.reduce((acc, p) => acc + (Number(p.realized_pnl) || 0), 0);
   const netRealizedPnl = realizedPnl - totalCharges;
+
+  // Aggregation Logic
+  const monthWiseMap = {};
+  const scripWiseMap = {};
+
+  filteredPositions.forEach(p => {
+    const dt = new Date(p.updated_at || p.created_at);
+    const mStr = dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    const sym = p.symbol || 'UNKNOWN';
+
+    if (!monthWiseMap[mStr]) monthWiseMap[mStr] = { name: mStr, rawDate: dt, pnl: 0, charges: 0 };
+    monthWiseMap[mStr].pnl += (Number(p.realized_pnl) || 0);
+
+    if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, pnl: 0, charges: 0 };
+    scripWiseMap[sym].pnl += (Number(p.realized_pnl) || 0);
+  });
+
+  filteredOrders.forEach(o => {
+    const dt = new Date(o.created_at);
+    const mStr = dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    const sym = o.symbol || 'UNKNOWN';
+    const c = (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
+
+    if (!monthWiseMap[mStr]) monthWiseMap[mStr] = { name: mStr, rawDate: dt, pnl: 0, charges: 0 };
+    monthWiseMap[mStr].charges += c;
+
+    if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, pnl: 0, charges: 0 };
+    scripWiseMap[sym].charges += c;
+  });
+
+  const monthWiseData = Object.values(monthWiseMap).sort((a, b) => b.rawDate - a.rawDate);
+  const scripWiseData = Object.values(scripWiseMap).sort((a, b) => (b.pnl - b.charges) - (a.pnl - a.charges));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -642,25 +767,79 @@ const ProfitAndLoss = () => {
                <div style={{ fontSize: '16px', fontWeight: '700', color: netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                  {netRealizedPnl >= 0 ? '+' : ''}₹{netRealizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
                </div>
+               <PnLCalendarHeatmap positions={filteredPositions} orders={filteredOrders} />
              </div>
-          </div>
-        </div>
-
-        {/* Heatmap Placeholder */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
-          <div style={{ textAlign: 'center' }}>
-            <Calendar size={48} style={{ margin: '0 auto 16px auto', color: 'var(--text-secondary)' }} />
-            <div style={{ fontSize: '14px' }}>P&L Activity Calendar</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>No trades recorded in this period</div>
           </div>
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing P&L Summary for current period</div>
-         <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
-            <span style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-blue-light)' }}>Month-Wise View</span>
-            <span style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>Scrip-Wise View</span>
+      <div className="glass-panel" style={{ padding: '24px' }}>
+         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing P&L Summary for current period</div>
+           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+              <span 
+                onClick={() => setViewMode('Month-Wise View')}
+                style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Month-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Month-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                Month-Wise View
+              </span>
+              <span 
+                onClick={() => setViewMode('Scrip-Wise View')}
+                style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Scrip-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Scrip-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
+              >
+                Scrip-Wise View
+              </span>
+           </div>
+         </div>
+
+         <div style={{ overflowX: 'auto' }}>
+           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+             <thead>
+               <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                 <th style={{ padding: '12px', fontWeight: '500' }}>{viewMode === 'Month-Wise View' ? 'Month' : 'Scrip'}</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Gross P&L</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Total Charges</th>
+                 <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Net Realized P&L</th>
+               </tr>
+             </thead>
+             <tbody>
+               {viewMode === 'Month-Wise View' ? (
+                 monthWiseData.length === 0 ? (
+                   <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</td></tr>
+                 ) : (
+                   monthWiseData.map((row, idx) => (
+                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                       <td style={{ padding: '12px', fontWeight: '500' }}>{row.name}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                         {row.pnl >= 0 ? '+' : ''}₹{row.pnl.toFixed(2)}
+                       </td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.charges.toFixed(2)}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: (row.pnl - row.charges) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                         {(row.pnl - row.charges) >= 0 ? '+' : ''}₹{(row.pnl - row.charges).toFixed(2)}
+                       </td>
+                     </tr>
+                   ))
+                 )
+               ) : (
+                 scripWiseData.length === 0 ? (
+                   <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</td></tr>
+                 ) : (
+                   scripWiseData.map((row, idx) => (
+                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                       <td style={{ padding: '12px', fontWeight: '500' }}>{row.symbol}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', color: row.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                         {row.pnl >= 0 ? '+' : ''}₹{row.pnl.toFixed(2)}
+                       </td>
+                       <td style={{ padding: '12px', textAlign: 'right' }}>₹{row.charges.toFixed(2)}</td>
+                       <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: (row.pnl - row.charges) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                         {(row.pnl - row.charges) >= 0 ? '+' : ''}₹{(row.pnl - row.charges).toFixed(2)}
+                       </td>
+                     </tr>
+                   ))
+                 )
+               )}
+             </tbody>
+           </table>
          </div>
       </div>
     </div>
