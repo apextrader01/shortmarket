@@ -114,7 +114,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       await fetch(`${API}/api/user/watchlists`, { credentials: 'include', method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body:    JSON.stringify({ watchlists: newWatchlists }),
       });
     } catch (_) {}
@@ -252,7 +252,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/basket-order`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify(basketPayload),
       });
       const data = await res.json();
@@ -277,8 +277,7 @@ export const useStore = create(persist((set, get) => ({
 
   cancelOrder: async (id) => {
     try {
-      const res = await fetch(`${API}/api/order/${id}/cancel`, { credentials: 'include', method: 'POST',
-        headers: { 'Authorization': `Bearer ${get().token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/order/${id}/cancel`, { credentials: 'include', method: 'POST'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -294,7 +293,7 @@ export const useStore = create(persist((set, get) => ({
     try {
       const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
         headers: { 
-          'Authorization': `Bearer ${get().token}, credentials: "include"`,
+          
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ quantity, price, sl_price, tgt_price })
@@ -499,7 +498,8 @@ export const useStore = create(persist((set, get) => ({
         return;
       }
       
-      set({ 
+      if (!get().user) return;
+      set({
         positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
         user: (user && !user.error) ? user : get().user 
@@ -590,7 +590,7 @@ export const useStore = create(persist((set, get) => ({
     try {
       const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
         headers: { 
-          'Authorization': `Bearer ${get().token}, credentials: "include"`,
+          
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ quantity, price, sl_price, tgt_price })
@@ -657,7 +657,7 @@ export const useStore = create(persist((set, get) => ({
       
       try {
           const res = await fetch(`${API}/api/position/convert`, { credentials: 'include', method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+              headers: { 'Content-Type': 'application/json', },
               body: JSON.stringify({ positionId, newProductType, requiredMargin }),
           });
           const data = await res.json();
@@ -671,7 +671,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/user/profile_picture`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ profile_picture_url: url })
       });
       const data = await res.json();
@@ -688,7 +688,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/user/details`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify(details)
       });
       const data = await res.json();
@@ -705,7 +705,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/user/kyc`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify(kycDocs)
       });
       const data = await res.json();
@@ -722,7 +722,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res  = await fetch(`${API}/api/order`, { credentials: 'include', method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body:    JSON.stringify(orderPayload),
       });
       const data = await res.json();
@@ -740,7 +740,6 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res  = await fetch(`${API}/api/order/${orderId}/cancel`, { credentials: 'include', method:  'POST',
-        headers: { Authorization: `Bearer ${token}, credentials: "include"` },
       });
       const data = await res.json();
       if (data.success) { get().fetchUserData(); return true; }
@@ -754,7 +753,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/wallet/deposit`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ amount })
       });
       const data = await res.json();
@@ -768,8 +767,7 @@ export const useStore = create(persist((set, get) => ({
     const { user } = get();
     if (!user) return { success: false };
     try {
-      const res = await fetch(`${API}/api/user/reset`, { credentials: 'include', method: 'POST',
-        headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/user/reset`, { credentials: 'include', method: 'POST'
       });
       const data = await res.json();
       if (data.success) {
@@ -789,7 +787,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/user/password`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ oldPassword, newPassword })
       });
       const data = await res.json();
@@ -804,7 +802,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       await fetch(`${API}/api/user/watchlists`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ watchlists })
       });
     } catch (err) {}
@@ -815,7 +813,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/analytics`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/admin/analytics`, { credentials: 'include'
       });
       if (res.ok) {
         const data = await res.json();
@@ -831,7 +829,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/orders`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` } });
+      const res = await fetch(`${API}/api/admin/orders`, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -843,7 +841,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/positions`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` } });
+      const res = await fetch(`${API}/api/admin/positions`, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -855,7 +853,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/ledger`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` } });
+      const res = await fetch(`${API}/api/admin/ledger`, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -868,7 +866,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/admin/force-close`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ positionId })
       });
       const data = await res.json();
@@ -883,7 +881,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/users`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/admin/users`, { credentials: 'include'
       });
       if (res.ok) {
         const users = await res.json();
@@ -899,8 +897,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/user/${userId}/reset`, { credentials: 'include', method: 'POST',
-        headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/admin/user/${userId}/reset`, { credentials: 'include', method: 'POST'
       });
       const data = await res.json();
       return data.success ? { success: true } : { success: false, error: data.error };
@@ -914,7 +911,7 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const res = await fetch(`${API}/api/admin/user/${userId}/balance`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}, credentials: "include"` },
+        headers: { 'Content-Type': 'application/json', },
         body: JSON.stringify({ balance })
       });
       const data = await res.json();
@@ -928,7 +925,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/deposits`, { credentials: 'include', headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/admin/deposits`, { credentials: 'include'
       });
       if (res.ok) {
         const data = await res.json();
@@ -945,8 +942,7 @@ export const useStore = create(persist((set, get) => ({
     
     
     try {
-      const res = await fetch(`${API}/api/admin/deposits/${depositId}/${action}`, { credentials: 'include', method: 'POST',
-        headers: { Authorization: `Bearer ${token}, credentials: "include"` }
+      const res = await fetch(`${API}/api/admin/deposits/${depositId}/${action}`, { credentials: 'include', method: 'POST'
       });
       const data = await res.json();
       return data.success ? { success: true } : { success: false, error: data.error };
