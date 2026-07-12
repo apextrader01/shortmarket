@@ -37,7 +37,7 @@ export const useStore = create(persist((set, get) => ({
     try {
       set({ authError: null });
       const res  = await fetch(`${API}/api/auth/login`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (data.success) {
@@ -59,7 +59,7 @@ export const useStore = create(persist((set, get) => ({
     try {
       set({ authError: null });
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ username, email, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }),
       });
       const data = await res.json();
       if (data.success) {
@@ -80,7 +80,7 @@ export const useStore = create(persist((set, get) => ({
   forgotPassword: async (email) => {
     try {
       const res = await fetch(`${API}/api/auth/forgot-password`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email })
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -93,7 +93,7 @@ export const useStore = create(persist((set, get) => ({
   resetPassword: async (email, otp, newPassword) => {
     try {
       const res = await fetch(`${API}/api/auth/reset-password`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email, otp, newPassword })
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp, newPassword })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -108,17 +108,6 @@ export const useStore = create(persist((set, get) => ({
   // ── Watchlists ──────────────────────────────────────────────────────────────
   watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
   activeWatchlistId: 1,
-
-  syncWatchlists: async (newWatchlists) => {
-    
-    
-    try {
-      await fetch(`${API}/api/user/watchlists`, { credentials: 'include', method:  'POST',
-        headers: { 'Content-Type': 'application/json', },
-        body:    JSON.stringify({ watchlists: newWatchlists }),
-      });
-    } catch (_) {}
-  },
 
   createWatchlist: (name) => {
     if (get().watchlists.some(w => w.name.toLowerCase() === name.toLowerCase())) {
@@ -275,39 +264,6 @@ export const useStore = create(persist((set, get) => ({
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
   closeEditOrderModal: () => set({ editOrderModal: { isOpen: false, order: null } }),
 
-  cancelOrder: async (id) => {
-    try {
-      const res = await fetch(`${API}/api/order/${id}/cancel`, { credentials: 'include', method: 'POST'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      await get().fetchUserData();
-      return true;
-    } catch (err) {
-      set({ authError: err.message });
-      return false;
-    }
-  },
-
-  updateOrder: async (id, quantity, price, sl_price, tgt_price) => {
-    try {
-      const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
-        headers: { 
-          
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ quantity, price, sl_price, tgt_price })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      await get().fetchUserData();
-      return true;
-    } catch (err) {
-      set({ authError: err.message });
-      return false;
-    }
-  },
-
   // ── Market Data ─────────────────────────────────────────────────────────────
   prices:         {},
   stocks:         [],
@@ -446,7 +402,7 @@ export const useStore = create(persist((set, get) => ({
   // ── Price Fetching ───────────────────────────────────────────────────────────
   refreshPrices: async () => {
     try {
-      const res      = await fetch(`${API}/api/prices`, { credentials: 'include', credentials: 'include' });
+      const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
       const snapshot = await res.json();
       if (snapshot && Object.keys(snapshot).length > 0) {
         set((state) => ({ prices: applySnapshot(snapshot, state) }));
@@ -467,7 +423,7 @@ export const useStore = create(persist((set, get) => ({
   // ── Stock List ───────────────────────────────────────────────────────────────
   loadStocks: async () => {
     try {
-      const res    = await fetch(`${API}/api/stocks`, { credentials: 'include', credentials: 'include' });
+      const res    = await fetch(`${API}/api/stocks`, { credentials: 'include' });
       const stocks = await res.json();
       if (!Array.isArray(stocks) || stocks.length === 0) return;
       set({ stocks });
@@ -520,7 +476,7 @@ export const useStore = create(persist((set, get) => ({
   restrictedStocks: [],
   fetchRestrictedStocks: async () => {
       try {
-          const res = await fetch(`${API}/api/restricted-stocks`, { credentials: 'include', credentials: 'include' });
+          const res = await fetch(`${API}/api/restricted-stocks`, { credentials: 'include' });
           const data = await res.json();
           if (Array.isArray(data)) set({ restrictedStocks: data });
       } catch (_) {}
@@ -531,7 +487,7 @@ export const useStore = create(persist((set, get) => ({
   searchMutualFunds: async (query) => {
       try {
           const currentRequestId = ++get().searchMfRequestId;
-          const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`, { credentials: 'include', credentials: 'include' });
+          const res = await fetch(`${API}/api/mf/search?q=${encodeURIComponent(query)}`, { credentials: 'include' });
           const data = await res.json();
           
           // Only update if this is still the latest search request!
@@ -614,7 +570,7 @@ export const useStore = create(persist((set, get) => ({
           return currentCache[schemeName].data;
       }
       try {
-          const res = await fetch(`${API}/api/mf/details?name=${encodeURIComponent(schemeName)}`, { credentials: 'include', credentials: 'include' });
+          const res = await fetch(`${API}/api/mf/details?name=${encodeURIComponent(schemeName)}`, { credentials: 'include' });
           if (!res.ok) return null;
           const data = await res.json();
           set({ fundDetailsCache: { ...currentCache, [schemeName]: { timestamp: Date.now(), data } } });
@@ -631,7 +587,7 @@ export const useStore = create(persist((set, get) => ({
       if (currentCache[schemeCode]) return currentCache[schemeCode]; // already fetched
 
       try {
-          const res = await fetch(`${API}/api/mf/${schemeCode}`, { credentials: 'include', credentials: 'include' });
+          const res = await fetch(`${API}/api/mf/${schemeCode}`, { credentials: 'include' });
           const data = await res.json();
           
           if (data && data.data) {

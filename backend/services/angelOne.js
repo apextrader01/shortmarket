@@ -380,6 +380,7 @@ function lookupDerivativeBySymbol(symbolStr) {
 }
 
 function enrichLotsize(token, uniqueSymbol) {
+    if (!uniqueSymbol) return;
     if (token && STOCK_MASTER[token] && !STOCK_MASTER[token].lotsize) {
         const parts = uniqueSymbol.split('-');
         const rawSymbol = parts.slice(0, -1).join('-') || parts[0];
@@ -879,7 +880,7 @@ async function loginAngelOne(io, externalPriceCache) {
             otp
         );
 
-        if (loginSession.status) {
+        if (loginSession.status === true && loginSession.data) {
             console.log('✅ Angel One Login Successful');
             jwtToken = loginSession.data.jwtToken;
             feedToken = loginSession.data.feedToken;
