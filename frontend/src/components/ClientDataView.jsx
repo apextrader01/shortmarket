@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
-import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 
@@ -43,26 +42,30 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     setIsUploading(true);
     setUploadError(null);
 
-    try {
-      const fileExtension = file.name.split('.').pop();
-      const fileName = `profile_${user.id}_${Date.now()}.${fileExtension}`;
-      const storageRef = ref(storage, `profiles/${fileName}`);
-
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      const res = await updateProfilePicture(downloadURL);
-      
-      if (!res.success) {
-        setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64String = reader.result;
+          const res = await updateProfilePicture(base64String);
+          
+          if (!res.success) {
+            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+          }
+          
+          setIsUploading(false);
+          if (e.target) e.target.value = '';
+        };
+        reader.onerror = () => {
+          setIsUploading(false);
+          setUploadError('Failed to read image file.');
+          if (e.target) e.target.value = '';
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        setIsUploading(false);
+        setUploadError(err.message || 'Failed to process image.');
+        if (e.target) e.target.value = '';
       }
-      
-      setIsUploading(false);
-      if (e.target) e.target.value = '';
-    } catch (err) {
-      setIsUploading(false);
-      setUploadError(err.message || 'Failed to upload image to server.');
-      if (e.target) e.target.value = '';
-    }
   };
 
   // Removed LedgerSection to outside
