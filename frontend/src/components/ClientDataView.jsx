@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
 import { storage } from '../firebase';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 
@@ -48,27 +48,20 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       const fileName = `profile_${user.id}_${Date.now()}.${fileExtension}`;
       const storageRef = ref(storage, `profiles/${fileName}`);
 
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on('state_changed', 
-        (snapshot) => {}, 
-        (error) => {
-          setIsUploading(false);
-          setUploadError(error.message);
-        }, 
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          const res = await updateProfilePicture(downloadURL);
-          if (!res.success) {
-            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
-          }
-          setIsUploading(false);
-          if (e.target) e.target.value = '';
-        }
-      );
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      const res = await updateProfilePicture(downloadURL);
+      
+      if (!res.success) {
+        setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+      }
+      
+      setIsUploading(false);
+      if (e.target) e.target.value = '';
     } catch (err) {
       setIsUploading(false);
-      setUploadError(err.message);
+      setUploadError(err.message || 'Failed to upload image to server.');
+      if (e.target) e.target.value = '';
     }
   };
 
