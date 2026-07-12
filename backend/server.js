@@ -1932,7 +1932,6 @@ server.listen(PORT, '0.0.0.0', async () => {
   }
   
   // Start Cron Jobs
-  const { initAutoSquareOff } = require('./services/autoSquareOff');
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
   const { initOrderExecutor } = require('./services/orderExecutor');
   const schedule = require('node-schedule');
@@ -1948,7 +1947,6 @@ server.listen(PORT, '0.0.0.0', async () => {
     await loginAngelOne(io, priceCache);
   });
 
-  initAutoSquareOff(priceCache);
   initRiskyStocksSync();
   initOrderExecutor(priceCache);
 });
