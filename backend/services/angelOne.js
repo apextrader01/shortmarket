@@ -7,6 +7,47 @@ const smart_api = new SmartAPI({
     api_key: process.env.ANGEL_API_KEY
 });
 
+// ─── Direct login helper ─────────────────────────────────────────────────────
+// The smartapi-javascript SDK's generateSession() omits the X-MACAddress,
+// X-ClientLocalIP and X-ClientPublicIP headers from the actual request (it sets
+// them on a base axios instance via an async address() callback that resolves
+// AFTER the instance is created, so the values stay null). Angel One rejects
+// the login with errorcode AB1012 "Required header X-MACaddress is missing".
+// Fix: perform the login directly via HTTPS with the correct headers, then
+// hand the tokens back to the SDK instance so its marketData() / candle calls work.
+const ANGEL_ROOT = 'https://apiconnect.angelone.in';
+const ANGEL_LOGIN_URL = ANGEL_ROOT + '/rest/auth/angelbroking/user/v1/loginByPassword';
+
+async function directLogin(clientCode, pin, totp) {
+    const body = JSON.stringify({ clientcode: clientCode, password: pin, totp });
+    return new Promise((resolve, reject) => {
+        const req = https.request(ANGEL_LOGIN_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-UserType': 'USER',
+                'X-SourceID': 'WEB',
+                'X-PrivateKey': process.env.ANGEL_API_KEY,
+                'X-ClientLocalIP': '127.0.0.1',
+                'X-ClientPublicIP': '127.0.0.1',
+                'X-MACAddress': '00-00-00-00-00-00',
+                'Content-Length': Buffer.byteLength(body),
+            },
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); }
+                catch (e) { reject(new Error('Invalid JSON from Angel One login: ' + data.slice(0, 200))); }
+            });
+        });
+        req.on('error', reject);
+        req.write(body);
+        req.end();
+    });
+}
+
 // ─── Price Cache (injected from server.js to ensure same reference) ──────────
 let sharedPriceCache = null;
 
@@ -874,16 +915,20 @@ async function loginAngelOne(io, externalPriceCache) {
 
         console.log('🔐 Logging into Angel One...');
         const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
-        const loginSession = await smart_api.generateSession(
+        const loginSession = await directLogin(
             process.env.ANGEL_CLIENT_ID,
             process.env.ANGEL_PIN,
             otp
         );
 
-        if (loginSession.status === true && loginSession.data) {
+        if (loginSession && loginSession.status === true && loginSession.data) {
             console.log('✅ Angel One Login Successful');
             jwtToken = loginSession.data.jwtToken;
             feedToken = loginSession.data.feedToken;
+            // Inject tokens into the SDK so its marketData() / candle calls work.
+            smart_api.setAccessToken(jwtToken);
+            smart_api.setPublicToken(loginSession.data.refreshToken);
+            smart_api.setClientCode(process.env.ANGEL_CLIENT_ID);
 
             await broadcastLTPs(io);
 
