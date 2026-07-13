@@ -137,7 +137,7 @@ h1, h2, h3, h4, h5, h6 {
   grid-template-rows: auto 1fr;
   gap: 20px;
   padding: 24px;
-  height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
   overflow-y: auto;
 }
 
@@ -378,8 +378,9 @@ tbody tr:hover {
   /* Modals on mobile should slide up like bottom sheets */
   .modal-backdrop {
     align-items: flex-end !important;
+    z-index: 1001 !important; /* above bottom nav */
   }
-  
+
   .modal-backdrop > div {
     width: 100% !important;
     max-width: 100% !important;
@@ -387,10 +388,37 @@ tbody tr:hover {
     margin: 0 !important;
     border: none !important;
     border-top: 1px solid var(--border-color) !important;
-    max-height: 90vh !important;
+    max-height: 85vh !important;
     overflow-y: auto !important;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Ensure fixed-position modals without modal-backdrop also sit above bottom nav */
+  [style*="position: fixed"][style*="zIndex"] {
+    z-index: 1001 !important;
+  }
+
+  /* Companion modal side-by-side: stack instead of side-shift on mobile */
+  .order-modal-companion { transform: none !important; }
+
+  /* Increase bottom padding for views with fixed banners above bottom nav */
+  .mobile-bottom-spacer { padding-bottom: 120px !important; }
+
+  /* MutualFundModal: stack chart above order form on mobile */
+  .mf-layout-split { flex-direction: column !important; }
+  .mf-order-form { width: 100% !important; border-top: 1px solid var(--border-color); }
+
+  /* MutualFundDetailsModal: stack main info above sidebar on mobile */
+  .mf-details-content { flex-direction: column !important; }
+  .mf-details-content > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border-color); }
+  .mf-details-content > div:last-child { width: 100% !important; }
+
+  /* Lift fixed MTM banner above bottom nav on mobile */
+  .mtm-banner { bottom: 60px !important; padding: '12px 16px' !important; }
+
+  /* Lift floating support button above bottom nav on mobile */
+  .support-fab { bottom: 76px !important; right: 16px !important; }
 }
 
 @keyframes slideUp {
@@ -869,6 +897,14 @@ input:checked + .slider:before {
   cursor: pointer;
 }
 
+/* Mobile: always show option-chain action buttons (touch has no hover) */
+@media (max-width: 768px) {
+  .option-chain-table tr .action-buttons { opacity: 1; }
+  .option-chain-table tr .btn-mini { padding: 6px 14px; font-size: 12px; }
+  .option-chain-table tr:hover .ltp-value { opacity: 1; }
+  .option-chain-table tr .option-chain-icons { opacity: 1; }
+}
+
 .btn-mini.buy { background: #2563eb; }
 .btn-mini.buy:hover { background: #1d4ed8; }
 .btn-mini.sell { background: #dc2626; }
@@ -890,7 +926,7 @@ input:checked + .slider:before {
 .mobile-only {
   display: none !important;
 }
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
   .mobile-only {
     display: flex !important;
   }
@@ -900,7 +936,7 @@ input:checked + .slider:before {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   background: var(--bg-primary);
   z-index: 9999;
   display: flex;

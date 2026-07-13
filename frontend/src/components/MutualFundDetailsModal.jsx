@@ -57,8 +57,8 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const calcResult = calculateReturns();
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-            <div style={{ width: '95%', maxWidth: '1200px', height: '90vh', background: 'var(--bg-dark)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+            <div style={{ width: '95%', maxWidth: '1200px', height: '90vh', maxHeight: '85vh', background: 'var(--bg-dark)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 
                 {/* Header */}
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--bg-panel)' }}>
@@ -101,7 +101,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 </div>
 
                 {/* Content */}
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex' }}>
+                <div className="mf-details-content" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'row' }}>
                     
                     {/* Left Column (Main Info) */}
                     <div style={{ flex: '1', padding: '24px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '32px' }}>

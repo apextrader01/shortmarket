@@ -332,7 +332,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       </div>
       
       {/* Floating Ask Angel / Support Button */}
-      <div style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: '#FFF', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)' }}>
+      <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: '#FFF', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
         <HelpCircle size={18} />
         <span style={{ fontSize: '14px', fontWeight: '700' }}>Ask Support</span>
       </div>

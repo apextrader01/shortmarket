@@ -61,15 +61,15 @@ export default function MarketDepthModal() {
   const askRatio = totalVol ? (totalAskQty / totalVol) * 100 : 50;
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.6)', 
+    <div className="modal-backdrop" style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.6)',
       backdropFilter: orderModal?.isOpen ? 'none' : 'blur(2px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
       pointerEvents: orderModal?.isOpen ? 'none' : 'auto'
     }}>
-      <div style={{
-        width: '500px', background: 'var(--bg-dark)', borderRadius: '8px', 
+      <div className={orderModal?.isOpen ? 'order-modal-companion' : ''} style={{
+        width: '500px', background: 'var(--bg-dark)', borderRadius: '8px',
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
         transform: orderModal?.isOpen ? 'translateX(260px)' : 'none',

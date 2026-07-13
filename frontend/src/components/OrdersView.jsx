@@ -155,7 +155,7 @@ export default function OrdersView() {
               )}
             </div>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 {activeTab === 'Pending Triggers' ? (
                   <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
@@ -189,7 +189,7 @@ export default function OrdersView() {
                   displayTriggers.map(trigger => (
                     <tr key={trigger.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: '12px 16px' }}>{new Date(trigger.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.symbol.split('-')[0]}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={trigger.symbol}>{trigger.symbol.split('-')[0]}</td>
                       <td style={{ padding: '12px 16px', color: trigger.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                         <span style={{ background: trigger.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <span>{trigger.side}</span>

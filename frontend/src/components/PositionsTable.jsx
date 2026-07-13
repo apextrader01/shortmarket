@@ -58,7 +58,7 @@ export default function PositionsTable() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   {['Symbol', 'Qty', 'Avg Price', viewMode === 'OPEN' ? 'LTP' : 'Exit Price', 'P&L', 'P&L%'].map(h => (
@@ -70,7 +70,7 @@ export default function PositionsTable() {
                 {positionsWithPnl.map(pos => (
                   <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: '700' }}>
-                      <div>{pos.symbol}</div>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }} title={pos.symbol}>{pos.symbol}</div>
                       <div style={{ fontSize: '10px', color: pos.quantity > 0 ? 'var(--color-green-light)' : (pos.quantity < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
                         {pos.quantity > 0 ? 'LONG' : (pos.quantity < 0 ? 'SHORT' : 'CLOSED')}
                       </div>
@@ -104,7 +104,7 @@ export default function PositionsTable() {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   {['Symbol', 'Side', 'Type', 'Qty', 'Price', 'Status', 'Time'].map(h => (
