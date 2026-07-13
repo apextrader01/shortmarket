@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
 
 export default function AnalyticsView() {
-  const { token } = useStore();
+  const { user } = useStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -12,8 +12,9 @@ export default function AnalyticsView() {
     const fetchAnalytics = async () => {
       try {
         const res = await fetch('/api/analytics', {
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include'
         });
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
         const result = await res.json();
         setData(result);
       } catch (err) {
@@ -22,8 +23,12 @@ export default function AnalyticsView() {
         setLoading(false);
       }
     };
-    if (token) fetchAnalytics();
-  }, [token]);
+    if (user) {
+      fetchAnalytics();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   if (loading) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Loading analytics...</div>;
   if (!data) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Failed to load data.</div>;
