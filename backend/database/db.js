@@ -4,6 +4,11 @@ const path = require('path');
 // Determine environment
 const isProduction = !!process.env.DATABASE_URL;
 
+if (!isProduction) {
+  console.warn('⚠️  DATABASE_URL not set. Backend will start, but DB features (login, orders, positions) will not work locally.');
+  console.warn('   This is expected for local dev if your Postgres lives on Railway. Set DATABASE_URL to enable them.');
+}
+
 // Configure Knex
 const dbConfig = {
   client: 'pg',
