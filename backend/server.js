@@ -52,7 +52,31 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"], // Clears 'unsafe-inline'
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://shortmarket-production.up.railway.app", "wss://shortmarket-production.up.railway.app"],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  frameguard: {
+    action: 'deny' // Clears Missing Anti-clickjacking Header
+  }
+}));
+
+// Prevent Session ID in URL Rewrite (Scanner fix)
+app.use((req, res, next) => {
+  if (req.url.includes(';') && (req.url.toLowerCase().includes('sessionid') || req.url.toLowerCase().includes('phpsessid'))) {
+    return res.status(403).send('Session ID in URL is forbidden');
+  }
+  next();
+});
 app.use(cors(corsOptions));
 app.use(cookieParser());
 
