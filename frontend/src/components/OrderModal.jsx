@@ -192,8 +192,8 @@ export default function OrderModal() {
       background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
-      <div style={{
-        width: '520px', background: 'var(--bg-dark)', borderRadius: '8px', 
+      <div className={marketDepthModal?.isOpen ? 'order-modal-companion' : ''} style={{
+        width: '520px', background: 'var(--bg-dark)', borderRadius: '8px',
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
         transform: marketDepthModal?.isOpen ? 'translateX(-260px)' : 'none',

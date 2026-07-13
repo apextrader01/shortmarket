@@ -85,7 +85,7 @@ export default function LoginView() {
   return (
     <div style={{
       width:          '100%',
-      minHeight:      '100vh',
+      minHeight:      '100dvh',
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'center',
@@ -94,7 +94,7 @@ export default function LoginView() {
       <div style={{
         width:        '100%',
         maxWidth:     '400px',
-        padding:      '40px',
+        padding:      'min(40px, 6vw)',
         background:   'var(--bg-secondary)',
         borderRadius: '12px',
         border:       '1px solid var(--border-color)',
@@ -165,7 +165,7 @@ export default function LoginView() {
           {view === 'otp' && (
             <div>
               <label style={labelStyle}>6-Digit OTP</label>
-              <input type="text" required maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} style={inputStyle} placeholder="Enter the code sent to your email" />
+              <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={(e) => setOtp(e.target.value)} style={inputStyle} placeholder="Enter the code sent to your email" />
             </div>
           )}
 

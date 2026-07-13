@@ -125,7 +125,7 @@ export default function PositionsView() {
   };
 
   return (
-    <div style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+    <div className="mobile-bottom-spacer" style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Strategies</h2>
@@ -346,8 +346,8 @@ export default function PositionsView() {
       </div>
 
       {/* Global MTM Banner */}
-      <div style={{
-        position: 'fixed', bottom: '0', left: '0', right: '0', 
+      <div className="mtm-banner" style={{
+        position: 'fixed', bottom: '0', left: '0', right: '0',
         background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
         backdropFilter: 'blur(10px)', borderTop: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
         padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',

@@ -23,13 +23,14 @@ export default function MutualFundModal({ fund, onClose }) {
   };
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+    <div className="modal-backdrop" style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
-        width: '800px', height: '600px', background: 'var(--bg-dark)', borderRadius: '12px', 
+        width: '800px', maxWidth: '95vw', height: '600px', maxHeight: '85vh',
+        background: 'var(--bg-dark)', borderRadius: '12px',
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column'
       }}>
@@ -54,18 +55,18 @@ export default function MutualFundModal({ fund, onClose }) {
         </div>
 
         {/* Layout Split */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            
+        <div className="mf-layout-split" style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'row' }}>
+
             {/* Left side: Chart */}
             <div style={{ flex: 1, borderRight: '1px solid var(--border-color)', padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--text-secondary)' }}>Historical NAV (5Y)</div>
-                <div style={{ flex: 1, background: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden', minHeight: '200px' }}>
                     <MutualFundChart schemeCode={fund.id} color="#3b82f6" />
                 </div>
             </div>
 
             {/* Right side: Order Form */}
-            <div style={{ width: '320px', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
+            <div className="mf-order-form" style={{ width: '320px', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
                 {/* Tabs */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
                   {['SIP', 'Lumpsum'].map(t => (
