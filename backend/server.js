@@ -1296,221 +1296,173 @@ let lastOrderError = null;
 
 app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
   lastOrderError = null;
-  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
+  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, product_type, trigger_type } = req.body;
+  
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
+      const pType = product_type || 'DEL';
+      const tType = trigger_type || 'REGULAR'; // REGULAR, CO, BO
+      
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      const LedgerService = require('./services/ledgerService');
+      const triggerEngine = require('./services/triggerEngine');
+      const { isIntradayBlocked } = require('./services/cronJobs');
+
+      // 1. Time Blocking logic
+      if (isIntradayBlocked() && pType === 'INT') {
+         throw new Error('Intraday trading is currently blocked by RMS sweep.');
+      }
+
       await db.transaction(async (trx) => {
-        // --- Order Time Blocking Logic ---
-        const pType = product_type || 'DEL';
-        const existingPosCheck = await trx('positions').where({ user_id: req.user.id, symbol, product_type: pType }).whereNot({ quantity: 0 }).first();
-        const isClosingOrder = existingPosCheck && (
-            (existingPosCheck.quantity > 0 && side === 'SELL') || 
-            (existingPosCheck.quantity < 0 && side === 'BUY')
+        const isMarket = type === 'MARKET';
+        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
+        if (!execPrice) throw new Error('Live price not available. Try Limit order.');
+
+        // 2. Margin Calculation
+        // First check if it's a closing order
+        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: pType }).whereNot({ quantity: 0 }).first();
+        const isClosingOrder = existingPos && (
+            (existingPos.quantity > 0 && side === 'SELL') || 
+            (existingPos.quantity < 0 && side === 'BUY')
         );
 
-        if (!req.body.is_system_close && !isClosingOrder) {
-            const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-            const totalMinutes = istTime.getHours() * 60 + istTime.getMinutes();
-            const isCommodity = symbol.includes('MCX');
-            
-            // 1. Intraday Block
-            if (product_type === 'INT') {
-                if (isCommodity && totalMinutes >= (23 * 60 + 20)) {
-                    throw new Error('Intraday trading for Commodities is blocked after 11:20 PM IST.');
-                } else if (!isCommodity && totalMinutes >= (15 * 60 + 20)) {
-                    throw new Error('Intraday trading for Equities/Derivatives is blocked after 3:20 PM IST.');
-                }
+        let requiredMargin = 0;
+        let isNetNewPosition = true;
+
+        if (isClosingOrder) {
+            // Check if quantity being closed exceeds current position
+            const absPos = Math.abs(existingPos.quantity);
+            if (Number(quantity) > absPos) {
+                // Reverse position: requires margin for the excess
+                requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity) - absPos, execPrice);
+            } else {
+                isNetNewPosition = false; // Pure close, no margin required
             }
-            
-            // 2. Expiry Block
-            const expiryRegex = /([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{2})/i;
-            const match = symbol.match(expiryRegex);
-            if (match) {
-                const day = parseInt(match[1], 10);
-                const monthStr = match[2].toUpperCase();
-                const year = 2000 + parseInt(match[3], 10);
-                const months = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
-                const expiryDateObj = new Date(year, months[monthStr], day);
-                
-                const formatD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                
-                if (formatD(expiryDateObj) === formatD(istTime)) {
-                    if (isCommodity && totalMinutes >= (23 * 60 + 25)) {
-                        throw new Error('Trading for expiring Commodities is blocked after 11:25 PM IST on expiry day.');
-                    } else if (!isCommodity && totalMinutes >= (15 * 60 + 25)) {
-                        throw new Error('Trading for expiring contracts is blocked after 3:25 PM IST on expiry day.');
-                    }
-                }
-            }
-        }
-        // --- End Time Blocking Logic ---
-
-        // 1. Determine execution status
-        const isMarket = type === 'MARKET';
-        const status = isMarket ? 'EXECUTED' : 'PENDING';
-        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
-      
-      // 2. Deduct Margin from User Balance
-      let requiresMargin = true;
-      if (side === 'SELL') {
-          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).whereNot({ quantity: 0 }).first();
-          if (existingPos && existingPos.quantity >= Number(quantity)) {
-              requiresMargin = false;
-          }
-      }
-
-      if (margin && Number(margin) > 0 && requiresMargin) {
-        const user = await trx('users').where({ id: req.user.id }).first();
-        if (user.balance < Number(margin)) {
-           throw new Error('Insufficient funds');
-        }
-        const newBalance = Number(user.balance) - Number(margin);
-        await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
-        
-        await trx('ledger').insert({
-            user_id: req.user.id,
-            amount: -Number(margin),
-            type: 'MARGIN_BLOCK',
-            description: `Margin blocked for ${side} ${quantity} ${symbol} (${product_type || 'DEL'})`
-        });
-      }
-
-      // 3. Insert Order
-      const [id] = await trx('orders').insert({
-        user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
-      }).returning('id');
-      const orderId = typeof id === 'object' ? id.id : id;
-
-      const { calculateTaxes } = require('./services/taxCalculator');
-
-      // 4. Update Positions if EXECUTED
-      if (status === 'EXECUTED') {
-        const taxesObj = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), execPrice);
-        const totalTaxes = taxesObj.totalTaxes;
-        let realizedPnl = 0;
-        let marginRefund = 0;
-
-        await trx('orders').where({ id: orderId }).update({ taxes: totalTaxes });
-
-        // Only find open positions (quantity != 0) — closed position records must not be reused
-        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol }).whereNot({ quantity: 0 }).first();
-        const qtyChange = side === 'BUY' ? Number(quantity) : -Number(quantity);
-        
-        if (existingPos) {
-          const newQty = existingPos.quantity + qtyChange;
-          let newAvgPrice = existingPos.average_price;
-          let newMargin = parseFloat(existingPos.margin) || 0;
-          
-          if ((existingPos.quantity > 0 && side === 'BUY') || (existingPos.quantity < 0 && side === 'SELL')) {
-            const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
-            const newTotal = Number(quantity) * execPrice;
-            newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
-            newMargin += Number(margin);
-          }
-
-          // Are we CLOSING a position?
-          let isPartialClose = false;
-          if ((existingPos.quantity > 0 && side === 'SELL') || (existingPos.quantity < 0 && side === 'BUY')) {
-               isPartialClose = true;
-               if (existingPos.quantity > 0) {
-                   realizedPnl = (execPrice - existingPos.average_price) * Number(quantity);
-               } else {
-                   realizedPnl = (existingPos.average_price - execPrice) * Number(quantity);
-               }
-               
-               const proportionClosed = Math.abs(Number(quantity)) / Math.abs(existingPos.quantity);
-               marginRefund = (existingPos.margin || 0) * proportionClosed;
-               newMargin -= marginRefund;
-          }
-
-          if (newQty === 0) {
-             // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
-             await trx('positions').where({ id: existingPos.id }).update({ 
-                quantity: 0, 
-                closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + Math.abs(parseInt(existingPos.quantity)), 
-                exit_price: execPrice, 
-                margin: 0,
-                realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl
-             });
-             // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
-             await trx('orders')
-               .where({ user_id: req.user.id, symbol: symbol, status: 'PENDING' })
-               .update({ status: 'CANCELLED' });
-          } else {
-             const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
-             if (isPartialClose) {
-                updateObj.closed_quantity = (parseInt(existingPos.closed_quantity) || 0) + Math.abs(Number(quantity));
-                updateObj.exit_price = execPrice;
-                updateObj.realized_pnl = (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl;
-             }
-             await trx('positions').where({ id: existingPos.id }).update(updateObj);
-          }
         } else {
-          // If selling something they don't have, it's a short position
-          await trx('positions').insert({
+            requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity), execPrice);
+        }
+
+        // Apply CO / BO margin discount (requires less margin typically, but for mock we'll use same Intraday rules)
+        if (tType === 'CO' || tType === 'BO') {
+           if (pType !== 'INT') throw new Error('Cover and Bracket Orders must be Intraday (INT).');
+           if (!sl_price) throw new Error('Cover/Bracket orders require a Stop Loss price.');
+           if (tType === 'BO' && !tgt_price) throw new Error('Bracket orders require a Target price.');
+        }
+
+        // 3. Margin Block (The "Broke" Check)
+        if (requiredMargin > 0) {
+            await LedgerService.blockMargin(trx, req.user.id, requiredMargin, `Margin blocked for ${side} ${quantity} ${symbol} (${pType})`);
+        }
+
+        // 4. Create Order
+        let finalStatus = isMarket ? 'EXECUTED' : 'PENDING';
+        
+        // If order is TARGET or SL, it's pending trigger
+        if (type === 'SL' || type === 'SL-M' || type === 'SL-L') finalStatus = 'PENDING_TRIGGER';
+
+        const [orderIdObj] = await trx('orders').insert({
             user_id: req.user.id,
-            symbol,
-            quantity: qtyChange,
-            average_price: execPrice,
-            product_type: product_type || 'DEL',
-            margin: Number(margin) || 0
-          });
+            symbol, type, side, quantity, price: isMarket ? execPrice : price,
+            status: finalStatus,
+            sl_price: sl_price || null,
+            tgt_price: tgt_price || null,
+            trigger_price: trigger_price || null,
+            trail_amount: trail_amount || null,
+            product_type: pType,
+            trigger_type: tType,
+            margin: requiredMargin
+        }).returning('*');
+        
+        const orderRecord = orderIdObj;
+
+        // 5. Execution or Memory Load
+        if (finalStatus === 'EXECUTED') {
+            // Pass to triggerEngine to immediately handle execution logic so we don't duplicate code
+            triggerEngine.addOrderToMemory(orderRecord);
+            await triggerEngine.executeOrder(orderRecord, execPrice);
+        } else {
+            triggerEngine.addOrderToMemory(orderRecord);
         }
 
-        // 5. Update User Balance & Ledger (Taxes, P&L, Margin Refund)
-        const userAfterExec = await trx('users').where({ id: req.user.id }).first();
-        let balanceChange = -totalTaxes;
-        
-        await trx('ledger').insert({
-            user_id: req.user.id,
-            amount: -totalTaxes,
-            type: 'TAXES',
-            description: `Taxes & Charges for ${side} ${quantity} ${symbol}`
-        });
-        
-        if (realizedPnl !== 0) {
-            balanceChange += realizedPnl;
-            await trx('orders').where({ id: orderId }).update({ realized_pnl: realizedPnl });
-            
-            await trx('ledger').insert({
-                user_id: req.user.id,
-                amount: realizedPnl,
-                type: 'REALIZED_PNL',
-                description: `Realized P&L for closing ${quantity} ${symbol}`
-            });
-        }
-        
-        if (marginRefund > 0) {
-           balanceChange += marginRefund;
-           
-           await trx('ledger').insert({
-                user_id: req.user.id,
-                amount: marginRefund,
-                type: 'MARGIN_RELEASE',
-                description: `Margin released for closing ${quantity} ${symbol}`
-           });
-        }
-
-        await trx('users').where({ id: req.user.id }).update({ balance: Number(userAfterExec.balance) + balanceChange });
-        
-        // Spawn Bracket Orders (SL & TP) if any
-        await spawnBracketOrders(trx, {
-          id: orderId, user_id: req.user.id, symbol, side, quantity,
-          sl_price, tgt_price, product_type: product_type || 'DEL'
-        });
-      }
-
-      res.json({ success: true, orderId, status });
-    });
+        res.json({ success: true, orderId: orderRecord.id, status: finalStatus });
+      });
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
     console.error('[ORDER ERROR]:', error);
     res.status(500).json({ error: error.message, success: false });
   }
+});
+
+// ─── Convert Position (INT -> DEL) ──────────────────────────────────────────
+app.post('/api/position/convert', authenticateToken, async (req, res) => {
+    const { position_id } = req.body;
+    try {
+        await db.transaction(async (trx) => {
+            const pos = await trx('positions').where({ id: position_id, user_id: req.user.id, product_type: 'INT' }).whereNot({ quantity: 0 }).first();
+            if (!pos) throw new Error('Active Intraday position not found');
+
+            const { calculateRequiredMargin } = require('./services/marginEngine');
+            const LedgerService = require('./services/ledgerService');
+
+            // Calculate new required margin for DELIVERY
+            const side = pos.quantity > 0 ? 'BUY' : 'SELL';
+            if (side === 'SELL' && !pos.symbol.match(/(FUT|CE|PE)$/i)) {
+               throw new Error('Short Selling in Equity Delivery is not allowed.');
+            }
+
+            const delMargin = calculateRequiredMargin(pos.symbol, 'DEL', side, Math.abs(pos.quantity), pos.average_price);
+            const additionalRequired = delMargin - pos.margin;
+
+            if (additionalRequired > 0) {
+                await LedgerService.blockMargin(trx, req.user.id, additionalRequired, `Margin blocked for INT -> DEL conversion of ${pos.symbol}`);
+            } else if (additionalRequired < 0) {
+                await LedgerService.releaseMargin(trx, req.user.id, Math.abs(additionalRequired), `Margin released for INT -> DEL conversion of ${pos.symbol}`);
+            }
+
+            await trx('positions').where({ id: pos.id }).update({
+                product_type: 'DEL',
+                margin: delMargin
+            });
+
+            res.json({ success: true, message: 'Position converted to Delivery' });
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message, success: false });
+    }
+});
+
+// ─── Cancel/Modify Order ────────────────────────────────────────────────────
+app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
+    try {
+        await db.transaction(async (trx) => {
+            const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+            if (!order || (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER')) {
+                throw new Error('Order cannot be cancelled.');
+            }
+
+            const LedgerService = require('./services/ledgerService');
+            await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
+            await LedgerService.releaseMargin(trx, req.user.id, order.margin, `Margin released for cancelled order ${order.symbol}`);
+            
+            const triggerEngine = require('./services/triggerEngine');
+            triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+
+            // If it's part of an OCO, cancel sibling
+            if (order.linked_order_id) {
+                const sibling = await trx('orders').where({ id: order.linked_order_id, status: 'PENDING_TRIGGER' }).first();
+                if (sibling) {
+                    await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED' });
+                    triggerEngine.removeOrderFromMemory(sibling.id, sibling.symbol);
+                }
+            }
+        });
+        res.json({ success: true, message: 'Order cancelled' });
+    } catch (err) {
+        res.status(500).json({ error: err.message, success: false });
+    }
 });
 
 // 🧮 Estimate Charges 🧮
@@ -1646,62 +1598,6 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Cancel Order ─────────────────────────────────────────────────────────
-app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
-  try {
-    await db.transaction(async (trx) => {
-      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
-      if (!order) return res.status(404).json({ error: 'Order not found' });
-      if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
-      
-      // Update status
-      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
-      
-      // OCO: Cancel sibling if it exists
-      if (order.parent_order_id) {
-          await trx('orders')
-            .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
-            .whereNot({ id: order.id })
-            .update({ status: 'CANCELLED' });
-            
-          // Bracket order cancelled: Auto-exit the underlying position at market
-          const parentOrder = await trx('orders').where({ id: order.parent_order_id }).first();
-          if (parentOrder && parentOrder.status === 'EXECUTED') {
-              const pos = await trx('positions').where({ user_id: req.user.id, symbol: order.symbol }).first();
-              if (pos && pos.quantity !== 0) {
-                 const exitQty = Math.min(Math.abs(pos.quantity), Number(parentOrder.quantity));
-                 const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-                 
-                 if (exitQty > 0) {
-                   await trx('orders').insert({
-                     user_id: req.user.id,
-                     symbol: pos.symbol,
-                     type: 'MARKET',
-                     side: exitSide,
-                     quantity: exitQty,
-                     price: null,
-                     status: 'PENDING', // orderExecutor will pick this up instantly
-                     product_type: pos.product_type || 'INT',
-                     margin: 0
-                   });
-                 }
-              }
-          }
-      }
-      
-      // Refund Margin
-      const refundAmount = order.margin ? parseFloat(order.margin) : (order.quantity * parseFloat(order.price || 0));
-      if (refundAmount > 0) {
-          const user = await trx('users').where({ id: req.user.id }).first();
-          await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
-      }
-      
-      res.json({ success: true });
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
@@ -1937,14 +1833,13 @@ const { loginAngelOne, setPriceCache } = require('./services/angelOne');
 setPriceCache(priceCache);
 
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
-const { startSquareOffJobs } = require('./services/autoSquareOff');
+// startSquareOffJobs removed in favor of new cronJobs.js
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
   
-  // Start automated expiry & intraday settlement jobs
-  startSquareOffJobs();
+  // startSquareOffJobs() removed
   
   // Update options master in background
   updateOptionsMaster().catch(e => console.error(e));
@@ -1955,10 +1850,21 @@ server.listen(PORT, '0.0.0.0', async () => {
       await loginAngelOne(io, priceCache);
   }
   
-  // Start Cron Jobs
+  // Start Cron Jobs & Engines
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
-  const { initOrderExecutor } = require('./services/orderExecutor');
   const schedule = require('node-schedule');
+  const triggerEngine = require('./services/triggerEngine');
+  const MTMRiskManager = require('./services/mtmRiskManager');
+  const { initCronJobs } = require('./services/cronJobs');
+  
+  // Initialize new 12-point architecture engines
+  triggerEngine.setSocketIo(io);
+  await triggerEngine.loadPendingOrders();
+  
+  const mtmRiskManager = new MTMRiskManager(priceCache);
+  mtmRiskManager.start();
+  
+  initCronJobs(priceCache, triggerEngine);
   
   // Refresh Angel One Token daily at 2:00 AM IST
   const loginRule = new schedule.RecurrenceRule();
@@ -1972,7 +1878,6 @@ server.listen(PORT, '0.0.0.0', async () => {
   });
 
   initRiskyStocksSync();
-  initOrderExecutor(priceCache);
 });
 
 module.exports = { io, priceCache };

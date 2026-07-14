@@ -902,7 +902,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
 
 // ─── Broadcast LTPs to all subscribers & update cache ───────────────────────
 async function broadcastLTPs(io) {
-    const { processTick } = require('./matchingEngine');
+    const triggerEngine = require('./triggerEngine');
     const ltps = await fetchAllLTPs();
     const ts = new Date().toISOString();
     
@@ -910,7 +910,7 @@ async function broadcastLTPs(io) {
         const entry = { symbol: uniqueSymbol, ...data, timestamp: ts };
         // Update the shared cache
         sharedPriceCache[uniqueSymbol] = entry;
-        processTick(uniqueSymbol, data.ltp);
+        triggerEngine.evaluateTick(uniqueSymbol, data.ltp);
         // Emit to subscribers (socket rooms)
         io.to(uniqueSymbol).emit('market_data', entry);
     }
@@ -979,7 +979,7 @@ async function loginAngelOne(io, externalPriceCache) {
 
 // ─── Live WebSocket ───────────────────────────────────────────────────────────
 function startLiveWebSocket(io) {
-    const { processTick } = require('./matchingEngine');
+    const triggerEngine = require('./triggerEngine');
     const BATCH = 50; // WebSocket token limit per subscription
 
     global_web_socket = new WebSocketV2({
@@ -1066,7 +1066,7 @@ function startLiveWebSocket(io) {
                 // Handle Mode 1 (LTP) Data
                 if (info && data.last_traded_price) {
                     const ltp = data.last_traded_price / 100;
-                    processTick(info.uniqueSymbol, ltp);
+                    triggerEngine.evaluateTick(info.uniqueSymbol, ltp);
                     
                     // Build full price entry with OHLC if available
                     const entry = {

@@ -255,10 +255,10 @@ export const useStore = create(persist((set, get) => ({
     } catch (_) { return false; }
   },
 
-  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1 },
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' },
 
-  openOrderModal:  (symbol, type = 'BUY', lotsize = 1) => set({ orderModal: { isOpen: true, symbol, type, lotsize } }),
-  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1 } }),
+  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT') => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType } }),
+  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
@@ -352,6 +352,11 @@ export const useStore = create(persist((set, get) => ({
     socket.off('market_depth_data');
     socket.on('market_depth_data', (data) => {
       get().setMarketDepthData(data);
+    });
+
+    socket.off('sync_user_data');
+    socket.on('sync_user_data', () => {
+      get().fetchUserData();
     });
 
     socket.on('connect', () => {

@@ -1,4 +1,4 @@
--- SQLite Schema for Short Market Mock Backend
+-- SQLite Schema for Short Market Backend
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12,6 +12,16 @@ CREATE TABLE IF NOT EXISTS users (
     kyc_aadhar_url TEXT,
     is_admin BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS holdings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    average_price REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS positions (
@@ -38,13 +48,19 @@ CREATE TABLE IF NOT EXISTS orders (
     trigger_price REAL, -- For GTT and SL orders
     sl_price REAL, -- For Stop Loss target
     tgt_price REAL, -- For Target target
+    trail_amount REAL, -- Trailing stop loss amount
     product_type TEXT DEFAULT 'DEL', -- INT or DEL
+    trigger_type TEXT DEFAULT 'REGULAR', -- REGULAR, CO, BO
+    parent_order_id INTEGER, -- If this is a leg of a CO/BO
+    linked_order_id INTEGER, -- For OCO execution
     margin REAL DEFAULT 0, -- Margin blocked for this order
     realized_pnl REAL DEFAULT 0, -- Profit/Loss made if this order closed a position
     taxes REAL DEFAULT 0, -- Total taxes and brokerage deducted for this order
-    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED')),
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'PENDING_TRIGGER', 'EXECUTED', 'CANCELLED', 'REJECTED')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(parent_order_id) REFERENCES orders(id),
+    FOREIGN KEY(linked_order_id) REFERENCES orders(id)
 );
 
 -- Insert a default mock user if not exists
@@ -54,7 +70,7 @@ CREATE TABLE IF NOT EXISTS ledger (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     amount REAL NOT NULL,
-    type TEXT NOT NULL, -- 'DEPOSIT', 'WITHDRAWAL', 'MARGIN_BLOCK', 'MARGIN_RELEASE', 'REALIZED_PNL', 'TAXES'
+    type TEXT NOT NULL CHECK(type IN ('DEPOSIT', 'WITHDRAWAL', 'MARGIN_BLOCK', 'MARGIN_RELEASE', 'REALIZED_PNL', 'TAXES', 'RMS_PENALTY')),
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)

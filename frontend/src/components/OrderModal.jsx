@@ -34,9 +34,10 @@ export default function OrderModal() {
   useEffect(() => {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
+      setProductType(orderModal.productType || 'INT');
       setPrice(livePrice ? livePrice.toFixed(2) : '');
     }
-  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, livePrice]);
+  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, orderModal.productType, livePrice]);
 
   if (!orderModal.isOpen || !symbol) return null;
 
@@ -159,7 +160,8 @@ export default function OrderModal() {
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
-      product_type: productType
+      product_type: productType,
+      trigger_type: isCO ? 'CO' : isBO ? 'BO' : 'REGULAR'
     };
 
     if (tab === 'Stop Loss' || tab === 'GTT') {

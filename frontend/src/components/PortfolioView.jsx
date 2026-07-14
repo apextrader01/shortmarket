@@ -210,6 +210,7 @@ export default function PortfolioView() {
                   <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>LTP</th>
                   <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Current Value</th>
                   <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Total P&L</th>
+                  <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -250,6 +251,23 @@ export default function PortfolioView() {
                           <div style={{ fontSize: '11px', color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', opacity: 0.8 }}>
                             {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
                           </div>
+                        </td>
+                        <td style={{ padding: '16px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL')}
+                            style={{
+                              background: 'transparent',
+                              color: 'var(--color-red-light)',
+                              border: '1px solid var(--color-red-light)',
+                              padding: '4px 12px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            SELL
+                          </button>
                         </td>
                       </tr>
                     );

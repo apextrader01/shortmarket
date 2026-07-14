@@ -23,6 +23,30 @@ export default function PositionsView() {
   const [partialExitType, setPartialExitType] = useState('MARKET');
   const [partialExitPrice, setPartialExitPrice] = useState('');
 
+  const handleConvert = async (posId) => {
+      try {
+          const token = useStore.getState().token;
+          const res = await fetch('/api/position/convert', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ position_id: posId })
+          });
+          const data = await res.json();
+          if (data.success) {
+              alert('Successfully converted to Delivery');
+              useStore.getState().fetchPositions();
+              useStore.getState().fetchProfile();
+          } else {
+              alert('Conversion failed: ' + data.error);
+          }
+      } catch (e) {
+          alert('Error converting position: ' + e.message);
+      }
+  };
+
   // Group positions by underlying asset
   const { groupedStrategies, globalMTM } = useMemo(() => {
     let globalMTM = 0;
@@ -311,27 +335,46 @@ export default function PositionsView() {
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
                           {viewMode === 'OPEN' && (
-                            <button
-                              onClick={() => {
-                                setPartialExitPos(pos);
-                                const ls = pos.lotSize || 1;
-                                setPartialExitQty((Math.abs(pos.qty) / ls).toString());
-                                setPartialExitType('MARKET');
-                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
-                              }}
-                              style={{
-                                background: 'transparent',
-                                color: 'var(--color-red-light)',
-                                border: '1px solid var(--color-red-light)',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              EXIT
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              {pos.product_type === 'INT' && (
+                                <button
+                                  onClick={() => handleConvert(pos.id)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: 'var(--color-blue-light)',
+                                    border: '1px solid var(--color-blue-light)',
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  CONVERT
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setPartialExitPos(pos);
+                                  const ls = pos.lotSize || 1;
+                                  setPartialExitQty((Math.abs(pos.qty) / ls).toString());
+                                  setPartialExitType('MARKET');
+                                  setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  color: 'var(--color-red-light)',
+                                  border: '1px solid var(--color-red-light)',
+                                  padding: '4px 10px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                EXIT
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
