@@ -698,51 +698,63 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
 
 // ─── Fetch specific LTPs on demand (for search results) ──────────────────────
 async function fetchBatchLTPs(uniqueSymbols) {
-    const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [] };
-    const tokensRequested = [];
-    
-    uniqueSymbols.slice(0, 50).forEach(sym => {
-        const token = symbolToToken[sym];
-        if (token) {
-            const exch = STOCK_MASTER[token]?.exchange || 'NSE';
-            if (exchangeMap[exch]) {
-                exchangeMap[exch].push(token);
-                tokensRequested.push(token);
-            }
-        }
-    });
-    
+    const BATCH_SIZE = 50;
     const result = {};
-    if (tokensRequested.length === 0) return result;
+    if (!uniqueSymbols || uniqueSymbols.length === 0) return result;
 
-    try {
-        const res = await smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap });
-        if (res?.status && res.data?.fetched) {
-            for (const item of res.data.fetched) {
-                const info = STOCK_MASTER[item.symbolToken];
-                if (info && item.ltp) {
-                    result[info.uniqueSymbol] = {
-                        symbol: info.uniqueSymbol,
-                        ltp: item.ltp,
-                        lotsize: info.lotsize || 1,
-                        open: item.open || item.ltp,
-                        high: item.high || item.ltp,
-                        low: item.low || item.ltp,
-                        close: item.close || item.ltp,
-                        change: item.netChange || 0,
-                        pct: item.percentChange || 0,
-                        timestamp: new Date().toISOString(),
-                        volume: item.tradeVolume || item.volumeTradeForTheDay || item.volume || 0,
-                        ltq: item.lastTradeQty || item.last_traded_quantity || item.ltq || 0,
-                        avgPrice: item.averageTradePrice || item.avgTradePrice || item.average_traded_price || item.atp || 0,
-                        ltt: item.lastTradeTime || item.lastUpdateTime || item.lastTradeTimestamp || item.last_traded_timestamp || item.ltt || '',
-                        lowerCircuit: item.lowerCircuitLimit || item.lowerCircuit || item.lower_circuit_limit || item.lc || 0,
-                        upperCircuit: item.upperCircuitLimit || item.upperCircuit || item.upper_circuit_limit || item.uc || 0,
-                    };
+    for (let i = 0; i < uniqueSymbols.length; i += BATCH_SIZE) {
+        const batch = uniqueSymbols.slice(i, i + BATCH_SIZE);
+        const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
+        let hasTokens = false;
+
+        batch.forEach(sym => {
+            const token = symbolToToken[sym];
+            if (token) {
+                const exch = STOCK_MASTER[token]?.exchange || 'NSE';
+                if (exchangeMap[exch]) {
+                    exchangeMap[exch].push(token);
+                    hasTokens = true;
                 }
             }
+        });
+
+        if (!hasTokens) continue;
+
+        try {
+            const res = await Promise.race([
+                smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+            ]);
+            
+            if (res?.status && res.data?.fetched) {
+                for (const item of res.data.fetched) {
+                    const info = STOCK_MASTER[item.symbolToken];
+                    if (info && item.ltp) {
+                        result[info.uniqueSymbol] = {
+                            symbol: info.uniqueSymbol,
+                            ltp: item.ltp,
+                            lotsize: info.lotsize || 1,
+                            open: item.open || item.ltp,
+                            high: item.high || item.ltp,
+                            low: item.low || item.ltp,
+                            close: item.close || item.ltp,
+                            change: item.netChange || 0,
+                            pct: item.percentChange || 0,
+                            timestamp: new Date().toISOString(),
+                            volume: item.tradeVolume || item.volumeTradeForTheDay || item.volume || 0,
+                            ltq: item.lastTradeQty || item.last_traded_quantity || item.ltq || 0,
+                            avgPrice: item.averageTradePrice || item.avgTradePrice || item.average_traded_price || item.atp || 0,
+                            ltt: item.lastTradeTime || item.lastUpdateTime || item.lastTradeTimestamp || item.last_traded_timestamp || item.ltt || '',
+                            lowerCircuit: item.lowerCircuitLimit || item.lowerCircuit || item.lower_circuit_limit || item.lc || 0,
+                            upperCircuit: item.upperCircuitLimit || item.upperCircuit || item.upper_circuit_limit || item.uc || 0,
+                        };
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('fetchBatchLTPs error', e.message);
         }
-    } catch (e) { console.error('fetchBatchLTPs error', e.message); }
+    }
     return result;
 }
 
