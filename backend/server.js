@@ -879,24 +879,32 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Position is already in the requested product type' });
       }
 
-      // If converting INT -> DEL, we must charge the remaining margin
-      if (position.product_type === 'INT' && newProductType === 'DEL') {
-        const user = await trx('users').where({ id: req.user.id }).first();
-        if (parseFloat(user.balance) < requiredMargin) {
-          throw new Error('Insufficient Funds to convert to Delivery');
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      
+      const side = position.quantity > 0 ? 'BUY' : 'SELL';
+      const absQty = Math.abs(position.quantity);
+      
+      const newRequiredMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, parseFloat(position.average_price), true);
+      const currentMargin = parseFloat(position.margin || 0);
+      const marginDifference = newRequiredMargin - currentMargin;
+      
+      const user = await trx('users').where({ id: req.user.id }).first();
+      
+      if (marginDifference > 0) {
+        if (parseFloat(user.balance) < marginDifference) {
+          throw new Error(`Insufficient Funds. Need ₹${marginDifference.toFixed(2)} more margin.`);
         }
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - requiredMargin });
-      }
-
-      // If converting DEL -> INT, we refund the 3x margin
-      if (position.product_type === 'DEL' && newProductType === 'INT') {
-        const user = await trx('users').where({ id: req.user.id }).first();
-        const refund = requiredMargin; // the frontend passes the amount to refund
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refund });
+        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+      } else if (marginDifference < 0) {
+        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + Math.abs(marginDifference) });
       }
 
       // Update position product type
-      await trx('positions').where({ id: positionId }).update({ product_type: newProductType, updated_at: new Date() });
+      await trx('positions').where({ id: positionId }).update({ 
+          product_type: newProductType, 
+          margin: newRequiredMargin,
+          updated_at: new Date() 
+      });
       
       // Try to merge positions if there's already an existing position for the same symbol + product_type
       const existingPos = await trx('positions').where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType }).whereNot('id', positionId).first();
@@ -904,7 +912,8 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         // Merge them
         const newQty = existingPos.quantity + position.quantity;
         const newAvg = ((existingPos.quantity * parseFloat(existingPos.average_price)) + (position.quantity * parseFloat(position.average_price))) / newQty;
-        await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvg });
+        const mergedMargin = parseFloat(existingPos.margin || 0) + newRequiredMargin;
+        await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvg, margin: mergedMargin });
         await trx('positions').where({ id: positionId }).del();
       }
       
