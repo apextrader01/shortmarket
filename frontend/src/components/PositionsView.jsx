@@ -49,9 +49,20 @@ export default function PositionsView() {
     let globalMTM = 0;
     const groups = {};
 
+    const getCutoffTime = () => {
+      const cutoff = new Date();
+      if (cutoff.getHours() < 8) {
+        cutoff.setDate(cutoff.getDate() - 1);
+      }
+      cutoff.setHours(8, 0, 0, 0);
+      return cutoff.getTime();
+    };
+    const cutoffTime = getCutoffTime();
+
     positions.forEach(pos => {
       const isOpen = pos.quantity !== 0;
-      const isHolding = pos.product_type === 'DEL';
+      const posDate = new Date(pos.updated_at || pos.created_at || Date.now()).getTime();
+      const isHolding = pos.product_type === 'DEL' && posDate < cutoffTime;
       
       if (viewMode === 'OPEN' && (!isOpen || isHolding)) return;
       if (viewMode === 'HOLDING' && (!isOpen || !isHolding)) return;

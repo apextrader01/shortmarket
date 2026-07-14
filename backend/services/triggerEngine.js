@@ -156,7 +156,8 @@ class TriggerEngine {
                             quantity: remainingQty,
                             average_price: execPrice,
                             product_type: order.product_type,
-                            margin: order.margin || 0
+                            margin: order.margin || 0,
+                            updated_at: new Date()
                         });
                     }
                 } else {
@@ -169,7 +170,8 @@ class TriggerEngine {
                     await trx('positions').where({ id: existingPos.id }).update({
                         quantity: newQty,
                         average_price: newAvgPrice,
-                        margin: parseFloat(existingPos.margin) + Number(order.margin || 0)
+                        margin: parseFloat(existingPos.margin) + Number(order.margin || 0),
+                        updated_at: new Date()
                     });
                 }
             } else {
@@ -180,7 +182,8 @@ class TriggerEngine {
                     quantity: qtyChange,
                     average_price: execPrice,
                     product_type: order.product_type,
-                    margin: Number(order.margin || 0)
+                    margin: Number(order.margin || 0),
+                    updated_at: new Date()
                 });
             }
 

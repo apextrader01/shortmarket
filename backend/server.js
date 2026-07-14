@@ -896,7 +896,7 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       }
 
       // Update position product type
-      await trx('positions').where({ id: positionId }).update({ product_type: newProductType });
+      await trx('positions').where({ id: positionId }).update({ product_type: newProductType, updated_at: new Date() });
       
       // Try to merge positions if there's already an existing position for the same symbol + product_type
       const existingPos = await trx('positions').where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType }).whereNot('id', positionId).first();
