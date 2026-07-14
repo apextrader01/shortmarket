@@ -797,23 +797,28 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
     // Simulate a MARKET order to close the position
     const side = position.quantity > 0 ? 'SELL' : 'BUY';
     const quantity = Math.abs(position.quantity);
+    const ltp = priceCache[position.symbol]?.ltp;
+    if (!ltp) return res.status(400).json({ error: 'No live price for this symbol' });
     
-    // We don't execute it right away, we just insert a market order. 
-    // The order execution logic runs periodically, or we can just mock it here directly.
-    // To be safe and reuse exact P&L logic, we will just insert it as a MARKET order 
-    // and let the orderExecutor pick it up in the next 1-second tick!
-    
-    const [orderId] = await db('orders').insert({
+    const [orderRecord] = await db('orders').insert({
       user_id: position.user_id,
       symbol: position.symbol,
       type: 'MARKET',
       side: side,
       quantity: quantity,
       product_type: position.product_type,
-      status: 'PENDING'
-    }).returning('id');
+      trigger_type: 'REGULAR',
+      price: ltp,
+      status: 'PENDING',
+      margin: 0
+    }).returning('*');
 
-    res.json({ success: true, message: 'Force close order placed', orderId: typeof orderId === 'object' ? orderId.id : orderId });
+    // Execute immediately via triggerEngine
+    const triggerEngine = require('./services/triggerEngine');
+    triggerEngine.addOrderToMemory(orderRecord);
+    await triggerEngine.executeOrder(orderRecord, ltp);
+
+    res.json({ success: true, message: 'Force close order executed', orderId: orderRecord.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1290,8 +1295,6 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 });
 
 // ─── Place Order ─────────────────────────────────────────────────────────
-const { spawnBracketOrders } = require('./services/orderExecutor');
-
 let lastOrderError = null;
 
 app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
@@ -1397,44 +1400,6 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
     console.error('[ORDER ERROR]:', error);
     res.status(500).json({ error: error.message, success: false });
   }
-});
-
-// ─── Convert Position (INT -> DEL) ──────────────────────────────────────────
-app.post('/api/position/convert', authenticateToken, async (req, res) => {
-    const { position_id } = req.body;
-    try {
-        await db.transaction(async (trx) => {
-            const pos = await trx('positions').where({ id: position_id, user_id: req.user.id, product_type: 'INT' }).whereNot({ quantity: 0 }).first();
-            if (!pos) throw new Error('Active Intraday position not found');
-
-            const { calculateRequiredMargin } = require('./services/marginEngine');
-            const LedgerService = require('./services/ledgerService');
-
-            // Calculate new required margin for DELIVERY
-            const side = pos.quantity > 0 ? 'BUY' : 'SELL';
-            if (side === 'SELL' && !pos.symbol.match(/(FUT|CE|PE)$/i)) {
-               throw new Error('Short Selling in Equity Delivery is not allowed.');
-            }
-
-            const delMargin = calculateRequiredMargin(pos.symbol, 'DEL', side, Math.abs(pos.quantity), pos.average_price);
-            const additionalRequired = delMargin - pos.margin;
-
-            if (additionalRequired > 0) {
-                await LedgerService.blockMargin(trx, req.user.id, additionalRequired, `Margin blocked for INT -> DEL conversion of ${pos.symbol}`);
-            } else if (additionalRequired < 0) {
-                await LedgerService.releaseMargin(trx, req.user.id, Math.abs(additionalRequired), `Margin released for INT -> DEL conversion of ${pos.symbol}`);
-            }
-
-            await trx('positions').where({ id: pos.id }).update({
-                product_type: 'DEL',
-                margin: delMargin
-            });
-
-            res.json({ success: true, message: 'Position converted to Delivery' });
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message, success: false });
-    }
 });
 
 // ─── Cancel/Modify Order ────────────────────────────────────────────────────

@@ -25,20 +25,17 @@ export default function PositionsView() {
 
   const handleConvert = async (posId) => {
       try {
-          const token = useStore.getState().token;
-          const res = await fetch('/api/position/convert', {
+          const API = import.meta.env?.VITE_API_URL?.replace(/\/+$/, '') || '';
+          const res = await fetch(`${API}/api/position/convert`, {
               method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ position_id: posId })
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ positionId: posId, newProductType: 'DEL' })
           });
           const data = await res.json();
           if (data.success) {
               alert('Successfully converted to Delivery');
-              useStore.getState().fetchPositions();
-              useStore.getState().fetchProfile();
+              useStore.getState().fetchUserData();
           } else {
               alert('Conversion failed: ' + data.error);
           }
