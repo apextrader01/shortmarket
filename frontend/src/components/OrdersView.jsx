@@ -14,12 +14,12 @@ export default function OrdersView() {
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
     if (activeTab === 'Open Orders') return order.status === 'PENDING' && !order.parent_order_id;
-    if (activeTab === 'Order History') return order.status !== 'PENDING';
+    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER';
     return false;
   });
   
   const boLegTriggers = orders
-    .filter(order => order.status === 'PENDING' && order.parent_order_id)
+    .filter(order => order.status === 'PENDING_TRIGGER' && order.parent_order_id)
     .map(order => ({
       id: order.id,
       symbol: order.symbol,
