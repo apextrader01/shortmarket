@@ -235,6 +235,22 @@ const OptionChainView = () => {
 
         if (tokensToSub.length > 0) {
           subscribeToOptionBatch(tokensToSub);
+          
+          // Instantly fetch snapshot of the visible options so they load immediately
+          const uniqueSymbolsToFetch = [];
+          if (indexKey) uniqueSymbolsToFetch.push(indexKey);
+          uniqueSymbolsToFetch.push('INDIA VIX-NSE');
+          if (futureData) uniqueSymbolsToFetch.push(`${futureData.symbol}-${futureData.exchange}`);
+
+          visibleStrikes.forEach((strike) => {
+            const data = optionsData[expiry]?.[strike];
+            if (data?.CE) uniqueSymbolsToFetch.push(`${data.CE.symbol}-${data.CE.exch_seg}`);
+            if (data?.PE) uniqueSymbolsToFetch.push(`${data.PE.symbol}-${data.PE.exch_seg}`);
+          });
+
+          if (uniqueSymbolsToFetch.length > 0) {
+            useStore.getState().fetchBatchPrices(uniqueSymbolsToFetch);
+          }
         }
       }
     }
