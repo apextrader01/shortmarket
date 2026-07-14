@@ -82,37 +82,16 @@ class TriggerEngine {
                     if (order.type.startsWith('SL') && ltp <= trigger) shouldExecute = true; // Stop Loss Hit
                     if (order.type === 'LIMIT' && ltp >= trigger) shouldExecute = true; // Target Hit
                 }
-        if (triggers && triggers.length > 0) {
-            for (const order of triggers) {
-                let shouldExecute = false;
+            }
 
-                if (order.status === 'PENDING') {
-                    // Limit Orders
-                    if (order.type === 'LIMIT') {
-                        if (order.side === 'BUY' && ltp <= order.price) shouldExecute = true;
-                        if (order.side === 'SELL' && ltp >= order.price) shouldExecute = true;
-                    }
-                } else if (order.status === 'PENDING_TRIGGER') {
-                    // Stop Loss or Target legs for CO/BO
-                    const trigger = Number(order.trigger_price);
-                    if (order.side === 'BUY') {
-                        if (order.type.startsWith('SL') && ltp >= trigger) shouldExecute = true; // Stop Loss Hit
-                        if (order.type === 'LIMIT' && ltp <= trigger) shouldExecute = true; // Target Hit
-                    } else if (order.side === 'SELL') {
-                        if (order.type.startsWith('SL') && ltp <= trigger) shouldExecute = true; // Stop Loss Hit
-                        if (order.type === 'LIMIT' && ltp >= trigger) shouldExecute = true; // Target Hit
-                    }
-                }
-
-                if (shouldExecute) {
-                    // Remove from memory immediately to prevent double-execution while DB processes
-                    this.removeOrderFromMemory(order.id, symbol);
-                    this.executeOrder(order, ltp).catch(err => {
-                        console.error('Execution Error:', err);
-                        // On failure, re-add to memory to try again on next tick
-                        this.addOrderToMemory(order);
-                    });
-                }
+            if (shouldExecute) {
+                // Remove from memory immediately to prevent double-execution while DB processes
+                this.removeOrderFromMemory(order.id, symbol);
+                this.executeOrder(order, ltp).catch(err => {
+                    console.error('Execution Error:', err);
+                    // On failure, re-add to memory to try again on next tick
+                    this.addOrderToMemory(order);
+                });
             }
         }
         
