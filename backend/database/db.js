@@ -157,6 +157,7 @@ async function initSchema() {
         table.string('type').notNullable(); // MARKET, LIMIT, SL-M, SL-L
         table.string('side').notNullable(); // BUY, SELL
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
+        table.string('trigger_type').notNullable().defaultTo('REGULAR'); // REGULAR, CO, BO
         table.integer('quantity').notNullable();
         table.decimal('price', 14, 2); // Nullable for MARKET orders
         table.string('status').notNullable().defaultTo('PENDING'); // PENDING, EXECUTED, CANCELLED, REJECTED
@@ -179,6 +180,14 @@ async function initSchema() {
           table.string('product_type').notNullable().defaultTo('DEL');
         });
         console.log('Added product_type to orders table');
+      }
+
+      const hasTriggerType = await db.schema.hasColumn('orders', 'trigger_type');
+      if (!hasTriggerType) {
+        await db.schema.alterTable('orders', table => {
+          table.string('trigger_type').notNullable().defaultTo('REGULAR');
+        });
+        console.log('Added trigger_type to orders table');
       }
 
       const hasMargin = await db.schema.hasColumn('orders', 'margin');
