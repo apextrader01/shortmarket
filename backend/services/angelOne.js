@@ -1231,6 +1231,7 @@ module.exports = {
     fetchAllLTPs,
     getPriceCache,
     setPriceCache,
+    lookupDerivativeBySymbol,
     get STOCK_MASTER() { return STOCK_MASTER; },
     get globalNfoOptions() { return globalNfoOptions; },
     get globalNfoFutures() { return globalNfoFutures; },
