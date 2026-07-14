@@ -751,9 +751,8 @@ async function fetchAllLTPs() {
     const BATCH_SIZE = 50;
     const result = {};
     
-    // Poll top 300 tokens AND any tokens clients are actively subscribed to
-    const baseTokens = allTokens.slice(0, 300);
-    const tokensToFetch = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
+    // Poll ONLY tokens clients are actively subscribed to
+    const tokensToFetch = Array.from(clientSubscriptions);
 
     for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
         const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
@@ -765,10 +764,13 @@ async function fetchAllLTPs() {
         });
 
         try {
-            const res = await smart_api.marketData({
-                mode: 'FULL',
-                exchangeTokens: exchangeMap
-            });
+            const res = await Promise.race([
+                smart_api.marketData({
+                    mode: 'FULL',
+                    exchangeTokens: exchangeMap
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+            ]);
             if (res?.status && res.data?.fetched) {
                 for (const item of res.data.fetched) {
                     const info = STOCK_MASTER[item.symbolToken];
@@ -935,7 +937,7 @@ async function loginAngelOne(io, externalPriceCache) {
             console.log('📈 Starting live WebSocket connection...');
             startLiveWebSocket(io);
             
-            // Periodic REST polling as a fallback (every 10 seconds during market hours)
+            // Periodic REST polling as a fallback (every 1 second during market hours)
             // This ensures derivatives (options/futures/commodities) always get fresh prices,
             // even if the Angel One WebSocket doesn't deliver ticks for them.
             if (!global_pollInterval) {
@@ -952,8 +954,8 @@ async function loginAngelOne(io, externalPriceCache) {
                             isPolling = false;
                         }
                     }
-                }, 3000); // Every 3 seconds
-                console.log('⏱️  Started periodic REST polling (every 3s during market hours)');
+                }, 1000); // 1 second
+                console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
             }
         } else {
             console.error('Login Failed:', loginSession.message);
