@@ -169,6 +169,7 @@ async function initSchema() {
         table.decimal('realized_pnl', 14, 2).defaultTo(0);
         table.decimal('taxes', 14, 2).defaultTo(0);
         table.integer('parent_order_id').unsigned().references('id').inTable('orders').onDelete('CASCADE');
+        table.integer('linked_order_id').unsigned().references('id').inTable('orders').onDelete('SET NULL');
         table.string('remarks').defaultTo('');
         table.timestamps(true, true);
       });
@@ -260,6 +261,14 @@ async function initSchema() {
           table.string('remarks').defaultTo('');
         });
         console.log('Added remarks to orders table');
+      }
+
+      const hasLinkedOrderId = await db.schema.hasColumn('orders', 'linked_order_id');
+      if (!hasLinkedOrderId) {
+        await db.schema.alterTable('orders', table => {
+          table.integer('linked_order_id').unsigned().references('id').inTable('orders').onDelete('SET NULL');
+        });
+        console.log('Added linked_order_id to orders table');
       }
     }
 
