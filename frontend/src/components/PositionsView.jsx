@@ -7,71 +7,51 @@ const extractUnderlying = (symbol) => {
   return match ? match[0] : symbol;
 };
 
-const classifySymbol = (symbol) => {
-  if (symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT') || /\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/i.test(symbol)) return 'DERIVATIVES';
-  if (symbol.includes('BEES') || symbol.includes('ETF')) return 'ETF';
-  if (symbol.includes('MF') || symbol.endsWith('-MF')) return 'MF';
-  return 'STOCK';
-};
-
 export default function PositionsView() {
-  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDING'
-  const [holdingType, setHoldingType] = useState('ALL'); // 'ALL' | 'STOCK' | 'DERIVATIVES' | 'ETF' | 'MF'
+  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED'
   const { positions, prices } = useStore();
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
   const [partialExitPrice, setPartialExitPrice] = useState('');
 
-  const handleConvert = async (posId) => {
-      try {
-          const API = import.meta.env?.VITE_API_URL?.replace(/\/+$/, '') || '';
-          const res = await fetch(`${API}/api/position/convert`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ positionId: posId, newProductType: 'DEL' })
-          });
-          const data = await res.json();
-          if (data.success) {
-              alert('Successfully converted to Delivery');
-              useStore.getState().fetchUserData();
-          } else {
-              alert('Conversion failed: ' + data.error);
-          }
-      } catch (e) {
-          alert('Error converting position: ' + e.message);
-      }
-  };
-
   // Group positions by underlying asset
   const { groupedStrategies, globalMTM } = useMemo(() => {
     let globalMTM = 0;
     const groups = {};
-
-    const getCutoffTime = () => {
-      const cutoff = new Date();
-      if (cutoff.getHours() < 8) {
-        cutoff.setDate(cutoff.getDate() - 1);
-      }
-      cutoff.setHours(8, 0, 0, 0);
-      return cutoff.getTime();
-    };
-    const cutoffTime = getCutoffTime();
+    const symbolAgg = {};
 
     positions.forEach(pos => {
       const isOpen = pos.quantity !== 0;
-      const posDate = new Date(pos.updated_at || pos.created_at || Date.now()).getTime();
-      const isHolding = pos.product_type === 'DEL' && posDate < cutoffTime;
-      
-      if (viewMode === 'OPEN' && (!isOpen || isHolding)) return;
-      if (viewMode === 'HOLDING' && (!isOpen || !isHolding)) return;
+      if (viewMode === 'OPEN' && !isOpen) return;
       if (viewMode === 'CLOSED' && isOpen) return;
 
-      if (viewMode === 'HOLDING' && holdingType !== 'ALL') {
-        const type = classifySymbol(pos.symbol);
-        if (type !== holdingType) return;
+      if (!symbolAgg[pos.symbol]) {
+         symbolAgg[pos.symbol] = { ...pos, encumberedQty: 0, unencumberedQty: 0 };
       }
+      
+      const agg = symbolAgg[pos.symbol];
+      if (agg.id !== pos.id) { // Merge
+         const prevQty = agg.quantity;
+         agg.quantity += pos.quantity;
+         agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
+         const currentTotal = Math.abs(prevQty) * parseFloat(agg.average_price || 0);
+         const newTotal = Math.abs(pos.quantity) * parseFloat(pos.average_price || 0);
+         agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : 0;
+         if ((agg.product_type === 'BO' || agg.product_type === 'CO') && (pos.product_type !== 'BO' && pos.product_type !== 'CO')) {
+             agg.product_type = pos.product_type;
+         }
+      }
+      
+      if (pos.product_type === 'BO' || pos.product_type === 'CO') {
+         agg.encumberedQty += Math.abs(pos.quantity);
+      } else {
+         agg.unencumberedQty += Math.abs(pos.quantity);
+      }
+    });
+
+    Object.values(symbolAgg).forEach(pos => {
+      if (pos.quantity === 0 && viewMode === 'OPEN') return;
 
       const underlying = extractUnderlying(pos.symbol);
       if (!groups[underlying]) {
@@ -86,13 +66,13 @@ export default function PositionsView() {
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       
-      const pnl = isOpen 
+      const pnl = (qty !== 0) 
           ? (qty > 0 ? (currentValue - invested) : (invested - currentValue))
           : parseFloat(pos.realized_pnl || 0);
           
       const lotSize = priceData.lotsize || 1;
       
-      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize, isOpen });
+      groups[underlying].positions.push({ ...pos, ltp, avg, qty, pnl, invested, lotSize, isOpen: qty !== 0 });
       groups[underlying].netPnl += pnl;
       groups[underlying].totalInvested += invested;
       globalMTM += pnl;
@@ -104,9 +84,12 @@ export default function PositionsView() {
   // Removed early return to keep the header visible when empty
 
   const exitAllPositions = async () => {
-    const openPositions = positions.filter(p => p.quantity !== 0);
-    if (openPositions.length === 0) return;
-    if (!window.confirm(`Exit ALL ${openPositions.length} open position(s) at market price?`)) return;
+    const openPositions = positions.filter(p => p.quantity !== 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
+    if (openPositions.length === 0) {
+      alert('No valid unencumbered positions to exit.');
+      return;
+    }
+    if (!window.confirm(`Exit ALL ${openPositions.length} unencumbered position(s) at market price?`)) return;
     const store = useStore.getState();
     let failed = 0;
     for (const pos of openPositions) {
@@ -133,9 +116,12 @@ export default function PositionsView() {
   };
 
   const exitStrategyGroup = async (groupPositions) => {
-    const openLegs = groupPositions.filter(p => p.quantity !== 0);
-    if (openLegs.length === 0) return;
-    if (!window.confirm(`Exit ${openLegs.length} leg(s) in this strategy at market price?`)) return;
+    const openLegs = groupPositions.filter(p => p.quantity !== 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
+    if (openLegs.length === 0) {
+      alert('No valid unencumbered positions to exit in this strategy.');
+      return;
+    }
+    if (!window.confirm(`Exit ${openLegs.length} unencumbered leg(s) in this strategy at market price?`)) return;
     const store = useStore.getState();
     let failed = 0;
     for (const pos of openLegs) {
@@ -157,7 +143,7 @@ export default function PositionsView() {
   };
 
   return (
-    <div className="mobile-bottom-spacer" style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+    <div style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Strategies</h2>
@@ -174,12 +160,6 @@ export default function PositionsView() {
             >
               CLOSED
             </button>
-            <button
-              onClick={() => setViewMode('HOLDING')}
-              style={{ background: viewMode === 'HOLDING' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
-            >
-              HOLDING
-            </button>
           </div>
         </div>
         {viewMode === 'OPEN' && (
@@ -195,32 +175,6 @@ export default function PositionsView() {
           </button>
         )}
       </div>
-
-      {viewMode === 'HOLDING' && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {['ALL', 'STOCK', 'DERIVATIVES', 'ETF', 'MF'].map(type => (
-            <button
-              key={type}
-              onClick={() => setHoldingType(type)}
-              style={{
-                background: holdingType === type ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                color: holdingType === type ? '#fff' : 'var(--text-secondary)',
-                border: '1px solid',
-                borderColor: holdingType === type ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                padding: '6px 16px',
-                borderRadius: '100px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-      )}
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {positions.length === 0 || groupedStrategies.length === 0 ? (
@@ -343,54 +297,31 @@ export default function PositionsView() {
                         </td>
                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
                           {viewMode === 'OPEN' && (
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                              {(() => {
-                                const orders = useStore.getState().orders || [];
-                                const hasPendingTrigger = orders.some(o => 
-                                  o.symbol === pos.symbol && 
-                                  (o.status === 'PENDING_TRIGGER' || o.status === 'PENDING') &&
-                                  o.parent_order_id
-                                );
-                                return pos.product_type === 'INT' && !hasPendingTrigger;
-                              })() && (
-                                <button
-                                  onClick={() => handleConvert(pos.id)}
-                                  style={{
-                                    background: 'transparent',
-                                    color: 'var(--color-blue-light)',
-                                    border: '1px solid var(--color-blue-light)',
-                                    padding: '4px 10px',
-                                    borderRadius: '4px',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  CONVERT
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setPartialExitPos(pos);
-                                  const ls = pos.lotSize || 1;
-                                  setPartialExitQty((Math.abs(pos.qty) / ls).toString());
-                                  setPartialExitType('MARKET');
-                                  setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
-                                }}
-                                style={{
-                                  background: 'transparent',
-                                  color: 'var(--color-red-light)',
-                                  border: '1px solid var(--color-red-light)',
-                                  padding: '4px 10px',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  fontWeight: 'bold',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                EXIT
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => {
+                                if (pos.unencumberedQty === 0) {
+                                  alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+                                  return;
+                                }
+                                setPartialExitPos(pos);
+                                const ls = pos.lotSize || 1;
+                                setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+                                setPartialExitType('MARKET');
+                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                              }}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--color-red-light)',
+                                border: '1px solid var(--color-red-light)',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              EXIT
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -405,8 +336,8 @@ export default function PositionsView() {
       </div>
 
       {/* Global MTM Banner */}
-      <div className="mtm-banner" style={{
-        position: 'fixed', bottom: '0', left: '0', right: '0',
+      <div style={{
+        position: 'fixed', bottom: '0', left: '0', right: '0', 
         background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
         backdropFilter: 'blur(10px)', borderTop: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
         padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -493,9 +424,9 @@ export default function PositionsView() {
                   const inputVal = parseInt(partialExitQty);
                   const ls = partialExitPos.lotSize || 1;
                   const qtyToExit = inputVal * ls;
-                  const maxQty = Math.abs(partialExitPos.qty);
+                  const maxQty = Math.abs(partialExitPos.unencumberedQty);
                   if (!qtyToExit || qtyToExit <= 0 || qtyToExit > maxQty) {
-                    alert(`Invalid quantity. Max allowed: ${maxQty}`);
+                    alert(`Invalid quantity. Max allowed (unencumbered): ${maxQty / ls} lots`);
                     return;
                   }
                   const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';

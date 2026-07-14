@@ -116,7 +116,8 @@ async function executeOrder(order, execPrice) {
 
       // 2. Update Positions
       // Only find open positions (quantity != 0) — closed position records must not be reused
-      const existingPos = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol }).whereNot({ quantity: 0 }).first();
+      const effectiveProductType = order.product_type || 'DEL';
+      const existingPos = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
       const qtyChange = order.side === 'BUY' ? Number(order.quantity) : -Number(order.quantity);
       
       if (existingPos) {
