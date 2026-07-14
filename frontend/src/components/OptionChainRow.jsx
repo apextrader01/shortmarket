@@ -47,9 +47,10 @@ const OptionChainRow = React.memo(({
   
   const cBreakPct = (cBreakeven > 0 && basePrice > 0) ? ((cBreakeven / basePrice) - 1) * 100 : 0;
   const pBreakPct = (pBreakeven > 0 && basePrice > 0) ? ((pBreakeven / basePrice) - 1) * 100 : 0;
+  const atmClass = strike === atmStrike ? 'bg-blue-900/40 border-y border-blue-500/50 relative' : 'border-b border-gray-800/50 hover:bg-gray-800/50';
 
   return (
-    <tr ref={strike === atmStrike ? atmRowRef : null}>
+    <tr ref={strike === atmStrike ? atmRowRef : null} className={`transition-colors ${atmClass}`}>
       {/* Calls */}
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
