@@ -1316,7 +1316,7 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
          throw new Error('Intraday trading is currently blocked by RMS sweep.');
       }
 
-      await db.transaction(async (trx) => {
+      const result = await db.transaction(async (trx) => {
         const isMarket = type === 'MARKET';
         const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
         if (!execPrice) throw new Error('Live price not available. Try Limit order.');
@@ -1358,7 +1358,7 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
         }
 
         // 4. Create Order
-        let finalStatus = isMarket ? 'EXECUTED' : 'PENDING';
+        let finalStatus = 'PENDING';
         
         // If order is TARGET or SL, it's pending trigger
         if (type === 'SL' || type === 'SL-M' || type === 'SL-L') finalStatus = 'PENDING_TRIGGER';
@@ -1377,18 +1377,21 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
         }).returning('*');
         
         const orderRecord = orderIdObj;
-
-        // 5. Execution or Memory Load
-        if (finalStatus === 'EXECUTED') {
-            // Pass to triggerEngine to immediately handle execution logic so we don't duplicate code
-            triggerEngine.addOrderToMemory(orderRecord);
-            await triggerEngine.executeOrder(orderRecord, execPrice);
-        } else {
-            triggerEngine.addOrderToMemory(orderRecord);
-        }
-
-        res.json({ success: true, orderId: orderRecord.id, status: finalStatus });
+        return { orderRecord, execPrice, isMarket, finalStatus };
       });
+
+      const { orderRecord, execPrice, isMarket, finalStatus } = result;
+
+      // 5. Execution or Memory Load
+      if (isMarket) {
+          // Add to memory and execute immediately
+          triggerEngine.addOrderToMemory(orderRecord);
+          await triggerEngine.executeOrder(orderRecord, execPrice);
+          res.json({ success: true, orderId: orderRecord.id, status: 'EXECUTED' });
+      } else {
+          triggerEngine.addOrderToMemory(orderRecord);
+          res.json({ success: true, orderId: orderRecord.id, status: finalStatus });
+      }
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
     console.error('[ORDER ERROR]:', error);
