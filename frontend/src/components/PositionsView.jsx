@@ -333,7 +333,15 @@ export default function PositionsView() {
                         <td style={{ textAlign: 'right', paddingRight: '20px' }}>
                           {viewMode === 'OPEN' && (
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                              {pos.product_type === 'INT' && (
+                              {(() => {
+                                const orders = useStore.getState().orders || [];
+                                const hasPendingTrigger = orders.some(o => 
+                                  o.symbol === pos.symbol && 
+                                  (o.status === 'PENDING_TRIGGER' || o.status === 'PENDING') &&
+                                  o.parent_order_id
+                                );
+                                return pos.product_type === 'INT' && !hasPendingTrigger;
+                              })() && (
                                 <button
                                   onClick={() => handleConvert(pos.id)}
                                   style={{
