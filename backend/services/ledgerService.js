@@ -16,7 +16,7 @@ class LedgerService {
             throw new Error('Insufficient funds');
         }
         
-        await trx('users').where({ id: userId }).update({ balance: user.balance - amount });
+        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - amount });
         await trx('ledger').insert({
             user_id: userId,
             amount: -amount,
@@ -32,7 +32,7 @@ class LedgerService {
         if (amount <= 0) return;
         
         const user = await trx('users').where({ id: userId }).first();
-        await trx('users').where({ id: userId }).update({ balance: user.balance + amount });
+        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + amount });
         await trx('ledger').insert({
             user_id: userId,
             amount: amount,
@@ -50,7 +50,7 @@ class LedgerService {
         
         if (totalTaxes > 0) {
             const user = await trx('users').where({ id: userId }).first();
-            await trx('users').where({ id: userId }).update({ balance: user.balance - totalTaxes });
+            await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - totalTaxes });
             await trx('ledger').insert({
                 user_id: userId,
                 amount: -totalTaxes,
@@ -98,7 +98,7 @@ class LedgerService {
 
         // 5. Update Ledger & Balance
         const user = await trx('users').where({ id: userId }).first();
-        await trx('users').where({ id: userId }).update({ balance: user.balance + netRelease });
+        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + netRelease });
 
         await trx('ledger').insert({
             user_id: userId,

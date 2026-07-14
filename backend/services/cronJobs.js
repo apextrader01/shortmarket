@@ -176,7 +176,7 @@ function initCronJobs(priceCache, triggerEngine) {
                     const netPnl = pnl - taxesObj.totalTaxes - 59; // RMS penalty
 
                     const user = await trx('users').where({ id: hold.user_id }).first();
-                    await trx('users').where({ id: hold.user_id }).update({ balance: user.balance + netPnl });
+                    await trx('users').where({ id: hold.user_id }).update({ balance: parseFloat(user.balance) + netPnl });
                     
                     await trx('holdings').where({ id: hold.id }).update({ quantity: 0 });
                 }

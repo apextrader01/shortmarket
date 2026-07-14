@@ -116,7 +116,7 @@ class TriggerEngine {
 
             // Update user balance and ledger for taxes
             const user = await trx('users').where({ id: order.user_id }).first();
-            await trx('users').where({ id: order.user_id }).update({ balance: user.balance - totalTaxes });
+            await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) - totalTaxes });
             await trx('ledger').insert({
                 user_id: order.user_id,
                 amount: -totalTaxes,
