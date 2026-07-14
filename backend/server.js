@@ -1303,6 +1303,15 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/debug-orders', async (req, res) => {
+  try {
+    const orders = await db('orders').orderBy('created_at', 'desc').limit(5);
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Place Order ─────────────────────────────────────────────────────────
 let lastOrderError = null;
 

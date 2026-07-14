@@ -35,6 +35,10 @@ export default function OrdersView() {
     }));
 
   let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
+  
+  console.log('ALL ORDERS:', orders);
+  console.log('BO LEG TRIGGERS:', boLegTriggers);
+  console.log('DISPLAY TRIGGERS:', displayTriggers);
 
   if (statusFilter !== 'ALL') {
     displayOrders = displayOrders.filter(order => order.status === statusFilter);
