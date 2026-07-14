@@ -126,9 +126,10 @@ function initCronJobs(priceCache, triggerEngine) {
                     }
                 }
 
-                // 3. WIPE Positions Table
+                // 3. WIPE Positions & Orders Tables
                 await trx('positions').del();
-                console.log('[CRON] T+1 Reset complete. Positions wiped and migrated.');
+                await trx('orders').del();
+                console.log('[CRON] T+1 Reset complete. Positions and Orders wiped and migrated.');
             });
         } catch (err) {
             console.error('T+1 Reset Error:', err);

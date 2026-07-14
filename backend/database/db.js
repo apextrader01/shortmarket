@@ -191,6 +191,22 @@ async function initSchema() {
         console.log('Added trigger_type to orders table');
       }
 
+      const hasHoldings = await db.schema.hasTable('holdings');
+      if (!hasHoldings) {
+        await db.schema.createTable('holdings', table => {
+          table.increments('id').primary();
+          table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+          table.string('symbol').notNullable();
+          table.integer('quantity').notNullable().defaultTo(0);
+          table.decimal('average_price', 14, 2).notNullable();
+          table.string('asset_class').notNullable().defaultTo('STOCK');
+          table.timestamps(true, true);
+        });
+        console.log('Created holdings table');
+      }
+
+      console.log('Database initialization complete.');
+
       const hasMargin = await db.schema.hasColumn('orders', 'margin');
       if (!hasMargin) {
         await db.schema.alterTable('orders', table => {

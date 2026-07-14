@@ -880,23 +880,19 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       }
 
       const { calculateRequiredMargin } = require('./services/marginEngine');
+      const LedgerService = require('./services/ledgerService');
       
       const side = position.quantity > 0 ? 'BUY' : 'SELL';
       const absQty = Math.abs(position.quantity);
       
-      const newRequiredMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, parseFloat(position.average_price), true);
+      const newRequiredMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, parseFloat(position.average_price));
       const currentMargin = parseFloat(position.margin || 0);
       const marginDifference = newRequiredMargin - currentMargin;
       
-      const user = await trx('users').where({ id: req.user.id }).first();
-      
       if (marginDifference > 0) {
-        if (parseFloat(user.balance) < marginDifference) {
-          throw new Error(`Insufficient Funds. Need ₹${marginDifference.toFixed(2)} more margin.`);
-        }
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+        await LedgerService.blockMargin(trx, req.user.id, marginDifference, `Margin blocked for position conversion to ${newProductType}`);
       } else if (marginDifference < 0) {
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + Math.abs(marginDifference) });
+        await LedgerService.releaseMargin(trx, req.user.id, Math.abs(marginDifference), `Margin released from position conversion to ${newProductType}`);
       }
 
       // Update position product type
@@ -1342,7 +1338,33 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
         const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
         if (!execPrice) throw new Error('Live price not available. Try Limit order.');
 
-        // 2. Margin Calculation
+        // 2. Asset & Constraints Check
+        const isOptions = symbol.match(/(CE|PE)$/i);
+        const isFutures = symbol.match(/FUT$/i);
+        const assetClass = isOptions ? 'OPTIONS' : (isFutures ? 'FUTURES' : 'STOCK');
+        
+        // Delivery Short-Sell Block (Inventory check)
+        if (assetClass === 'STOCK' && pType === 'DELIVERY' && side === 'SELL') {
+            const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
+            if (!holding || holding.quantity < Number(quantity)) {
+                throw new Error("Delivery Short-Sell Blocked: Insufficient inventory.");
+            }
+            
+            // Deduct from inventory instantly
+            const newQty = holding.quantity - Number(quantity);
+            await trx('holdings').where({ id: holding.id }).update({ quantity: newQty });
+        }
+
+        // CO/BO Constraints
+        if (tType === 'CO' || tType === 'BO') {
+            if (pType !== 'INT') throw new Error('Cover and Bracket Orders must be Intraday (INT).');
+            if (!sl_price) throw new Error('Cover/Bracket orders require a Stop Loss price.');
+            if (side === 'BUY' && sl_price >= execPrice) throw new Error('Long SL must be below entry price.');
+            if (side === 'SELL' && sl_price <= execPrice) throw new Error('Short SL must be above entry price.');
+            if (tType === 'BO' && !tgt_price) throw new Error('Bracket orders require a Target price.');
+        }
+
+        // 3. Margin Calculation
         // First check if it's a closing order
         const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: pType }).whereNot({ quantity: 0 }).first();
         const isClosingOrder = existingPos && (
@@ -1358,27 +1380,20 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
             const absPos = Math.abs(existingPos.quantity);
             if (Number(quantity) > absPos) {
                 // Reverse position: requires margin for the excess
-                requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity) - absPos, execPrice);
+                requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity) - absPos, execPrice, { stopLoss: sl_price });
             } else {
                 isNetNewPosition = false; // Pure close, no margin required
             }
         } else {
-            requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity), execPrice);
+            requiredMargin = calculateRequiredMargin(symbol, pType, side, Number(quantity), execPrice, { stopLoss: sl_price });
         }
 
-        // Apply CO / BO margin discount (requires less margin typically, but for mock we'll use same Intraday rules)
-        if (tType === 'CO' || tType === 'BO') {
-           if (pType !== 'INT') throw new Error('Cover and Bracket Orders must be Intraday (INT).');
-           if (!sl_price) throw new Error('Cover/Bracket orders require a Stop Loss price.');
-           if (tType === 'BO' && !tgt_price) throw new Error('Bracket orders require a Target price.');
-        }
-
-        // 3. Margin Block (The "Broke" Check)
+        // 4. Margin Block (The "Broke" Check)
         if (requiredMargin > 0) {
             await LedgerService.blockMargin(trx, req.user.id, requiredMargin, `Margin blocked for ${side} ${quantity} ${symbol} (${pType})`);
         }
 
-        // 4. Create Order
+        // 5. Create Order
         let finalStatus = 'PENDING';
         
         // If order is TARGET or SL, it's pending trigger
@@ -1432,6 +1447,17 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
             const LedgerService = require('./services/ledgerService');
             await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
             await LedgerService.releaseMargin(trx, req.user.id, order.margin, `Margin released for cancelled order ${order.symbol}`);
+            
+            // Restore holding if it was a Delivery Sell
+            const isOptions = order.symbol.match(/(CE|PE)$/i);
+            const isFutures = order.symbol.match(/FUT$/i);
+            const assetClass = isOptions ? 'OPTIONS' : (isFutures ? 'FUTURES' : 'STOCK');
+            if (assetClass === 'STOCK' && order.product_type === 'DELIVERY' && order.side === 'SELL') {
+                const holding = await trx('holdings').where({ user_id: req.user.id, symbol: order.symbol }).first();
+                if (holding) {
+                    await trx('holdings').where({ id: holding.id }).update({ quantity: holding.quantity + order.quantity });
+                }
+            }
             
             const triggerEngine = require('./services/triggerEngine');
             triggerEngine.removeOrderFromMemory(order.id, order.symbol);

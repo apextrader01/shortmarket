@@ -9,45 +9,49 @@ const { lookupDerivativeBySymbol } = require('./angelOne');
  * @param {number} price - The execution price (LTP or Limit Price).
  * @returns {number} The required margin in INR.
  */
-function calculateRequiredMargin(symbol, product_type, side, quantity, price) {
+function calculateRequiredMargin(symbol, product_type, side, quantity, price, assetDetails = {}) {
     const isOptions = symbol.match(/(CE|PE)$/i);
     const isFutures = symbol.match(/FUT$/i);
+    const contractValue = quantity * price;
     
     // 1. Equity Margin Rules
     if (!isOptions && !isFutures) {
-        if (product_type === 'INT') {
-            // 5x Leverage for Intraday (Requires 20% upfront)
-            return (quantity * price) * 0.20;
-        } else {
-            // 1x Leverage for Delivery (Requires 100% upfront)
-            return quantity * price;
+        if (product_type === 'DEL' || product_type === 'DELIVERY') {
+            return contractValue; // 1x
+        }
+        if (['INT', 'INTRADAY', 'CO', 'BO'].includes(product_type)) {
+            // 5x Leverage
+            let margin = contractValue * 0.20;
+            if (assetDetails.stopLoss) {
+                const risk = Math.abs(price - assetDetails.stopLoss) * quantity;
+                margin = (contractValue * 0.10) + risk; // Lower upfront if SL is tight
+            }
+            return margin;
         }
     }
     
     // 2. Options Margin Rules
     if (isOptions) {
-        if (side === 'BUY') {
-            // Option Buyers pay 100% of the Premium
-            return quantity * price;
-        } else if (side === 'SELL') {
-            // Option Sellers require SPAN + Exposure margin
-            // Placeholder: Assume 1,00,000 INR per lot for Option Selling
+        if (side === 'BUY') return contractValue; // 100% Premium
+        if (side === 'SELL') {
+            // SPAN + Exposure margin mocked as 15% of the underlying contract value. 
+            // For options, we use the premium value as a fallback mock (15% of notional).
+            // Since we don't have underlying price here, we'll mock it realistically at a flat ₹1,00,000 per lot fallback,
+            // or 15% of the option notional if it exceeds 1L.
             const lotsize = getLotSize(symbol);
             const numLots = quantity / lotsize;
-            return numLots * 100000;
+            return Math.max(numLots * 100000, contractValue * 0.15);
         }
     }
     
     // 3. Futures Margin Rules
     if (isFutures) {
-        // Futures Buyers and Sellers both require SPAN + Exposure margin
-        // Placeholder: Assume 1,00,000 INR per lot for Futures
         const lotsize = getLotSize(symbol);
         const numLots = quantity / lotsize;
-        return numLots * 100000;
+        return Math.max(numLots * 100000, contractValue * 0.15);
     }
     
-    return quantity * price;
+    return contractValue;
 }
 
 function getLotSize(symbol) {
