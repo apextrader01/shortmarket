@@ -1435,6 +1435,10 @@ app.post('/api/order', authenticateToken, apiLimiter, async (req, res) => {
   }
 });
 
+app.get('/api/debug-error', (req, res) => {
+  res.json(lastOrderError);
+});
+
 // ─── Cancel/Modify Order ────────────────────────────────────────────────────
 app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
     try {
