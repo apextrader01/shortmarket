@@ -82,12 +82,13 @@ export default function OrderModal() {
   if (isOption && !isBuy) {
     // Extract strike price robustly. Broker symbols often look like NIFTY30JUN2623900PE
     // This regex looks for a 3-letter month and 2-digit year before the strike digits.
+    const cleanSymbol = symbol.split('-')[0];
     let optionStrike = 0;
-    const robustMatch = symbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
+    const robustMatch = cleanSymbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
     if (robustMatch) {
       optionStrike = parseFloat(robustMatch[1]);
     } else {
-      const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
+      const strikeMatch = cleanSymbol.match(/(\d+)(CE|PE)$/i);
       if (strikeMatch) {
          let rawStrikeStr = strikeMatch[1];
          if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
