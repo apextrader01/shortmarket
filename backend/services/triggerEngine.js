@@ -152,13 +152,22 @@ class TriggerEngine {
                             updated_at: new Date()
                         });
                         
-                        // Update Balance and Ledger with Realized P&L
-                        if (realizedPnl !== 0) {
+                        // Update Balance and Ledger with Realized P&L and RMS Penalty
+                        const rmsPenalty = order.is_rms ? 59 : 0;
+                        if (realizedPnl !== 0 || rmsPenalty !== 0) {
                             const user = await trx('users').where({ id: order.user_id }).first();
-                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + realizedPnl });
-                            await trx('ledger').insert({
-                                user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
-                            });
+                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + realizedPnl - rmsPenalty });
+                            
+                            if (realizedPnl !== 0) {
+                                await trx('ledger').insert({
+                                    user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
+                                });
+                            }
+                            if (rmsPenalty > 0) {
+                                await trx('ledger').insert({
+                                    user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `Auto-Square-Off RMS Penalty for holding ${order.symbol}`
+                                });
+                            }
                         }
                         
                         remainingQty += offsetQty; // e.g. -15 + 10 = -5
@@ -188,7 +197,8 @@ class TriggerEngine {
                     const closeQty = Math.min(absQty, absPosQty);
                     
                     // Close the position
-                    const { realizedPnl, exitTaxes, rmsPenalty, netRelease } = await LedgerService.closePosition(trx, order.user_id, existingPos.id, execPrice, false);
+                    const isRMS = order.is_rms || false;
+                    const { realizedPnl, exitTaxes, rmsPenalty, netRelease } = await LedgerService.closePosition(trx, order.user_id, existingPos.id, execPrice, isRMS);
                     await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
 
                     // If order quantity exceeds existing position (Reverse Position)

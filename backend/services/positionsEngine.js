@@ -102,14 +102,15 @@ class PositionsEngine {
                         price: null,
                         status: 'PENDING',
                         product_type: pos.product_type,
-                        margin: 0 // No margin required to exit
+                        margin: 0, // No margin required to exit
+                        is_rms: true // Flag for RMS penalty
                     }).returning('id');
                     
                     const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
 
                     triggerEngine.addOrderToMemory({
                         id: orderIdVal, user_id: pos.user_id, symbol: pos.symbol, type: 'MARKET', side: exitSide,
-                        quantity: exitQty, price: null, status: 'PENDING', product_type: pos.product_type, margin: 0
+                        quantity: exitQty, price: null, status: 'PENDING', product_type: pos.product_type, margin: 0, is_rms: true
                     });
 
                     // Kick evaluation immediately
@@ -178,11 +179,13 @@ class PositionsEngine {
                     price: 0,
                     status: 'PENDING',
                     product_type: prodType,
+                    is_rms: true,
                     created_at: new Date(),
                     updated_at: new Date()
                 }).returning('id');
 
                 const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
+                orderRow.is_rms = true; // Inject it into memory for triggerEngine
                 await triggerEngine.executeOrder(orderRow, ltp);
                 console.log(`[EXPIRY SETTLED] ${item.symbol} (${side} ${orderQty}) for User ${item.user_id}`);
             };
