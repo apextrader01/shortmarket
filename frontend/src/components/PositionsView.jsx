@@ -8,8 +8,8 @@ const extractUnderlying = (symbol) => {
 };
 
 export default function PositionsView() {
-  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED'
-  const { positions, prices } = useStore();
+  const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
+  const { positions, holdings, prices } = useStore();
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
@@ -21,7 +21,9 @@ export default function PositionsView() {
     const groups = {};
     const symbolAgg = {};
 
-    positions.forEach(pos => {
+    const sourceData = viewMode === 'HOLDINGS' ? (holdings || []) : (positions || []);
+
+    sourceData.forEach(pos => {
       const isOpen = pos.quantity !== 0;
       if (viewMode === 'OPEN' && !isOpen) return;
       if (viewMode === 'CLOSED' && isOpen) return;
@@ -155,6 +157,12 @@ export default function PositionsView() {
               OPEN
             </button>
             <button
+              onClick={() => setViewMode('HOLDINGS')}
+              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              HOLDINGS
+            </button>
+            <button
               onClick={() => setViewMode('CLOSED')}
               style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
             >
@@ -188,10 +196,10 @@ export default function PositionsView() {
               <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
             </div>
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
-              {viewMode === 'CLOSED' ? 'No closed positions yet' : 'You do not have any positions'}
+              {viewMode === 'CLOSED' ? 'No closed positions yet' : viewMode === 'HOLDINGS' ? 'You have no active holdings' : 'You do not have any positions'}
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
-              {viewMode === 'CLOSED' ? 'Positions you close today will appear here.' : 'List of all your positions for today will appear here.'}
+              {viewMode === 'CLOSED' ? 'Positions you close today will appear here.' : viewMode === 'HOLDINGS' ? 'Long-term delivery positions will appear here on T+1.' : 'List of all your positions for today will appear here.'}
             </p>
           </div>
         ) : groupedStrategies.map((group, idx) => {
