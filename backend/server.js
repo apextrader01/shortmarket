@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 // Ultimate Crash Reporter
 process.on('uncaughtException', err => {
@@ -16,7 +17,6 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const db = require('./database/db');
-const path = require('path');
 const fs = require('fs');
 
 const app = express();
