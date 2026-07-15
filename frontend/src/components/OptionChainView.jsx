@@ -147,6 +147,21 @@ const OptionChainView = () => {
         }
         await useStore.getState().fetchBatchPrices(initialToFetch);
 
+        // Set initialSpotPrice immediately from the store (don't wait for React re-render)
+        const storeState = useStore.getState().prices;
+        let resolvedSpotPrice = null;
+        if (idxKey && storeState[idxKey]?.ltp > 0) {
+          resolvedSpotPrice = storeState[idxKey].ltp;
+        } else if (isCommodity && futDataResult) {
+          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          if (storeState[futKey]?.ltp > 0) {
+            resolvedSpotPrice = storeState[futKey].ltp;
+          }
+        }
+        if (resolvedSpotPrice !== null) {
+          setInitialSpotPrice(resolvedSpotPrice);
+        }
+
         // Process chain result
         if (!chainRes.ok) {
           const errBody = await chainRes.json().catch(()=>({}));
