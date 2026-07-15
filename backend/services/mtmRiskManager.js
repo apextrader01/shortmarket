@@ -52,24 +52,12 @@ class MTMRiskManager {
                     const user = await db('users').where({ id: userId }).first();
                     if (!user) continue;
 
-                    // The total available balance (excluding blocked margin) is simply `user.balance`
-                    // However, we want 95% of the TOTAL Wallet Balance (including blocked margins for positions).
-                    // Total Wallet Balance = user.balance + total blocked margin.
-                    // Wait, the user has blocked margin for these very positions!
-                    // Let's get the total blocked margin for this user.
-                    
-                    const userOrders = await db('orders').where({ user_id: userId, status: 'PENDING' });
-                    let totalOrderMargin = 0;
-                    userOrders.forEach(o => { totalOrderMargin += (o.margin || 0); });
-                    
-                    let totalPosMargin = 0;
-                    positions.forEach(p => { totalPosMargin += (p.margin || 0); });
+                    // The total available balance (excluding blocked margin) is `user.balance`
+                    const availableBalance = Number(user.balance);
 
-                    const totalLedgerBalance = Number(user.balance) + totalOrderMargin + totalPosMargin;
-
-                    // 95% Threshold Check
-                    if (totalMtmLoss >= (totalLedgerBalance * 0.95)) {
-                        console.log(`[RMS ALERT] User ${userId} hit 95% MTM Loss (${totalMtmLoss} >= ${totalLedgerBalance * 0.95}). Liquidating!`);
+                    // 95% Threshold Check against Available Balance
+                    if (totalMtmLoss >= (availableBalance * 0.95)) {
+                        console.log(`[RMS ALERT] User ${userId} hit 95% MTM Loss (${totalMtmLoss} >= ${availableBalance * 0.95}). Liquidating!`);
                         await this.liquidateUser(userId, positions);
                     }
                 }

@@ -95,80 +95,9 @@ class TriggerEngine {
                 });
             }
         }
-        
-        // 95% MTM Liquidation Check (Asynchronous, decoupled from tick blocking)
-        this.check95PercentMTMLiquidation(symbol, ltp).catch(err => console.error('MTM Check Error:', err));
     }
 
-    async check95PercentMTMLiquidation(symbol, ltp) {
-        // Find all users who have an open position in this symbol
-        const affectedUsers = await db('positions')
-            .where({ symbol })
-            .whereNot({ quantity: 0 })
-            .distinct('user_id')
-            .pluck('user_id');
 
-        for (const userId of affectedUsers) {
-            // Get all open positions for this user
-            const opens = await db('positions')
-                .where({ user_id: userId })
-                .whereNot({ quantity: 0 });
-
-            let totalUnrealizedPnL = 0;
-            for (const pos of opens) {
-                const currentPrice = pos.symbol === symbol ? ltp : parseFloat(pos.average_price); // Approximation for other symbols without live tick
-                const qty = pos.quantity;
-                const entryPrice = parseFloat(pos.average_price);
-                
-                if (qty > 0) {
-                    totalUnrealizedPnL += (currentPrice - entryPrice) * qty;
-                } else if (qty < 0) {
-                    totalUnrealizedPnL += (entryPrice - currentPrice) * Math.abs(qty);
-                }
-            }
-
-            if (totalUnrealizedPnL < 0) {
-                const user = await db('users').where({ id: userId }).first();
-                const availableBalance = parseFloat(user.balance);
-                const maxLossLimit = availableBalance * 0.95;
-
-                if (Math.abs(totalUnrealizedPnL) >= maxLossLimit) {
-                    console.error(`EMERGENCY 95% MARGIN CALL TRIGGERED FOR USER ${userId}`);
-                    await this.triggerRMSSquareOff(userId);
-                }
-            }
-        }
-    }
-
-    async triggerRMSSquareOff(userId) {
-        await db.transaction(async (trx) => {
-            // 1. Close all open positions with RMS penalty
-            const opens = await trx('positions').where({ user_id: userId }).whereNot({ quantity: 0 });
-            for (const pos of opens) {
-                // To close long, sell at market. To close short, buy at market.
-                // Since this is emergency, we assume exit price is current average price or tick price if we had it.
-                // We'll just exit at average_price to avoid complex live price fetching here, but it triggers the RMS penalty.
-                await LedgerService.closePosition(trx, userId, pos.id, parseFloat(pos.average_price), true);
-            }
-
-            // 2. Cancel all pending orders
-            const pendings = await trx('orders')
-                .where({ user_id: userId })
-                .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-
-            for (const order of pendings) {
-                await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
-                this.removeOrderFromMemory(order.id, order.symbol);
-                if (order.status === 'PENDING') {
-                    await LedgerService.releaseMargin(trx, userId, parseFloat(order.margin || 0), `Margin released from RMS cancelled order ${order.symbol}`);
-                }
-            }
-        });
-        
-        if (this.io) {
-            this.io.to(userId.toString()).emit('rms_alert', { message: 'EMERGENCY 95% MARGIN CALL TRIGGERED. All positions squared off.' });
-        }
-    }
 
     async executeOrder(order, execPrice) {
         await db.transaction(async (trx) => {
