@@ -287,14 +287,6 @@ export default function OrdersView() {
                       {order.tgt_price && order.sl_price && <span style={{ fontSize: '9px', background: '#f59e0b', color: '#000', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px', fontWeight: '700' }}>BO</span>}
                       {order.sl_price && !order.tgt_price && <span style={{ fontSize: '9px', background: '#8b5cf6', color: '#fff', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px', fontWeight: '700' }}>CO</span>}
                       {order.parent_order_id && <span style={{ fontSize: '9px', background: 'var(--color-blue)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>OCO</span>}
-                      
-                      {/* BO/CO Details */}
-                      {(order.sl_price || order.tgt_price) && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 'normal' }}>
-                          {order.sl_price && <span>SL: ₹{parseFloat(order.sl_price).toFixed(2)} </span>}
-                          {order.tgt_price && <span>TGT: ₹{parseFloat(order.tgt_price).toFixed(2)}</span>}
-                        </div>
-                      )}
                     </td>
                     {activeTab === 'Order History' && (
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
