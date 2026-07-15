@@ -183,7 +183,8 @@ export default function OrderModal() {
     if (success) {
       closeOrderModal();
     } else {
-      alert("Failed to place order. Please try again.");
+      const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
+      alert(errorMsg);
     }
   };
 
