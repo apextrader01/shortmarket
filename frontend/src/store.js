@@ -418,7 +418,12 @@ export const useStore = create(persist((set, get) => ({
 
   fetchBatchPrices: async (symbols) => {
     try {
-      const res      = await fetch(`${API}/api/prices/batch?symbols=${symbols.join(',')}`, { credentials: 'include' });
+      const res = await fetch(`${API}/api/ltp-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ symbols }),
+      });
       const snapshot = await res.json();
       if (snapshot && Object.keys(snapshot).length > 0) {
         set((state) => ({ prices: applySnapshot(snapshot, state) }));

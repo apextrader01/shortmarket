@@ -121,7 +121,7 @@ const OptionChainView = () => {
         const idxKey = getIndexKey(symbol);
         const initialToFetch = ['INDIA VIX-NSE'];
         if (idxKey) initialToFetch.push(idxKey);
-        useStore.getState().fetchBatchPrices(initialToFetch);
+        await useStore.getState().fetchBatchPrices(initialToFetch);
 
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
         if (!res.ok) {
