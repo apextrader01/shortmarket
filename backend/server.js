@@ -1281,9 +1281,31 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       let requiresMargin = true;
       const effectiveProductType = product_type || 'DEL';
       if (side === 'SELL') {
-          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
-          if (existingPos && existingPos.quantity >= Number(quantity)) {
-              requiresMargin = false;
+          if (effectiveProductType === 'DEL') {
+              // 1. Fetch available Holdings
+              const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
+              const holdingQty = holding ? holding.quantity : 0;
+              
+              // 2. Fetch open Positions for today
+              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
+              const posQty = existingPos && existingPos.quantity > 0 ? existingPos.quantity : 0;
+              
+              // 3. Fetch Pending Sell Orders for this symbol
+              const pendingOrders = await trx('orders')
+                  .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
+              const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+              
+              const totalAvailable = holdingQty + posQty - pendingSellQty;
+              
+              if (Number(quantity) > totalAvailable) {
+                  throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
+              }
+              requiresMargin = false; // Selling DEL from holdings requires no margin
+          } else {
+              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
+              if (existingPos && existingPos.quantity >= Number(quantity)) {
+                  requiresMargin = false;
+              }
           }
       }
 
@@ -1407,6 +1429,33 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       
       if (requiredMargin > 0 && parseFloat(user.balance) < requiredMargin) {
         throw new Error(`Insufficient Funds.`);
+      }
+
+      // 1.5 Validate SELL DEL orders against holdings (No Naked Shorting)
+      const sellDelQuantities = {};
+      for (const item of items) {
+          if (item.side === 'SELL' && (item.product_type || 'DEL') === 'DEL') {
+              sellDelQuantities[item.symbol] = (sellDelQuantities[item.symbol] || 0) + Number(item.quantity);
+          }
+      }
+      for (const symbol in sellDelQuantities) {
+          const qtyRequested = sellDelQuantities[symbol];
+          
+          const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
+          const holdingQty = holding ? holding.quantity : 0;
+          
+          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
+          const posQty = existingPos && existingPos.quantity > 0 ? existingPos.quantity : 0;
+          
+          const pendingOrders = await trx('orders')
+              .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
+          const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+          
+          const totalAvailable = holdingQty + posQty - pendingSellQty;
+          
+          if (qtyRequested > totalAvailable) {
+              throw new Error(`Insufficient holdings for ${symbol}. You only have ${totalAvailable} shares available to sell.`);
+          }
       }
 
       // 2. Deduct total margin

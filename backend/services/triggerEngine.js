@@ -130,8 +130,13 @@ class TriggerEngine {
                     if (holding && holding.quantity > 0) {
                         const offsetQty = Math.min(Math.abs(remainingQty), holding.quantity);
                         
-                        // Deduct from holding
-                        await trx('holdings').where({ id: holding.id }).update({ quantity: holding.quantity - offsetQty });
+                        // Deduct from holding or remove row if sold out
+                        const newHoldingQty = holding.quantity - offsetQty;
+                        if (newHoldingQty <= 0) {
+                            await trx('holdings').where({ id: holding.id }).del();
+                        } else {
+                            await trx('holdings').where({ id: holding.id }).update({ quantity: newHoldingQty });
+                        }
                         
                         // Create a CLOSED position record for today
                         const realizedPnl = (execPrice - holding.average_price) * offsetQty;
