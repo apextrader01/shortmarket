@@ -254,8 +254,8 @@ const OptionChainView = () => {
 
           visibleStrikes.forEach((strike) => {
             const data = optionsData[expiry]?.[strike];
-            if (data?.CE) uniqueSymbolsToFetch.push(data.CE.symbol);
-            if (data?.PE) uniqueSymbolsToFetch.push(data.PE.symbol);
+            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
+            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
           });
 
           if (uniqueSymbolsToFetch.length > 0) {
