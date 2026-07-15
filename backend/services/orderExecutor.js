@@ -67,37 +67,44 @@ async function spawnBracketOrders(trx, order) {
   // The side of the child orders is OPPOSITE to the parent order's side
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
 
-  // OCO (One Cancels Other) requires a parent_order_id link
+  const triggerEngine = require('./triggerEngine');
+  
   if (hasSL) {
-    await trx('orders').insert({
+    const slOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
       type: 'SL-M', // Stop Loss Market
       side: childSide,
       quantity: order.quantity,
       price: null,
-      status: 'PENDING',
+      status: 'PENDING_TRIGGER',
       trigger_price: order.sl_price,
       product_type: order.product_type,
       parent_order_id: order.id,
-      margin: 0 // Brackets usually don't block additional margin since they close a position
-    });
+      margin: 0
+    };
+    const [slId] = await trx('orders').insert(slOrder).returning('id');
+    slOrder.id = typeof slId === 'object' ? slId.id : slId;
+    triggerEngine.addOrderToMemory(slOrder);
   }
 
   if (hasTgt) {
-    await trx('orders').insert({
+    const tgtOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
       type: 'LIMIT',
       side: childSide,
       quantity: order.quantity,
       price: order.tgt_price,
-      status: 'PENDING',
+      status: 'PENDING_TRIGGER',
       trigger_price: null,
       product_type: order.product_type,
       parent_order_id: order.id,
       margin: 0
-    });
+    };
+    const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
+    tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
+    triggerEngine.addOrderToMemory(tgtOrder);
   }
 }
 

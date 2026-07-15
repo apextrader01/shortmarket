@@ -1319,6 +1319,14 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
+      
+      const triggerEngine = require('./services/triggerEngine');
+      if (status === 'PENDING' || status === 'PENDING_TRIGGER') {
+         triggerEngine.addOrderToMemory({
+           id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
+           status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
+         });
+      }
 
       const { calculateTaxes } = require('./services/taxCalculator');
 
@@ -1587,7 +1595,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
     await db.transaction(async (trx) => {
       const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
       if (!order) return res.status(404).json({ error: 'Order not found' });
-      if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be cancelled' });
+      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') return res.status(400).json({ error: 'Only pending orders can be cancelled' });
       
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
@@ -1595,7 +1603,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // OCO: Cancel sibling if it exists
       if (order.parent_order_id) {
           await trx('orders')
-            .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
+            .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
             .whereNot({ id: order.id })
             .update({ status: 'CANCELLED' });
             
@@ -1630,6 +1638,9 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
           const user = await trx('users').where({ id: req.user.id }).first();
           await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
       }
+      
+      const triggerEngine = require('./services/triggerEngine');
+      triggerEngine.removeOrderFromMemory(req.params.id, order.symbol);
       
       res.json({ success: true });
     });
@@ -1677,8 +1688,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       // Update child OCO orders (SL and Target legs) if sl_price or tgt_price changed
       if (sl_price !== undefined || tgt_price !== undefined) {
         const childOrders = await trx('orders')
-          .where({ parent_order_id: req.params.id, status: 'PENDING' });
+          .where({ parent_order_id: req.params.id, status: 'PENDING_TRIGGER' });
         
+        const triggerEngine = require('./services/triggerEngine');
         for (const child of childOrders) {
           if (child.type === 'SL-M' && sl_price !== undefined) {
             await trx('orders').where({ id: child.id }).update({ 
@@ -1697,6 +1709,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       if (marginDifference !== 0) {
           await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
       }
+      
+      const triggerEngine = require('./services/triggerEngine');
+      triggerEngine.addOrderToMemory({ ...order, ...updateObj });
       
       res.json({ success: true });
     });
