@@ -172,14 +172,15 @@ const OptionChainView = () => {
     setFutureData(null); // Clear old future data so it doesn't anchor to previous symbol's price
   }, [symbol, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
+  const commodities = [
+    'CRUDEOIL', 'CRUDEOILM', 
+    'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 
+    'SILVER', 'SILVERM', 'SILVERMIC', 
+    'NATURALGAS', 'NATURALGASM', 
+    'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
+  ];
+
   const getIndexKey = (sym) => {
-    const commodities = [
-      'CRUDEOIL', 'CRUDEOILM', 
-      'GOLD', 'GOLDM', 'GOLDGUINEA', 'GOLDPETAL', 
-      'SILVER', 'SILVERM', 'SILVERMIC', 
-      'NATURALGAS', 'NATURALGASM', 
-      'COPPER', 'ZINC', 'ZINCMINI', 'LEAD', 'LEADMINI', 'ALUMINIUM', 'ALUMINI', 'MENTHAOIL', 'COTTONCNDY'
-    ];
     if (sym === 'SENSEX' || sym === 'BANKEX') return `${sym}-BSE`;
     if (commodities.includes(sym)) return null; // Commodities use futures price, not spot
     return `${sym}-NSE`;
