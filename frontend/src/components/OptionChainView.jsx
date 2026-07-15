@@ -119,8 +119,27 @@ const OptionChainView = () => {
       setOptionsData({}); // Clear old chain data
       try {
         const idxKey = getIndexKey(symbol);
+        const isCommodity = commodities.includes(symbol);
+
+        // Fetch Future first (needed for commodity spot price)
+        let futDataResult = null;
+        const futRes = await fetch(`${API}/api/options/futures/${symbol}`);
+        if (futRes.ok) {
+          futDataResult = await futRes.json();
+          setFutureData(futDataResult);
+          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          setFutureTokenKey(futKey);
+        } else {
+          setFutureData(null);
+          setFutureTokenKey(null);
+        }
+
+        // Build initial batch: VIX + index key (for stocks) or futures key (for commodities)
         const initialToFetch = ['INDIA VIX-NSE'];
         if (idxKey) initialToFetch.push(idxKey);
+        if (isCommodity && futDataResult) {
+          initialToFetch.push(`${futDataResult.symbol}-${futDataResult.exchange}`);
+        }
         await useStore.getState().fetchBatchPrices(initialToFetch);
 
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
@@ -139,21 +158,6 @@ const OptionChainView = () => {
         setExpiries(expList);
         if (expList.length > 0) {
           setExpiry(expList[0]);
-        }
-
-        // Fetch Future
-        const futRes = await fetch(`${API}/api/options/futures/${symbol}`);
-        if (futRes.ok) {
-          const futData = await futRes.json();
-          setFutureData(futData);
-          const futKey = `${futData.symbol}-${futData.exchange}`;
-          setFutureTokenKey(futKey);
-          if (commodities.includes(symbol)) {
-            useStore.getState().fetchBatchPrices([futKey]);
-          }
-        } else {
-          setFutureData(null);
-          setFutureTokenKey(null);
         }
 
       } catch (err) {
