@@ -1683,7 +1683,18 @@ app.get('/api/candles/:symbol', async (req, res) => {
     }
 
     const candles = await fetchCandleData(cleanSymbol, interval);
-    
+
+    // Retry once if empty — the Angel One token may still be initializing at boot
+    // (login is async; the first candle request can arrive before setAccessToken finishes)
+    if ((!candles || candles.length === 0)) {
+      await new Promise(r => setTimeout(r, 500));
+      const retryCandles = await fetchCandleData(cleanSymbol, interval);
+      if (retryCandles && retryCandles.length > 0) {
+        candleCache[cacheKey] = { timestamp: now, data: retryCandles };
+        return res.json(retryCandles);
+      }
+    }
+
     // Save to cache only if valid data is returned
     if (candles && candles.length > 0) {
       candleCache[cacheKey] = {

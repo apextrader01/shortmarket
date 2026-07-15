@@ -851,7 +851,7 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             
             if (!smart_api.access_token) return [];
             const response = await fetch('https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData', {
-                signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(3000) : undefined,
+                signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(8000) : undefined,
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${smart_api.access_token}`,
