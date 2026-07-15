@@ -20,19 +20,26 @@ export default function OrdersView() {
   
   const boLegTriggers = orders
     .filter(order => order.status === 'PENDING_TRIGGER' && order.parent_order_id)
-    .map(order => ({
-      id: order.id,
-      symbol: order.symbol,
-      type: order.type, // 'SL-M' or 'LIMIT'
-      side: order.side,
-      quantity: order.quantity,
-      limitPrice: order.price ? parseFloat(order.price) : null,
-      triggerPrice: order.trigger_price ? parseFloat(order.trigger_price) : null,
-      productType: order.product_type || 'DEL',
-      status: 'PENDING_TRIGGER', // Style it as pending trigger
-      createdAt: order.created_at,
-      isBackendOrder: true
-    }));
+    .map(order => {
+      let pType = order.product_type || 'INT';
+      if (order.trigger_type === 'BO') pType = 'BO';
+      else if (order.trigger_type === 'CO') pType = 'CO';
+      if (pType === 'DEL') pType = 'INT'; // Legs are never DEL
+
+      return {
+        id: order.id,
+        symbol: order.symbol,
+        type: order.type,
+        side: order.side,
+        quantity: order.quantity,
+        limitPrice: order.price ? parseFloat(order.price) : null,
+        triggerPrice: order.trigger_price ? parseFloat(order.trigger_price) : null,
+        productType: pType,
+        status: 'PENDING_TRIGGER',
+        createdAt: order.created_at,
+        isBackendOrder: true
+      };
+    });
 
   let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
   
@@ -256,7 +263,9 @@ export default function OrdersView() {
                     <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                       <span style={{ background: order.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span>{order.side}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.8 }}>({order.product_type || 'DEL'})</span>
+                        <span style={{ fontSize: '10px', opacity: 0.8 }}>
+                          ({(order.sl_price && order.tgt_price) ? 'BO' : (order.sl_price && !order.parent_order_id) ? 'CO' : (order.product_type || 'DEL')})
+                        </span>
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
@@ -356,7 +365,11 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Product Type:</span>
-                <span style={{ fontWeight: '600' }}>{selectedOrder.product_type === 'INT' ? 'INTRADAY (MIS)' : 'DELIVERY (NRML)'}</span>
+                <span style={{ fontWeight: '600' }}>
+                  {(selectedOrder.sl_price && selectedOrder.tgt_price) ? 'BRACKET ORDER (BO)' : 
+                   (selectedOrder.sl_price && !selectedOrder.parent_order_id) ? 'COVER ORDER (CO)' : 
+                   selectedOrder.product_type === 'INT' ? 'INTRADAY (MIS)' : 'DELIVERY (NRML)'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Order Type:</span>
