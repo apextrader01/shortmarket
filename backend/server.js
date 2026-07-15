@@ -383,6 +383,7 @@ app.get('/api/user', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     delete user.password_hash;
     if (typeof user.watchlists === 'string') user.watchlists = JSON.parse(user.watchlists);
+    user.balance = parseFloat(user.balance || 0);
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -523,6 +524,24 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const targetUserId = req.params.id;
+    await db.transaction(async (trx) => {
+      await trx('orders').where({ user_id: targetUserId }).del();
+      await trx('positions').where({ user_id: targetUserId }).del();
+      await trx('ledger').where({ user_id: targetUserId }).del();
+      await trx('users').where({ id: targetUserId }).update({ balance: 1000000.0 });
+    });
+    res.json({ success: true, message: 'User account reset to ₹10,00,000.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset user' });
   }
 });
 
@@ -744,6 +763,34 @@ app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Reset Account ──────────────────────────────────────────────────────────
+app.post('/api/user/reset', authenticateToken, async (req, res) => {
+  try {
+    await db.transaction(async (trx) => {
+      // 1. Nullify self-referencing FK links first so the batch delete doesn't
+      //    trip the orders.linked_order_id / parent_order_id constraints.
+      await trx('orders').where({ user_id: req.user.id }).update({ linked_order_id: null, parent_order_id: null });
+      // 2. Delete all trades (orders)
+      await trx('orders').where({ user_id: req.user.id }).del();
+      // 3. Delete all holdings/positions
+      await trx('positions').where({ user_id: req.user.id }).del();
+      // 4. Clear holdings table if it exists (T+1 delivery inventory)
+      const hasHoldings = await trx.schema.hasTable('holdings');
+      if (hasHoldings) {
+        await trx('holdings').where({ user_id: req.user.id }).del();
+      }
+      // 5. Delete ledger history
+      await trx('ledger').where({ user_id: req.user.id }).del();
+      // 6. Reset balance to 10 Lakh (1,000,000)
+      await trx('users').where({ id: req.user.id }).update({ balance: 1000000.0 });
+    });
+    res.json({ success: true, message: 'Account successfully reset to ₹10,00,000.' });
+  } catch (err) {
+    console.error('Reset Account Error:', err);
+    res.status(500).json({ error: 'Failed to reset account' });
   }
 });
 
