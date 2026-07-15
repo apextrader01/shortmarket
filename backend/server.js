@@ -1301,26 +1301,36 @@ app.post('/api/order', authenticateToken, async (req, res) => {
           }
       }
 
-      if (margin && Number(margin) > 0 && requiresMargin) {
+      let finalMargin = Number(margin) || 0;
+      if (requiresMargin && finalMargin <= 0) {
+          const { calculateRequiredMargin } = require('./services/marginEngine');
+          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, Number(quantity), execPrice);
+      }
+
+      if (requiresMargin && finalMargin > 0) {
         const user = await trx('users').where({ id: req.user.id }).first();
-        if (user.balance < Number(margin)) {
-           throw new Error('Insufficient funds');
+        if (Number(user.balance) < finalMargin) {
+           throw new Error('Insufficient Funds.');
         }
-        const newBalance = Number(user.balance) - Number(margin);
+        const newBalance = Number(user.balance) - finalMargin;
         await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
         
         await trx('ledger').insert({
             user_id: req.user.id,
-            amount: -Number(margin),
+            amount: -finalMargin,
             type: 'MARGIN_BLOCK',
-            description: `Margin blocked for ${side} ${quantity} ${symbol} (${product_type || 'DEL'})`
+            description: `Margin blocked for ${side} ${quantity} ${symbol} (${effectiveProductType})`
         });
       }
+
+      // Ensure margin passed down to insert is the final margin
+      const marginToSave = requiresMargin ? finalMargin : 0;
+
 
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
@@ -1519,7 +1529,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       const user = await trx('users').where({ id: req.user.id }).first();
       
       if (requiredMargin > 0 && parseFloat(user.balance) < requiredMargin) {
-        throw new Error(`Insufficient balance. Requires ₹${requiredMargin.toFixed(2)}`);
+        throw new Error(`Insufficient Funds.`);
       }
 
       // 2. Deduct total margin
@@ -1673,7 +1683,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       // Check if user has enough balance if margin increases
       const user = await trx('users').where({ id: req.user.id }).first();
       if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
-         return res.status(400).json({ error: 'Insufficient balance to increase order size' });
+         return res.status(400).json({ error: 'Insufficient Funds.' });
       }
 
       // Build update object
