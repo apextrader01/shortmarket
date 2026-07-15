@@ -10,6 +10,8 @@ export default function PortfolioView() {
   let totalCurrent = 0;
   let totalInvestedStocks = 0;
   let totalInvestedETFs = 0;
+  let totalInvestedDerivatives = 0;
+  let totalInvestedMutualFunds = 0;
   let unrealizedPnl = 0;
 
   // Render holdings instead of filtering today's positions for DEL
@@ -29,15 +31,19 @@ export default function PortfolioView() {
       else if (pos.quantity < 0) pnl = invested - current;
       unrealizedPnl += pnl;
 
-      // For portfolio breakdown, include Holdings and newly bought Delivery
-      if (isHolding || pos.product_type === 'DEL') {
+      // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)
+      if (isHolding) {
           totalInvested += invested;
           totalCurrent += current;
 
           const symbolStr = pos.symbol || '';
-          const isETF = symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID');
-          if (isETF) {
+          
+          if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
               totalInvestedETFs += invested;
+          } else if (symbolStr.endsWith('CE') || symbolStr.endsWith('PE') || symbolStr.endsWith('FUT')) {
+              totalInvestedDerivatives += invested;
+          } else if (symbolStr.includes('MF') || symbolStr.includes('MUTUALFUND')) {
+              totalInvestedMutualFunds += invested;
           } else {
               totalInvestedStocks += invested;
           }
@@ -69,11 +75,12 @@ export default function PortfolioView() {
   const isGain = overallGain >= 0;
 
   // Chart Data
-  const COLORS = ['#3B82F6', '#22C55E', '#EAB308'];
+  const COLORS = ['#3B82F6', '#22C55E', '#EAB308', '#A855F7'];
   const chartData = [
     { name: 'Stocks', value: totalInvestedStocks },
     { name: 'ETFs', value: totalInvestedETFs },
-    { name: 'Mutual Funds', value: 0 }, // Future addition
+    { name: 'Derivatives', value: totalInvestedDerivatives },
+    { name: 'Mutual Funds', value: totalInvestedMutualFunds }
   ].filter(d => d.value > 0);
   
   // If no investments yet, show placeholder
