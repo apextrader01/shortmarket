@@ -1587,7 +1587,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
     await db.transaction(async (trx) => {
       const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
       if (!order) return res.status(404).json({ error: 'Order not found' });
-      if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be modified' });
+      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
+        return res.status(400).json({ error: 'Only PENDING or PENDING_TRIGGER orders can be modified' });
+      }
       
       const { calculateRequiredMargin } = require('./services/marginEngine');
       const oldMargin = parseFloat(order.margin || 0);
@@ -1600,12 +1602,38 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
          return res.status(400).json({ error: 'Insufficient Funds.' });
       }
 
+      // Mathematical Price Validation for PENDING_TRIGGER
+      if (order.status === 'PENDING_TRIGGER') {
+         const parent = await trx('orders').where({ id: order.parent_order_id }).first();
+         if (parent) {
+             const entryPrice = parseFloat(parent.price);
+             if (order.type === 'SL-M') {
+                 if (order.side === 'SELL' && parseFloat(price) >= entryPrice) {
+                     return res.status(400).json({ error: 'BO Buy: Stop-Loss must be lower than execution price.' });
+                 } else if (order.side === 'BUY' && parseFloat(price) <= entryPrice) {
+                     return res.status(400).json({ error: 'BO Sell: Stop-Loss must be higher than execution price.' });
+                 }
+             } else if (order.type === 'LIMIT') {
+                 if (order.side === 'SELL' && parseFloat(price) <= entryPrice) {
+                     return res.status(400).json({ error: 'BO Buy: Target must be higher than execution price.' });
+                 } else if (order.side === 'BUY' && parseFloat(price) >= entryPrice) {
+                     return res.status(400).json({ error: 'BO Sell: Target must be lower than execution price.' });
+                 }
+             }
+         }
+      }
+
       // Build update object
       const updateObj = { 
           quantity: Number(quantity), 
           price: parseFloat(price),
           margin: newMargin
       };
+
+      if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M') {
+          updateObj.trigger_price = parseFloat(price);
+          updateObj.price = null; // SL-M is a market order when triggered
+      }
 
       // Update sl_price and tgt_price if provided
       if (sl_price !== undefined) updateObj.sl_price = sl_price;
