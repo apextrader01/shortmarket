@@ -1246,15 +1246,26 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // Block new Intraday orders for non-commodities after 3:15 PM IST
+  // Block new Intraday orders outside valid time windows
   if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const hours = istTime.getHours();
+    const minutes = istTime.getMinutes();
+    
     if (!isCommodity) {
-      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      const hours = istTime.getHours();
-      const minutes = istTime.getMinutes();
-      if (hours > 15 || (hours === 15 && minutes >= 15)) {
-        return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is blocked after 3:15 PM IST.' });
+      // Equities: 9:15 AM to 3:15 PM
+      const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
+      const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
+      if (isBeforeOpen || isAfterClose) {
+        return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
+      }
+    } else {
+      // Commodities: 9:00 AM to 10:50 PM
+      const isBeforeOpen = hours < 9;
+      const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
+      if (isBeforeOpen || isAfterClose) {
+        return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
       }
     }
   }
@@ -1421,14 +1432,23 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
   // Block Intraday cutoff
   for (const item of items) {
-    if (item.product_type === 'INT') {
+    if (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO') {
       const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => item.symbol.startsWith(c));
+      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      
       if (!isCommodity) {
-        const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        const hours = istTime.getHours();
-        const minutes = istTime.getMinutes();
-        if (hours > 15 || (hours === 15 && minutes >= 15)) {
-          return res.status(400).json({ error: 'Intraday trading for Equities is blocked after 3:15 PM IST.' });
+        const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
+        const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
+        if (isBeforeOpen || isAfterClose) {
+          return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
+        }
+      } else {
+        const isBeforeOpen = hours < 9;
+        const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
+        if (isBeforeOpen || isAfterClose) {
+          return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
         }
       }
     }
@@ -1895,6 +1915,9 @@ server.listen(PORT, '0.0.0.0', async () => {
   triggerEngine.setSocketIo(io);
   await triggerEngine.loadPendingOrders();
   console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
+
+  // Initialize EOD Positions Engine (Cron Automations)
+  require('./services/positionsEngine');
 
   // Initialize MTM Risk Manager: 95% auto-liquidation rule (checks every 2s)
   new MTMRiskManager(priceCache).start();
