@@ -1263,20 +1263,24 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   const valPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
   if (product_type === 'BO') {
       if (!sl_price || !tgt_price) return res.status(400).json({ error: 'Bracket Orders (BO) require both Stop-Loss and Target prices. Direct square-off from positions is blocked.' });
-      if (side === 'BUY') {
-          if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'BO Buy: Stop-Loss must be lower than execution price.' });
-          if (parseFloat(tgt_price) <= valPrice) return res.status(400).json({ error: 'BO Buy: Target must be higher than execution price.' });
-      } else {
-          if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'BO Sell: Stop-Loss must be higher than execution price.' });
-          if (parseFloat(tgt_price) >= valPrice) return res.status(400).json({ error: 'BO Sell: Target must be lower than execution price.' });
+      if (valPrice > 0) {
+          if (side === 'BUY') {
+              if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'BO Buy: Stop-Loss must be lower than execution price.' });
+              if (parseFloat(tgt_price) <= valPrice) return res.status(400).json({ error: 'BO Buy: Target must be higher than execution price.' });
+          } else {
+              if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'BO Sell: Stop-Loss must be higher than execution price.' });
+              if (parseFloat(tgt_price) >= valPrice) return res.status(400).json({ error: 'BO Sell: Target must be lower than execution price.' });
+          }
       }
   }
   if (product_type === 'CO') {
       if (!sl_price) return res.status(400).json({ error: 'Cover Orders (CO) require a Stop-Loss price. Direct square-off from positions is blocked.' });
-      if (side === 'BUY') {
-          if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'CO Buy: Stop-Loss must be lower than execution price.' });
-      } else {
-          if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'CO Sell: Stop-Loss must be higher than execution price.' });
+      if (valPrice > 0) {
+          if (side === 'BUY') {
+              if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'CO Buy: Stop-Loss must be lower than execution price.' });
+          } else {
+              if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'CO Sell: Stop-Loss must be higher than execution price.' });
+          }
       }
   }
 
