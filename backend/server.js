@@ -1659,7 +1659,10 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       
       const { calculateRequiredMargin } = require('./services/marginEngine');
       const oldMargin = parseFloat(order.margin || 0);
-      const newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
+      let newMargin = 0;
+      if (!order.parent_order_id) {
+          newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
+      }
       const marginDifference = newMargin - oldMargin;
       
       // Check if user has enough balance if margin increases
