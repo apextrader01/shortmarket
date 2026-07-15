@@ -1375,9 +1375,32 @@ app.post('/api/ltp-batch', async (req, res) => {
     if (!symbols || !Array.isArray(symbols)) {
       return res.status(400).json({ error: 'Missing or invalid symbols array' });
     }
-    const { fetchBatchLTPs } = require('./services/angelOne');
-    const data = await fetchBatchLTPs(symbols);
-    res.json(data);
+    
+    const result = {};
+    const missingSymbols = [];
+    
+    // 1. Try to serve from memory cache instantly
+    for (const sym of symbols) {
+      if (priceCache[sym] && priceCache[sym].ltp > 0) {
+        result[sym] = priceCache[sym];
+      } else {
+        missingSymbols.push(sym);
+      }
+    }
+    
+    // 2. Fetch only missing symbols from Angel One REST API
+    if (missingSymbols.length > 0) {
+      const { fetchBatchLTPs } = require('./services/angelOne');
+      const data = await fetchBatchLTPs(missingSymbols);
+      for (const [sym, ltpData] of Object.entries(data)) {
+        result[sym] = ltpData;
+        if (ltpData && ltpData.ltp > 0) {
+          priceCache[sym] = ltpData;
+        }
+      }
+    }
+    
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
