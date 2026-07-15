@@ -1281,7 +1281,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       let requiresMargin = true;
       const effectiveProductType = product_type || 'DEL';
       if (side === 'SELL') {
-          if (effectiveProductType === 'DEL') {
+          const isDerivative = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
+          if (effectiveProductType === 'DEL' && !isDerivative) {
               // 1. Fetch available Holdings
               const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
               const holdingQty = holding ? holding.quantity : 0;
@@ -1301,7 +1302,14 @@ app.post('/api/order', authenticateToken, async (req, res) => {
                   throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
               }
               requiresMargin = false; // Selling DEL from holdings requires no margin
-          } else {
+          } else if (!isDerivative || effectiveProductType !== 'DEL') {
+              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
+              if (existingPos && existingPos.quantity >= Number(quantity)) {
+                  requiresMargin = false;
+              }
+          } else if (isDerivative && effectiveProductType === 'DEL') {
+              // Option writing / Future shorting in Delivery (NRML).
+              // Check if we are closing an existing long position.
               const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
               if (existingPos && existingPos.quantity >= Number(quantity)) {
                   requiresMargin = false;
