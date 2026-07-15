@@ -16,9 +16,14 @@ export default function EditOrderModal() {
   const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
   const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
 
-  // Determine if BO or CO
-  const isBO = order ? (order.sl_price && order.tgt_price) : false;
-  const isCO = order ? (order.sl_price && !order.tgt_price) : false;
+  // Determine if BO or CO (handles both Parent Open Orders and Child Pending Legs)
+  const isBOParent = order ? !!(order.sl_price && order.tgt_price) : false;
+  const isCOParent = order ? !!(order.sl_price && !order.tgt_price && !order.parent_order_id) : false;
+  const isBOLeg = order ? (order.productType === 'BO' || order.product_type === 'BO' || order.trigger_type === 'BO') : false;
+  const isCOLeg = order ? (order.productType === 'CO' || order.product_type === 'CO' || order.trigger_type === 'CO') : false;
+  
+  const isBO = isBOParent || isBOLeg;
+  const isCO = isCOParent || isCOLeg;
 
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
