@@ -238,6 +238,12 @@ app.post('/api/auth/register', async (req, res) => {
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
     res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
   } catch (err) {
     const errorMsg = err.message || String(err);
@@ -263,6 +269,12 @@ app.post('/api/auth/login', async (req, res) => {
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
     res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
   } catch (err) {
     const errorMsg = err.message || String(err);
@@ -272,6 +284,13 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: errorMsg || 'Unknown error occurred during login' });
   }
 });
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'lax' });
+  res.json({ success: true });
+});
+
 // ─── Forgot Password ────────────────────────────────────────────────────────
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
