@@ -325,7 +325,7 @@ export default function OrderModal() {
               </fieldset>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
                 <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: 'var(--color-blue)' }} /> 
-                Trigger buy <Info size={12} />
+                Trigger {side.toLowerCase()} <Info size={12} />
               </label>
             </div>
           </div>

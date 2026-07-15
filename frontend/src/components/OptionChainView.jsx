@@ -118,6 +118,11 @@ const OptionChainView = () => {
       setError(null);
       setOptionsData({}); // Clear old chain data
       try {
+        const idxKey = getIndexKey(symbol);
+        const initialToFetch = ['INDIA VIX-NSE'];
+        if (idxKey) initialToFetch.push(idxKey);
+        useStore.getState().fetchBatchPrices(initialToFetch);
+
         const res = await fetch(`${API}/api/options/chain/${symbol}`);
         if (!res.ok) {
           const errBody = await res.json().catch(()=>({}));
