@@ -1259,37 +1259,12 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     }
   }
 
-  // BO / CO Mathematical Validation & Square-Off Blocker
-  const valPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
-  if (product_type === 'BO') {
-      if (!sl_price || !tgt_price) return res.status(400).json({ error: 'Bracket Orders (BO) require both Stop-Loss and Target prices. Direct square-off from positions is blocked.' });
-      if (valPrice > 0) {
-          if (side === 'BUY') {
-              if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'BO Buy: Stop-Loss must be lower than execution price.' });
-              if (parseFloat(tgt_price) <= valPrice) return res.status(400).json({ error: 'BO Buy: Target must be higher than execution price.' });
-          } else {
-              if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'BO Sell: Stop-Loss must be higher than execution price.' });
-              if (parseFloat(tgt_price) >= valPrice) return res.status(400).json({ error: 'BO Sell: Target must be lower than execution price.' });
-          }
-      }
-  }
-  if (product_type === 'CO') {
-      if (!sl_price) return res.status(400).json({ error: 'Cover Orders (CO) require a Stop-Loss price. Direct square-off from positions is blocked.' });
-      if (valPrice > 0) {
-          if (side === 'BUY') {
-              if (parseFloat(sl_price) >= valPrice) return res.status(400).json({ error: 'CO Buy: Stop-Loss must be lower than execution price.' });
-          } else {
-              if (parseFloat(sl_price) <= valPrice) return res.status(400).json({ error: 'CO Sell: Stop-Loss must be higher than execution price.' });
-          }
-      }
-  }
-
   try {
-      await db.transaction(async (trx) => {
-        // 1. Determine execution status
-        const isMarket = type === 'MARKET';
-        const status = isMarket ? 'EXECUTED' : 'PENDING';
-        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
+    await db.transaction(async (trx) => {
+      // 1. Determine execution status
+      const isMarket = type === 'MARKET';
+      const status = 'PENDING';
+      const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
       
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
@@ -1326,7 +1301,6 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // Ensure margin passed down to insert is the final margin
       const marginToSave = requiresMargin ? finalMargin : 0;
 
-
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
@@ -1335,79 +1309,17 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       const orderId = typeof id === 'object' ? id.id : id;
       
       const triggerEngine = require('./services/triggerEngine');
-      if (status === 'PENDING' || status === 'PENDING_TRIGGER') {
-         triggerEngine.addOrderToMemory({
-           id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-           status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: requiresMargin ? Number(margin) : 0
-         });
-      }
+      triggerEngine.addOrderToMemory({
+        id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: marginToSave
+      });
+      
+      // Manually trigger an evaluation to instantly process Market orders in the background
+      triggerEngine.evaluateTick(symbol, execPrice).catch(err => console.error('Immediate evaluation error:', err));
 
-      const { calculateTaxes } = require('./services/taxCalculator');
-
-      // 4. Update Positions if EXECUTED
-      if (status === 'EXECUTED') {
-        const taxesObj = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), execPrice);
-        const totalTaxes = taxesObj.totalTaxes;
-        let realizedPnl = 0;
-        let marginRefund = 0;
-
-        await trx('orders').where({ id: orderId }).update({ taxes: totalTaxes });
-
-        // Only find open positions (quantity != 0) — closed position records must not be reused
-        const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
-        const qtyChange = side === 'BUY' ? Number(quantity) : -Number(quantity);
-        
-        if (existingPos) {
-          const newQty = existingPos.quantity + qtyChange;
-          let newAvgPrice = existingPos.average_price;
-          let newMargin = parseFloat(existingPos.margin) || 0;
-          
-          if ((existingPos.quantity > 0 && side === 'BUY') || (existingPos.quantity < 0 && side === 'SELL')) {
-            const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
-            const newTotal = Number(quantity) * execPrice;
-            newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
-            newMargin += Number(margin);
-          }
-
-          // Are we CLOSING a position?
-          let isPartialClose = false;
-          if ((existingPos.quantity > 0 && side === 'SELL') || (existingPos.quantity < 0 && side === 'BUY')) {
-               isPartialClose = true;
-               if (existingPos.quantity > 0) {
-                   realizedPnl = (execPrice - existingPos.average_price) * Number(quantity);
-               } else {
-                   realizedPnl = (existingPos.average_price - execPrice) * Number(quantity);
-               }
-               
-               const proportionClosed = Math.abs(Number(quantity)) / Math.abs(existingPos.quantity);
-               marginRefund = (existingPos.margin || 0) * proportionClosed;
-               newMargin -= marginRefund;
-          }
-
-          if (newQty === 0) {
-             // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
-             await trx('positions').where({ id: existingPos.id }).update({ 
-                quantity: 0, 
-                closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + Math.abs(parseInt(existingPos.quantity)), 
-                exit_price: execPrice, 
-                margin: 0,
-                realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl
-             });
-             // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
-             await trx('orders')
-               .where({ user_id: req.user.id, symbol: symbol, status: 'PENDING' })
-               .update({ status: 'CANCELLED' });
-          } else {
-             const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
-             if (isPartialClose) {
-                updateObj.closed_quantity = (parseInt(existingPos.closed_quantity) || 0) + Math.abs(Number(quantity));
-                updateObj.exit_price = execPrice;
-                updateObj.realized_pnl = (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl;
-             }
-             await trx('positions').where({ id: existingPos.id }).update(updateObj);
-          }
-        } else {
-          // If selling something they don't have, it's a short position
+      res.json({ success: true, orderId, status });
+    });
+  } catch (error) {something they don't have, it's a short position
           await trx('positions').insert({
             user_id: req.user.id,
             symbol,
@@ -1541,10 +1453,11 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
       // 3. Process each item
       const executedOrders = [];
+      const triggerEngine = require('./services/triggerEngine');
+
       for (const item of items) {
         const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin } = item;
-        const isMarket = type === 'MARKET';
-        const status = isMarket ? 'EXECUTED' : 'PENDING';
+        const status = 'PENDING';
         
         const [orderId] = await trx('orders').insert({
           user_id: req.user.id,
@@ -1676,8 +1589,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       if (!order) return res.status(404).json({ error: 'Order not found' });
       if (order.status !== 'PENDING') return res.status(400).json({ error: 'Only PENDING orders can be modified' });
       
-      const oldMargin = order.quantity * parseFloat(order.price || 0);
-      const newMargin = Number(quantity) * parseFloat(price);
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      const oldMargin = parseFloat(order.margin || 0);
+      const newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
       const marginDifference = newMargin - oldMargin;
       
       // Check if user has enough balance if margin increases
@@ -1689,7 +1603,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       // Build update object
       const updateObj = { 
           quantity: Number(quantity), 
-          price: parseFloat(price) 
+          price: parseFloat(price),
+          margin: newMargin
       };
 
       // Update sl_price and tgt_price if provided

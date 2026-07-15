@@ -67,8 +67,9 @@ class TriggerEngine {
             let shouldExecute = false;
 
             if (order.status === 'PENDING') {
-                // Limit Orders
-                if (order.type === 'LIMIT') {
+                if (order.type === 'MARKET') {
+                    shouldExecute = true;
+                } else if (order.type === 'LIMIT') {
                     if (order.side === 'BUY' && ltp <= order.price) shouldExecute = true;
                     if (order.side === 'SELL' && ltp >= order.price) shouldExecute = true;
                 }
