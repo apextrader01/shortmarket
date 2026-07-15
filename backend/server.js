@@ -1431,10 +1431,11 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         throw new Error(`Insufficient Funds.`);
       }
 
-      // 1.5 Validate SELL DEL orders against holdings (No Naked Shorting)
+      // 1.5 Validate SELL DEL orders against holdings (No Naked Shorting for Equities)
       const sellDelQuantities = {};
       for (const item of items) {
-          if (item.side === 'SELL' && (item.product_type || 'DEL') === 'DEL') {
+          const isDerivative = item.symbol.includes('CE') || item.symbol.includes('PE') || item.symbol.includes('FUT');
+          if (item.side === 'SELL' && (item.product_type || 'DEL') === 'DEL' && !isDerivative) {
               sellDelQuantities[item.symbol] = (sellDelQuantities[item.symbol] || 0) + Number(item.quantity);
           }
       }
