@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PortfolioView() {
   const [activeTab, setActiveTab] = useState('Overview');
-  const { positions, prices, orders } = useStore();
+  const { positions, holdings, prices, orders } = useStore();
 
   let totalInvested = 0;
   let totalCurrent = 0;
@@ -12,9 +12,10 @@ export default function PortfolioView() {
   let totalInvestedETFs = 0;
   let unrealizedPnl = 0;
 
-  const deliveryPositions = (positions || []).filter(p => p && p.product_type === 'DEL');
+  // Render holdings instead of filtering today's positions for DEL
+  const deliveryPositions = holdings || [];
 
-  (positions || []).forEach(pos => {
+  const calculatePnL = (pos, isHolding = false) => {
       if (!pos) return;
       const priceData = prices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
@@ -28,8 +29,8 @@ export default function PortfolioView() {
       else if (pos.quantity < 0) pnl = invested - current;
       unrealizedPnl += pnl;
 
-      // For portfolio breakdown, only include Delivery investments
-      if (pos.product_type === 'DEL') {
+      // For portfolio breakdown, include Holdings and newly bought Delivery
+      if (isHolding || pos.product_type === 'DEL') {
           totalInvested += invested;
           totalCurrent += current;
 
@@ -41,7 +42,10 @@ export default function PortfolioView() {
               totalInvestedStocks += invested;
           }
       }
-  });
+  };
+
+  (holdings || []).forEach(h => calculatePnL(h, true));
+  (positions || []).forEach(p => calculatePnL(p, false));
 
   const isToday = (dateString) => {
      if (!dateString) return false;

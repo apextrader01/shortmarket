@@ -123,6 +123,53 @@ class TriggerEngine {
             
             const qtyChange = order.side === 'BUY' ? Number(order.quantity) : -Number(order.quantity);
 
+            // Helper to handle inserting new positions or offsetting holdings
+            const handleRemainingPos = async (trx, remainingQty, execPrice) => {
+                if (order.product_type === 'DEL' && remainingQty < 0) {
+                    const holding = await trx('holdings').where({ user_id: order.user_id, symbol: order.symbol }).first();
+                    if (holding && holding.quantity > 0) {
+                        const offsetQty = Math.min(Math.abs(remainingQty), holding.quantity);
+                        
+                        // Deduct from holding
+                        await trx('holdings').where({ id: holding.id }).update({ quantity: holding.quantity - offsetQty });
+                        
+                        // Create a CLOSED position record for today
+                        const realizedPnl = (execPrice - holding.average_price) * offsetQty;
+                        await trx('positions').insert({
+                            user_id: order.user_id,
+                            symbol: order.symbol,
+                            quantity: 0,
+                            closed_quantity: offsetQty,
+                            average_price: holding.average_price,
+                            exit_price: execPrice,
+                            realized_pnl: realizedPnl,
+                            product_type: 'DEL',
+                            updated_at: new Date()
+                        });
+                        
+                        // Update Balance and Ledger with Realized P&L
+                        if (realizedPnl !== 0) {
+                            const user = await trx('users').where({ id: order.user_id }).first();
+                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + realizedPnl });
+                            await trx('ledger').insert({
+                                user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
+                            });
+                        }
+                        
+                        remainingQty += offsetQty; // e.g. -15 + 10 = -5
+                    }
+                }
+                
+                // If there's still a remaining quantity, insert an OPEN position
+                if (remainingQty !== 0) {
+                    await trx('positions').insert({
+                        user_id: order.user_id, symbol: order.symbol, quantity: remainingQty,
+                        average_price: execPrice, product_type: order.product_type,
+                        margin: Number(order.margin || 0), updated_at: new Date()
+                    });
+                }
+            };
+
             if (existingPos) {
                 // Calculate if closing or averaging
                 let isPartialClose = false;
@@ -142,15 +189,7 @@ class TriggerEngine {
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
                         const remainingQty = order.side === 'BUY' ? (absQty - absPosQty) : -(absQty - absPosQty);
-                        await trx('positions').insert({
-                            user_id: order.user_id,
-                            symbol: order.symbol,
-                            quantity: remainingQty,
-                            average_price: execPrice,
-                            product_type: order.product_type,
-                            margin: order.margin || 0,
-                            updated_at: new Date()
-                        });
+                        await handleRemainingPos(trx, remainingQty, execPrice);
                     }
                 } else {
                     // Averaging
@@ -167,16 +206,8 @@ class TriggerEngine {
                     });
                 }
             } else {
-                // Create new position
-                await trx('positions').insert({
-                    user_id: order.user_id,
-                    symbol: order.symbol,
-                    quantity: qtyChange,
-                    average_price: execPrice,
-                    product_type: order.product_type,
-                    margin: Number(order.margin || 0),
-                    updated_at: new Date()
-                });
+                // Create new position (or offset holdings)
+                await handleRemainingPos(trx, qtyChange, execPrice);
             }
 
             // 3. Bracket Order (CO/BO) Leg Generation

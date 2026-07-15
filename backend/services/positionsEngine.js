@@ -11,6 +11,12 @@ class PositionsEngine {
     }
 
     initCronJobs() {
+        // HOLDINGS MIGRATION (T+1)
+        // Phase 0: The 8:00 AM Wipe - 08:00 AM IST
+        cron.schedule('0 8 * * *', () => {
+            this.runHoldingsMigration();
+        }, { timezone: 'Asia/Kolkata' });
+
         // EQUITIES
         // Phase 2: The Order Sweep - 03:19 PM IST (15:19)
         cron.schedule('19 15 * * *', () => {
@@ -117,6 +123,54 @@ class PositionsEngine {
             }
         } catch (error) {
             console.error(`[EOD SQUARE-OFF ERROR] ${market}:`, error);
+        }
+    }
+
+    async runHoldingsMigration() {
+        console.log(`[8:00 AM WIPE] Starting T+1 Holdings Migration...`);
+        try {
+            await db.transaction(async (trx) => {
+                // 1. Fetch all Delivery positions with Qty > 0
+                const deliveryPositions = await trx('positions')
+                    .where('product_type', 'DEL')
+                    .where('quantity', '>', 0);
+
+                for (const pos of deliveryPositions) {
+                    const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
+                    const assetClass = isCommodity ? 'COMMODITY' : 'STOCK';
+
+                    // Check if holding already exists
+                    const existingHolding = await trx('holdings')
+                        .where({ user_id: pos.user_id, symbol: pos.symbol })
+                        .first();
+
+                    if (existingHolding) {
+                        // Average the price
+                        const newTotalQty = existingHolding.quantity + pos.quantity;
+                        const totalCost = (existingHolding.quantity * existingHolding.average_price) + (pos.quantity * pos.average_price);
+                        const newAvgPrice = totalCost / newTotalQty;
+
+                        await trx('holdings')
+                            .where({ id: existingHolding.id })
+                            .update({ quantity: newTotalQty, average_price: newAvgPrice });
+                    } else {
+                        // Insert new holding
+                        await trx('holdings').insert({
+                            user_id: pos.user_id,
+                            symbol: pos.symbol,
+                            quantity: pos.quantity,
+                            average_price: pos.average_price,
+                            asset_class: assetClass
+                        });
+                    }
+                }
+
+                // 2. Completely wipe the positions table to clear UI history
+                await trx('positions').del();
+                console.log(`[8:00 AM WIPE] Successfully migrated ${deliveryPositions.length} DEL positions and wiped today's history.`);
+            });
+        } catch (error) {
+            console.error(`[8:00 AM WIPE ERROR]:`, error);
         }
     }
 }

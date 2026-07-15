@@ -268,6 +268,7 @@ export const useStore = create(persist((set, get) => ({
   prices:         {},
   stocks:         [],
   positions:      [],
+  holdings:       [],
   orders:         [],
   selectedSymbol: 'RELIANCE-NSE',
 
@@ -442,15 +443,17 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const headers = {  };
-      const [posRes, ordRes, userRes] = await Promise.all([
+      const [posRes, ordRes, userRes, holdRes] = await Promise.all([
         fetch(`${API}/api/positions`, { credentials: 'include', headers }),
         fetch(`${API}/api/orders`, { credentials: 'include', headers }),
         fetch(`${API}/api/user`, { credentials: 'include', headers }),
+        fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
       ]);
-      const [positions, orders, user] = await Promise.all([
+      const [positions, orders, user, holdData] = await Promise.all([
         posRes.json().catch(() => ({})), 
         ordRes.json().catch(() => ({})), 
-        userRes.json().catch(() => ({}))
+        userRes.json().catch(() => ({})),
+        holdRes.json().catch(() => ({}))
       ]);
       
       if (userRes.status === 401 || userRes.status === 403 || user?.error) {
@@ -462,14 +465,17 @@ export const useStore = create(persist((set, get) => ({
       if (!get().user) return;
       set({
         positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
+        holdings: holdData.success ? holdData.holdings : get().holdings,
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
         user: (user && !user.error) ? user : get().user 
       });
       
       const posSymbols = (positions || []).map(p => p.symbol);
-      if (posSymbols.length > 0) {
-        get().fetchBatchPrices(posSymbols);
-        posSymbols.forEach(sym => socket.emit('subscribe', sym));
+      const holdSymbols = (holdData.holdings || []).map(h => h.symbol);
+      const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
+      if (allSymbolsToSubscribe.length > 0) {
+        get().fetchBatchPrices(allSymbolsToSubscribe);
+        allSymbolsToSubscribe.forEach(sym => socket.emit('subscribe', sym));
       }
       
       // Also fetch restricted stocks on load
