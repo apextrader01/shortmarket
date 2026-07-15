@@ -146,7 +146,11 @@ const OptionChainView = () => {
         if (futRes.ok) {
           const futData = await futRes.json();
           setFutureData(futData);
-          setFutureTokenKey(futData.symbol);
+          const futKey = `${futData.symbol}-${futData.exchange}`;
+          setFutureTokenKey(futKey);
+          if (commodities.includes(symbol)) {
+            useStore.getState().fetchBatchPrices([futKey]);
+          }
         } else {
           setFutureData(null);
           setFutureTokenKey(null);
