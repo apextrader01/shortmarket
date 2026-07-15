@@ -121,9 +121,14 @@ const OptionChainView = () => {
         const idxKey = getIndexKey(symbol);
         const isCommodity = commodities.includes(symbol);
 
-        // Fetch Future first (needed for commodity spot price)
+        // Fire ALL requests in parallel — don't wait for one before starting the next
+        const [futRes, chainRes] = await Promise.all([
+          fetch(`${API}/api/options/futures/${symbol}`),
+          fetch(`${API}/api/options/chain/${symbol}`),
+        ]);
+
+        // Process futures result
         let futDataResult = null;
-        const futRes = await fetch(`${API}/api/options/futures/${symbol}`);
         if (futRes.ok) {
           futDataResult = await futRes.json();
           setFutureData(futDataResult);
@@ -134,7 +139,7 @@ const OptionChainView = () => {
           setFutureTokenKey(null);
         }
 
-        // Build initial batch: VIX + index key (for stocks) or futures key (for commodities)
+        // Now fetch batch prices (needs futures result for commodities)
         const initialToFetch = ['INDIA VIX-NSE'];
         if (idxKey) initialToFetch.push(idxKey);
         if (isCommodity && futDataResult) {
@@ -142,12 +147,12 @@ const OptionChainView = () => {
         }
         await useStore.getState().fetchBatchPrices(initialToFetch);
 
-        const res = await fetch(`${API}/api/options/chain/${symbol}`);
-        if (!res.ok) {
-          const errBody = await res.json().catch(()=>({}));
+        // Process chain result
+        if (!chainRes.ok) {
+          const errBody = await chainRes.json().catch(()=>({}));
           throw new Error(errBody.error || 'Failed to fetch option chain');
         }
-        const data = await res.json();
+        const data = await chainRes.json();
         
         setOptionsData(data);
         const today = new Date();
