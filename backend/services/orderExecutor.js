@@ -79,7 +79,9 @@ async function spawnBracketOrders(trx, order) {
       price: null,
       status: 'PENDING_TRIGGER',
       trigger_price: order.sl_price,
+      trail_amount: order.trail_amount || null,
       product_type: order.product_type,
+      trigger_type: order.trigger_type || null,
       parent_order_id: order.id,
       margin: 0
     };
@@ -99,6 +101,7 @@ async function spawnBracketOrders(trx, order) {
       status: 'PENDING_TRIGGER',
       trigger_price: null,
       product_type: order.product_type,
+      trigger_type: order.trigger_type || null,
       parent_order_id: order.id,
       margin: 0
     };
