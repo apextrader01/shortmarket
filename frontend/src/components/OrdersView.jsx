@@ -209,20 +209,30 @@ export default function OrdersView() {
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         {trigger.status === 'PENDING_TRIGGER' && (
-                           <button 
-                             onClick={() => {
-                               if (window.confirm('Cancel this pending trigger?')) {
-                                 if (trigger.isBackendOrder) {
-                                   useStore.getState().cancelOrder(trigger.id);
-                                 } else {
-                                   removePendingTrigger(trigger.id);
+                           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                             {trigger.isBackendOrder && (
+                               <button 
+                                 onClick={() => useStore.getState().openEditOrderModal(trigger)}
+                                 style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                               >
+                                 EDIT
+                               </button>
+                             )}
+                             <button 
+                               onClick={() => {
+                                 if (window.confirm('Cancel this pending trigger?')) {
+                                   if (trigger.isBackendOrder) {
+                                     useStore.getState().cancelOrder(trigger.id);
+                                   } else {
+                                     removePendingTrigger(trigger.id);
+                                   }
                                  }
-                               }
-                             }}
-                             style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-                           >
-                             CANCEL
-                           </button>
+                               }}
+                               style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                             >
+                               CANCEL
+                             </button>
+                           </div>
                         )}
                       </td>
                     </tr>
