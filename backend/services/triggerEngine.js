@@ -253,12 +253,14 @@ class TriggerEngine {
             await this.spawnBracketLegs(trx, order);
 
             // 4. OCO (One Cancels Other) Logic for BO
-            if (order.linked_order_id) {
-                const sibling = await trx('orders').where({ id: order.linked_order_id, status: 'PENDING_TRIGGER' }).first();
-                if (sibling) {
+            if (order.parent_order_id) {
+                const siblings = await trx('orders')
+                    .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
+                    .whereNot({ id: order.id });
+                
+                for (const sibling of siblings) {
                     await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED' });
                     this.removeOrderFromMemory(sibling.id, sibling.symbol);
-                    // Free the margin blocked by the sibling (Wait, brackets don't block additional margin since they close)
                 }
             }
             
@@ -271,60 +273,8 @@ class TriggerEngine {
     }
 
     async spawnBracketLegs(trx, order) {
-        const isCO = order.trigger_type === 'CO';
-        const isBO = order.trigger_type === 'BO';
-        if (!isCO && !isBO) return;
-
-        const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
-        let slOrderId = null;
-        let tgtOrderId = null;
-
-        // Generate Stop Loss Leg
-        if (order.sl_price) {
-            const [slId] = await trx('orders').insert({
-                user_id: order.user_id,
-                symbol: order.symbol,
-                type: 'SL-M',
-                side: childSide,
-                quantity: order.quantity,
-                status: 'PENDING_TRIGGER',
-                trigger_price: order.sl_price,
-                trail_amount: order.trail_amount,
-                product_type: order.product_type,
-                trigger_type: order.trigger_type,
-                parent_order_id: order.id,
-                margin: 0
-            }).returning('*');
-            slOrderId = slId;
-            this.addOrderToMemory(slId);
-        }
-
-        // Generate Target Leg (BO only)
-        if (isBO && order.tgt_price) {
-            const [tgtId] = await trx('orders').insert({
-                user_id: order.user_id,
-                symbol: order.symbol,
-                type: 'LIMIT',
-                side: childSide,
-                quantity: order.quantity,
-                status: 'PENDING_TRIGGER',
-                trigger_price: order.tgt_price, // Treating limit tgt as trigger
-                product_type: order.product_type,
-                trigger_type: order.trigger_type,
-                parent_order_id: order.id,
-                margin: 0
-            }).returning('*');
-            tgtOrderId = tgtId;
-            this.addOrderToMemory(tgtId);
-        }
-
-        // Link OCO
-        if (slOrderId && tgtOrderId) {
-            await trx('orders').where({ id: slOrderId.id || slOrderId }).update({ linked_order_id: tgtOrderId.id || tgtOrderId });
-            await trx('orders').where({ id: tgtOrderId.id || tgtOrderId }).update({ linked_order_id: slOrderId.id || slOrderId });
-            this.addOrderToMemory(await trx('orders').where({ id: slOrderId.id || slOrderId }).first());
-            this.addOrderToMemory(await trx('orders').where({ id: tgtOrderId.id || tgtOrderId }).first());
-        }
+        const { spawnBracketOrders } = require('./orderExecutor');
+        await spawnBracketOrders(trx, order);
     }
 }
 
