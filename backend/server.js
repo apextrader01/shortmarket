@@ -14,6 +14,7 @@ const compression = require('compression');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const path = require('path');
 const fs = require('fs');
@@ -25,10 +26,11 @@ const server = http.createServer(app);
 const priceCache = {};
 
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: { origin: true, credentials: true, methods: ['GET', 'POST'] }
 });
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 app.use(compression()); // Compress all API responses to fix frontend loading lag
 
@@ -240,8 +242,8 @@ app.post('/api/auth/register', async (req, res) => {
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
@@ -271,8 +273,8 @@ app.post('/api/auth/login', async (req, res) => {
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
@@ -287,7 +289,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/auth/logout', (req, res) => {
-  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'lax' });
+  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'none', secure: true });
   res.json({ success: true });
 });
 
