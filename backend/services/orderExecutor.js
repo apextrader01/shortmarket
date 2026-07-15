@@ -99,7 +99,7 @@ async function spawnBracketOrders(trx, order) {
       quantity: order.quantity,
       price: order.tgt_price,
       status: 'PENDING_TRIGGER',
-      trigger_price: null,
+      trigger_price: order.tgt_price,
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,

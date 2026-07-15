@@ -196,10 +196,60 @@ class TriggerEngine {
                     const absPosQty = Math.abs(existingPos.quantity);
                     const closeQty = Math.min(absQty, absPosQty);
                     
+                    let realizedPnl = 0;
+                    if (existingPos.quantity > 0) {
+                        realizedPnl = (execPrice - existingPos.average_price) * closeQty;
+                    } else {
+                        realizedPnl = (existingPos.average_price - execPrice) * closeQty;
+                    }
+                    
+                    const proportionClosed = closeQty / absPosQty;
+                    const marginRefund = (existingPos.margin || 0) * proportionClosed;
+                    const newMargin = (existingPos.margin || 0) - marginRefund;
+                    
+                    const newQty = existingPos.quantity + qtyChange;
+                    
                     // Close the position
+                    if (newQty === 0) {
+                        await trx('positions').where({ id: existingPos.id }).update({ 
+                           quantity: 0, 
+                           closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + closeQty, 
+                           exit_price: execPrice, 
+                           margin: 0,
+                           realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
+                           updated_at: new Date()
+                        });
+                        // Cancel dangling pending orders
+                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, status: 'PENDING' }).update({ status: 'CANCELLED' });
+                    } else {
+                        await trx('positions').where({ id: existingPos.id }).update({
+                           quantity: newQty,
+                           margin: newMargin,
+                           closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + closeQty,
+                           exit_price: execPrice,
+                           realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
+                           updated_at: new Date()
+                        });
+                    }
+
+                    // Update Ledger for realized P&L and margin refund
                     const isRMS = order.is_rms || false;
-                    const { realizedPnl, exitTaxes, rmsPenalty, netRelease } = await LedgerService.closePosition(trx, order.user_id, existingPos.id, execPrice, isRMS);
-                    await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
+                    const rmsPenalty = isRMS ? 59 : 0;
+                    let balanceChange = realizedPnl + marginRefund - rmsPenalty;
+                    
+                    if (marginRefund > 0) {
+                        await trx('ledger').insert({ user_id: order.user_id, amount: marginRefund, type: 'MARGIN_RELEASE', description: `Margin released for closing ${closeQty} ${order.symbol}` });
+                    }
+                    if (realizedPnl !== 0) {
+                        await trx('ledger').insert({ user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for ${order.symbol}` });
+                        await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
+                    }
+                    if (rmsPenalty > 0) {
+                        await trx('ledger').insert({ user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `RMS Penalty for ${order.symbol}` });
+                    }
+                    
+                    const user = await trx('users').where({ id: order.user_id }).first();
+                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + balanceChange });
 
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
