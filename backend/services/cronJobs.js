@@ -137,58 +137,9 @@ function initCronJobs(priceCache, triggerEngine) {
     }, TZ);
 
     // ─── EXPIRY DAY SETTLEMENT (03:25 PM / 07:00 PM) ─────────────────────────
-    const expirySquareOff = async (isCommodity) => {
-        console.log(`[CRON] Expiry Day Settlement triggered (Com: ${isCommodity}).`);
-        try {
-            const todayStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' }).split(',')[0].replace(/\//g, '-');
-            const formatExpiryStr = (dateStr) => {
-                // dateStr is DD-MM-YYYY -> AngelOne uses DDMMMYY
-                const [d, m, y] = dateStr.split('-');
-                const monthMap = { '01':'JAN', '02':'FEB', '03':'MAR', '04':'APR', '05':'MAY', '06':'JUN', '07':'JUL', '08':'AUG', '09':'SEP', '10':'OCT', '11':'NOV', '12':'DEC' };
-                return `${d}${monthMap[m]}${y.slice(-2)}`;
-            };
-            const expiryToken = formatExpiryStr(todayStr); // e.g. 14JUL26
-
-            await db.transaction(async (trx) => {
-                // Check positions
-                let posQuery = trx('positions').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
-                if (isCommodity) posQuery = posQuery.where('symbol', 'like', '%MCX%');
-                else posQuery = posQuery.whereNot('symbol', 'like', '%MCX%');
-
-                const expiringPositions = await posQuery;
-                for (const pos of expiringPositions) {
-                    const ltp = priceCache[pos.symbol]?.ltp;
-                    if (!ltp) continue;
-                    await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true); // True = RMS Penalty
-                }
-
-                // Check holdings (some futures can be delivered to holdings)
-                let holdQuery = trx('holdings').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
-                if (isCommodity) holdQuery = holdQuery.where('symbol', 'like', '%MCX%');
-                else holdQuery = holdQuery.whereNot('symbol', 'like', '%MCX%');
-
-                const expiringHoldings = await holdQuery;
-                for (const hold of expiringHoldings) {
-                    const ltp = priceCache[hold.symbol]?.ltp;
-                    if (!ltp) continue;
-                    
-                    const pnl = (ltp - hold.average_price) * hold.quantity;
-                    const taxesObj = require('./taxCalculator').calculateTaxes(hold.symbol, 'DEL', 'SELL', hold.quantity, ltp);
-                    const netPnl = pnl - taxesObj.totalTaxes - 59; // RMS penalty
-
-                    const user = await trx('users').where({ id: hold.user_id }).first();
-                    await trx('users').where({ id: hold.user_id }).update({ balance: parseFloat(user.balance) + netPnl });
-                    
-                    await trx('holdings').where({ id: hold.id }).update({ quantity: 0 });
-                }
-            });
-        } catch (err) {
-            console.error('Expiry Square-Off Error:', err);
-        }
-    };
-
-    cron.schedule('25 15 * * *', () => expirySquareOff(false), TZ);
-    cron.schedule('0 19 * * *', () => expirySquareOff(true), TZ);
+    // DISABLED: Handled exclusively in positionsEngine.js to avoid race conditions.
+    // cron.schedule('25 15 * * *', () => expirySquareOff(false), TZ);
+    // cron.schedule('0 19 * * *', () => expirySquareOff(true), TZ);
 }
 
 module.exports = { initCronJobs, isIntradayBlocked: () => isIntradayBlocked };

@@ -28,6 +28,11 @@ class PositionsEngine {
             this.forceSquareOff('EQUITY');
         }, { timezone: 'Asia/Kolkata' });
 
+        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:25 PM
+        cron.schedule('25 15 * * *', () => {
+            this.settleExpiries(false); // false = Not Commodity
+        }, { timezone: 'Asia/Kolkata' });
+
         // COMMODITIES
         // Phase 2: The Order Sweep - 10:59 PM IST (22:59)
         cron.schedule('59 22 * * *', () => {
@@ -37,6 +42,11 @@ class PositionsEngine {
         // Phase 3: The Square-Off - 11:00 PM IST (23:00)
         cron.schedule('0 23 * * *', () => {
             this.forceSquareOff('COMMODITY');
+        }, { timezone: 'Asia/Kolkata' });
+
+        // Condition 10: Expiry Day Settlement (Commodities) - 07:00 PM (19:00)
+        cron.schedule('0 19 * * *', () => {
+            this.settleExpiries(true); // true = Commodity
         }, { timezone: 'Asia/Kolkata' });
     }
 
@@ -123,6 +133,68 @@ class PositionsEngine {
             }
         } catch (error) {
             console.error(`[EOD SQUARE-OFF ERROR] ${market}:`, error);
+        }
+    }
+
+    async settleExpiries(isCommodity) {
+        console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}).`);
+        try {
+            const todayStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' }).split(',')[0].replace(/\//g, '-');
+            const [d, m, y] = todayStr.split('-');
+            const monthMap = { '01':'JAN', '02':'FEB', '03':'MAR', '04':'APR', '05':'MAY', '06':'JUN', '07':'JUL', '08':'AUG', '09':'SEP', '10':'OCT', '11':'NOV', '12':'DEC' };
+            const expiryToken = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 14JUL26
+
+            // Find all expiring assets in Holdings OR Positions
+            let posQuery = db('positions').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
+            let holdQuery = db('holdings').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
+            
+            if (isCommodity) {
+                posQuery = posQuery.where('symbol', 'like', '%MCX%');
+                holdQuery = holdQuery.where('symbol', 'like', '%MCX%');
+            } else {
+                posQuery = posQuery.whereNot('symbol', 'like', '%MCX%');
+                holdQuery = holdQuery.whereNot('symbol', 'like', '%MCX%');
+            }
+
+            const expiringPositions = await posQuery;
+            const expiringHoldings = await holdQuery;
+
+            const triggerEngine = require('./triggerEngine');
+            const priceCache = require('./priceCache'); 
+            
+            // Helper to submit market order
+            const submitSettlementOrder = async (item, isHolding) => {
+                const ltp = priceCache[item.symbol]?.ltp || item.average_price; 
+                const side = item.quantity > 0 ? 'SELL' : 'BUY';
+                const orderQty = Math.abs(item.quantity);
+                const prodType = isHolding ? 'DEL' : item.product_type;
+
+                const [orderId] = await db('orders').insert({
+                    user_id: item.user_id,
+                    symbol: item.symbol,
+                    type: 'MARKET',
+                    side: side,
+                    quantity: orderQty,
+                    price: 0,
+                    status: 'PENDING',
+                    product_type: prodType,
+                    created_at: new Date(),
+                    updated_at: new Date()
+                }).returning('id');
+
+                const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
+                await triggerEngine.executeOrder(orderRow, ltp);
+                console.log(`[EXPIRY SETTLED] ${item.symbol} (${side} ${orderQty}) for User ${item.user_id}`);
+            };
+
+            for (const pos of expiringPositions) {
+                await submitSettlementOrder(pos, false);
+            }
+            for (const hold of expiringHoldings) {
+                await submitSettlementOrder(hold, true);
+            }
+        } catch (error) {
+            console.error(`[EXPIRY SETTLEMENT ERROR]:`, error);
         }
     }
 
