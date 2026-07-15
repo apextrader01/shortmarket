@@ -739,7 +739,7 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         // Optimistically update local state to reflect the wipe
-        set({ positions: [], orders: [], user: { ...user, balance: 1000000.0 } });
+        set({ positions: [], orders: [], pendingTriggers: [], alerts: [], user: { ...user, balance: 1000000.0 } });
         return { success: true };
       }
       return { success: false, error: data.error };
