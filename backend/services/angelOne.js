@@ -708,7 +708,27 @@ async function fetchBatchLTPs(uniqueSymbols) {
         let hasTokens = false;
 
         batch.forEach(sym => {
-            const token = symbolToToken[sym];
+            let token = symbolToToken[sym];
+            
+            // Fallback: dynamically resolve derivatives (MCX futures, NFO options, etc.)
+            if (!token) {
+                const parts = sym.split('-');
+                const rawSymbol = parts.slice(0, -1).join('-') || parts[0];
+                const exchFromSymbol = parts[parts.length - 1];
+                const found = lookupDerivativeBySymbol(rawSymbol);
+                if (found) {
+                    STOCK_MASTER[found.token] = {
+                        symbol: rawSymbol,
+                        uniqueSymbol: sym,
+                        name: found.name || rawSymbol,
+                        exchange: found.exchange || exchFromSymbol || 'NFO',
+                        lotsize: Number(found.lotsize || 1)
+                    };
+                    symbolToToken[sym] = found.token;
+                    token = found.token;
+                }
+            }
+            
             if (token) {
                 const exch = STOCK_MASTER[token]?.exchange || 'NSE';
                 if (exchangeMap[exch]) {
