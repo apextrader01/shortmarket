@@ -5,8 +5,10 @@ function initOrderExecutor(priceCache) {
 
   setInterval(async () => {
     try {
-      // 1. Fetch all pending orders
-      const pendingOrders = await db('orders').where({ status: 'PENDING' });
+      // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
+      // are owned by triggerEngine.js (in-memory, evaluated on every WS price tick) to
+      // avoid double-execution races between the two engines.
+      const pendingOrders = await db('orders').where({ status: 'PENDING', type: 'MARKET' });
       if (pendingOrders.length === 0) return;
 
       for (const order of pendingOrders) {

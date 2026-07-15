@@ -1840,11 +1840,14 @@ server.listen(PORT, '0.0.0.0', async () => {
   }
   
   // Start Cron Jobs
-  const { initAutoSquareOff } = require('./services/autoSquareOff');
+  const { startSquareOffJobs } = require('./services/autoSquareOff');
   const { initRiskyStocksSync } = require('./services/riskyStocksSync');
   const { initOrderExecutor } = require('./services/orderExecutor');
+  const triggerEngine = require('./services/triggerEngine');
+  const MTMRiskManager = require('./services/mtmRiskManager');
+  const { initCronJobs } = require('./services/cronJobs');
   const schedule = require('node-schedule');
-  
+
   // Refresh Angel One Token daily at 2:00 AM IST
   const loginRule = new schedule.RecurrenceRule();
   loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
@@ -1856,7 +1859,23 @@ server.listen(PORT, '0.0.0.0', async () => {
     await loginAngelOne(io, priceCache);
   });
 
-  initAutoSquareOff(priceCache);
+  // Initialize TriggerEngine: matches LIMIT + PENDING_TRIGGER (SL/TP/CO/BO) orders
+  // against live WS price ticks. angelOne.js already calls triggerEngine.evaluateTick()
+  // on every tick — this just loads existing orders into memory on startup.
+  triggerEngine.setSocketIo(io);
+  await triggerEngine.loadPendingOrders();
+  console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
+
+  // Initialize MTM Risk Manager: 95% auto-liquidation rule (checks every 2s)
+  new MTMRiskManager(priceCache).start();
+  console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
+
+  // Initialize Cron Jobs: Phase 1/2/3 intraday square-off, 8AM T+1 reset, expiry settlement
+  initCronJobs(priceCache, triggerEngine);
+  console.log('⏰ Cron jobs active (intraday phases, T+1 reset, expiry settlement)');
+
+  // Legacy square-off jobs (expiry + intraday via HTTP self-calls) + remaining services
+  startSquareOffJobs();
   initRiskyStocksSync();
   initOrderExecutor(priceCache);
 });
