@@ -1368,6 +1368,21 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   }
 });
 
+// ⚡ Fetch Batch LTPs (REST) ⚡
+app.post('/api/ltp-batch', async (req, res) => {
+  try {
+    const { symbols } = req.body;
+    if (!symbols || !Array.isArray(symbols)) {
+      return res.status(400).json({ error: 'Missing or invalid symbols array' });
+    }
+    const { fetchBatchLTPs } = require('./services/angelOne');
+    const data = await fetchBatchLTPs(symbols);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 🧮 Estimate Charges 🧮
 app.get('/api/estimate-charges', authenticateToken, (req, res) => {
   try {
