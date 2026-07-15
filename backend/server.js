@@ -1330,62 +1330,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
 
       res.json({ success: true, orderId, status });
     });
-  } catch (error) {something they don't have, it's a short position
-          await trx('positions').insert({
-            user_id: req.user.id,
-            symbol,
-            quantity: qtyChange,
-            average_price: execPrice,
-            product_type: product_type || 'DEL',
-            margin: Number(margin) || 0
-          });
-        }
 
-        // 5. Update User Balance & Ledger (Taxes, P&L, Margin Refund)
-        const userAfterExec = await trx('users').where({ id: req.user.id }).first();
-        let balanceChange = -totalTaxes;
-        
-        await trx('ledger').insert({
-            user_id: req.user.id,
-            amount: -totalTaxes,
-            type: 'TAXES',
-            description: `Taxes & Charges for ${side} ${quantity} ${symbol}`
-        });
-        
-        if (realizedPnl !== 0) {
-            balanceChange += realizedPnl;
-            await trx('orders').where({ id: orderId }).update({ realized_pnl: realizedPnl });
-            
-            await trx('ledger').insert({
-                user_id: req.user.id,
-                amount: realizedPnl,
-                type: 'REALIZED_PNL',
-                description: `Realized P&L for closing ${quantity} ${symbol}`
-            });
-        }
-        
-        if (marginRefund > 0) {
-           balanceChange += marginRefund;
-           
-           await trx('ledger').insert({
-                user_id: req.user.id,
-                amount: marginRefund,
-                type: 'MARGIN_RELEASE',
-                description: `Margin released for closing ${quantity} ${symbol}`
-           });
-        }
-
-        await trx('users').where({ id: req.user.id }).update({ balance: Number(userAfterExec.balance) + balanceChange });
-        
-        // Spawn Bracket Orders (SL & TP) if any
-        await spawnBracketOrders(trx, {
-          id: orderId, user_id: req.user.id, symbol, side, quantity,
-          sl_price, tgt_price, product_type: product_type || 'DEL'
-        });
-      }
-
-      res.json({ success: true, orderId, status });
-    });
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
     console.error('[ORDER ERROR]:', error);
