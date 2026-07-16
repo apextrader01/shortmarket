@@ -27,26 +27,30 @@ function initCronJobs(priceCache, triggerEngine) {
         isIntradayBlocked = false;
     }, TZ);
 
+    // Helper: Check if a symbol is a commodity
+    const COMMODITY_PREFIXES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'];
+    const isCommoditySymbol = (symbol) => COMMODITY_PREFIXES.some(c => symbol.startsWith(c));
+
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
         console.log(`[CRON] Phase 2 (${assetType}): Sweeping pending Intraday/CO/BO entry orders...`);
         try {
             await db.transaction(async (trx) => {
-                let query = trx('orders').whereIn('status', ['PENDING']);
-                if (assetType === 'EQ') {
-                    query = query.whereNot('symbol', 'like', '%MCX%');
-                } else {
-                    query = query.where('symbol', 'like', '%MCX%');
-                }
-                
-                const pendingOrders = await query;
+                const pendingOrders = await trx('orders').whereIn('status', ['PENDING']);
                 
                 for (const order of pendingOrders) {
-                    if (order.product_type === 'INT' || order.trigger_type !== 'REGULAR') {
-                        // Cancel and refund margin
+                    const isCom = isCommoditySymbol(order.symbol);
+                    if (assetType === 'EQ' && isCom) continue;  // Skip commodities during EQ sweep
+                    if (assetType === 'COM' && !isCom) continue; // Skip equities during COM sweep
+                    
+                    // Sweep all intraday-type orders: INT, BO, CO
+                    if (order.product_type === 'INT' || order.product_type === 'BO' || order.product_type === 'CO') {
                         await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
-                        await LedgerService.releaseMargin(trx, order.user_id, order.margin, `Phase 2 Sweep Cancelled: ${order.symbol}`);
+                        if (parseFloat(order.margin) > 0) {
+                            await LedgerService.releaseMargin(trx, order.user_id, order.margin, `Phase 2 Sweep Cancelled: ${order.symbol}`);
+                        }
                         triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                        console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type} order ${order.id} for ${order.symbol}`);
                     }
                 }
             });
@@ -60,30 +64,44 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
-        console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday positions...`);
+        console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
         try {
             await db.transaction(async (trx) => {
-                let posQuery = trx('positions').where({ product_type: 'INT' }).whereNot({ quantity: 0 });
-                if (assetType === 'EQ') {
-                    posQuery = posQuery.whereNot('symbol', 'like', '%MCX%');
-                } else {
-                    posQuery = posQuery.where('symbol', 'like', '%MCX%');
-                }
-                
-                const positions = await posQuery;
+                // Get ALL intraday-type positions (INT, BO, CO) that are still open
+                const positions = await trx('positions')
+                    .whereIn('product_type', ['INT', 'BO', 'CO'])
+                    .whereNot({ quantity: 0 });
 
                 for (const pos of positions) {
+                    const isCom = isCommoditySymbol(pos.symbol);
+                    if (assetType === 'EQ' && isCom) continue;
+                    if (assetType === 'COM' && !isCom) continue;
+
                     const ltp = priceCache[pos.symbol]?.ltp;
-                    if (!ltp) continue;
+                    if (!ltp) {
+                        console.warn(`[CRON] Phase 3: No LTP for ${pos.symbol}, skipping square-off.`);
+                        continue;
+                    }
 
                     // Close position with RMS penalty
                     await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
+                    console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
                     
-                    // Cancel all PENDING_TRIGGER brackets for this symbol
+                    // Cancel all PENDING_TRIGGER brackets for this user+symbol
                     const triggers = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' });
                     for (const t of triggers) {
                         await trx('orders').where({ id: t.id }).update({ status: 'CANCELLED' });
                         triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                    }
+                    
+                    // Also cancel any remaining PENDING orders for this user+symbol
+                    const pendingOrders = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' });
+                    for (const o of pendingOrders) {
+                        await trx('orders').where({ id: o.id }).update({ status: 'CANCELLED' });
+                        if (parseFloat(o.margin) > 0) {
+                            await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Phase 3 Cancelled: ${o.symbol}`);
+                        }
+                        triggerEngine.removeOrderFromMemory(o.id, o.symbol);
                     }
                 }
             });

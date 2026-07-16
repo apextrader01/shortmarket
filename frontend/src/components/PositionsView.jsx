@@ -35,11 +35,28 @@ export default function PositionsView() {
       const agg = symbolAgg[pos.symbol];
       if (agg.id !== pos.id) { // Merge
          const prevQty = agg.quantity;
-         agg.quantity += pos.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
-         const currentTotal = Math.abs(prevQty) * parseFloat(agg.average_price || 0);
-         const newTotal = Math.abs(pos.quantity) * parseFloat(pos.average_price || 0);
-         agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : 0;
+         agg.closed_quantity = (parseInt(agg.closed_quantity) || 0) + (parseInt(pos.closed_quantity) || 0);
+         
+         if (isOpen) {
+           // For open positions: aggregate quantity and recalculate avg price
+           agg.quantity += pos.quantity;
+           const currentTotal = Math.abs(prevQty) * parseFloat(agg.average_price || 0);
+           const newTotal = Math.abs(pos.quantity) * parseFloat(pos.average_price || 0);
+           agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : agg.average_price;
+         } else {
+           // For closed positions: keep the first non-zero avg price, and use weighted avg for exit_price
+           if (parseFloat(pos.average_price) > 0 && parseFloat(agg.average_price) === 0) {
+             agg.average_price = pos.average_price;
+           }
+           // Weighted average exit price
+           const prevClosed = parseInt(agg.closed_quantity) - (parseInt(pos.closed_quantity) || 0);
+           const prevExitTotal = prevClosed * parseFloat(agg.exit_price || 0);
+           const newExitTotal = (parseInt(pos.closed_quantity) || 0) * parseFloat(pos.exit_price || 0);
+           const totalClosed = parseInt(agg.closed_quantity) || 1;
+           agg.exit_price = (prevExitTotal + newExitTotal) / totalClosed;
+         }
+         
          if ((agg.product_type === 'BO' || agg.product_type === 'CO') && (pos.product_type !== 'BO' && pos.product_type !== 'CO')) {
              agg.product_type = pos.product_type;
          }
