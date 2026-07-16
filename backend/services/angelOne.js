@@ -740,6 +740,15 @@ async function fetchBatchLTPs(uniqueSymbols) {
 
         if (!hasTokens) continue;
 
+        // Clean up empty arrays to prevent Angel One API from rejecting the payload
+        for (const exch in exchangeMap) {
+            if (exchangeMap[exch].length === 0) {
+                delete exchangeMap[exch];
+            }
+        }
+
+        if (Object.keys(exchangeMap).length === 0) continue;
+
         try {
             const res = await Promise.race([
                 smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap }),
@@ -794,6 +803,15 @@ async function fetchAllLTPs() {
             const exch = STOCK_MASTER[token]?.exchange || 'NSE';
             if (exchangeMap[exch]) exchangeMap[exch].push(token);
         });
+
+        // Clean up empty arrays to prevent Angel One API from rejecting the payload
+        for (const exch in exchangeMap) {
+            if (exchangeMap[exch].length === 0) {
+                delete exchangeMap[exch];
+            }
+        }
+
+        if (Object.keys(exchangeMap).length === 0) continue;
 
         try {
             const res = await Promise.race([
