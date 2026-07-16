@@ -1356,7 +1356,14 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       });
       
       // Manually trigger an evaluation to instantly process Market orders in the background
-      triggerEngine.evaluateTick(symbol, execPrice).catch(err => console.error('Immediate evaluation error:', err));
+      // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
+      // Using the order's own price would cause LIMIT orders to self-trigger immediately.
+      if (isMarket) {
+        const realLtp = priceCache[symbol]?.ltp || 0;
+        if (realLtp > 0) {
+          triggerEngine.evaluateTick(symbol, realLtp).catch(err => console.error('Immediate evaluation error:', err));
+        }
+      }
 
       res.json({ success: true, orderId, status });
     });
