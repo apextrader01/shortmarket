@@ -998,9 +998,65 @@ async function loginAngelOne(io, externalPriceCache) {
 }
 
 // ─── Live WebSocket ───────────────────────────────────────────────────────────
+let wsReconnectAttempts = 0;
+let wsReconnecting = false;
+
+function cleanupWebSocket() {
+    if (global_web_socket) {
+        try {
+            global_web_socket.removeAllListeners && global_web_socket.removeAllListeners();
+            global_web_socket.close && global_web_socket.close();
+        } catch (e) { /* ignore cleanup errors */ }
+        global_web_socket = null;
+    }
+}
+
+async function reconnectWebSocket(io) {
+    if (wsReconnecting) return; // Prevent duplicate reconnects
+    wsReconnecting = true;
+    
+    cleanupWebSocket();
+    wsReconnectAttempts++;
+    
+    const delay = Math.min(2000 * Math.pow(2, wsReconnectAttempts - 1), 30000); // 2s, 4s, 8s, 16s, 30s max
+    console.log(`🔄 WS reconnect attempt ${wsReconnectAttempts} in ${delay/1000}s...`);
+    
+    // After 3 failed attempts, do a full re-login to get fresh JWT/feed tokens
+    if (wsReconnectAttempts >= 3 && wsReconnectAttempts % 3 === 0) {
+        console.log('🔑 Re-logging into Angel One for fresh tokens...');
+        try {
+            const { TOTP } = require('totp-generator');
+            const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
+            const loginSession = await directLogin(
+                process.env.ANGEL_CLIENT_ID,
+                process.env.ANGEL_PIN,
+                otp
+            );
+            if (loginSession?.data?.jwtToken) {
+                jwtToken = loginSession.data.jwtToken;
+                feedToken = loginSession.data.feedToken;
+                smart_api.setAccessToken(jwtToken);
+                smart_api.setPublicToken(loginSession.data.refreshToken);
+                console.log('✅ Fresh tokens obtained!');
+            } else {
+                console.error('❌ Re-login failed:', loginSession?.message);
+            }
+        } catch (e) {
+            console.error('❌ Re-login error:', e.message);
+        }
+    }
+    
+    setTimeout(() => {
+        wsReconnecting = false;
+        startLiveWebSocket(io);
+    }, delay);
+}
+
 function startLiveWebSocket(io) {
     const triggerEngine = require('./triggerEngine');
     const BATCH = 50; // WebSocket token limit per subscription
+
+    cleanupWebSocket(); // Always clean up before creating new connection
 
     global_web_socket = new WebSocketV2({
         jwttoken: jwtToken,
@@ -1011,6 +1067,7 @@ function startLiveWebSocket(io) {
 
     global_web_socket.connect().then(() => {
         console.log('🔌 WebSocket Connected!');
+        wsReconnectAttempts = 0; // Reset on successful connect
 
         const baseTokens = allTokens.slice(0, 300);
         const tokensToSubscribe = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
@@ -1124,19 +1181,18 @@ function startLiveWebSocket(io) {
         });
 
         global_web_socket.on('error', () => {
-            console.error('⚠️  WS error! Reconnecting in 2 seconds...');
-            setTimeout(() => startLiveWebSocket(io), 2000);
+            console.error('⚠️  WS error! Will reconnect...');
+            reconnectWebSocket(io);
         });
 
         global_web_socket.on('close', () => {
-            console.warn('⚠️  WS closed! Reconnecting in 2 seconds...');
-            setTimeout(() => startLiveWebSocket(io), 2000);
+            console.warn('⚠️  WS closed! Will reconnect...');
+            reconnectWebSocket(io);
         });
 
     }).catch(err => {
         console.error('WS connect error:', err.message);
-        console.log('🔄 Retrying WS connection in 2 seconds...');
-        setTimeout(() => startLiveWebSocket(io), 2000);
+        reconnectWebSocket(io);
     });
 }
 
