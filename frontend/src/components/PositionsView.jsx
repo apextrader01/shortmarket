@@ -347,6 +347,23 @@ export default function PositionsView() {
                               EXIT
                             </button>
                           )}
+                          {viewMode === 'HOLDINGS' && (
+                            <button
+                              onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL')}
+                              style={{
+                                background: 'transparent',
+                                color: 'var(--color-red-light)',
+                                border: '1px solid var(--color-red-light)',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              SELL
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
