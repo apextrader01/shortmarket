@@ -202,7 +202,7 @@ export default function PositionsView() {
       </div>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {positions.length === 0 || groupedStrategies.length === 0 ? (
+        {sourceData.length === 0 || groupedStrategies.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
             <div style={{ 
               width: '120px', height: '100px', background: 'var(--bg-panel)', 
