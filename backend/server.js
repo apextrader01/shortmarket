@@ -804,6 +804,16 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
   }
 });
 
+// ─── Holdings ─────────────────────────────────────────────────────────────
+app.get('/api/holdings', authenticateToken, async (req, res) => {
+  try {
+    const holdings = await db('holdings').where({ user_id: req.user.id });
+    res.json({ success: true, holdings });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Convert Position (INT <-> DEL) ───────────────────────────────────────
 app.post('/api/position/convert', authenticateToken, async (req, res) => {
   const { positionId, newProductType, requiredMargin } = req.body;
