@@ -240,10 +240,11 @@ app.post('/api/auth/register', async (req, res) => {
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
@@ -271,10 +272,11 @@ app.post('/api/auth/login', async (req, res) => {
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
@@ -289,7 +291,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/auth/logout', (req, res) => {
-  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'none', secure: true });
+  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
+  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
 });
 
