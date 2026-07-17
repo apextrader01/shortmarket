@@ -354,6 +354,7 @@ function loadFallbackMaster() {
 
 // ─── Market Hours Check ───────────────────────────────────────────────────────
 function isMarketOpen() {
+    if (process.env.BYPASS_MARKET_CHECK === 'true') return true;
     const now = new Date();
     const day = now.getUTCDay();
     if (day === 0 || day === 6) return false;
