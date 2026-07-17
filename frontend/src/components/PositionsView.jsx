@@ -10,6 +10,7 @@ const extractUnderlying = (symbol) => {
 export default function PositionsView() {
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const { positions, holdings, prices } = useStore();
+  const sourceData = viewMode === 'HOLDINGS' ? (holdings || []) : (positions || []);
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
@@ -20,8 +21,6 @@ export default function PositionsView() {
     let globalMTM = 0;
     const groups = {};
     const symbolAgg = {};
-
-    const sourceData = viewMode === 'HOLDINGS' ? (holdings || []) : (positions || []);
 
     sourceData.forEach(pos => {
       const isOpen = pos.quantity !== 0;
@@ -98,7 +97,7 @@ export default function PositionsView() {
     });
 
     return { groupedStrategies: Object.values(groups), globalMTM };
-  }, [positions, prices, viewMode]);
+  }, [sourceData, prices, viewMode]);
 
   // Removed early return to keep the header visible when empty
 
