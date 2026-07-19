@@ -916,6 +916,12 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
 
             const res = JSON.parse(text);
             
+            if (res && res.errorCode === 'AG8001') {
+                console.warn(`⚠️ Expired/Invalid token detected in chart fetch for ${uniqueSymbol}. Triggering auto-relogin...`);
+                await loginAngelOne(global_io, sharedPriceCache);
+                continue;
+            }
+            
             if (!res || !res.status || !res.data) {
                 console.error(`Angel One historical API error for ${uniqueSymbol}:`, res);
                 return [];
