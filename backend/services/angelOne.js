@@ -757,7 +757,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
         try {
             const res = await Promise.race([
                 smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 5000))
             ]);
             
             if (res?.status && res.data?.fetched) {
@@ -824,7 +824,7 @@ async function fetchAllLTPs() {
                     mode: 'FULL',
                     exchangeTokens: exchangeMap
                 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 5000))
             ]);
             if (res?.status && res.data?.fetched) {
                 for (const item of res.data.fetched) {
