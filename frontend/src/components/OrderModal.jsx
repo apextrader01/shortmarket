@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
@@ -57,7 +57,7 @@ export default function OrderModal() {
              return;
          }
          const token = useStore.getState().token;
-         const res = await fetch(`/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
+         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });
          const data = await res.json();
