@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
 import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
-
-const API = '';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {

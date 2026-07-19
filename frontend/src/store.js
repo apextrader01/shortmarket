@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
-let API = '';
+export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
   API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
 }
