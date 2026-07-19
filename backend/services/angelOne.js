@@ -435,6 +435,16 @@ function enrichLotsize(token, uniqueSymbol) {
     }
 }
 
+function safeFetchData(payload) {
+    if (global_web_socket) {
+        try {
+            global_web_socket.fetchData(payload);
+        } catch (err) {
+            console.warn(`⚠️ Failed to send WS subscription (correlationID: ${payload.correlationID}):`, err.message);
+        }
+    }
+}
+
 async function addSubscription(data, io, priceCache) {
     let token, exchangeCode, uniqueSymbol, exchStr;
 
@@ -499,12 +509,10 @@ async function addSubscription(data, io, priceCache) {
         clientSubscriptions.add(token);
         
         // If websocket is running, dynamically subscribe to the new token
-        if (global_web_socket) {
-            global_web_socket.fetchData({
-                correlationID: `dynamic_sub_${token}`,
-                action: 1, mode: 1, exchangeType: exchangeCode, tokens: [token]
-            });
-        }
+        safeFetchData({
+            correlationID: `dynamic_sub_${token}`,
+            action: 1, mode: 1, exchangeType: exchangeCode, tokens: [token]
+        });
         
         }
 
@@ -634,23 +642,19 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
         }
     }
 
-    if (global_web_socket) {
-        let delayMs = 0;
-        for (const [exchCodeStr, tokens] of Object.entries(tokensByExchange)) {
-            const exchCode = parseInt(exchCodeStr);
-            if (tokens.length > 0) {
-                for (let i = 0; i < tokens.length; i += 50) {
-                    const batch = tokens.slice(i, i + 50);
-                    setTimeout(() => {
-                        if (global_web_socket) {
-                            global_web_socket.fetchData({
-                                correlationID: `batch_sub_${Date.now()}_${i}`,
-                                action: 1, mode: 1, exchangeType: exchCode, tokens: batch
-                            });
-                        }
-                    }, delayMs);
-                    delayMs += 350;
-                }
+    let delayMs = 0;
+    for (const [exchCodeStr, tokens] of Object.entries(tokensByExchange)) {
+        const exchCode = parseInt(exchCodeStr);
+        if (tokens.length > 0) {
+            for (let i = 0; i < tokens.length; i += 50) {
+                const batch = tokens.slice(i, i + 50);
+                setTimeout(() => {
+                    safeFetchData({
+                        correlationID: `batch_sub_${Date.now()}_${i}`,
+                        action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                    });
+                }, delayMs);
+                delayMs += 350;
             }
         }
     }
@@ -1111,12 +1115,10 @@ function startLiveWebSocket(io) {
             for (let i = 0; i < tokens.length; i += 50) {
                 const batch = tokens.slice(i, i + 50);
                 setTimeout(() => {
-                    if (global_web_socket) {
-                        global_web_socket.fetchData({
-                            correlationID: `short_market_init_${exchCode}_${i}`,
-                            action: 1, mode: 1, exchangeType: exchCode, tokens: batch
-                        });
-                    }
+                    safeFetchData({
+                        correlationID: `short_market_init_${exchCode}_${i}`,
+                        action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                    });
                 }, delayMs);
                 delayMs += 350; // Delay to prevent WebSocket limit of 3 requests per second
             }
