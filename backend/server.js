@@ -240,7 +240,7 @@ app.post('/api/auth/register', async (req, res) => {
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -272,7 +272,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
-    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
@@ -291,7 +291,7 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/auth/logout', (req, res) => {
-  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure;
+  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
   res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
 });
