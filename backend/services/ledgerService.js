@@ -9,17 +9,18 @@ class LedgerService {
      * Blocks margin when an order is placed (PENDING).
      */
     static async blockMargin(trx, userId, amount, description) {
-        if (amount <= 0) return;
+        const parsedAmount = parseFloat(amount) || 0;
+        if (parsedAmount <= 0) return;
         
         const user = await trx('users').where({ id: userId }).first();
-        if (user.balance < amount) {
+        if (parseFloat(user.balance) < parsedAmount) {
             throw new Error('Insufficient funds');
         }
         
-        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - amount });
+        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - parsedAmount });
         await trx('ledger').insert({
             user_id: userId,
-            amount: -amount,
+            amount: -parsedAmount,
             type: 'MARGIN_BLOCK',
             description
         });
@@ -29,13 +30,14 @@ class LedgerService {
      * Releases exact margin when an order is cancelled or swept.
      */
     static async releaseMargin(trx, userId, amount, description) {
-        if (amount <= 0) return;
+        const parsedAmount = parseFloat(amount) || 0;
+        if (parsedAmount <= 0) return;
         
         const user = await trx('users').where({ id: userId }).first();
-        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + amount });
+        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + parsedAmount });
         await trx('ledger').insert({
             user_id: userId,
-            amount: amount,
+            amount: parsedAmount,
             type: 'MARGIN_RELEASE',
             description
         });
@@ -93,7 +95,7 @@ class LedgerService {
 
         // 4. Calculate Total Release Amount
         // Release Amount = (Original Blocked Margin) + (Realized P&L) - (Exit Taxes) - (RMS Penalty)
-        const marginBlocked = position.margin;
+        const marginBlocked = parseFloat(position.margin) || 0;
         const netRelease = marginBlocked + realizedPnl - exitTaxes - rmsPenalty;
 
         // 5. Update Ledger & Balance
