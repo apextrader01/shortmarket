@@ -1259,6 +1259,34 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Validate Bracket Order (BO) and Cover Order (CO) formats
+  if (product_type === 'BO' || product_type === 'CO') {
+    const entryPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
+    
+    if (entryPrice <= 0) {
+      return res.status(400).json({ error: 'Cannot place Bracket/Cover order when live price is unavailable. Please specify a limit price.' });
+    }
+    
+    const parsedSL = sl_price ? parseFloat(sl_price) : 0;
+    const parsedTgt = tgt_price ? parseFloat(tgt_price) : 0;
+    
+    if (side === 'BUY') {
+      if (parsedSL && parsedSL >= entryPrice) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+      if (parsedTgt && parsedTgt <= entryPrice) {
+        return res.status(400).json({ error: `Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+    } else if (side === 'SELL') {
+      if (parsedSL && parsedSL <= entryPrice) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+      if (parsedTgt && parsedTgt >= entryPrice) {
+        return res.status(400).json({ error: `Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+    }
+  }
+
   // Block new Intraday orders outside valid time windows
   if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
