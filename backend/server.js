@@ -2009,4 +2009,20 @@ server.listen(PORT, '0.0.0.0', async () => {
   initOrderExecutor(priceCache);
 });
 
+// Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
+const cleanupAndExit = () => {
+  console.log('Stopping server and releasing port...');
+  server.close(() => {
+    console.log('Server stopped.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.log('Forced exit.');
+    process.exit(0);
+  }, 2000);
+};
+
+process.on('SIGINT', cleanupAndExit);
+process.on('SIGTERM', cleanupAndExit);
+
 module.exports = { io, priceCache };
