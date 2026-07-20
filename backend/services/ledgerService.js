@@ -93,6 +93,22 @@ class LedgerService {
         // 3. RMS Penalty
         const rmsPenalty = isForcedRMSExit ? 59 : 0;
 
+        // Create completed exit order record for audit & history log
+        await trx('orders').insert({
+            user_id: userId,
+            symbol: symbol,
+            type: 'MARKET',
+            side: side,
+            quantity: absQty,
+            price: exitPrice,
+            status: 'EXECUTED',
+            product_type: productType,
+            margin: 0,
+            realized_pnl: realizedPnl,
+            taxes: exitTaxes,
+            remarks: isForcedRMSExit ? 'Auto-Square-Off (RMS)' : 'Exit'
+        });
+
         // 4. Calculate Total Release Amount
         // Release Amount = (Original Blocked Margin) + (Realized P&L) - (Exit Taxes) - (RMS Penalty)
         const marginBlocked = parseFloat(position.margin) || 0;
