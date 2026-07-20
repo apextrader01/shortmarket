@@ -1883,6 +1883,13 @@ io.on('connection', (socket) => {
     socket.emit('price_snapshot', priceCache);
   }
 
+  socket.on('register_user', (userId) => {
+    if (userId) {
+      socket.join(userId.toString());
+      console.log(`Socket ${socket.id} registered user: ${userId}`);
+    }
+  });
+
   socket.on('subscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
     socket.join(symbol);
