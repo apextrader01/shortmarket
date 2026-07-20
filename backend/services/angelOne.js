@@ -707,8 +707,12 @@ async function fetchBatchLTPs(uniqueSymbols) {
     const result = {};
     if (!uniqueSymbols || uniqueSymbols.length === 0) return result;
 
+    const batches = [];
     for (let i = 0; i < uniqueSymbols.length; i += BATCH_SIZE) {
-        const batch = uniqueSymbols.slice(i, i + BATCH_SIZE);
+        batches.push(uniqueSymbols.slice(i, i + BATCH_SIZE));
+    }
+
+    const promises = batches.map(async (batch) => {
         const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
         let hasTokens = false;
 
@@ -743,7 +747,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
             }
         });
 
-        if (!hasTokens) continue;
+        if (!hasTokens) return;
 
         // Clean up empty arrays to prevent Angel One API from rejecting the payload
         for (const exch in exchangeMap) {
@@ -752,7 +756,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
             }
         }
 
-        if (Object.keys(exchangeMap).length === 0) continue;
+        if (Object.keys(exchangeMap).length === 0) return;
 
         try {
             const res = await Promise.race([
@@ -788,7 +792,9 @@ async function fetchBatchLTPs(uniqueSymbols) {
         } catch (e) {
             console.error('fetchBatchLTPs error', e.message);
         }
-    }
+    });
+
+    await Promise.all(promises);
     return result;
 }
 
@@ -799,9 +805,14 @@ async function fetchAllLTPs() {
     
     // Poll ONLY tokens clients are actively subscribed to
     const tokensToFetch = Array.from(clientSubscriptions);
+    if (tokensToFetch.length === 0) return result;
 
+    const batches = [];
     for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
-        const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
+        batches.push(tokensToFetch.slice(i, i + BATCH_SIZE));
+    }
+
+    const promises = batches.map(async (batch) => {
         const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
         
         batch.forEach(token => {
@@ -816,7 +827,7 @@ async function fetchAllLTPs() {
             }
         }
 
-        if (Object.keys(exchangeMap).length === 0) continue;
+        if (Object.keys(exchangeMap).length === 0) return;
 
         try {
             const res = await Promise.race([
@@ -853,7 +864,9 @@ async function fetchAllLTPs() {
         } catch (e) {
             // Silent - batch might fail for some tokens
         }
-    }
+    });
+
+    await Promise.all(promises);
     return result;
 }
 

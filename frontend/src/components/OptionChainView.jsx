@@ -119,10 +119,14 @@ const OptionChainView = () => {
         const idxKey = getIndexKey(symbol);
         const isCommodity = commodities.includes(symbol);
 
+        const initialToFetch = ['INDIA VIX-NSE'];
+        if (idxKey) initialToFetch.push(idxKey);
+
         // Fire ALL requests in parallel — don't wait for one before starting the next
-        const [futRes, chainRes] = await Promise.all([
+        const [futRes, chainRes, _] = await Promise.all([
           fetch(`${API}/api/options/futures/${symbol}`),
           fetch(`${API}/api/options/chain/${symbol}`),
+          useStore.getState().fetchBatchPrices(initialToFetch)
         ]);
 
         // Process futures result
@@ -132,18 +136,15 @@ const OptionChainView = () => {
           setFutureData(futDataResult);
           const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
           setFutureTokenKey(futKey);
+          
+          // For commodities, now that we have the futures symbol/exchange, fetch its price
+          if (isCommodity) {
+            await useStore.getState().fetchBatchPrices([futKey]);
+          }
         } else {
           setFutureData(null);
           setFutureTokenKey(null);
         }
-
-        // Now fetch batch prices (needs futures result for commodities)
-        const initialToFetch = ['INDIA VIX-NSE'];
-        if (idxKey) initialToFetch.push(idxKey);
-        if (isCommodity && futDataResult) {
-          initialToFetch.push(`${futDataResult.symbol}-${futDataResult.exchange}`);
-        }
-        await useStore.getState().fetchBatchPrices(initialToFetch);
 
         // Set initialSpotPrice immediately from the store (don't wait for React re-render)
         const storeState = useStore.getState().prices;
