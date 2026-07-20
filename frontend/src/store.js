@@ -429,8 +429,8 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
   refreshPrices: async () => {
-    // Only fetch fallback prices if socket is not connected
-    if (socket && socket.connected) return;
+    // Only fetch fallback prices if socket is connected AND we already have prices
+    if (socket && socket.connected && Object.keys(get().prices).length > 0) return;
 
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
