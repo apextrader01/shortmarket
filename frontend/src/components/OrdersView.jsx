@@ -199,8 +199,16 @@ export default function OrdersView() {
                 {activeTab === 'Pending Triggers' ? (
                   displayTriggers.map(trigger => (
                     <tr key={trigger.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '12px 16px' }}>{new Date(trigger.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={trigger.symbol}>{trigger.symbol.split('-')[0]}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        {(() => {
+                          if (!trigger.createdAt) return '—';
+                          const d = new Date(trigger.createdAt);
+                          return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        })()}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={trigger.symbol || ''}>
+                        {(trigger.symbol || '').split('-')[0] || '—'}
+                      </td>
                       <td style={{ padding: '12px 16px', color: trigger.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                         <span style={{ background: trigger.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <span>{trigger.side}</span>
@@ -259,9 +267,14 @@ export default function OrdersView() {
                     onMouseLeave={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'transparent')}
                   >
                     <td style={{ padding: '12px 16px' }}>
-                      {new Date(activeTab === 'Order History' ? (order.updated_at || order.created_at) : order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      {(() => {
+                        const dateStr = activeTab === 'Order History' ? (order.updated_at || order.created_at) : order.created_at;
+                        if (!dateStr) return '—';
+                        const d = new Date(dateStr);
+                        return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                      })()}
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{order.symbol.split('-')[0]}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{(order.symbol || '').split('-')[0] || '—'}</td>
                     <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                       <span style={{ background: order.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span>{order.side}</span>
@@ -363,7 +376,7 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Placed Time:</span>
-                <span style={{ fontWeight: '600' }}>{new Date(selectedOrder.created_at).toLocaleString()}</span>
+                <span style={{ fontWeight: '600' }}>{selectedOrder.created_at ? (() => { const d = new Date(selectedOrder.created_at); return isNaN(d.getTime()) ? '—' : d.toLocaleString(); })() : '—'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Product Type:</span>
