@@ -122,6 +122,9 @@ async function spawnBracketOrders(trx, order) {
 async function executeOrder(order, execPrice) {
   try {
     await db.transaction(async (trx) => {
+      // Serialize order executions on a per-user basis to prevent position/ledger race conditions
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [order.user_id]);
+
       // Verify order is still pending in DB before executing to prevent double execution race conditions
       const dbOrder = await trx('orders').where({ id: order.id }).first();
       if (!dbOrder || (dbOrder.status !== 'PENDING' && dbOrder.status !== 'PENDING_TRIGGER')) {
