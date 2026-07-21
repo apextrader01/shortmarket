@@ -27,11 +27,12 @@ export default function PositionsView() {
       if (viewMode === 'OPEN' && !isOpen) return;
       if (viewMode === 'CLOSED' && isOpen) return;
 
-      if (!symbolAgg[pos.symbol]) {
-         symbolAgg[pos.symbol] = { ...pos, encumberedQty: 0, unencumberedQty: 0 };
+      const key = `${pos.symbol}-${pos.product_type}`;
+      if (!symbolAgg[key]) {
+         symbolAgg[key] = { ...pos, encumberedQty: 0, unencumberedQty: 0 };
       }
       
-      const agg = symbolAgg[pos.symbol];
+      const agg = symbolAgg[key];
       if (agg.id !== pos.id) { // Merge
          const prevQty = agg.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
