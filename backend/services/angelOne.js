@@ -436,12 +436,14 @@ function enrichLotsize(token, uniqueSymbol) {
 }
 
 function safeFetchData(payload) {
-    if (global_web_socket) {
+    if (global_web_socket && global_web_socket.ws && global_web_socket.ws.readyState === 1) {
         try {
             global_web_socket.fetchData(payload);
         } catch (err) {
             console.warn(`⚠️ Failed to send WS subscription (correlationID: ${payload.correlationID}):`, err.message);
         }
+    } else {
+        console.warn(`⚠️ WebSocket not ready (readyState: ${global_web_socket?.ws?.readyState || 'none'}). Skipping subscription.`);
     }
 }
 
@@ -1107,7 +1109,10 @@ function startLiveWebSocket(io) {
         feedtype: feedToken
     });
 
-    global_web_socket.connect().then(() => {
+    const currentSocket = global_web_socket;
+
+    currentSocket.connect().then(() => {
+        if (currentSocket !== global_web_socket) return;
         console.log('🔌 WebSocket Connected!');
         wsReconnectAttempts = 0; // Reset on successful connect
 
@@ -1128,6 +1133,7 @@ function startLiveWebSocket(io) {
             for (let i = 0; i < tokens.length; i += 50) {
                 const batch = tokens.slice(i, i + 50);
                 setTimeout(() => {
+                    if (currentSocket !== global_web_socket) return;
                     safeFetchData({
                         correlationID: `short_market_init_${exchCode}_${i}`,
                         action: 1, mode: 1, exchangeType: exchCode, tokens: batch
@@ -1137,7 +1143,8 @@ function startLiveWebSocket(io) {
             }
         }
 
-        global_web_socket.on('tick', (receiveData) => {
+        currentSocket.on('tick', (receiveData) => {
+            if (currentSocket !== global_web_socket) return;
             const dataArray = Array.isArray(receiveData) ? receiveData : [receiveData];
             
             for (const data of dataArray) {
@@ -1220,17 +1227,20 @@ function startLiveWebSocket(io) {
             }
         });
 
-        global_web_socket.on('error', () => {
+        currentSocket.on('error', () => {
+            if (currentSocket !== global_web_socket) return;
             console.error('⚠️  WS error! Will reconnect...');
             reconnectWebSocket(io);
         });
 
-        global_web_socket.on('close', () => {
+        currentSocket.on('close', () => {
+            if (currentSocket !== global_web_socket) return;
             console.warn('⚠️  WS closed! Will reconnect...');
             reconnectWebSocket(io);
         });
 
     }).catch(err => {
+        if (currentSocket !== global_web_socket) return;
         console.error('WS connect error:', err.message);
         reconnectWebSocket(io);
     });

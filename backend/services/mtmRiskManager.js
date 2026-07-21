@@ -5,6 +5,7 @@ class MTMRiskManager {
     constructor(priceCache) {
         this.priceCache = priceCache;
         this.isRunning = false;
+        this.isChecking = false;
         console.log('MTM Risk Manager Initialized.');
     }
 
@@ -17,10 +18,15 @@ class MTMRiskManager {
     }
 
     async evaluateMTM() {
+        if (this.isChecking) return;
+        this.isChecking = true;
         try {
             // Group active positions by user
             const openPositions = await db('positions').whereNot({ quantity: 0 });
-            if (openPositions.length === 0) return;
+            if (openPositions.length === 0) {
+                this.isChecking = false;
+                return;
+            }
 
             const userPositions = {};
             openPositions.forEach(pos => {
@@ -64,6 +70,8 @@ class MTMRiskManager {
             }
         } catch (err) {
             console.error('MTM Risk Manager Error:', err);
+        } finally {
+            this.isChecking = false;
         }
     }
 

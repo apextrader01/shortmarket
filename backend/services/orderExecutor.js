@@ -3,13 +3,19 @@ const db = require('../database/db');
 function initOrderExecutor(priceCache) {
   console.log('Starting Order Execution Engine...');
 
+  let isExecuting = false;
   setInterval(async () => {
+    if (isExecuting) return;
+    isExecuting = true;
     try {
       // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
       // are owned by triggerEngine.js (in-memory, evaluated on every WS price tick) to
       // avoid double-execution races between the two engines.
       const pendingOrders = await db('orders').where({ status: 'PENDING', type: 'MARKET' });
-      if (pendingOrders.length === 0) return;
+      if (pendingOrders.length === 0) {
+        isExecuting = false;
+        return;
+      }
 
       for (const order of pendingOrders) {
         const ltp = priceCache[order.symbol]?.ltp;
@@ -51,6 +57,8 @@ function initOrderExecutor(priceCache) {
       }
     } catch (err) {
       console.error('OrderExecutor Error:', err.message);
+    } finally {
+      isExecuting = false;
     }
   }, 2000); // Check every 2 seconds
 }
@@ -114,6 +122,12 @@ async function spawnBracketOrders(trx, order) {
 async function executeOrder(order, execPrice) {
   try {
     await db.transaction(async (trx) => {
+      // Verify order is still pending in DB before executing to prevent double execution race conditions
+      const dbOrder = await trx('orders').where({ id: order.id }).first();
+      if (!dbOrder || (dbOrder.status !== 'PENDING' && dbOrder.status !== 'PENDING_TRIGGER')) {
+          return;
+      }
+
       // Calculate Taxes
       const taxesObj = calculateTaxes(order.symbol, order.product_type, order.side, Number(order.quantity), execPrice);
       const totalTaxes = taxesObj.totalTaxes;
