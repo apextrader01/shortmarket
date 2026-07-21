@@ -10,36 +10,13 @@ if (!fs.existsSync(targetFile)) {
 
 let content = fs.readFileSync(targetFile, 'utf8');
 
-// 1. Fix ping interval crash (checking readyState before sending)
-const originalPing = `reset = setInterval(function () {
-                                                        ws.send('ping');
-                                                }, ping_Interval);`;
-
-const safePing = `reset = setInterval(function () {
-                                                        if (ws && ws.readyState === 1) {
-                                                                try { ws.send('ping'); } catch (e) {}
-                                                        }
-                                                }, ping_Interval);`;
-
-if (content.includes(originalPing)) {
-    content = content.replace(originalPing, safePing);
-    console.log('✅ Patched ws.send ping interval safety.');
+// 1. Fix ping interval crash (checking readyState before sending, independent of spaces/tabs/newlines)
+const pingRegex = /ws\.send\(\s*['"]ping['"]\s*\);/g;
+if (pingRegex.test(content)) {
+    content = content.replace(pingRegex, "if (ws && ws.readyState === 1) { try { ws.send('ping'); } catch (e) {} }");
+    console.log('✅ Patched ws.send ping safety.');
 } else {
-    // Try with different indentation or format
-    const alternateOriginal = `reset = setInterval(function () {
-            ws.send('ping');
-        }, ping_Interval);`;
-    const alternateSafe = `reset = setInterval(function () {
-            if (ws && ws.readyState === 1) {
-                try { ws.send('ping'); } catch (e) {}
-            }
-        }, ping_Interval);`;
-    if (content.includes(alternateOriginal)) {
-        content = content.replace(alternateOriginal, alternateSafe);
-        console.log('✅ Patched alternate ws.send ping interval safety.');
-    } else {
-        console.warn('⚠️ Ping interval pattern match not found. Already patched?');
-    }
+    console.warn('⚠️ ws.send ping pattern match not found. Already patched?');
 }
 
 // 2. Prevent uncaught exception throws on errors
