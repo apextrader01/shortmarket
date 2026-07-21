@@ -2,12 +2,26 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 
-let API = '';
+export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
   API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
 }
 
-export const socket = io(API, { withCredentials: true });
+// Global HTTP Fetch Interceptor to support Token-based authentication
+// when third-party cookies are blocked by browser settings (e.g. Incognito or Safari)
+const originalFetch = window.fetch;
+window.fetch = async function (url, options = {}) {
+  const token = localStorage.getItem('token');
+  if (token && typeof url === 'string' && url.includes('/api/')) {
+    options.headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    };
+  }
+  return originalFetch(url, options);
+};
+
+export const socket = io(API, { withCredentials: false });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +55,8 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
           
@@ -63,6 +79,8 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
           
@@ -362,6 +380,10 @@ export const useStore = create(persist((set, get) => ({
 
     socket.on('connect', () => {
       console.log('Socket connected, refreshing and resubscribing...');
+      const currentUser = get().user;
+      if (currentUser?.id) {
+        socket.emit('register_user', currentUser.id);
+      }
       get().refreshPrices();
       
       // Helper to determine exchange from a uniqueSymbol
@@ -407,6 +429,9 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
   refreshPrices: async () => {
+    // Only fetch fallback prices if socket is connected AND we already have prices
+    if (socket && socket.connected && Object.keys(get().prices).length > 0) return;
+
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
       const snapshot = await res.json();
@@ -925,7 +950,11 @@ export const useStore = create(persist((set, get) => ({
 
   setToken: (token) => set({ token }),
   setUser:  (user)  => set({ user }),
-  logout: () => { set({ user: null, positions: [], orders: [] }); fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{}); },
+  logout: () => {
+    localStorage.removeItem('token');
+    set({ user: null, positions: [], orders: [] });
+    fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{});
+  },
   
   // ── Theme ───────────────────────────────────────────────────────────────────
   theme: 'dark', // default to dark

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
 
@@ -11,7 +11,7 @@ export default function AnalyticsView() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const res = await fetch('/api/analytics', {
+        const res = await fetch(`${API}/api/analytics`, {
           credentials: 'include'
         });
         if (!res.ok) throw new Error(`HTTP error: ${res.status}`);

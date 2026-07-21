@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useStore, API } from '../store';
 import { SMA, RSI, MACD } from 'technicalindicators';
 
 export default function StockDetails({ symbol, price, candles }) {
@@ -9,7 +10,7 @@ export default function StockDetails({ symbol, price, candles }) {
   useEffect(() => {
     if (!symbol) return;
     setLoading(true);
-    fetch(`/api/stocks/${encodeURIComponent(symbol)}/details`)
+    fetch(`${API}/api/stocks/${encodeURIComponent(symbol)}/details`)
       .then(r => r.json())
       .then(data => {
         setDetails(data);

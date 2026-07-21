@@ -20,9 +20,11 @@ const OptionChainRow = React.memo(({
   openMarketDepthModal,
   openDomLadderModal
 }) => {
-  // Subscribe specifically to the prices for this exact strike to avoid re-rendering the whole chain
-  const callPriceData = useStore(state => call ? state.prices[call.symbol] : null);
-  const putPriceData = useStore(state => put ? state.prices[put.symbol] : null);
+  const callKey = call ? (call.symbol.includes('-') ? call.symbol : `${call.symbol}-${call.exch_seg}`) : null;
+  const putKey = put ? (put.symbol.includes('-') ? put.symbol : `${put.symbol}-${put.exch_seg}`) : null;
+
+  const callPriceData = useStore(state => callKey ? state.prices[callKey] : null);
+  const putPriceData = useStore(state => putKey ? state.prices[putKey] : null);
 
   const cLtp = callPriceData?.ltp || 0;
   const pLtp = putPriceData?.ltp || 0;
@@ -89,10 +91,10 @@ const OptionChainRow = React.memo(({
           <div style={{ display: 'flex', gap: '2px' }}>
             {call && (
               <>
-                <button onClick={() => setAlertModalSymbol(call.symbol)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
-                <button onClick={() => setChartModalSymbol(call.symbol)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
-                <button onClick={() => openMarketDepthModal(call.symbol)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(call.symbol, parseInt(call.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                <button onClick={() => setAlertModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
+                <button onClick={() => setChartModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
+                <button onClick={() => openMarketDepthModal(callKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
+                <button onClick={() => openDomLadderModal(callKey, parseInt(call.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
               </>
             )}
           </div>
@@ -128,10 +130,10 @@ const OptionChainRow = React.memo(({
           <div style={{ display: 'flex', gap: '2px' }}>
             {put && (
               <>
-                <button onClick={() => setAlertModalSymbol(put.symbol)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
-                <button onClick={() => setChartModalSymbol(put.symbol)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
-                <button onClick={() => openMarketDepthModal(put.symbol)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(put.symbol, parseInt(put.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                <button onClick={() => setAlertModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
+                <button onClick={() => setChartModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
+                <button onClick={() => openMarketDepthModal(putKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
+                <button onClick={() => openDomLadderModal(putKey, parseInt(put.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
               </>
             )}
           </div>

@@ -354,6 +354,7 @@ function loadFallbackMaster() {
 
 // ─── Market Hours Check ───────────────────────────────────────────────────────
 function isMarketOpen() {
+    if (process.env.BYPASS_MARKET_CHECK === 'true') return true;
     const now = new Date();
     const day = now.getUTCDay();
     if (day === 0 || day === 6) return false;
@@ -434,6 +435,18 @@ function enrichLotsize(token, uniqueSymbol) {
     }
 }
 
+function safeFetchData(payload) {
+    if (global_web_socket && global_web_socket.ws && global_web_socket.ws.readyState === 1) {
+        try {
+            global_web_socket.fetchData(payload);
+        } catch (err) {
+            console.warn(`⚠️ Failed to send WS subscription (correlationID: ${payload.correlationID}):`, err.message);
+        }
+    } else {
+        console.warn(`⚠️ WebSocket not ready (readyState: ${global_web_socket?.ws?.readyState || 'none'}). Skipping subscription.`);
+    }
+}
+
 async function addSubscription(data, io, priceCache) {
     let token, exchangeCode, uniqueSymbol, exchStr;
 
@@ -498,12 +511,10 @@ async function addSubscription(data, io, priceCache) {
         clientSubscriptions.add(token);
         
         // If websocket is running, dynamically subscribe to the new token
-        if (global_web_socket) {
-            global_web_socket.fetchData({
-                correlationID: `dynamic_sub_${token}`,
-                action: 1, mode: 1, exchangeType: exchangeCode, tokens: [token]
-            });
-        }
+        safeFetchData({
+            correlationID: `dynamic_sub_${token}`,
+            action: 1, mode: 1, exchangeType: exchangeCode, tokens: [token]
+        });
         
         }
 
@@ -633,23 +644,19 @@ function addSubscriptionBatch(dataArray, io, priceCache, socket) {
         }
     }
 
-    if (global_web_socket) {
-        let delayMs = 0;
-        for (const [exchCodeStr, tokens] of Object.entries(tokensByExchange)) {
-            const exchCode = parseInt(exchCodeStr);
-            if (tokens.length > 0) {
-                for (let i = 0; i < tokens.length; i += 50) {
-                    const batch = tokens.slice(i, i + 50);
-                    setTimeout(() => {
-                        if (global_web_socket) {
-                            global_web_socket.fetchData({
-                                correlationID: `batch_sub_${Date.now()}_${i}`,
-                                action: 1, mode: 1, exchangeType: exchCode, tokens: batch
-                            });
-                        }
-                    }, delayMs);
-                    delayMs += 350;
-                }
+    let delayMs = 0;
+    for (const [exchCodeStr, tokens] of Object.entries(tokensByExchange)) {
+        const exchCode = parseInt(exchCodeStr);
+        if (tokens.length > 0) {
+            for (let i = 0; i < tokens.length; i += 50) {
+                const batch = tokens.slice(i, i + 50);
+                setTimeout(() => {
+                    safeFetchData({
+                        correlationID: `batch_sub_${Date.now()}_${i}`,
+                        action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                    });
+                }, delayMs);
+                delayMs += 350;
             }
         }
     }
@@ -702,8 +709,12 @@ async function fetchBatchLTPs(uniqueSymbols) {
     const result = {};
     if (!uniqueSymbols || uniqueSymbols.length === 0) return result;
 
+    const batches = [];
     for (let i = 0; i < uniqueSymbols.length; i += BATCH_SIZE) {
-        const batch = uniqueSymbols.slice(i, i + BATCH_SIZE);
+        batches.push(uniqueSymbols.slice(i, i + BATCH_SIZE));
+    }
+
+    const promises = batches.map(async (batch) => {
         const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
         let hasTokens = false;
 
@@ -738,7 +749,7 @@ async function fetchBatchLTPs(uniqueSymbols) {
             }
         });
 
-        if (!hasTokens) continue;
+        if (!hasTokens) return;
 
         // Clean up empty arrays to prevent Angel One API from rejecting the payload
         for (const exch in exchangeMap) {
@@ -747,12 +758,12 @@ async function fetchBatchLTPs(uniqueSymbols) {
             }
         }
 
-        if (Object.keys(exchangeMap).length === 0) continue;
+        if (Object.keys(exchangeMap).length === 0) return;
 
         try {
             const res = await Promise.race([
                 smart_api.marketData({ mode: 'FULL', exchangeTokens: exchangeMap }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 5000))
             ]);
             
             if (res?.status && res.data?.fetched) {
@@ -783,7 +794,9 @@ async function fetchBatchLTPs(uniqueSymbols) {
         } catch (e) {
             console.error('fetchBatchLTPs error', e.message);
         }
-    }
+    });
+
+    await Promise.all(promises);
     return result;
 }
 
@@ -794,9 +807,14 @@ async function fetchAllLTPs() {
     
     // Poll ONLY tokens clients are actively subscribed to
     const tokensToFetch = Array.from(clientSubscriptions);
+    if (tokensToFetch.length === 0) return result;
 
+    const batches = [];
     for (let i = 0; i < tokensToFetch.length; i += BATCH_SIZE) {
-        const batch = tokensToFetch.slice(i, i + BATCH_SIZE);
+        batches.push(tokensToFetch.slice(i, i + BATCH_SIZE));
+    }
+
+    const promises = batches.map(async (batch) => {
         const exchangeMap = { NSE: [], BSE: [], NFO: [], BFO: [], MCX: [] };
         
         batch.forEach(token => {
@@ -811,7 +829,7 @@ async function fetchAllLTPs() {
             }
         }
 
-        if (Object.keys(exchangeMap).length === 0) continue;
+        if (Object.keys(exchangeMap).length === 0) return;
 
         try {
             const res = await Promise.race([
@@ -819,7 +837,7 @@ async function fetchAllLTPs() {
                     mode: 'FULL',
                     exchangeTokens: exchangeMap
                 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 2000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Angel One API Timeout')), 5000))
             ]);
             if (res?.status && res.data?.fetched) {
                 for (const item of res.data.fetched) {
@@ -848,7 +866,9 @@ async function fetchAllLTPs() {
         } catch (e) {
             // Silent - batch might fail for some tokens
         }
-    }
+    });
+
+    await Promise.all(promises);
     return result;
 }
 
@@ -914,6 +934,12 @@ async function fetchCandleData(uniqueSymbol, interval = 'ONE_DAY') {
             }
 
             const res = JSON.parse(text);
+            
+            if (res && res.errorCode === 'AG8001') {
+                console.warn(`⚠️ Expired/Invalid token detected in chart fetch for ${uniqueSymbol}. Triggering auto-relogin...`);
+                await loginAngelOne(global_io, sharedPriceCache);
+                continue;
+            }
             
             if (!res || !res.status || !res.data) {
                 console.error(`Angel One historical API error for ${uniqueSymbol}:`, res);
@@ -1083,7 +1109,10 @@ function startLiveWebSocket(io) {
         feedtype: feedToken
     });
 
-    global_web_socket.connect().then(() => {
+    const currentSocket = global_web_socket;
+
+    currentSocket.connect().then(() => {
+        if (currentSocket !== global_web_socket) return;
         console.log('🔌 WebSocket Connected!');
         wsReconnectAttempts = 0; // Reset on successful connect
 
@@ -1104,18 +1133,18 @@ function startLiveWebSocket(io) {
             for (let i = 0; i < tokens.length; i += 50) {
                 const batch = tokens.slice(i, i + 50);
                 setTimeout(() => {
-                    if (global_web_socket) {
-                        global_web_socket.fetchData({
-                            correlationID: `short_market_init_${exchCode}_${i}`,
-                            action: 1, mode: 1, exchangeType: exchCode, tokens: batch
-                        });
-                    }
+                    if (currentSocket !== global_web_socket) return;
+                    safeFetchData({
+                        correlationID: `short_market_init_${exchCode}_${i}`,
+                        action: 1, mode: 1, exchangeType: exchCode, tokens: batch
+                    });
                 }, delayMs);
                 delayMs += 350; // Delay to prevent WebSocket limit of 3 requests per second
             }
         }
 
-        global_web_socket.on('tick', (receiveData) => {
+        currentSocket.on('tick', (receiveData) => {
+            if (currentSocket !== global_web_socket) return;
             const dataArray = Array.isArray(receiveData) ? receiveData : [receiveData];
             
             for (const data of dataArray) {
@@ -1198,17 +1227,20 @@ function startLiveWebSocket(io) {
             }
         });
 
-        global_web_socket.on('error', () => {
+        currentSocket.on('error', () => {
+            if (currentSocket !== global_web_socket) return;
             console.error('⚠️  WS error! Will reconnect...');
             reconnectWebSocket(io);
         });
 
-        global_web_socket.on('close', () => {
+        currentSocket.on('close', () => {
+            if (currentSocket !== global_web_socket) return;
             console.warn('⚠️  WS closed! Will reconnect...');
             reconnectWebSocket(io);
         });
 
     }).catch(err => {
+        if (currentSocket !== global_web_socket) return;
         console.error('WS connect error:', err.message);
         reconnectWebSocket(io);
     });

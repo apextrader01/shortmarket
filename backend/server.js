@@ -240,10 +240,11 @@ app.post('/api/auth/register', async (req, res) => {
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
@@ -271,10 +272,11 @@ app.post('/api/auth/login', async (req, res) => {
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
     res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
@@ -289,7 +291,8 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Logout endpoint
 app.post('/api/auth/logout', (req, res) => {
-  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: 'none', secure: true });
+  const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+  res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
 });
 
@@ -1256,6 +1259,34 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Validate Bracket Order (BO) and Cover Order (CO) formats
+  if (product_type === 'BO' || product_type === 'CO') {
+    const entryPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
+    
+    if (entryPrice <= 0) {
+      return res.status(400).json({ error: 'Cannot place Bracket/Cover order when live price is unavailable. Please specify a limit price.' });
+    }
+    
+    const parsedSL = sl_price ? parseFloat(sl_price) : 0;
+    const parsedTgt = tgt_price ? parseFloat(tgt_price) : 0;
+    
+    if (side === 'BUY') {
+      if (parsedSL && parsedSL >= entryPrice) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+      if (parsedTgt && parsedTgt <= entryPrice) {
+        return res.status(400).json({ error: `Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+    } else if (side === 'SELL') {
+      if (parsedSL && parsedSL <= entryPrice) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+      if (parsedTgt && parsedTgt >= entryPrice) {
+        return res.status(400).json({ error: `Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      }
+    }
+  }
+
   // Block new Intraday orders outside valid time windows
   if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
@@ -1880,6 +1911,13 @@ io.on('connection', (socket) => {
     socket.emit('price_snapshot', priceCache);
   }
 
+  socket.on('register_user', (userId) => {
+    if (userId) {
+      socket.join(userId.toString());
+      console.log(`Socket ${socket.id} registered user: ${userId}`);
+    }
+  });
+
   socket.on('subscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
     socket.join(symbol);
@@ -1998,5 +2036,21 @@ server.listen(PORT, '0.0.0.0', async () => {
   initRiskyStocksSync();
   initOrderExecutor(priceCache);
 });
+
+// Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
+const cleanupAndExit = () => {
+  console.log('Stopping server and releasing port...');
+  server.close(() => {
+    console.log('Server stopped.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.log('Forced exit.');
+    process.exit(0);
+  }, 2000);
+};
+
+process.on('SIGINT', cleanupAndExit);
+process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };

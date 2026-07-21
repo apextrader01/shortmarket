@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell } from 'lucide-react';
 
 export default function MarketWatch({ className = '' }) {
@@ -26,7 +26,7 @@ export default function MarketWatch({ className = '' }) {
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
         if (res.ok) {
           const data = await res.json();
           // Cache the lotsize locally so we have it instantly if the user adds to watchlist

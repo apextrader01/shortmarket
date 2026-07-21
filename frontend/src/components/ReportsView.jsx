@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { FileText, PieChart, BarChart2, Download, Search, Filter, ArrowLeft, Calendar, FileDown } from 'lucide-react';
 
 // --- Utility function for CSV Download ---
@@ -52,7 +52,7 @@ const LedgerStatement = () => {
     const fetchLedger = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/ledger', {
+        const res = await fetch(`${API}/api/ledger`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();

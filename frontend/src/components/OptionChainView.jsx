@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
 import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
-
-const API = '';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -121,10 +119,14 @@ const OptionChainView = () => {
         const idxKey = getIndexKey(symbol);
         const isCommodity = commodities.includes(symbol);
 
+        const initialToFetch = ['INDIA VIX-NSE'];
+        if (idxKey) initialToFetch.push(idxKey);
+
         // Fire ALL requests in parallel — don't wait for one before starting the next
-        const [futRes, chainRes] = await Promise.all([
+        const [futRes, chainRes, _] = await Promise.all([
           fetch(`${API}/api/options/futures/${symbol}`),
           fetch(`${API}/api/options/chain/${symbol}`),
+          useStore.getState().fetchBatchPrices(initialToFetch)
         ]);
 
         // Process futures result
@@ -134,18 +136,15 @@ const OptionChainView = () => {
           setFutureData(futDataResult);
           const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
           setFutureTokenKey(futKey);
+          
+          // For commodities, now that we have the futures symbol/exchange, fetch its price
+          if (isCommodity) {
+            await useStore.getState().fetchBatchPrices([futKey]);
+          }
         } else {
           setFutureData(null);
           setFutureTokenKey(null);
         }
-
-        // Now fetch batch prices (needs futures result for commodities)
-        const initialToFetch = ['INDIA VIX-NSE'];
-        if (idxKey) initialToFetch.push(idxKey);
-        if (isCommodity && futDataResult) {
-          initialToFetch.push(`${futDataResult.symbol}-${futDataResult.exchange}`);
-        }
-        await useStore.getState().fetchBatchPrices(initialToFetch);
 
         // Set initialSpotPrice immediately from the store (don't wait for React re-render)
         const storeState = useStore.getState().prices;
@@ -278,8 +277,8 @@ const OptionChainView = () => {
 
           visibleStrikes.forEach((strike) => {
             const data = optionsData[expiry]?.[strike];
-            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
-            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
+            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: `${data.CE.symbol}-${data.CE.exch_seg}`, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
+            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: `${data.PE.symbol}-${data.PE.exch_seg}`, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
           });
 
           if (uniqueSymbolsToFetch.length > 0) {
@@ -340,10 +339,13 @@ const OptionChainView = () => {
   const handleTrade = (opt, type, optionType, iv) => {
     if (!opt) return;
     
+    // Construct unique symbol with exchange suffix (e.g. SENSEX2672378000CE-BFO)
+    const optKey = opt.symbol.includes('-') ? opt.symbol : `${opt.symbol}-${opt.exch_seg}`;
+    
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
       const currentPrices = useStore.getState().prices;
-      const priceData = currentPrices[opt.symbol] || {};
+      const priceData = currentPrices[optKey] || {};
       const price = priceData.ltp || 0;
       setStrategyLegs(prev => [...prev, {
         optionType,
@@ -352,31 +354,29 @@ const OptionChainView = () => {
         side: type === 'BUY' ? 'BUY' : 'SELL',
         quantity: opt.lotsize ? parseInt(opt.lotsize) : 1,
         iv: iv || 0,
-        symbol: opt.symbol
+        symbol: optKey
       }]);
       return;
     }
     
     if (basketMode) {
       addToBasket({
-        symbol: opt.symbol,
+        symbol: optKey,
         side: type === 'BUY' ? 'BUY' : 'SELL',
         quantity: 1,
         lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
         orderType: 'MARKET',
         price: ''
       });
-      // Modal opens manually via the "View Basket" button
-      // Modal opens manually via the "View Basket" button
     } else if (oneClickMode) {
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
       const finalQuantity = lotsize * (oneClickMultiplier || 1);
       const currentPrices = useStore.getState().prices;
-      const livePrice = currentPrices[opt.symbol]?.ltp || 0;
+      const livePrice = currentPrices[optKey]?.ltp || 0;
       
       const payload = {
-        symbol: opt.symbol,
+        symbol: optKey,
         type: 'MARKET',
         side: type === 'BUY' ? 'BUY' : 'SELL',
         quantity: finalQuantity,
@@ -390,7 +390,7 @@ const OptionChainView = () => {
       
       placeOrder(payload); // Async, but we don't need to block UI
     } else {
-      openOrderModal(opt.symbol, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
+      openOrderModal(optKey, type === 'BUY' ? 'BUY' : 'SELL', opt.lotsize ? parseInt(opt.lotsize) : 1);
     }
   };
 

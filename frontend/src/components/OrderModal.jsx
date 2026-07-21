@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
@@ -57,7 +57,7 @@ export default function OrderModal() {
              return;
          }
          const token = useStore.getState().token;
-         const res = await fetch(`/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
+         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });
          const data = await res.json();
@@ -142,6 +142,47 @@ export default function OrderModal() {
     if (isRestricted && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
+    }
+
+    // Validate Bracket Order (BO) and Cover Order (CO) formats
+    if (isBO || isCO) {
+      const entryPrice = orderType === 'MARKET' ? livePrice : parseFloat(price);
+      if (!entryPrice || entryPrice <= 0) {
+        alert("Please enter a valid price to place a Bracket/Cover order.");
+        return;
+      }
+      
+      const parsedSL = slPrice ? parseFloat(slPrice) : 0;
+      const parsedTgt = tgtPrice ? parseFloat(tgtPrice) : 0;
+      
+      if (isCO && !parsedSL) {
+        alert("Please specify a Stop Loss price for your Cover Order (CO).");
+        return;
+      }
+      if (isBO && (!parsedSL || !parsedTgt)) {
+        alert("Please specify both Stop Loss and Target prices for your Bracket Order (BO).");
+        return;
+      }
+      
+      if (side === 'BUY') {
+        if (parsedSL && parsedSL >= entryPrice) {
+          alert(`Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
+          return;
+        }
+        if (parsedTgt && parsedTgt <= entryPrice) {
+          alert(`Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
+          return;
+        }
+      } else { // SELL
+        if (parsedSL && parsedSL <= entryPrice) {
+          alert(`Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).`);
+          return;
+        }
+        if (parsedTgt && parsedTgt >= entryPrice) {
+          alert(`Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).`);
+          return;
+        }
+      }
     }
 
     let finalType = orderType;

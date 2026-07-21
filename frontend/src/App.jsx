@@ -57,13 +57,17 @@ function App() {
     loadStocks();
     refreshPrices();
 
-    const interval = setInterval(() => {
-      if (user) fetchUserData();
+    const priceInterval = setInterval(() => {
       refreshPrices();
     }, 2000);
 
+    const userInterval = setInterval(() => {
+      if (user) fetchUserData();
+    }, 20000); // Fallback database poll every 20 seconds
+
     return () => {
-      clearInterval(interval);
+      clearInterval(priceInterval);
+      clearInterval(userInterval);
     };
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
