@@ -249,22 +249,6 @@ async function runWatchlistCleanup() {
 }
 
 function startSquareOffJobs() {
-    // EXPIRY JOBS (3:25 PM / 3:25 PM MCX)
-    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('NSE_NFO_BFO');
-        runAutoSquareOff('MCX'); // Using identical times based on earlier discussion
-    });
-
-    // INTRADAY JOBS (3:20 PM NSE/NFO/BFO)
-    schedule.scheduleJob({ rule: '20 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runIntradaySquareOff('NSE_NFO_BFO');
-    });
-
-    // INTRADAY JOBS (11:20 PM MCX)
-    schedule.scheduleJob({ rule: '20 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runIntradaySquareOff('MCX');
-    });
-
     // MIDNIGHT WATCHLIST CLEANUP (12:00 AM)
     schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
         runWatchlistCleanup();
@@ -273,7 +257,7 @@ function startSquareOffJobs() {
     // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
     runWatchlistCleanup();
 
-    console.log('✅ Auto Square-Off schedules initialized (Intraday: 3:20pm / 11:20pm) (Expiry: 3:25pm) (Cleanup: 12:00am).');
+    console.log('✅ Watchlist Cleanup schedule initialized (Cleanup: 12:00am).');
 }
 
 module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };

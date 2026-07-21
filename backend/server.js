@@ -2027,9 +2027,7 @@ server.listen(PORT, '0.0.0.0', async () => {
   new MTMRiskManager(priceCache).start();
   console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
 
-  // Initialize Cron Jobs: Phase 1/2/3 intraday square-off, 8AM T+1 reset, expiry settlement
-  initCronJobs(priceCache, triggerEngine);
-  console.log('⏰ Cron jobs active (intraday phases, T+1 reset, expiry settlement)');
+  // EOD Automations (sweeps, square-offs, holdings migration, expiry settlement) are handled by positionsEngine.js above.
 
   // Legacy square-off jobs (expiry + intraday via HTTP self-calls) + remaining services
   startSquareOffJobs();
