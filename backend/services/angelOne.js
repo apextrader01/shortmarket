@@ -984,61 +984,74 @@ async function broadcastLTPs(io) {
 }
 
 // ─── Main Login ───────────────────────────────────────────────────────────────
+let isLoggingIn = false;
+let loginPromise = null;
+
 async function loginAngelOne(io, externalPriceCache) {
-    global_io = io;
-    sharedPriceCache = externalPriceCache; // Use the server.js cache object
-    try {
-        // First load the full instrument master
-        await loadInstrumentMaster();
-
-        console.log('🔐 Logging into Angel One...');
-        const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
-        const loginSession = await directLogin(
-            process.env.ANGEL_CLIENT_ID,
-            process.env.ANGEL_PIN,
-            otp
-        );
-
-        if (loginSession && loginSession.status === true && loginSession.data) {
-            console.log('✅ Angel One Login Successful');
-            jwtToken = loginSession.data.jwtToken;
-            feedToken = loginSession.data.feedToken;
-            // Inject tokens into the SDK so its marketData() / candle calls work.
-            smart_api.setAccessToken(jwtToken);
-            smart_api.setPublicToken(loginSession.data.refreshToken);
-            smart_api.setClientCode(process.env.ANGEL_CLIENT_ID);
-
-            await broadcastLTPs(io);
-
-            console.log('📈 Starting live WebSocket connection...');
-            startLiveWebSocket(io);
-            
-            // Periodic REST polling as a fallback (every 1 second during market hours)
-            // This ensures derivatives (options/futures/commodities) always get fresh prices,
-            // even if the Angel One WebSocket doesn't deliver ticks for them.
-            if (!global_pollInterval) {
-                let isPolling = false; // Mutex to prevent overlapping calls
-                global_pollInterval = setInterval(async () => {
-                    if (isPolling) return; // Skip if previous poll still running
-                    if (isMarketOpen() && clientSubscriptions.size > 0) {
-                        isPolling = true;
-                        try {
-                            await broadcastLTPs(io);
-                        } catch (e) {
-                            console.error('Periodic poll error:', e.message);
-                        } finally {
-                            isPolling = false;
-                        }
-                    }
-                }, 1000); // 1 second
-                console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
-            }
-        } else {
-            console.error('Login Failed:', loginSession.message);
-        }
-    } catch (error) {
-        console.error('Error:', error.message);
+    if (isLoggingIn) {
+        return loginPromise;
     }
+    isLoggingIn = true;
+    loginPromise = (async () => {
+        global_io = io;
+        sharedPriceCache = externalPriceCache; // Use the server.js cache object
+        try {
+            // First load the full instrument master
+            await loadInstrumentMaster();
+
+            console.log('🔐 Logging into Angel One...');
+            const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
+            const loginSession = await directLogin(
+                process.env.ANGEL_CLIENT_ID,
+                process.env.ANGEL_PIN,
+                otp
+            );
+
+            if (loginSession && loginSession.status === true && loginSession.data) {
+                console.log('✅ Angel One Login Successful');
+                jwtToken = loginSession.data.jwtToken;
+                feedToken = loginSession.data.feedToken;
+                // Inject tokens into the SDK so its marketData() / candle calls work.
+                smart_api.setAccessToken(jwtToken);
+                smart_api.setPublicToken(loginSession.data.refreshToken);
+                smart_api.setClientCode(process.env.ANGEL_CLIENT_ID);
+
+                await broadcastLTPs(io);
+
+                console.log('📈 Starting live WebSocket connection...');
+                startLiveWebSocket(io);
+                
+                // Periodic REST polling as a fallback (every 1 second during market hours)
+                // This ensures derivatives (options/futures/commodities) always get fresh prices,
+                // even if the Angel One WebSocket doesn't deliver ticks for them.
+                if (!global_pollInterval) {
+                    let isPolling = false; // Mutex to prevent overlapping calls
+                    global_pollInterval = setInterval(async () => {
+                        if (isPolling) return; // Skip if previous poll still running
+                        if (isMarketOpen() && clientSubscriptions.size > 0) {
+                            isPolling = true;
+                            try {
+                                await broadcastLTPs(io);
+                            } catch (e) {
+                                console.error('Periodic poll error:', e.message);
+                            } finally {
+                                isPolling = false;
+                            }
+                        }
+                    }, 1000); // 1 second
+                    console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
+                }
+            } else {
+                console.error('Login Failed:', loginSession.message);
+            }
+        } catch (error) {
+            console.error('Error:', error.message);
+        } finally {
+            isLoggingIn = false;
+            loginPromise = null;
+        }
+    })();
+    return loginPromise;
 }
 
 // ─── Live WebSocket ───────────────────────────────────────────────────────────
