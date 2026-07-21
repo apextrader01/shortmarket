@@ -378,7 +378,7 @@ export const useStore = create(persist((set, get) => ({
       get().fetchUserData();
     });
 
-    socket.on('connect', () => {
+    const onConnect = () => {
       console.log('Socket connected, refreshing and resubscribing...');
       const currentUser = get().user;
       if (currentUser?.id) {
@@ -424,7 +424,13 @@ export const useStore = create(persist((set, get) => ({
       if (tokensToSub.length > 0) {
         subscribeToOptionBatch(tokensToSub);
       }
-    });
+    };
+
+    socket.off('connect');
+    socket.on('connect', onConnect);
+    if (socket.connected) {
+      onConnect();
+    }
   },
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
