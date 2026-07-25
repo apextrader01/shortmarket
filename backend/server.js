@@ -262,8 +262,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  const { email, password } = req.body;
   try {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
@@ -1970,8 +1969,15 @@ app.get('/api/debug-state', (req, res) => {
 });
 
 // ─── Serve Frontend in Production ─────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 app.use((req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
