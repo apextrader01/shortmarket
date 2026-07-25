@@ -435,15 +435,34 @@ function enrichLotsize(token, uniqueSymbol) {
     }
 }
 
+// Queue for subscriptions that failed because WebSocket wasn't ready
+const pendingSubscriptions = [];
+
 function safeFetchData(payload) {
     if (global_web_socket && global_web_socket.ws && global_web_socket.ws.readyState === 1) {
         try {
             global_web_socket.fetchData(payload);
         } catch (err) {
             console.warn(`⚠️ Failed to send WS subscription (correlationID: ${payload.correlationID}):`, err.message);
+            // Queue it for retry when WS reconnects
+            pendingSubscriptions.push(payload);
         }
     } else {
-        console.warn(`⚠️ WebSocket not ready (readyState: ${global_web_socket?.ws?.readyState || 'none'}). Skipping subscription.`);
+        console.warn(`⚠️ WebSocket not ready (readyState: ${global_web_socket?.ws?.readyState || 'none'}). Queuing subscription for retry.`);
+        // Queue the subscription to be sent when WS reconnects
+        pendingSubscriptions.push(payload);
+    }
+}
+
+// Replay any queued subscriptions after WebSocket reconnects
+function replayPendingSubscriptions() {
+    if (pendingSubscriptions.length === 0) return;
+    console.log(`🔄 Replaying ${pendingSubscriptions.length} queued subscriptions...`);
+    const toReplay = pendingSubscriptions.splice(0, pendingSubscriptions.length);
+    let delayMs = 0;
+    for (const payload of toReplay) {
+        setTimeout(() => safeFetchData(payload), delayMs);
+        delayMs += 350;
     }
 }
 
@@ -1028,7 +1047,10 @@ async function loginAngelOne(io, externalPriceCache) {
                     let isPolling = false; // Mutex to prevent overlapping calls
                     global_pollInterval = setInterval(async () => {
                         if (isPolling) return; // Skip if previous poll still running
-                        if (isMarketOpen() && clientSubscriptions.size > 0) {
+                        // Always poll during market hours — don't require clientSubscriptions
+                        // This prevents the chicken-and-egg deadlock where prices are empty
+                        // because no clients have subscribed yet
+                        if (isMarketOpen()) {
                             isPolling = true;
                             try {
                                 await broadcastLTPs(io);
@@ -1075,10 +1097,11 @@ async function reconnectWebSocket(io) {
     cleanupWebSocket();
     wsReconnectAttempts++;
     
-    const delay = Math.min(2000 * Math.pow(2, wsReconnectAttempts - 1), 30000); // 2s, 4s, 8s, 16s, 30s max
+    const delay = Math.min(2000 * Math.pow(2, wsReconnectAttempts - 1), 60000); // 2s, 4s, 8s, 16s, 30s, 60s max
     console.log(`🔄 WS reconnect attempt ${wsReconnectAttempts} in ${delay/1000}s...`);
     
     // After 3 failed attempts, do a full re-login to get fresh JWT/feed tokens
+    let loginSucceeded = true;
     if (wsReconnectAttempts >= 3 && wsReconnectAttempts % 3 === 0) {
         console.log('🔑 Re-logging into Angel One for fresh tokens...');
         try {
@@ -1097,15 +1120,24 @@ async function reconnectWebSocket(io) {
                 console.log('✅ Fresh tokens obtained!');
             } else {
                 console.error('❌ Re-login failed:', loginSession?.message);
+                loginSucceeded = false;
             }
         } catch (e) {
             console.error('❌ Re-login error:', e.message);
+            loginSucceeded = false;
         }
     }
     
     setTimeout(() => {
         wsReconnecting = false;
-        startLiveWebSocket(io);
+        // Only attempt WebSocket connection if we have valid tokens
+        if (!loginSucceeded && wsReconnectAttempts >= 6) {
+            // After 6 failed attempts with bad tokens, wait longer before trying again
+            console.warn('⚠️ Multiple re-login failures. Waiting 2 minutes before next attempt...');
+            setTimeout(() => reconnectWebSocket(io), 120000);
+        } else {
+            startLiveWebSocket(io);
+        }
     }, delay);
 }
 
@@ -1128,6 +1160,9 @@ function startLiveWebSocket(io) {
         if (currentSocket !== global_web_socket) return;
         console.log('🔌 WebSocket Connected!');
         wsReconnectAttempts = 0; // Reset on successful connect
+
+        // Replay any subscriptions that were queued while WS was down
+        setTimeout(() => replayPendingSubscriptions(), 1000);
 
         const baseTokens = allTokens.slice(0, 300);
         const tokensToSubscribe = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
