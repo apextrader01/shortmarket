@@ -12,7 +12,9 @@ if (import.meta.env && import.meta.env.VITE_API_URL) {
 const originalFetch = window.fetch;
 window.fetch = async function (url, options = {}) {
   const token = localStorage.getItem('token');
-  if (token && typeof url === 'string' && url.includes('/api/')) {
+  // Only add Authorization header when token is a valid non-empty string
+  // (prevents sending 'Bearer null' or 'Bearer undefined' before login)
+  if (token && token.length > 10 && typeof url === 'string' && url.includes('/api/')) {
     options.headers = {
       ...options.headers,
       'Authorization': `Bearer ${token}`
@@ -338,6 +340,8 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Socket ──────────────────────────────────────────────────────────────────
+  _lastPriceFetchTime: 0,
+
   initSocket: () => {
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
@@ -384,7 +388,9 @@ export const useStore = create(persist((set, get) => ({
       if (currentUser?.id) {
         socket.emit('register_user', currentUser.id);
       }
-      get().refreshPrices();
+      // Force a fresh REST price fetch on every socket connect/reconnect
+      // (bypass the throttle so we always get fresh prices after reconnect)
+      get().refreshPrices(true);
       
       // Helper to determine exchange from a uniqueSymbol
       const getExchange = (sym) => {
@@ -434,15 +440,16 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
-  refreshPrices: async () => {
-    // Only fetch fallback prices if socket is connected AND we already have prices
-    if (socket && socket.connected && Object.keys(get().prices).length > 0) return;
+  refreshPrices: async (force = false) => {
+    const now = Date.now();
+    // Throttle: skip if last fetch was < 2s ago (unless forced by socket reconnect)
+    if (!force && (now - get()._lastPriceFetchTime) < 2000) return;
 
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
       const snapshot = await res.json();
       if (snapshot && Object.keys(snapshot).length > 0) {
-        set((state) => ({ prices: applySnapshot(snapshot, state) }));
+        set((state) => ({ prices: applySnapshot(snapshot, state), _lastPriceFetchTime: now }));
       }
     } catch (_) {}
   },
