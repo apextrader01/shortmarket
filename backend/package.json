@@ -14,7 +14,6 @@
   "type": "commonjs",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -31,7 +30,6 @@
     "pg": "^8.22.0",
     "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
-    "sqlite3": "^6.0.1",
     "totp-generator": "^2.0.1"
   },
   "overrides": {
