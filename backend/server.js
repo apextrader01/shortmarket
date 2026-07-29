@@ -818,8 +818,14 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
         const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
         for (const order of pendingOrders) {
             const user = await db('users').where({ id: order.user_id }).first();
-            if (user && order.margin && order.margin > 0) {
-                await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
+            if (user) {
+                let margin = parseFloat(order.margin);
+                if (!isNaN(margin) && margin > 0) {
+                    let newBal = parseFloat(user.balance) + margin;
+                    if (!isNaN(newBal)) {
+                        await db('users').where({ id: order.user_id }).update({ balance: newBal });
+                    }
+                }
             }
         }
         await db('orders').where('symbol', 'like', pattern).del();
@@ -827,8 +833,13 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
         for (const pos of stuckPositions) {
             const user = await db('users').where({ id: pos.user_id }).first();
             if (user) {
-                const refundAmt = Math.abs(pos.quantity) * parseFloat(pos.average_price);
-                await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
+                let avg = parseFloat(pos.average_price);
+                if (isNaN(avg)) avg = 0;
+                const refundAmt = Math.abs(pos.quantity) * avg;
+                let newBal = parseFloat(user.balance) + refundAmt;
+                if (!isNaN(newBal)) {
+                    await db('users').where({ id: pos.user_id }).update({ balance: newBal });
+                }
             }
         }
         await db('positions').where('symbol', 'like', pattern).del();
