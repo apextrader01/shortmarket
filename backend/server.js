@@ -1705,7 +1705,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 app.get('/api/admin/cleanup', async (req, res) => {
   try {
      console.log("Running manual API cleanup for expired contracts...");
-     const patterns = ['%24JUL%', '%SENSEX2672377700%'];
+     const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
      let results = {};
      
      for (const pattern of patterns) {
