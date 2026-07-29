@@ -1,20 +1,20 @@
 require('dotenv').config();
 
-// Attempt to fetch DATABASE_URL from PM2 if it's missing in .env
-if (!process.env.DATABASE_URL) {
+// Attempt to fetch ALL environment variables from PM2 (like DOTENV_KEY or DATABASE_URL)
+try {
   const { execSync } = require('child_process');
-  try {
-     console.log("No DATABASE_URL found in .env. Attempting to fetch it from PM2...");
-     const pm2Output = execSync('npx pm2 jlist').toString();
-     const match = pm2Output.match(/"DATABASE_URL":"([^"]+)"/);
-     if (match && match[1]) {
-         process.env.DATABASE_URL = match[1];
-         console.log("Successfully fetched DATABASE_URL from PM2!");
-     }
-  } catch(e) {
-     console.log("Failed to fetch from PM2.");
+  console.log("Attempting to clone environment from running PM2 process...");
+  const pm2Output = execSync('npx pm2 jlist', { encoding: 'utf-8' });
+  const pm2Data = JSON.parse(pm2Output);
+  if (pm2Data && pm2Data.length > 0 && pm2Data[0].pm2_env) {
+      Object.assign(process.env, pm2Data[0].pm2_env);
+      console.log("Successfully cloned PM2 environment variables!");
   }
+} catch(e) {
+  console.log("Failed to fetch from PM2:", e.message);
 }
+
+require('dotenv').config();
 
 const db = require('./database/db');
 const { calculateRequiredMargin } = require('./services/marginEngine'); // Needed if we recalculate margin for positions
