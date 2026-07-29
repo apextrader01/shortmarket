@@ -2101,34 +2101,32 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
 
-  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS (RAW SQL) ──
-  try {
-    console.log('CLEANUP: Starting raw SQL cleanup...');
-    
-    // First, log what's actually in the tables
-    const allPositions = await db.raw("SELECT id, symbol, user_id, quantity FROM positions WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Found positions:', JSON.stringify(allPositions.rows || allPositions));
-    
-    const allHoldings = await db.raw("SELECT id, symbol, user_id, quantity FROM holdings WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Found holdings:', JSON.stringify(allHoldings.rows || allHoldings));
-    
-    const allOrders = await db.raw("SELECT id, symbol, user_id, status FROM orders WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Found orders:', JSON.stringify(allOrders.rows || allOrders));
-    
-    // Now delete with raw SQL
-    const d1 = await db.raw("DELETE FROM orders WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Deleted orders:', d1.rowCount || d1);
-    
-    const d2 = await db.raw("DELETE FROM positions WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Deleted positions:', d2.rowCount || d2);
-    
-    const d3 = await db.raw("DELETE FROM holdings WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
-    console.log('CLEANUP: Deleted holdings:', d3.rowCount || d3);
-    
-    console.log('CLEANUP: Done!');
-  } catch (cleanupErr) {
-    console.error('CLEANUP ERROR:', cleanupErr.message);
-  }
+  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS (DELAYED 15s) ──
+  setTimeout(async () => {
+    try {
+      console.log('[EXPIRY-FIX] Starting delayed cleanup...');
+      
+      // Log what we find first
+      const pos = await db('positions').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
+      console.log('[EXPIRY-FIX] Positions found: ' + pos.length, pos.map(p => p.symbol));
+      
+      const hold = await db('holdings').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
+      console.log('[EXPIRY-FIX] Holdings found: ' + hold.length, hold.map(h => h.symbol));
+      
+      const ord = await db('orders').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
+      console.log('[EXPIRY-FIX] Orders found: ' + ord.length, ord.map(o => o.symbol));
+      
+      // Delete them
+      const d1 = await db('positions').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
+      const d2 = await db('holdings').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
+      const d3 = await db('orders').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
+      
+      console.log('[EXPIRY-FIX] Deleted: ' + d1 + ' positions, ' + d2 + ' holdings, ' + d3 + ' orders');
+      console.log('[EXPIRY-FIX] Done!');
+    } catch (err) {
+      console.log('[EXPIRY-FIX] ERROR: ' + err.message);
+    }
+  }, 15000);
 
   // Update options master in background
   updateOptionsMaster().catch(e => console.error(e));
