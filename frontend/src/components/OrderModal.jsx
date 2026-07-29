@@ -220,8 +220,15 @@ export default function OrderModal() {
       return;
     }
 
-    const success = await useStore.getState().placeOrder(payload);
-    if (success) {
+    const result = await useStore.getState().placeOrder(payload);
+    if (result && result.success) {
+      if (result.status === 'EXECUTED') {
+        alert("✅ Order Executed Successfully!");
+      } else if (result.status === 'REJECTED') {
+        alert("❌ Order Rejected!");
+      } else {
+        alert("⏳ Order Placed (Pending)");
+      }
       closeOrderModal();
     } else {
       const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";

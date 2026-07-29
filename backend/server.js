@@ -1403,11 +1403,19 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       if (isMarket) {
         const realLtp = priceCache[symbol]?.ltp || 0;
         if (realLtp > 0) {
-          triggerEngine.evaluateTick(symbol, realLtp).catch(err => console.error('Immediate evaluation error:', err));
+          try {
+            await triggerEngine.evaluateTick(symbol, realLtp);
+          } catch (err) {
+            console.error('Immediate evaluation error:', err);
+          }
         }
       }
 
-      res.json({ success: true, orderId, status });
+      // Fetch the final status after evaluation to send back to frontend
+      const finalOrder = await trx('orders').where({ id: orderId }).first();
+      const finalStatus = finalOrder ? finalOrder.status : status;
+
+      res.json({ success: true, orderId, status: finalStatus });
     });
 
   } catch (error) {
