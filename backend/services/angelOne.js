@@ -436,7 +436,8 @@ function enrichLotsize(token, uniqueSymbol) {
 }
 
 // Queue for subscriptions that failed because WebSocket wasn't ready
-const pendingSubscriptions = [];
+// Using a Map keyed by correlationID to prevent duplicate subscriptions
+const pendingSubscriptions = new Map();
 
 function safeFetchData(payload) {
     if (global_web_socket && global_web_socket.ws && global_web_socket.ws.readyState === 1) {
@@ -444,25 +445,23 @@ function safeFetchData(payload) {
             global_web_socket.fetchData(payload);
         } catch (err) {
             console.warn(`⚠️ Failed to send WS subscription (correlationID: ${payload.correlationID}):`, err.message);
-            // Queue it for retry when WS reconnects
-            pendingSubscriptions.push(payload);
+            pendingSubscriptions.set(payload.correlationID, payload);
         }
     } else {
-        console.warn(`⚠️ WebSocket not ready (readyState: ${global_web_socket?.ws?.readyState || 'none'}). Queuing subscription for retry.`);
-        // Queue the subscription to be sent when WS reconnects
-        pendingSubscriptions.push(payload);
+        pendingSubscriptions.set(payload.correlationID, payload);
     }
 }
 
 // Replay any queued subscriptions after WebSocket reconnects
 function replayPendingSubscriptions() {
-    if (pendingSubscriptions.length === 0) return;
-    console.log(`🔄 Replaying ${pendingSubscriptions.length} queued subscriptions...`);
-    const toReplay = pendingSubscriptions.splice(0, pendingSubscriptions.length);
+    if (pendingSubscriptions.size === 0) return;
+    console.log(`🔄 Replaying ${pendingSubscriptions.size} queued subscriptions...`);
+    const toReplay = Array.from(pendingSubscriptions.values());
+    pendingSubscriptions.clear();
     let delayMs = 0;
     for (const payload of toReplay) {
         setTimeout(() => safeFetchData(payload), delayMs);
-        delayMs += 350;
+        delayMs += 500; // 500ms = max 2 req/sec, safely under Angel One's 3/sec limit
     }
 }
 
@@ -1079,6 +1078,8 @@ async function loginAngelOne(io, externalPriceCache) {
 // ─── Live WebSocket ───────────────────────────────────────────────────────────
 let wsReconnectAttempts = 0;
 let wsReconnecting = false;
+let lastTickTime = Date.now();
+let watchdogInterval = null;
 
 function cleanupWebSocket() {
     if (global_web_socket) {
@@ -1094,15 +1095,22 @@ async function reconnectWebSocket(io) {
     if (wsReconnecting) return; // Prevent duplicate reconnects
     wsReconnecting = true;
     
+    // Stop watchdog while reconnecting
+    if (watchdogInterval) {
+        clearInterval(watchdogInterval);
+        watchdogInterval = null;
+    }
+    
     cleanupWebSocket();
     wsReconnectAttempts++;
     
-    const delay = Math.min(2000 * Math.pow(2, wsReconnectAttempts - 1), 60000); // 2s, 4s, 8s, 16s, 30s, 60s max
+    const delay = Math.min(2000 * Math.pow(2, wsReconnectAttempts - 1), 30000); // 2s, 4s, 8s, 16s, 30s max
     console.log(`🔄 WS reconnect attempt ${wsReconnectAttempts} in ${delay/1000}s...`);
     
-    // After 3 failed attempts, do a full re-login to get fresh JWT/feed tokens
+    // Always attempt fresh login on first reconnect attempt during market hours
+    // and every 3rd attempt otherwise — expired JWT tokens are the #1 cause of WS failure
     let loginSucceeded = true;
-    if (wsReconnectAttempts >= 3 && wsReconnectAttempts % 3 === 0) {
+    if (wsReconnectAttempts === 1 || (wsReconnectAttempts >= 3 && wsReconnectAttempts % 3 === 0)) {
         console.log('🔑 Re-logging into Angel One for fresh tokens...');
         try {
             const { TOTP } = require('totp-generator');
@@ -1130,9 +1138,7 @@ async function reconnectWebSocket(io) {
     
     setTimeout(() => {
         wsReconnecting = false;
-        // Only attempt WebSocket connection if we have valid tokens
         if (!loginSucceeded && wsReconnectAttempts >= 6) {
-            // After 6 failed attempts with bad tokens, wait longer before trying again
             console.warn('⚠️ Multiple re-login failures. Waiting 2 minutes before next attempt...');
             setTimeout(() => reconnectWebSocket(io), 120000);
         } else {
@@ -1160,9 +1166,31 @@ function startLiveWebSocket(io) {
         if (currentSocket !== global_web_socket) return;
         console.log('🔌 WebSocket Connected!');
         wsReconnectAttempts = 0; // Reset on successful connect
+        lastTickTime = Date.now();
+
+        // ── Watchdog: detect silent WebSocket death ──
+        // Cloud platforms silently kill idle TCP connections without sending close frames.
+        // If no tick arrives for 30s during market hours, force a reconnect.
+        if (watchdogInterval) clearInterval(watchdogInterval);
+        watchdogInterval = setInterval(() => {
+            if (currentSocket !== global_web_socket) {
+                clearInterval(watchdogInterval);
+                watchdogInterval = null;
+                return;
+            }
+            const staleSec = (Date.now() - lastTickTime) / 1000;
+            if (staleSec > 30 && isMarketOpen()) {
+                console.warn(`🐛 WATCHDOG: No ticks for ${staleSec.toFixed(0)}s during market hours! Forcing reconnect...`);
+                clearInterval(watchdogInterval);
+                watchdogInterval = null;
+                reconnectWebSocket(io);
+            }
+        }, 10000); // Check every 10 seconds
 
         // Replay any subscriptions that were queued while WS was down
-        setTimeout(() => replayPendingSubscriptions(), 1000);
+        // Delay replay to AFTER initial subscriptions finish to prevent rate-limit violations
+        const estimatedInitDelay = Math.ceil(clientSubscriptions.size / 50) * 500 + 2000;
+        setTimeout(() => replayPendingSubscriptions(), estimatedInitDelay);
 
         const baseTokens = allTokens.slice(0, 300);
         const tokensToSubscribe = Array.from(new Set([...baseTokens, ...clientSubscriptions]));
@@ -1187,13 +1215,14 @@ function startLiveWebSocket(io) {
                         action: 1, mode: 1, exchangeType: exchCode, tokens: batch
                     });
                 }, delayMs);
-                delayMs += 350; // Delay to prevent WebSocket limit of 3 requests per second
+                delayMs += 500; // 500ms = max 2 req/sec, safely under Angel One's 3/sec limit
             }
         }
 
         currentSocket.on('tick', (receiveData) => {
             if (currentSocket !== global_web_socket) return;
             const dataArray = Array.isArray(receiveData) ? receiveData : [receiveData];
+            lastTickTime = Date.now(); // Feed watchdog
             
             for (const data of dataArray) {
                 if (!data?.token) continue;
