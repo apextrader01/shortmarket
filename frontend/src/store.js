@@ -289,6 +289,7 @@ export const useStore = create(persist((set, get) => ({
   stocks:         [],
   positions:      [],
   holdings:       [],
+  sips:           [],
   orders:         [],
   selectedSymbol: 'RELIANCE-EQ',
   isConnected: false,
@@ -519,17 +520,19 @@ export const useStore = create(persist((set, get) => ({
     
     try {
       const headers = {  };
-      const [posRes, ordRes, userRes, holdRes] = await Promise.all([
+      const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
         fetch(`${API}/api/positions`, { credentials: 'include', headers }),
         fetch(`${API}/api/orders`, { credentials: 'include', headers }),
         fetch(`${API}/api/user`, { credentials: 'include', headers }),
         fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
+        fetch(`${API}/api/sips`, { credentials: 'include', headers }),
       ]);
-      const [positions, orders, user, holdData] = await Promise.all([
+      const [positions, orders, user, holdData, sipsData] = await Promise.all([
         posRes.json().catch(() => ({})), 
         ordRes.json().catch(() => ({})), 
         userRes.json().catch(() => ({})),
-        holdRes.json().catch(() => ({}))
+        holdRes.json().catch(() => ({})),
+        sipsRes.json().catch(() => ({}))
       ]);
       
       if (userRes.status === 401 || userRes.status === 403 || user?.error) {
@@ -542,6 +545,7 @@ export const useStore = create(persist((set, get) => ({
       set({
         positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
         holdings: holdData.success ? holdData.holdings : get().holdings,
+        sips: sipsData.success ? sipsData.sips : get().sips,
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
         user: (user && !user.error) ? user : get().user 
       });
@@ -779,6 +783,33 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  setupSip: async (sipPayload) => {
+    try {
+      const res = await fetch(`${API}/api/sip`, { credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sipPayload)
+      });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return data; }
+      console.error('[setupSip FAILED]', data);
+      return data;
+    } catch (err) {
+      console.error('[setupSip ERROR]', err);
+      return null;
+    }
+  },
+
+  cancelSip: async (id) => {
+    try {
+      const res = await fetch(`${API}/api/sip/${id}`, { credentials: 'include', method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return data; }
+      return data;
+    } catch (err) {
+      console.error('[cancelSip ERROR]', err);
+      return null;
+    }
+  },
+
   cancelOrder: async (orderId) => {
     
     try {
@@ -1002,6 +1033,20 @@ export const useStore = create(persist((set, get) => ({
     fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{});
   },
   
+  // ── Mutual Fund Watchlist ──────────────────────────────────────────────────
+  mfWatchlist: JSON.parse(localStorage.getItem('mfWatchlist') || '[]'),
+  
+  toggleMfWatchlist: (symbol) => {
+    let current = get().mfWatchlist;
+    if (current.includes(symbol)) {
+      current = current.filter(s => s !== symbol);
+    } else {
+      current = [...current, symbol];
+    }
+    set({ mfWatchlist: current });
+    localStorage.setItem('mfWatchlist', JSON.stringify(current));
+  },
+
   // ── Theme ───────────────────────────────────────────────────────────────────
   theme: 'dark', // default to dark
   toggleTheme: () => set((state) => {

@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, fetchFundHistory, placeOrder } = useStore();
+    const { fetchFundDetails, fetchFundHistory, placeOrder, setupSip } = useStore();
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isInvesting, setIsInvesting] = useState(false);
@@ -305,21 +305,33 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                 onClick={async () => {
                                     setIsInvesting(true);
                                     const qty = investmentAmount / (details?.nav || fund.nav || 1);
-                                    const res = await placeOrder({
-                                        symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
-                                        type: 'MARKET',
-                                        side: 'BUY',
-                                        quantity: parseFloat(qty.toFixed(4)),
-                                        price: details?.nav || fund.nav,
-                                        margin: investmentAmount,
-                                        product_type: calcType === 'SIP' ? 'SIP' : 'DEL'
-                                    });
+                                    
+                                    let res;
+                                    if (calcType === 'SIP') {
+                                        res = await setupSip({
+                                            symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
+                                            amount: investmentAmount,
+                                            frequency: 'MONTHLY',
+                                            price: details?.nav || fund.nav
+                                        });
+                                    } else {
+                                        res = await placeOrder({
+                                            symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
+                                            type: 'MARKET',
+                                            side: 'BUY',
+                                            quantity: parseFloat(qty.toFixed(4)),
+                                            price: details?.nav || fund.nav,
+                                            margin: investmentAmount,
+                                            product_type: 'DEL'
+                                        });
+                                    }
+                                    
                                     setIsInvesting(false);
-                                    if (res) {
-                                        alert(`Successfully invested ₹${investmentAmount} in ${fund.name}!`);
+                                    if (res && res.success) {
+                                        alert(`Successfully ${calcType === 'SIP' ? 'set up SIP for' : 'invested'} ₹${investmentAmount} in ${fund.name}!`);
                                         onClose();
                                     } else {
-                                        alert("Failed to invest. Please check your margin balance.");
+                                        alert(`Failed to invest: ${res?.error || "Please check your margin balance."}`);
                                     }
                                 }}
                                 style={{ width: '100%', padding: '14px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: isInvesting ? 'not-allowed' : 'pointer', opacity: isInvesting ? 0.7 : 1 }}

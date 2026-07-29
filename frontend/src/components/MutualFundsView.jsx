@@ -4,7 +4,7 @@ import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react'
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds } = useStore();
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, mfWatchlist, toggleMfWatchlist } = useStore();
   const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
@@ -233,6 +233,16 @@ export default function MutualFundsView() {
                                 >
                                     Invest <ArrowUpRight size={14} />
                                 </button>
+                                <button
+                                    onClick={() => toggleMfWatchlist(fund.id)}
+                                    style={{
+                                        background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none',
+                                        padding: '6px', cursor: 'pointer', fontSize: '18px', marginLeft: '4px'
+                                    }}
+                                    title={mfWatchlist.includes(fund.id) ? "Remove from Watchlist" : "Add to Watchlist"}
+                                >
+                                    {mfWatchlist.includes(fund.id) ? '★' : '☆'}
+                                </button>
                             </td>
                         </tr>
                     ))
@@ -277,9 +287,109 @@ export default function MutualFundsView() {
             </div>
         )}
         </>
+        ) : mainTab === 'SIPs' ? (
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Active SIPs</h3>
+            {/* SIPS Table will be injected here */}
+            {sips?.length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                            <th style={{ padding: '16px', textAlign: 'left' }}>Symbol</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>Amount</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Frequency</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Next Execution</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Status</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sips.map(sip => (
+                            <tr key={sip.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '16px', fontWeight: '600' }}>{sip.symbol}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>{new Date(sip.next_execution_date).toLocaleDateString()}</td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                    <span style={{ padding: '4px 8px', borderRadius: '12px', background: sip.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: sip.status === 'ACTIVE' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '11px', fontWeight: '600' }}>
+                                        {sip.status}
+                                    </span>
+                                </td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                    <button onClick={() => cancelSip(sip.id)} style={{ padding: '6px 12px', background: 'var(--color-red)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            ) : (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no active SIPs.</div>
+            )}
+          </div>
+        ) : mainTab === 'Dashboard' ? (
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>
+            {holdings?.filter(h => h.symbol.endsWith('-MF')).length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                            <th style={{ padding: '16px', textAlign: 'left' }}>Fund Symbol</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>Units</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>Avg NAV</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>Invested Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {holdings.filter(h => h.symbol.endsWith('-MF')).map(h => (
+                            <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '16px', fontWeight: '600' }}>{h.symbol.replace('-MF', '')}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            ) : (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no mutual fund investments yet.</div>
+            )}
+          </div>
+        ) : mainTab === 'Watchlist' ? (
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Watchlist</h3>
+            {mutualFunds.filter(f => mfWatchlist.includes(f.id)).length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                            <th style={{ padding: '16px', textAlign: 'left' }}>Fund Name</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Category</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>NAV</th>
+                            <th style={{ padding: '16px', textAlign: 'right' }}>3Y Return</th>
+                            <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {mutualFunds.filter(f => mfWatchlist.includes(f.id)).map(fund => (
+                            <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
+                                <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{fund.nav.toFixed(2)}</td>
+                                <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                    <button onClick={() => setSelectedFund(fund)} style={{ padding: '6px 12px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>Invest</button>
+                                    <button onClick={() => toggleMfWatchlist(fund.id)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            ) : (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Your watchlist is empty. Add funds from the Explore tab!</div>
+            )}
+          </div>
         ) : (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            This section is currently under development.
+            This section is currently under development. Wait for updates!
           </div>
         )}
 

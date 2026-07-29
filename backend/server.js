@@ -1454,7 +1454,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
       // Using the order's own price would cause LIMIT orders to self-trigger immediately.
       if (isMarket) {
-        const realLtp = priceCache[symbol]?.ltp || 0;
+        const isMutualFund = symbol.endsWith('-MF');
+        const realLtp = isMutualFund ? execPrice : (priceCache[symbol]?.ltp || 0);
         if (realLtp > 0) {
           try {
             await triggerEngine.evaluateTick(symbol, realLtp);
@@ -1474,6 +1475,89 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
     console.error('[ORDER ERROR]:', error);
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
+// ⚡ SIP Endpoints ⚡
+app.post('/api/sip', authenticateToken, async (req, res) => {
+  const { symbol, amount, frequency, price } = req.body;
+  if (!symbol || !amount) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    await db.transaction(async (trx) => {
+      const user = await trx('users').where({ id: req.user.id }).first();
+      const finalMargin = Number(amount);
+      if (Number(user.balance) < finalMargin) {
+         throw new Error('Insufficient Funds for SIP installment.');
+      }
+      
+      const newBalance = Number(user.balance) - finalMargin;
+      await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
+      
+      await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: -finalMargin,
+          type: 'MARGIN_BLOCK',
+          description: `SIP installment blocked for ${symbol}`
+      });
+
+      const nextExecutionDate = new Date();
+      nextExecutionDate.setMonth(nextExecutionDate.getMonth() + 1);
+
+      await trx('sips').insert({
+        user_id: req.user.id,
+        symbol,
+        amount: finalMargin,
+        frequency: frequency || 'MONTHLY',
+        next_execution_date: nextExecutionDate,
+        status: 'ACTIVE'
+      });
+
+      const execPrice = price || priceCache[symbol]?.ltp || 1;
+      const qty = parseFloat((finalMargin / execPrice).toFixed(4));
+
+      const [id] = await trx('orders').insert({
+        user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
+        status: 'PENDING', product_type: 'SIP', margin: finalMargin
+      }).returning('id');
+      const orderId = typeof id === 'object' ? id.id : id;
+
+      const triggerEngine = require('./services/triggerEngine');
+      triggerEngine.addOrderToMemory({
+        id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
+        status: 'PENDING', product_type: 'SIP', margin: finalMargin
+      });
+
+      try {
+        await triggerEngine.evaluateTick(symbol, execPrice);
+      } catch (err) {
+        console.error('Immediate evaluation error:', err);
+      }
+    });
+
+    res.json({ success: true, message: 'SIP created successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
+app.get('/api/sips', authenticateToken, async (req, res) => {
+  try {
+    const sips = await db('sips').where({ user_id: req.user.id });
+    res.json({ success: true, sips });
+  } catch (error) {
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
+app.delete('/api/sip/:id', authenticateToken, async (req, res) => {
+  try {
+    await db('sips').where({ id: req.params.id, user_id: req.user.id }).del();
+    res.json({ success: true, message: 'SIP deleted' });
+  } catch (error) {
     res.status(500).json({ error: error.message, success: false });
   }
 });

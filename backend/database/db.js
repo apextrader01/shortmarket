@@ -315,6 +315,22 @@ async function initSchema() {
       console.log('Created deposit_requests table');
     }
 
+    // 6. SIPs Table
+    const hasSips = await db.schema.hasTable('sips');
+    if (!hasSips) {
+      await db.schema.createTable('sips', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('symbol').notNullable();
+        table.decimal('amount', 14, 2).notNullable();
+        table.string('frequency').notNullable().defaultTo('MONTHLY'); 
+        table.date('next_execution_date').notNullable();
+        table.string('status').notNullable().defaultTo('ACTIVE'); // ACTIVE, CANCELLED
+        table.timestamps(true, true);
+      });
+      console.log('Created sips table');
+    }
+
     // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {

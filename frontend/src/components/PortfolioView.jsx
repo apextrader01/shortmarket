@@ -14,8 +14,8 @@ export default function PortfolioView() {
   let totalInvestedMutualFunds = 0;
   let unrealizedPnl = 0;
 
-  // Render holdings instead of filtering today's positions for DEL
-  const deliveryPositions = holdings || [];
+  // Render holdings instead of filtering today's positions for DEL (excluding MF)
+  const deliveryPositions = (holdings || []).filter(h => !h.symbol.endsWith('-MF'));
 
   const calculatePnL = (pos, isHolding = false) => {
       if (!pos) return;
@@ -197,7 +197,7 @@ export default function PortfolioView() {
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[2] }} />
                 Mutual Funds
               </div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Coming Soon</div>
+              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{totalInvestedMutualFunds.toFixed(2)}</div>
             </div>
           </div>
         </div>
