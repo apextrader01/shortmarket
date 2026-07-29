@@ -1,91 +1,49 @@
-require('dotenv').config();
-
-// Attempt to fetch ALL environment variables from PM2 (like DOTENV_KEY or DATABASE_URL)
-try {
-  const { execSync } = require('child_process');
-  console.log("Attempting to clone environment from running PM2 process...");
-  const pm2Output = execSync('pm2 jlist', { encoding: 'utf-8' });
-  
-  // Find where the JSON array actually starts, skipping PM2 warning logs
-  const jsonStartIndex = pm2Output.indexOf('[');
-  if (jsonStartIndex !== -1) {
-      const cleanJson = pm2Output.substring(jsonStartIndex);
-      const pm2Data = JSON.parse(cleanJson);
-      if (pm2Data && pm2Data.length > 0 && pm2Data[0].pm2_env) {
-          Object.assign(process.env, pm2Data[0].pm2_env);
-          console.log("Successfully cloned PM2 environment variables!");
-      }
-  } else {
-      console.log("Could not find JSON array in PM2 output.");
-  }
-} catch(e) {
-  console.log("Failed to fetch from PM2:", e.message);
-}
-
-require('dotenv').config();
-
-require('dotenv').config();
-
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const db = require('./database/db');
-const { calculateRequiredMargin } = require('./services/marginEngine'); // Needed if we recalculate margin for positions
 
-async function run() {
-  console.log("Cleaning up expired contracts from the database and refunding margins...");
+(async function runCleanup() {
   try {
-     const patterns = [
-        '%24JUL%', 
-        '%SENSEX2672377700%'
-     ]; 
-
+     console.log("Running direct cleanup script for expired contracts...");
+     if (!process.env.DATABASE_URL) {
+         console.warn("WARNING: DATABASE_URL not found. Script might fail if local DB is missing.");
+     }
+     
+     const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
+     let results = {};
+     
      for (const pattern of patterns) {
-         // 1. Refund and Delete Pending Orders
-         const pendingOrders = await db('orders')
-             .where('symbol', 'like', pattern)
-             .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-             
+         let pResults = { ordersDeleted: 0, positionsDeleted: 0, holdingsDeleted: 0, marginRefunded: 0 };
+         
+         const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
          for (const order of pendingOrders) {
              const user = await db('users').where({ id: order.user_id }).first();
-             if (user && order.margin > 0) {
-                 await db('users').where({ id: order.user_id }).update({
-                     balance: parseFloat(user.balance) + parseFloat(order.margin)
-                 });
-                 console.log(`Refunded ?${order.margin} to User ${user.username} for Pending Order ${order.id}`);
+             if (user && order.margin && order.margin > 0) {
+                 await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
+                 pResults.marginRefunded += parseFloat(order.margin);
              }
          }
-         const deletedOrders = await db('orders').where('symbol', 'like', pattern).del();
-         console.log(`Deleted ${deletedOrders} old orders matching ${pattern}`);
+         pResults.ordersDeleted = await db('orders').where('symbol', 'like', pattern).del();
          
-         // 2. Refund and Delete Stuck Positions
-         // Note: For a mock paper trading app, we will just refund the original margin required to open it.
-         // We won't calculate settlement P&L for expired options here.
          const stuckPositions = await db('positions').where('symbol', 'like', pattern);
          for (const pos of stuckPositions) {
              const user = await db('users').where({ id: pos.user_id }).first();
              if (user) {
-                 // Roughly estimate the margin they used to open this
-                 // For options buying, it's roughly avg_price * qty.
-                 // We will refund a generic amount based on marginEngine, or just avg_price * qty for options
                  const refundAmt = Math.abs(pos.quantity) * parseFloat(pos.average_price);
-                 await db('users').where({ id: pos.user_id }).update({
-                     balance: parseFloat(user.balance) + refundAmt
-                 });
-                 console.log(`Refunded estimated ?${refundAmt.toFixed(2)} to User ${user.username} for Position ${pos.id}`);
+                 await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
+                 pResults.marginRefunded += refundAmt;
              }
          }
+         pResults.positionsDeleted = await db('positions').where('symbol', 'like', pattern).del();
+         pResults.holdingsDeleted = await db('holdings').where('symbol', 'like', pattern).del();
          
-         const deletedPositions = await db('positions').where('symbol', 'like', pattern).del();
-         console.log(`Deleted ${deletedPositions} stuck positions matching ${pattern}`);
-
-         // 3. Delete from holdings
-         const deletedHoldings = await db('holdings').where('symbol', 'like', pattern).del();
-         console.log(`Deleted ${deletedHoldings} stuck holdings matching ${pattern}`);
+         results[pattern] = pResults;
      }
-     
-     console.log("\nCleanup and margin refund complete! You can now restart your server.");
-  } catch (err) {
-     console.error("Error during cleanup:", err);
-  } finally {
+     console.log("Cleanup complete!");
+     console.log(JSON.stringify(results, null, 2));
      process.exit(0);
+  } catch (e) {
+     console.error("Cleanup failed:", e.message, e.stack);
+     process.exit(1);
   }
-}
-run();
+})();
