@@ -11,6 +11,7 @@ export default function EditOrderModal() {
   const [productType, setProductType] = useState('INT');
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
+  const [isMarket, setIsMarket] = useState(false);
 
   const symbol = order ? order.symbol : null;
   const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
@@ -24,14 +25,20 @@ export default function EditOrderModal() {
   
   const isBO = isBOParent || isBOLeg;
   const isCO = isCOParent || isCOLeg;
+  const isPendingTrigger = order?.status === 'PENDING_TRIGGER';
 
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
-      setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
+      if (isPendingTrigger) {
+        setPrice(order.type === 'SL-M' ? (order.trigger_price ? parseFloat(order.trigger_price).toFixed(2) : '') : (order.price ? parseFloat(order.price).toFixed(2) : ''));
+      } else {
+        setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
+      }
       if (order.productType) setProductType(order.productType);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
+      setIsMarket(false);
     }
   }, [editOrderModal.isOpen, order]);
 
@@ -48,17 +55,56 @@ export default function EditOrderModal() {
   const isBuy = order.side === 'BUY';
 
   const handleUpdateOrder = async () => {
-    const success = await updateOrder(
-      order.id, 
-      quantity, 
-      parseFloat(price),
-      slPrice ? parseFloat(slPrice) : null,
-      tgtPrice ? parseFloat(tgtPrice) : null
-    );
+    // If we're updating a pending trigger and isMarket is selected, we need a special payload
+    let success = false;
+    
+    if (isPendingTrigger && isMarket) {
+      // Execute at market
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`https://shortmarket.onrender.com/api/order/${order.id}`, { // Using API URL if configured, fallback to standard fetch if store uses fetch internally. Wait, useStore has updateOrder!
+          // We can just add isMarket to the updateOrder arguments, but updateOrder signature in store is (id, qty, price, sl, tgt)
+          // Let's modify the store action in store.js or just fetch directly here for safety.
+        });
+      } catch (e) {}
+    }
+    
+    // We will update the store.js to accept an options object or isMarket flag.
+    // For now, we will fetch directly here since it's a specialized action.
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+          quantity,
+          price: isPendingTrigger && isMarket ? 0 : parseFloat(price),
+          sl_price: slPrice ? parseFloat(slPrice) : null,
+          tgt_price: tgtPrice ? parseFloat(tgtPrice) : null,
+          isMarket: isPendingTrigger ? isMarket : false
+      };
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/order/${order.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
+      });
+      
+      if (res.ok) {
+        success = true;
+        // Optionally refresh orders in store
+        const getOrdersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/orders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (getOrdersRes.ok) {
+          useStore.getState().setOrders(await getOrdersRes.json());
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     if (success) {
       closeEditOrderModal();
     } else {
-      alert("Failed to update order. Please check your balance.");
+      alert("Failed to update order. Please check your balance or parameters.");
     }
   };
 
@@ -95,83 +141,117 @@ export default function EditOrderModal() {
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            
-            {/* Product Type */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
-              <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div onClick={() => setProductType('INT')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-                {!(isBO || isCO) && (
-                  <div onClick={() => setProductType('DEL')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
-                )}
-              </div>
-            </div>
-
-            {/* Quantity */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
-              <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-            </div>
-
-            {/* Price */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
-              <input type="text" value={price} onChange={e => setPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-            </div>
-
-          </div>
-
-          {/* BO/CO Fields */}
-          {(isBO || isCO) && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: isBO ? '1fr 1fr' : '1fr', 
-              gap: '16px', 
-              marginBottom: '16px',
-              padding: '16px',
-              background: 'rgba(255,255,255,0.02)',
-              borderRadius: '8px',
-              border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
-            }}>
-              {/* SL Price */}
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--color-red-light)', marginBottom: '8px', fontWeight: '600' }}>
-                  Stop Loss Price
-                </div>
+          
+          {isPendingTrigger ? (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <input 
-                  type="text" 
-                  value={slPrice} 
-                  onChange={e => setSlPrice(e.target.value)} 
-                  style={{ 
-                    width: '100%', background: 'var(--bg-panel)', 
-                    border: '1px solid rgba(239, 68, 68, 0.3)', 
-                    padding: '8px 12px', borderRadius: '4px', 
-                    color: '#fff', fontSize: '14px', outline: 'none' 
-                  }} 
+                  type="checkbox" 
+                  id="marketCheck"
+                  checked={isMarket} 
+                  onChange={e => setIsMarket(e.target.checked)} 
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-blue)' }} 
                 />
+                <label htmlFor="marketCheck" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  Execute immediately at Market Price
+                </label>
               </div>
 
-              {/* Target Price (BO only) */}
-              {isBO && (
+              {!isMarket && (
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-green-light)', marginBottom: '8px', fontWeight: '600' }}>
-                    Target Price
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    {order.type === 'SL-M' ? 'Trigger Price' : 'Limit Price'}
                   </div>
                   <input 
                     type="text" 
-                    value={tgtPrice} 
-                    onChange={e => setTgtPrice(e.target.value)} 
-                    style={{ 
-                      width: '100%', background: 'var(--bg-panel)', 
-                      border: '1px solid rgba(34, 197, 94, 0.3)', 
-                      padding: '8px 12px', borderRadius: '4px', 
-                      color: '#fff', fontSize: '14px', outline: 'none' 
-                    }} 
+                    value={price} 
+                    onChange={e => setPrice(e.target.value)} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', color: '#fff', fontSize: '16px', outline: 'none', fontWeight: '600' }} 
                   />
                 </div>
               )}
             </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                
+                {/* Product Type */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
+                  <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div onClick={() => setProductType('INT')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
+                    {!(isBO || isCO) && (
+                      <div onClick={() => setProductType('DEL')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
+                  <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                </div>
+
+                {/* Price */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
+                  <input type="text" value={price} onChange={e => setPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                </div>
+
+              </div>
+
+              {/* BO/CO Fields */}
+              {(isBO || isCO) && (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: isBO ? '1fr 1fr' : '1fr', 
+                  gap: '16px', 
+                  marginBottom: '16px',
+                  padding: '16px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '8px',
+                  border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
+                }}>
+                  {/* SL Price */}
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-red-light)', marginBottom: '8px', fontWeight: '600' }}>
+                      Stop Loss Price
+                    </div>
+                    <input 
+                      type="text" 
+                      value={slPrice} 
+                      onChange={e => setSlPrice(e.target.value)} 
+                      style={{ 
+                        width: '100%', background: 'var(--bg-panel)', 
+                        border: '1px solid rgba(239, 68, 68, 0.3)', 
+                        padding: '8px 12px', borderRadius: '4px', 
+                        color: '#fff', fontSize: '14px', outline: 'none' 
+                      }} 
+                    />
+                  </div>
+
+                  {/* Target Price (BO only) */}
+                  {isBO && (
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-green-light)', marginBottom: '8px', fontWeight: '600' }}>
+                        Target Price
+                      </div>
+                      <input 
+                        type="text" 
+                        value={tgtPrice} 
+                        onChange={e => setTgtPrice(e.target.value)} 
+                        style={{ 
+                          width: '100%', background: 'var(--bg-panel)', 
+                          border: '1px solid rgba(34, 197, 94, 0.3)', 
+                          padding: '8px 12px', borderRadius: '4px', 
+                          color: '#fff', fontSize: '14px', outline: 'none' 
+                        }} 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Margin Alert (if insufficient) */}

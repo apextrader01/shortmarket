@@ -1702,26 +1702,43 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
-  const { quantity, price, sl_price, tgt_price } = req.body;
-  if (!quantity || !price) {
-    return res.status(400).json({ error: 'Missing quantity or price' });
-  }
+      const { isMarket, quantity, price, sl_price, tgt_price } = req.body;
+      if (!isMarket && (!quantity || price === undefined)) {
+        return res.status(400).json({ error: 'Missing quantity or price' });
+      }
 
-  try {
-    await db.transaction(async (trx) => {
-      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
-      if (!order) return res.status(404).json({ error: 'Order not found' });
-      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
-        return res.status(400).json({ error: 'Only PENDING or PENDING_TRIGGER orders can be modified' });
-      }
-      
-      const { calculateRequiredMargin } = require('./services/marginEngine');
-      const oldMargin = parseFloat(order.margin || 0);
-      let newMargin = 0;
-      if (!order.parent_order_id) {
-          newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
-      }
-      const marginDifference = newMargin - oldMargin;
+      try {
+        let marketOrderToExecute = null;
+        let ltpForMarket = 0;
+        
+        await db.transaction(async (trx) => {
+          const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+          if (!order) return res.status(404).json({ error: 'Order not found' });
+          if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
+            return res.status(400).json({ error: 'Only PENDING or PENDING_TRIGGER orders can be modified' });
+          }
+
+          // Handle Market Execution override for Pending Triggers
+          if (isMarket && order.status === 'PENDING_TRIGGER') {
+             ltpForMarket = priceCache[order.symbol]?.ltp || 0;
+             if (ltpForMarket <= 0) throw new Error('Live price unavailable for market execution');
+             
+             // Update the order type to MARKET and status to PENDING so triggerEngine accepts it
+             await trx('orders').where({ id: order.id }).update({ type: 'MARKET', status: 'PENDING', trigger_price: null, price: null, updated_at: new Date() });
+             
+             // We will execute it outside this transaction
+             marketOrderToExecute = { ...order, type: 'MARKET', status: 'PENDING', trigger_price: null, price: null };
+             return; // Skip normal update logic
+          }
+
+          const { calculateRequiredMargin } = require('./services/marginEngine');
+          const oldMargin = parseFloat(order.margin || 0);
+          let newMargin = oldMargin;
+          if (!order.parent_order_id) {
+              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
+          }
+
+          const marginDifference = newMargin - oldMargin;
       
       // Check if user has enough balance if margin increases
       const user = await trx('users').where({ id: req.user.id }).first();
@@ -1799,6 +1816,14 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       
       res.json({ success: true });
     });
+
+    if (marketOrderToExecute) {
+        const triggerEngine = require('./services/triggerEngine');
+        triggerEngine.removeOrderFromMemory(marketOrderToExecute.id, marketOrderToExecute.symbol);
+        triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
+        return res.json({ success: true, executed: true });
+    }
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
