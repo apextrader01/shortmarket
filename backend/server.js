@@ -2100,7 +2100,24 @@ const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
-  
+
+  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS ──
+  try {
+    console.log('🧹 Running startup cleanup for expired contracts...');
+    const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
+    for (const pattern of patterns) {
+      const delOrders = await db('orders').where('symbol', 'like', pattern).del();
+      const delPositions = await db('positions').where('symbol', 'like', pattern).del();
+      const delHoldings = await db('holdings').where('symbol', 'like', pattern).del();
+      if (delOrders || delPositions || delHoldings) {
+        console.log(`🧹 Pattern ${pattern}: deleted ${delOrders} orders, ${delPositions} positions, ${delHoldings} holdings`);
+      }
+    }
+    console.log('🧹 Startup cleanup complete.');
+  } catch (cleanupErr) {
+    console.error('🧹 Startup cleanup error:', cleanupErr.message);
+  }
+
   // Update options master in background
   updateOptionsMaster().catch(e => console.error(e));
 
