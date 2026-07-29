@@ -1701,21 +1701,25 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 });
 
 
-// ─── ONE-TIME CLEANUP (Runs on Server Start) ───
-(async function runCleanup() {
+// ─── ADMIN CLEANUP ENDPOINT ───
+app.get('/api/admin/cleanup', async (req, res) => {
   try {
-     console.log("Running automatic cleanup for expired contracts...");
+     console.log("Running manual API cleanup for expired contracts...");
      const patterns = ['%24JUL%', '%SENSEX2672377700%'];
+     let results = {};
+     
      for (const pattern of patterns) {
+         let pResults = { ordersDeleted: 0, positionsDeleted: 0, holdingsDeleted: 0, marginRefunded: 0 };
+         
          const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
          for (const order of pendingOrders) {
              const user = await db('users').where({ id: order.user_id }).first();
-             if (user && order.margin > 0) {
+             if (user && order.margin && order.margin > 0) {
                  await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
-                 console.log(`Refunded ?${order.margin} to User ${user.username} for Pending Order`);
+                 pResults.marginRefunded += parseFloat(order.margin);
              }
          }
-         await db('orders').where('symbol', 'like', pattern).del();
+         pResults.ordersDeleted = await db('orders').where('symbol', 'like', pattern).del();
          
          const stuckPositions = await db('positions').where('symbol', 'like', pattern);
          for (const pos of stuckPositions) {
@@ -1723,17 +1727,20 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
              if (user) {
                  const refundAmt = Math.abs(pos.quantity) * parseFloat(pos.average_price);
                  await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
-                 console.log(`Refunded estimated ?${refundAmt.toFixed(2)} to User ${user.username} for Position`);
+                 pResults.marginRefunded += refundAmt;
              }
          }
-         await db('positions').where('symbol', 'like', pattern).del();
-         await db('holdings').where('symbol', 'like', pattern).del();
+         pResults.positionsDeleted = await db('positions').where('symbol', 'like', pattern).del();
+         pResults.holdingsDeleted = await db('holdings').where('symbol', 'like', pattern).del();
+         
+         results[pattern] = pResults;
      }
-     console.log("Cleanup complete!");
+     res.json({ success: true, message: "Cleanup complete", results });
   } catch (e) {
-     console.error("Cleanup failed:", e.message);
+     console.error("Cleanup failed:", e.message, e.stack);
+     res.status(500).json({ success: false, error: e.message, stack: e.stack });
   }
-})();
+});
 
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
