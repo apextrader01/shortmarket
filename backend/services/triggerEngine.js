@@ -222,8 +222,8 @@ class TriggerEngine {
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
                         });
-                        // Cancel dangling pending orders
-                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, status: 'PENDING' }).update({ status: 'CANCELLED' });
+                        // Cancel dangling pending orders for this specific product type
+                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type, status: 'PENDING' }).update({ status: 'CANCELLED' });
                     } else {
                         await trx('positions').where({ id: existingPos.id }).update({
                            quantity: newQty,
