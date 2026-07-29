@@ -1,4 +1,21 @@
 require('dotenv').config();
+
+// Attempt to fetch DATABASE_URL from PM2 if it's missing in .env
+if (!process.env.DATABASE_URL) {
+  const { execSync } = require('child_process');
+  try {
+     console.log("No DATABASE_URL found in .env. Attempting to fetch it from PM2...");
+     const pm2Output = execSync('npx pm2 jlist').toString();
+     const match = pm2Output.match(/"DATABASE_URL":"([^"]+)"/);
+     if (match && match[1]) {
+         process.env.DATABASE_URL = match[1];
+         console.log("Successfully fetched DATABASE_URL from PM2!");
+     }
+  } catch(e) {
+     console.log("Failed to fetch from PM2.");
+  }
+}
+
 const db = require('./database/db');
 const { calculateRequiredMargin } = require('./services/marginEngine'); // Needed if we recalculate margin for positions
 
