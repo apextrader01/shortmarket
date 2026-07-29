@@ -67,7 +67,7 @@ export default function OrdersView() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0 }}>
       {/* Sub Navigation */}
       <div style={{ display: 'flex', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '24px' }}>
@@ -121,7 +121,7 @@ export default function OrdersView() {
       </div>
 
       {/* Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start', minHeight: 0, width: '100%' }}>
         {(activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{ 
@@ -143,7 +143,7 @@ export default function OrdersView() {
             </button>
           </div>
         ) : (
-          <div style={{ padding: '24px', width: '100%', height: '100%', overflowY: 'auto' }}>
+          <div style={{ padding: '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{activeTab}</h2>
               {activeTab === 'Open Orders' && displayOrders.length > 0 && (
