@@ -290,7 +290,7 @@ export const useStore = create(persist((set, get) => ({
   positions:      [],
   holdings:       [],
   orders:         [],
-  selectedSymbol: 'RELIANCE-NSE',
+  selectedSymbol: 'RELIANCE-EQ',
 
   setSelectedSymbol: (symbol) => {
     set({ selectedSymbol: symbol });
