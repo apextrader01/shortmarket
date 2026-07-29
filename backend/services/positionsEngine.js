@@ -68,7 +68,7 @@ class PositionsEngine {
                             const user = await trx('users').where({ id: order.user_id }).first();
                             await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
                         }
-                        await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
+                        await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                         triggerEngine.removeOrderFromMemory(order.id, order.symbol);
                         console.log(`[EOD SWEEP] Cancelled Pending Entry Order ${order.id} (${order.symbol})`);
                     });

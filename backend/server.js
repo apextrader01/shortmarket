@@ -1649,14 +1649,14 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') return res.status(400).json({ error: 'Only pending orders can be cancelled' });
       
       // Update status
-      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED' });
+      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
       
       // OCO: Cancel sibling if it exists
       if (order.parent_order_id) {
           await trx('orders')
             .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
             .whereNot({ id: order.id })
-            .update({ status: 'CANCELLED' });
+            .update({ status: 'CANCELLED', updated_at: new Date() });
             
           // Bracket order cancelled: Auto-exit the underlying position at market
           const parentOrder = await trx('orders').where({ id: order.parent_order_id }).first();

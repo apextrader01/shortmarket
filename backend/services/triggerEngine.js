@@ -223,7 +223,7 @@ class TriggerEngine {
                            updated_at: new Date()
                         });
                         // Cancel dangling pending orders for this specific product type
-                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type, status: 'PENDING' }).update({ status: 'CANCELLED' });
+                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type, status: 'PENDING' }).update({ status: 'CANCELLED', updated_at: new Date() });
                     } else {
                         await trx('positions').where({ id: existingPos.id }).update({
                            quantity: newQty,
@@ -288,7 +288,7 @@ class TriggerEngine {
                     .whereNot({ id: order.id });
                 
                 for (const sibling of siblings) {
-                    await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED' });
+                    await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                     this.removeOrderFromMemory(sibling.id, sibling.symbol);
                 }
             }
