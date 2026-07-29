@@ -1,5 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+process.env.TZ = 'Asia/Kolkata';
 
 // Ultimate Crash Reporter
 process.on('uncaughtException', err => {
