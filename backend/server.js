@@ -812,43 +812,62 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
 // ─── Holdings ─────────────────────────────────────────────────────────────
 app.get('/api/holdings', authenticateToken, async (req, res) => {
   try {
-    console.log("Running in-route cleanup for expired contracts...");
+    const holdings = await db('holdings')
+      .where({ user_id: req.user.id })
+      .orderBy('id', 'desc');
+      
+    // Filter out zero quantities just in case
+    const filteredHoldings = holdings.filter(h => h.quantity !== 0);
+    res.json(filteredHoldings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── ADMIN CLEANUP ENDPOINT ───────────────────────────────────────────────
+app.get('/api/cleanup-expired', async (req, res) => {
+  try {
     const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
+    const results = [];
+    
     for (const pattern of patterns) {
+        // Find them first
         const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+        const stuckPositions = await db('positions').where('symbol', 'like', pattern);
+        const stuckHoldings = await db('holdings').where('symbol', 'like', pattern);
+        
+        // Refund margin for orders
         for (const order of pendingOrders) {
             const user = await db('users').where({ id: order.user_id }).first();
-            if (user) {
-                let margin = parseFloat(order.margin);
-                if (!isNaN(margin) && margin > 0) {
-                    let newBal = parseFloat(user.balance) + margin;
-                    if (!isNaN(newBal)) {
-                        await db('users').where({ id: order.user_id }).update({ balance: newBal });
-                    }
-                }
+            if (user && !isNaN(parseFloat(order.margin)) && parseFloat(order.margin) > 0) {
+                await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
             }
         }
-        await db('orders').where('symbol', 'like', pattern).del();
-        const stuckPositions = await db('positions').where('symbol', 'like', pattern);
+        
+        // Refund value for positions
         for (const pos of stuckPositions) {
             const user = await db('users').where({ id: pos.user_id }).first();
             if (user) {
-                let avg = parseFloat(pos.average_price);
-                if (isNaN(avg)) avg = 0;
-                const refundAmt = Math.abs(pos.quantity) * avg;
-                let newBal = parseFloat(user.balance) + refundAmt;
-                if (!isNaN(newBal)) {
-                    await db('users').where({ id: pos.user_id }).update({ balance: newBal });
-                }
+                const refundAmt = Math.abs(pos.quantity) * (parseFloat(pos.average_price) || 0);
+                await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
             }
         }
-        await db('positions').where('symbol', 'like', pattern).del();
-        await db('holdings').where('symbol', 'like', pattern).del();
+        
+        // Delete them
+        const delO = await db('orders').where('symbol', 'like', pattern).del();
+        const delP = await db('positions').where('symbol', 'like', pattern).del();
+        const delH = await db('holdings').where('symbol', 'like', pattern).del();
+        
+        results.push({
+            pattern,
+            found: { orders: pendingOrders.length, positions: stuckPositions.length, holdings: stuckHoldings.length },
+            deleted: { orders: delO, positions: delP, holdings: delH }
+        });
     }
-    const holdings = await db('holdings').where({ user_id: req.user.id });
-    res.json({ success: true, holdings });
+    
+    res.json({ success: true, results });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message, stack: err.stack });
   }
 });
 
@@ -2100,33 +2119,6 @@ const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
-
-  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS (DELAYED 15s) ──
-  setTimeout(async () => {
-    try {
-      console.log('[EXPIRY-FIX] Starting delayed cleanup...');
-      
-      // Log what we find first
-      const pos = await db('positions').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
-      console.log('[EXPIRY-FIX] Positions found: ' + pos.length, pos.map(p => p.symbol));
-      
-      const hold = await db('holdings').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
-      console.log('[EXPIRY-FIX] Holdings found: ' + hold.length, hold.map(h => h.symbol));
-      
-      const ord = await db('orders').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%');
-      console.log('[EXPIRY-FIX] Orders found: ' + ord.length, ord.map(o => o.symbol));
-      
-      // Delete them
-      const d1 = await db('positions').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
-      const d2 = await db('holdings').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
-      const d3 = await db('orders').where('symbol', 'like', '%24JUL%').orWhere('symbol', 'like', '%SENSEX2672377700%').del();
-      
-      console.log('[EXPIRY-FIX] Deleted: ' + d1 + ' positions, ' + d2 + ' holdings, ' + d3 + ' orders');
-      console.log('[EXPIRY-FIX] Done!');
-    } catch (err) {
-      console.log('[EXPIRY-FIX] ERROR: ' + err.message);
-    }
-  }, 15000);
 
   // Update options master in background
   updateOptionsMaster().catch(e => console.error(e));
