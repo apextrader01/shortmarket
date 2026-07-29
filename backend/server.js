@@ -2101,21 +2101,33 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT}`);
 
-  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS ──
+  // ── ONE-TIME CLEANUP OF EXPIRED CONTRACTS (RAW SQL) ──
   try {
-    console.log('🧹 Running startup cleanup for expired contracts...');
-    const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
-    for (const pattern of patterns) {
-      const delOrders = await db('orders').where('symbol', 'like', pattern).del();
-      const delPositions = await db('positions').where('symbol', 'like', pattern).del();
-      const delHoldings = await db('holdings').where('symbol', 'like', pattern).del();
-      if (delOrders || delPositions || delHoldings) {
-        console.log(`🧹 Pattern ${pattern}: deleted ${delOrders} orders, ${delPositions} positions, ${delHoldings} holdings`);
-      }
-    }
-    console.log('🧹 Startup cleanup complete.');
+    console.log('CLEANUP: Starting raw SQL cleanup...');
+    
+    // First, log what's actually in the tables
+    const allPositions = await db.raw("SELECT id, symbol, user_id, quantity FROM positions WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Found positions:', JSON.stringify(allPositions.rows || allPositions));
+    
+    const allHoldings = await db.raw("SELECT id, symbol, user_id, quantity FROM holdings WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Found holdings:', JSON.stringify(allHoldings.rows || allHoldings));
+    
+    const allOrders = await db.raw("SELECT id, symbol, user_id, status FROM orders WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Found orders:', JSON.stringify(allOrders.rows || allOrders));
+    
+    // Now delete with raw SQL
+    const d1 = await db.raw("DELETE FROM orders WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Deleted orders:', d1.rowCount || d1);
+    
+    const d2 = await db.raw("DELETE FROM positions WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Deleted positions:', d2.rowCount || d2);
+    
+    const d3 = await db.raw("DELETE FROM holdings WHERE symbol LIKE '%24JUL%' OR symbol LIKE '%SENSEX2672377700%'");
+    console.log('CLEANUP: Deleted holdings:', d3.rowCount || d3);
+    
+    console.log('CLEANUP: Done!');
   } catch (cleanupErr) {
-    console.error('🧹 Startup cleanup error:', cleanupErr.message);
+    console.error('CLEANUP ERROR:', cleanupErr.message);
   }
 
   // Update options master in background
