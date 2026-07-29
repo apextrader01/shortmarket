@@ -1700,6 +1700,41 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
   }
 });
 
+
+// ─── ONE-TIME CLEANUP (Runs on Server Start) ───
+(async function runCleanup() {
+  try {
+     console.log("Running automatic cleanup for expired contracts...");
+     const patterns = ['%24JUL%', '%SENSEX2672377700%'];
+     for (const pattern of patterns) {
+         const pendingOrders = await db('orders').where('symbol', 'like', pattern).whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+         for (const order of pendingOrders) {
+             const user = await db('users').where({ id: order.user_id }).first();
+             if (user && order.margin > 0) {
+                 await db('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + parseFloat(order.margin) });
+                 console.log(`Refunded ?${order.margin} to User ${user.username} for Pending Order`);
+             }
+         }
+         await db('orders').where('symbol', 'like', pattern).del();
+         
+         const stuckPositions = await db('positions').where('symbol', 'like', pattern);
+         for (const pos of stuckPositions) {
+             const user = await db('users').where({ id: pos.user_id }).first();
+             if (user) {
+                 const refundAmt = Math.abs(pos.quantity) * parseFloat(pos.average_price);
+                 await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
+                 console.log(`Refunded estimated ?${refundAmt.toFixed(2)} to User ${user.username} for Position`);
+             }
+         }
+         await db('positions').where('symbol', 'like', pattern).del();
+         await db('holdings').where('symbol', 'like', pattern).del();
+     }
+     console.log("Cleanup complete!");
+  } catch (e) {
+     console.error("Cleanup failed:", e.message);
+  }
+})();
+
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
       const { isMarket, quantity, price, sl_price, tgt_price } = req.body;
