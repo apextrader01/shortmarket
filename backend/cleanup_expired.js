@@ -4,15 +4,25 @@ require('dotenv').config();
 try {
   const { execSync } = require('child_process');
   console.log("Attempting to clone environment from running PM2 process...");
-  const pm2Output = execSync('npx pm2 jlist', { encoding: 'utf-8' });
-  const pm2Data = JSON.parse(pm2Output);
-  if (pm2Data && pm2Data.length > 0 && pm2Data[0].pm2_env) {
-      Object.assign(process.env, pm2Data[0].pm2_env);
-      console.log("Successfully cloned PM2 environment variables!");
+  const pm2Output = execSync('pm2 jlist', { encoding: 'utf-8' });
+  
+  // Find where the JSON array actually starts, skipping PM2 warning logs
+  const jsonStartIndex = pm2Output.indexOf('[');
+  if (jsonStartIndex !== -1) {
+      const cleanJson = pm2Output.substring(jsonStartIndex);
+      const pm2Data = JSON.parse(cleanJson);
+      if (pm2Data && pm2Data.length > 0 && pm2Data[0].pm2_env) {
+          Object.assign(process.env, pm2Data[0].pm2_env);
+          console.log("Successfully cloned PM2 environment variables!");
+      }
+  } else {
+      console.log("Could not find JSON array in PM2 output.");
   }
 } catch(e) {
   console.log("Failed to fetch from PM2:", e.message);
 }
+
+require('dotenv').config();
 
 require('dotenv').config();
 
