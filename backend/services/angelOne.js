@@ -1020,6 +1020,16 @@ async function loginAngelOne(io, externalPriceCache) {
             const db = require('../database/db');
             let cachedSession = null;
             try {
+                // Guarantee the table exists before querying (prevents race condition with db.js initSchema)
+                await db.raw(`
+                  CREATE TABLE IF NOT EXISTS system_configs (
+                    key VARCHAR(255) PRIMARY KEY,
+                    value JSON NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                  )
+                `);
+
                 const row = await db('system_configs').where({ key: 'angel_tokens' }).first();
                 if (row && row.value) {
                     const savedTokens = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
