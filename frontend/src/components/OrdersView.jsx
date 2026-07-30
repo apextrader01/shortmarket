@@ -11,10 +11,17 @@ export default function OrdersView() {
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
+  const isToday = (dateString) => {
+     if (!dateString) return false;
+     const d = new Date(dateString);
+     const today = new Date();
+     return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  };
+
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
     if (activeTab === 'Open Orders') return order.status === 'PENDING' && !order.parent_order_id;
-    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER';
+    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && isToday(order.updated_at || order.created_at);
     return false;
   });
   
