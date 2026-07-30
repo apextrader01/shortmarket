@@ -2020,9 +2020,6 @@ app.get('/api/candles/:symbol', async (req, res) => {
     if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
         cleanSymbol = cleanSymbol.replace(/\s+/g, '');
     }
-    if (cleanSymbol.endsWith('-EQ')) {
-        cleanSymbol = cleanSymbol.replace('-EQ', '');
-    }
     const cacheKey = `${cleanSymbol}_${interval}`;
     const now = Date.now();
     

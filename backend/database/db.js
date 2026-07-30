@@ -331,6 +331,17 @@ async function initSchema() {
       console.log('Created sips table');
     }
 
+    // 7. System Configs Table (For Token Persistence)
+    const hasSystemConfigs = await db.schema.hasTable('system_configs');
+    if (!hasSystemConfigs) {
+      await db.schema.createTable('system_configs', table => {
+        table.string('key').primary();
+        table.json('value').notNullable();
+        table.timestamps(true, true);
+      });
+      console.log('Created system_configs table');
+    }
+
     // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
@@ -347,6 +358,16 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
+    
+    // Ensure system_configs exists even if migration skipped
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS system_configs (
+        key VARCHAR(255) PRIMARY KEY,
+        value JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     console.log('✅ Critical columns verified on positions, users, and orders tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);

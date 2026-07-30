@@ -1016,54 +1016,104 @@ async function loginAngelOne(io, externalPriceCache) {
         try {
             // First load the full instrument master
             await loadInstrumentMaster();
+            
+            const db = require('../database/db');
+            let cachedSession = null;
+            try {
+                const row = await db('system_configs').where({ key: 'angel_tokens' }).first();
+                if (row && row.value) {
+                    const savedTokens = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+                    const tokenDate = new Date(row.updated_at);
+                    const now = new Date();
+                    
+                    if (tokenDate.toDateString() === now.toDateString()) {
+                        console.log('🔄 Reusing existing Angel One session from database...');
+                        cachedSession = savedTokens;
+                    }
+                }
+            } catch (err) {
+                console.warn('⚠️ Could not fetch cached tokens:', err.message);
+            }
 
-            console.log('🔐 Logging into Angel One...');
-            const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
-            const loginSession = await directLogin(
-                process.env.ANGEL_CLIENT_ID,
-                process.env.ANGEL_PIN,
-                otp
-            );
-
-            if (loginSession && loginSession.status === true && loginSession.data) {
-                console.log('✅ Angel One Login Successful');
-                jwtToken = loginSession.data.jwtToken;
-                feedToken = loginSession.data.feedToken;
-                // Inject tokens into the SDK so its marketData() / candle calls work.
+            if (cachedSession && cachedSession.jwtToken && cachedSession.feedToken) {
+                jwtToken = cachedSession.jwtToken;
+                feedToken = cachedSession.feedToken;
                 smart_api.setAccessToken(jwtToken);
-                smart_api.setPublicToken(loginSession.data.refreshToken);
+                smart_api.setPublicToken(cachedSession.refreshToken);
                 smart_api.setClientCode(process.env.ANGEL_CLIENT_ID);
-
+                console.log('✅ Angel One session restored from cache');
+                
                 await broadcastLTPs(io);
-
                 console.log('📈 Starting live WebSocket connection...');
                 startLiveWebSocket(io);
-                
-                // Periodic REST polling as a fallback (every 1 second during market hours)
-                // This ensures derivatives (options/futures/commodities) always get fresh prices,
-                // even if the Angel One WebSocket doesn't deliver ticks for them.
-                if (!global_pollInterval) {
-                    let isPolling = false; // Mutex to prevent overlapping calls
-                    global_pollInterval = setInterval(async () => {
-                        if (isPolling) return; // Skip if previous poll still running
-                        // Always poll during market hours — don't require clientSubscriptions
-                        // This prevents the chicken-and-egg deadlock where prices are empty
-                        // because no clients have subscribed yet
-                        if (isMarketOpen()) {
-                            isPolling = true;
-                            try {
-                                await broadcastLTPs(io);
-                            } catch (e) {
-                                console.error('Periodic poll error:', e.message);
-                            } finally {
-                                isPolling = false;
-                            }
-                        }
-                    }, 1000); // 1 second
-                    console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
-                }
             } else {
-                console.error('Login Failed:', loginSession.message);
+                console.log('🔐 Logging into Angel One (Fresh Login)...');
+                const { otp } = await TOTP.generate(process.env.ANGEL_TOTP_SECRET);
+                const loginSession = await directLogin(
+                    process.env.ANGEL_CLIENT_ID,
+                    process.env.ANGEL_PIN,
+                    otp
+                );
+    
+                if (loginSession && loginSession.status === true && loginSession.data) {
+                    console.log('✅ Angel One Login Successful');
+                    jwtToken = loginSession.data.jwtToken;
+                    feedToken = loginSession.data.feedToken;
+                    
+                    // Save to DB
+                    try {
+                        const tokenData = {
+                            jwtToken,
+                            feedToken,
+                            refreshToken: loginSession.data.refreshToken
+                        };
+                        const valueStr = JSON.stringify(tokenData);
+                        
+                        const exists = await db('system_configs').where({ key: 'angel_tokens' }).first();
+                        if (exists) {
+                            await db('system_configs').where({ key: 'angel_tokens' }).update({ value: valueStr, updated_at: new Date() });
+                        } else {
+                            await db('system_configs').insert({ key: 'angel_tokens', value: valueStr });
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Could not save tokens to database:', e.message);
+                    }
+    
+                    // Inject tokens into the SDK so its marketData() / candle calls work.
+                    smart_api.setAccessToken(jwtToken);
+                    smart_api.setPublicToken(loginSession.data.refreshToken);
+                    smart_api.setClientCode(process.env.ANGEL_CLIENT_ID);
+    
+                    await broadcastLTPs(io);
+    
+                    console.log('📈 Starting live WebSocket connection...');
+                    startLiveWebSocket(io);
+                
+                } else {
+                    console.error('Login Failed:', loginSession.message);
+                }
+            } // End of fresh login else block
+
+            // Periodic REST polling as a fallback (every 1 second during market hours)
+            // This ensures derivatives (options/futures/commodities) always get fresh prices,
+            // even if the Angel One WebSocket doesn't deliver ticks for them.
+            // (Run this regardless of whether login was cached or fresh)
+            if (!global_pollInterval) {
+                let isPolling = false; // Mutex to prevent overlapping calls
+                global_pollInterval = setInterval(async () => {
+                    if (isPolling) return; // Skip if previous poll still running
+                    if (isMarketOpen()) {
+                        isPolling = true;
+                        try {
+                            await broadcastLTPs(io);
+                        } catch (e) {
+                            console.error('Periodic poll error:', e.message);
+                        } finally {
+                            isPolling = false;
+                        }
+                    }
+                }, 1000); // 1 second
+                console.log('⏱️  Started periodic REST polling (every 1s during market hours)');
             }
         } catch (error) {
             console.error('Error:', error.message);
