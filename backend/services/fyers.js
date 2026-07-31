@@ -354,12 +354,6 @@ const INTERVAL_MAP = {
     'ONE_DAY': '1D'
 };
 
-let activeAccessToken = null;
-let wsInstance = null;
-let watchdogInterval = null;
-let lastTickTime = Date.now();
-let clientSubscriptions = new Set();
-let isFyersConnected = false;
 
 // Universal Mapping Dictionaries
 let tokenToFyers = {};
