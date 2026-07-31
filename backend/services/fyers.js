@@ -27,30 +27,47 @@ let isFyersConnected = false;
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
 function toFyersSymbol(symbol) {
     if (!symbol) return null;
+
+    try {
+        const { symbolToToken } = require('./instruments');
+        const token = symbolToToken[symbol];
+        if (token && tokenToFyers[token]) {
+            return tokenToFyers[token];
+        }
+    } catch(e) {}
     
-    // Indices
+    // Fallback logic
     if (symbol === 'NIFTY' || symbol === 'NIFTY-NSE') return 'NSE:NIFTY50-INDEX';
     if (symbol === 'BANKNIFTY' || symbol === 'BANKNIFTY-NSE') return 'NSE:NIFTYBANK-INDEX';
     if (symbol === 'SENSEX' || symbol === 'SENSEX-BSE') return 'BSE:SENSEX-INDEX';
     if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
     if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
 
-    // Derivatives
     if (symbol.endsWith('-MCX')) return `MCX:${symbol.replace('-MCX', '')}`;
     if (symbol.endsWith('-NFO')) return `NSE:${symbol.replace('-NFO', '')}`;
     if (symbol.endsWith('-BFO')) return `BSE:${symbol.replace('-BFO', '')}`;
-    
-    // Equity
     if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
     if (symbol.endsWith('-BSE')) return `BSE:${symbol.replace('-BSE', '')}-EQ`;
 
-    // Default to NSE Equity
     return `NSE:${symbol.replace('-NSE', '')}-EQ`;
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols
 function fromFyersSymbol(fyersSymbol) {
     if (!fyersSymbol) return null;
+
+    try {
+        const token = fyersToToken[fyersSymbol];
+        if (token) {
+            const { STOCK_MASTER } = require('./instruments');
+            const stock = STOCK_MASTER[token];
+            if (stock && stock.uniqueSymbol) {
+                return stock.uniqueSymbol;
+            }
+        }
+    } catch(e) {}
+
+    // Fallback logic
     if (fyersSymbol === 'NSE:NIFTY50-INDEX') return 'NIFTY';
     if (fyersSymbol === 'NSE:NIFTYBANK-INDEX') return 'BANKNIFTY';
     if (fyersSymbol === 'BSE:SENSEX-INDEX') return 'SENSEX';
@@ -62,14 +79,11 @@ function fromFyersSymbol(fyersSymbol) {
     const [exchange, name] = parts;
     
     if (exchange === 'MCX') return `${name}-MCX`;
-    
-    // If it's Equity (ends with -EQ), just return the name (e.g. RELIANCE-EQ)
     if (name.endsWith('-EQ')) {
-        if (exchange === 'BSE') return `${name.replace('-EQ', '')}-BSE`; // Or keep it if frontend handles it? Actually, frontend uses RELIANCE-EQ for NSE, RELIANCE-BSE for BSE.
+        if (exchange === 'BSE') return `${name.replace('-EQ', '')}-BSE`;
         return name;
     }
     
-    // Otherwise it's a derivative
     if (exchange === 'NSE') return `${name}-NFO`;
     if (exchange === 'BSE') return `${name}-BFO`;
 
@@ -134,6 +148,8 @@ function loadTokenFromDisk() {
 async function initFyers(io, pc) {
     global_io = io;
     sharedPriceCache = pc;
+    
+    await loadFyersSymbolMaps();
     
     if (loadTokenFromDisk()) {
         startLiveWebSocket();
@@ -337,6 +353,54 @@ const INTERVAL_MAP = {
     'ONE_HOUR': '60',
     'ONE_DAY': '1D'
 };
+
+let activeAccessToken = null;
+let wsInstance = null;
+let watchdogInterval = null;
+let lastTickTime = Date.now();
+let clientSubscriptions = new Set();
+let isFyersConnected = false;
+
+// Universal Mapping Dictionaries
+let tokenToFyers = {};
+let fyersToToken = {};
+
+async function loadFyersSymbolMaps() {
+    const urls = [
+        'https://public.fyers.in/sym_details/NSE_CM.csv',
+        'https://public.fyers.in/sym_details/NSE_FO.csv',
+        'https://public.fyers.in/sym_details/BSE_CM.csv',
+        'https://public.fyers.in/sym_details/BSE_FO.csv',
+        'https://public.fyers.in/sym_details/MCX_COM.csv'
+    ];
+
+    const https = require('https');
+    const readline = require('readline');
+
+    for (const url of urls) {
+        try {
+            await new Promise((resolve) => {
+                https.get(url, (res) => {
+                    const rl = readline.createInterface({ input: res });
+                    rl.on('line', line => {
+                        const parts = line.split(',');
+                        if (parts.length > 12) {
+                            const fyersSym = parts[9];
+                            const token = parts[12];
+                            tokenToFyers[token] = fyersSym;
+                            fyersToToken[fyersSym] = token;
+                        }
+                    });
+                    rl.on('close', resolve);
+                }).on('error', resolve);
+            });
+        } catch(e) {
+            console.error("Error loading Fyers map from", url, e);
+        }
+    }
+
+    console.log(`✅ Built Fyers mapping for ${Object.keys(fyersToToken).length} symbols.`);
+}
 
 async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     if (!activeAccessToken || !symbol) return [];
