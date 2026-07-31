@@ -244,8 +244,9 @@ function addSubscriptionBatch(symbols) {
     if (!Array.isArray(symbols) || symbols.length === 0) return;
     
     const fyersSymbols = [];
-    symbols.forEach(s => {
-        if (!s || s.endsWith('-MF')) return; // Ignore mutual funds
+    symbols.forEach(item => {
+        let s = typeof item === 'string' ? item : item?.symbol;
+        if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
         if (fSym) fyersSymbols.push(fSym);
