@@ -308,9 +308,15 @@ async function fetchBatchLTPs(symbols) {
     
     const fyersSymbols = validSymbols.map(toFyersSymbol).filter(Boolean);
     
+    console.log(`📡 fetchBatchLTPs called: ${validSymbols.length} symbols, ${fyersSymbols.length} mapped to Fyers, token=${activeAccessToken ? 'SET' : 'NONE'}`);
+    if (fyersSymbols.length > 0 && fyersSymbols.length <= 5) {
+        console.log(`   Fyers symbols: ${fyersSymbols.join(', ')}`);
+    }
+    
     if (!activeAccessToken || fyersSymbols.length === 0) {
+        console.log(`⚠️ fetchBatchLTPs: skipping API call (token=${!!activeAccessToken}, fyersSymbols=${fyersSymbols.length})`);
         return validSymbols.reduce((acc, sym) => {
-            if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym].ltp;
+            if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
             return acc;
         }, {});
     }
@@ -325,26 +331,38 @@ async function fetchBatchLTPs(symbols) {
             
             try {
                 const response = await fyers.getQuotes(chunk);
+                console.log(`📡 Fyers getQuotes response: s=${response?.s}, d_count=${response?.d?.length || 0}, code=${response?.code || 'none'}, msg=${response?.message || 'none'}`);
+                
                 if (response && response.s === 'ok' && response.d) {
                     response.d.forEach(item => {
                         if (item.v && item.v.lp) {
                             const uniqueSymbol = fromFyersSymbol(item.n);
                             if (uniqueSymbol) {
-                                results[uniqueSymbol] = item.v.lp.toFixed(2);
-                                // Update cache as well
-                                if (!sharedPriceCache[uniqueSymbol]) {
-                                    sharedPriceCache[uniqueSymbol] = { symbol: uniqueSymbol };
-                                }
-                                sharedPriceCache[uniqueSymbol].ltp = item.v.lp.toFixed(2);
+                                const priceObj = {
+                                    symbol: uniqueSymbol,
+                                    ltp: item.v.lp.toFixed(2),
+                                    open: item.v.open_price ? item.v.open_price.toFixed(2) : null,
+                                    high: item.v.high_price ? item.v.high_price.toFixed(2) : null,
+                                    low: item.v.low_price ? item.v.low_price.toFixed(2) : null,
+                                    close: item.v.close_price ? item.v.close_price.toFixed(2) : null,
+                                    volume: item.v.volume || 0,
+                                    ch: item.v.ch || 0,
+                                    chp: item.v.chp || 0
+                                };
+                                results[uniqueSymbol] = priceObj;
+                                sharedPriceCache[uniqueSymbol] = priceObj;
                             }
                         }
                     });
+                } else if (response && response.s === 'error') {
+                    console.error(`❌ Fyers getQuotes error: code=${response.code}, message=${response.message}`);
                 }
             } catch(chunkErr) {
                 console.error("Fyers getQuotes chunk error:", chunkErr);
             }
         }
         
+        console.log(`📡 fetchBatchLTPs returning ${Object.keys(results).length} prices`);
         return results;
     } catch(e) {
         console.error("Fyers fetchBatchLTPs error:", e);
