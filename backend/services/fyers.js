@@ -170,12 +170,10 @@ async function initFyers(io, pc) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
-    if (!activeAccessToken) return;
+    if (wsInstance) return;
     
-    if (wsInstance) {
-        // DataSocket.getInstance returns the singleton
-        wsInstance.close();
-    }
+    // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
+    const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     
     wsInstance = DataSocket.getInstance(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
     
@@ -308,7 +306,7 @@ async function fetchBatchLTPs(symbols) {
     const validSymbols = symbols.filter(s => s && !s.endsWith('-MF'));
     if (validSymbols.length === 0) return {};
     
-    const fyersSymbols = validSymbols.map(toFyersSymbol).filter(Boolean).join(',');
+    const fyersSymbols = validSymbols.map(toFyersSymbol).filter(Boolean);
     
     if (!activeAccessToken || fyersSymbols.length === 0) {
         return validSymbols.reduce((acc, sym) => {
@@ -318,7 +316,7 @@ async function fetchBatchLTPs(symbols) {
     }
 
     try {
-        const response = await fyers.getQuotes({ symbols: fyersSymbols });
+        const response = await fyers.getQuotes(fyersSymbols);
         if (response.s === 'ok' && response.d) {
             const results = {};
             response.d.forEach(item => {
@@ -401,23 +399,23 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     
     const fSym = toFyersSymbol(symbol);
     if (!fSym) return [];
-    
+
     const res = INTERVAL_MAP[interval] || '1D';
     
-    // Fyers history API requires range. 
-    // 1D = 1 year, Intraday = 30 days
-    const range_to = new Date();
-    const range_from = new Date();
+    // Fyers expects range in yyyy-mm-dd
+    const formatDate = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    let range_to = new Date();
+    let range_from = new Date();
     
+    // 30 days for intraday, 1 year for daily
     if (res === '1D') {
         range_from.setFullYear(range_from.getFullYear() - 1);
     } else {
         range_from.setDate(range_from.getDate() - 30);
     }
-    
-    const formatDate = (d) => {
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    };
 
     try {
         const response = await fyers.history({
@@ -431,7 +429,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
         
         if (response.s === 'ok' && response.candles) {
             return response.candles.map(c => ({
-                time: c[0] / 1000,
+                time: c[0],
                 open: c[1],
                 high: c[2],
                 low: c[3],
