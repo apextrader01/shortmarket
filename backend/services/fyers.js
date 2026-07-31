@@ -235,15 +235,21 @@ function startLiveWebSocket() {
                     asks = tick.asks.map(a => ({ price: a.price.toFixed(2), qty: a.volume, orders: a.ord }));
                 }
                 
+                const prev = tick.prev_close_price || ltp;
+                const change = ltp - prev;
+                const pct = prev > 0 ? (change / prev) * 100 : 0;
+
                 sharedPriceCache[uniqueSymbol] = {
                     symbol: uniqueSymbol,
-                    ltp: ltp.toFixed(2),
-                    open: tick.open_price ? tick.open_price.toFixed(2) : null,
-                    high: tick.high_price ? tick.high_price.toFixed(2) : null,
-                    low: tick.low_price ? tick.low_price.toFixed(2) : null,
-                    close: tick.prev_close_price ? tick.prev_close_price.toFixed(2) : null,
+                    ltp: ltp,
+                    open: tick.open_price || null,
+                    high: tick.high_price || null,
+                    low: tick.low_price || null,
+                    close: prev || null,
                     volume: tick.vol_traded_today || 0,
                     ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : null,
+                    change: change,
+                    pct: pct,
                     bids: bids,
                     asks: asks
                 };
@@ -341,14 +347,14 @@ async function fetchBatchLTPs(symbols) {
                             if (uniqueSymbol) {
                                 const priceObj = {
                                     symbol: uniqueSymbol,
-                                    ltp: item.v.lp.toFixed(2),
-                                    open: item.v.open_price ? item.v.open_price.toFixed(2) : null,
-                                    high: item.v.high_price ? item.v.high_price.toFixed(2) : null,
-                                    low: item.v.low_price ? item.v.low_price.toFixed(2) : null,
-                                    close: item.v.close_price ? item.v.close_price.toFixed(2) : null,
+                                    ltp: item.v.lp,
+                                    open: item.v.open_price || null,
+                                    high: item.v.high_price || null,
+                                    low: item.v.low_price || null,
+                                    close: item.v.close_price || null,
                                     volume: item.v.volume || 0,
-                                    ch: item.v.ch || 0,
-                                    chp: item.v.chp || 0
+                                    change: item.v.ch || 0,
+                                    pct: item.v.chp || 0
                                 };
                                 results[uniqueSymbol] = priceObj;
                                 sharedPriceCache[uniqueSymbol] = priceObj;
