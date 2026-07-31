@@ -1,0 +1,401 @@
+const fyersModel = require("fyers-api-v3").fyersModel;
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config();
+
+let global_io = null;
+let sharedPriceCache = null;
+let wsInstance = null;
+let clientSubscriptions = new Set();
+let watchdogInterval = null;
+let lastTickTime = Date.now();
+
+const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
+
+// Set Fyers Credentials
+const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+const SECRET_ID = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
+const REDIRECT_URL = 'https://shortmarket-staging.web.app/api/fyers/callback';
+
+fyers.setAppId(APP_ID);
+fyers.setRedirectUrl(REDIRECT_URL);
+
+// Keep track of the active access token
+let activeAccessToken = null;
+let isFyersConnected = false;
+
+// Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
+function toFyersSymbol(symbol) {
+    if (!symbol) return null;
+    
+    // Indices
+    if (symbol === 'NIFTY' || symbol === 'NIFTY-NSE') return 'NSE:NIFTY50-INDEX';
+    if (symbol === 'BANKNIFTY' || symbol === 'BANKNIFTY-NSE') return 'NSE:NIFTYBANK-INDEX';
+    if (symbol === 'SENSEX' || symbol === 'SENSEX-BSE') return 'BSE:SENSEX-INDEX';
+    if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
+    if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
+
+    // Derivatives
+    if (symbol.endsWith('-MCX')) return `MCX:${symbol.replace('-MCX', '')}`;
+    if (symbol.endsWith('-NFO')) return `NSE:${symbol.replace('-NFO', '')}`;
+    if (symbol.endsWith('-BFO')) return `BSE:${symbol.replace('-BFO', '')}`;
+
+    // Default to NSE Equity
+    return `NSE:${symbol.replace('-NSE', '')}-EQ`;
+}
+
+// Convert Fyers Symbols back to our platform's unique symbols
+function fromFyersSymbol(fyersSymbol) {
+    if (!fyersSymbol) return null;
+    if (fyersSymbol === 'NSE:NIFTY50-INDEX') return 'NIFTY';
+    if (fyersSymbol === 'NSE:NIFTYBANK-INDEX') return 'BANKNIFTY';
+    if (fyersSymbol === 'BSE:SENSEX-INDEX') return 'SENSEX';
+    if (fyersSymbol === 'NSE:FINNIFTY-INDEX') return 'FINNIFTY';
+    if (fyersSymbol === 'NSE:MIDCPNIFTY-INDEX') return 'MIDCPNIFTY';
+
+    const parts = fyersSymbol.split(':');
+    if (parts.length !== 2) return fyersSymbol;
+    const [exchange, name] = parts;
+    
+    if (exchange === 'MCX') return `${name}-MCX`;
+    
+    // Options/Futures
+    if (exchange === 'NSE' && !name.endsWith('-EQ') && !name.endsWith('-INDEX')) return `${name}-NFO`;
+    if (exchange === 'BSE' && !name.endsWith('-EQ') && !name.endsWith('-INDEX')) return `${name}-BFO`;
+    
+    // Equity
+    if (name.endsWith('-EQ')) return name.replace('-EQ', '');
+    
+    return name;
+}
+
+// ─── AUTHENTICATION ─────────────────────────────────────────────────────────
+
+function getFyersAuthURL() {
+    return fyers.generateAuthCode();
+}
+
+async function verifyFyersAuth(auth_code) {
+    try {
+        const response = await fyers.generate_access_token({
+            client_id: APP_ID,
+            secret_key: SECRET_ID,
+            auth_code: auth_code
+        });
+
+        if (response.s === 'ok' && response.access_token) {
+            activeAccessToken = response.access_token;
+            fyers.setAccessToken(activeAccessToken);
+            isFyersConnected = true;
+            
+            // Save token to disk so it survives restarts for the rest of the day
+            fs.writeFileSync(path.join(__dirname, '../fyers_token.txt'), activeAccessToken);
+            
+            // Start WebSocket
+            startLiveWebSocket();
+            return { success: true };
+        } else {
+            console.error("Fyers Auth Error:", response);
+            return { success: false, error: response.message };
+        }
+    } catch (e) {
+        console.error("Fyers Verify Exception:", e);
+        return { success: false, error: e.message };
+    }
+}
+
+// On boot, try to load token from disk
+function loadTokenFromDisk() {
+    try {
+        const p = path.join(__dirname, '../fyers_token.txt');
+        if (fs.existsSync(p)) {
+            const token = fs.readFileSync(p, 'utf8');
+            if (token && token.length > 20) {
+                activeAccessToken = token;
+                fyers.setAccessToken(activeAccessToken);
+                isFyersConnected = true;
+                console.log("🔌 Loaded Fyers token from disk.");
+                return true;
+            }
+        }
+    } catch (e) {}
+    return false;
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+
+async function initFyers(io, pc) {
+    global_io = io;
+    sharedPriceCache = pc;
+    
+    if (loadTokenFromDisk()) {
+        startLiveWebSocket();
+    } else {
+        console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
+    }
+    
+    // Start interval to broadcast LTPs
+    setInterval(() => {
+        if (Object.keys(sharedPriceCache).length > 0) {
+            global_io.emit('price_snapshot', sharedPriceCache);
+        }
+    }, 1000);
+}
+
+// ─── WEBSOCKET ──────────────────────────────────────────────────────────────
+
+const DataSocket = require("fyers-api-v3").fyersDataSocket;
+
+function startLiveWebSocket() {
+    if (!activeAccessToken) return;
+    
+    if (wsInstance) {
+        // DataSocket.getInstance returns the singleton
+        wsInstance.close();
+    }
+    
+    wsInstance = DataSocket.getInstance(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
+    
+    wsInstance.on('connect', () => {
+        console.log('✅ Fyers WebSocket Connected!');
+        lastTickTime = Date.now();
+        
+        // Re-subscribe to all existing client subscriptions
+        if (clientSubscriptions.size > 0) {
+            const fyersSymbols = Array.from(clientSubscriptions)
+                .map(toFyersSymbol)
+                .filter(Boolean);
+            
+            if (fyersSymbols.length > 0) {
+                wsInstance.subscribe(fyersSymbols);
+                wsInstance.autoreconnect();
+            }
+        }
+        
+        // Watchdog
+        if (watchdogInterval) clearInterval(watchdogInterval);
+        watchdogInterval = setInterval(() => {
+            const staleSec = (Date.now() - lastTickTime) / 1000;
+            // Only warn if market is open (9:15 - 3:30 approx, simple check for now)
+            const d = new Date();
+            const h = d.getHours();
+            if (staleSec > 30 && (h >= 9 && h <= 15) && clientSubscriptions.size > 0) {
+                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! Forcing reconnect...`);
+                startLiveWebSocket();
+            }
+        }, 15000);
+    });
+    
+    wsInstance.on('message', (message) => {
+        lastTickTime = Date.now();
+        const data = Array.isArray(message) ? message : [message];
+        
+        data.forEach(tick => {
+            if (!tick || !tick.symbol) return;
+            const uniqueSymbol = fromFyersSymbol(tick.symbol);
+            if (!uniqueSymbol) return;
+            
+            // Fyers WebSocket v3 sends tick data as an object
+            // ltp, ch, chp, vol, bid, ask, etc.
+            
+            if (tick.type === 'dp' || tick.type === 'if') {
+                // dp = Depth, if = Index
+                const ltp = tick.ltp;
+                if (!ltp) return;
+                
+                let bids = [];
+                let asks = [];
+                
+                if (tick.bids) {
+                    bids = tick.bids.map(b => ({ price: b.price.toFixed(2), qty: b.volume, orders: b.ord }));
+                }
+                if (tick.asks) {
+                    asks = tick.asks.map(a => ({ price: a.price.toFixed(2), qty: a.volume, orders: a.ord }));
+                }
+                
+                sharedPriceCache[uniqueSymbol] = {
+                    symbol: uniqueSymbol,
+                    ltp: ltp.toFixed(2),
+                    open: tick.open_price ? tick.open_price.toFixed(2) : null,
+                    high: tick.high_price ? tick.high_price.toFixed(2) : null,
+                    low: tick.low_price ? tick.low_price.toFixed(2) : null,
+                    close: tick.prev_close_price ? tick.prev_close_price.toFixed(2) : null,
+                    volume: tick.vol_traded_today || 0,
+                    ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : null,
+                    bids: bids,
+                    asks: asks
+                };
+            }
+        });
+    });
+    
+    wsInstance.on('error', (err) => {
+        console.error("Fyers WS Error:", err);
+    });
+    
+    wsInstance.on('close', () => {
+        console.log("Fyers WS Closed.");
+    });
+    
+    wsInstance.connect();
+}
+
+function addSubscriptionBatch(symbols) {
+    if (!Array.isArray(symbols) || symbols.length === 0) return;
+    
+    const fyersSymbols = [];
+    symbols.forEach(s => {
+        if (!s || s.endsWith('-MF')) return; // Ignore mutual funds
+        clientSubscriptions.add(s);
+        const fSym = toFyersSymbol(s);
+        if (fSym) fyersSymbols.push(fSym);
+    });
+    
+    if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
+        try {
+            wsInstance.subscribe(fyersSymbols);
+        } catch(e) {
+            console.error("Fyers subscribe error:", e);
+        }
+    }
+}
+
+function removeSubscriptionBatch(symbols) {
+    if (!Array.isArray(symbols) || symbols.length === 0) return;
+    
+    const fyersSymbols = [];
+    symbols.forEach(s => {
+        clientSubscriptions.delete(s);
+        const fSym = toFyersSymbol(s);
+        if (fSym) fyersSymbols.push(fSym);
+    });
+    
+    if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
+        try {
+            wsInstance.unsubscribe(fyersSymbols);
+        } catch(e) {}
+    }
+}
+
+// ─── API FETCH FUNCTIONS ────────────────────────────────────────────────────
+
+// Helper for HTTP fallback
+async function fetchBatchLTPs(symbols) {
+    const validSymbols = symbols.filter(s => s && !s.endsWith('-MF'));
+    if (validSymbols.length === 0) return {};
+    
+    const fyersSymbols = validSymbols.map(toFyersSymbol).filter(Boolean).join(',');
+    
+    if (!activeAccessToken || fyersSymbols.length === 0) {
+        return validSymbols.reduce((acc, sym) => {
+            if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym].ltp;
+            return acc;
+        }, {});
+    }
+
+    try {
+        const response = await fyers.getQuotes({ symbols: fyersSymbols });
+        if (response.s === 'ok' && response.d) {
+            const results = {};
+            response.d.forEach(item => {
+                if (item.v && item.v.lp) {
+                    const uniqueSymbol = fromFyersSymbol(item.n);
+                    if (uniqueSymbol) {
+                        results[uniqueSymbol] = item.v.lp.toFixed(2);
+                        // Update cache as well
+                        if (!sharedPriceCache[uniqueSymbol]) {
+                            sharedPriceCache[uniqueSymbol] = { symbol: uniqueSymbol };
+                        }
+                        sharedPriceCache[uniqueSymbol].ltp = item.v.lp.toFixed(2);
+                    }
+                }
+            });
+            return results;
+        }
+    } catch(e) {
+        console.error("Fyers fetchBatchLTPs error:", e);
+    }
+    return {};
+}
+
+// Fyers interval mapping
+const INTERVAL_MAP = {
+    'ONE_MINUTE': '1',
+    'THREE_MINUTE': '3',
+    'FIVE_MINUTE': '5',
+    'TEN_MINUTE': '10',
+    'FIFTEEN_MINUTE': '15',
+    'THIRTY_MINUTE': '30',
+    'ONE_HOUR': '60',
+    'ONE_DAY': '1D'
+};
+
+async function fetchCandleData(symbol, interval = 'ONE_DAY') {
+    if (!activeAccessToken || !symbol) return [];
+    
+    const fSym = toFyersSymbol(symbol);
+    if (!fSym) return [];
+    
+    const res = INTERVAL_MAP[interval] || '1D';
+    
+    // Fyers history API requires range. 
+    // 1D = 1 year, Intraday = 30 days
+    const range_to = new Date();
+    const range_from = new Date();
+    
+    if (res === '1D') {
+        range_from.setFullYear(range_from.getFullYear() - 1);
+    } else {
+        range_from.setDate(range_from.getDate() - 30);
+    }
+    
+    const formatDate = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    try {
+        const response = await fyers.history({
+            symbol: fSym,
+            resolution: res,
+            date_format: 1,
+            range_from: formatDate(range_from),
+            range_to: formatDate(range_to),
+            cont_flag: 1
+        });
+        
+        if (response.s === 'ok' && response.candles) {
+            return response.candles.map(c => ({
+                time: c[0] / 1000,
+                open: c[1],
+                high: c[2],
+                low: c[3],
+                close: c[4],
+                volume: c[5]
+            }));
+        }
+    } catch (e) {
+        console.error("Fyers fetchCandleData error:", e);
+    }
+    return [];
+}
+
+function setPriceCache(pc) { sharedPriceCache = pc; }
+function registerTokens() {}
+function addSubscription(symbol) { addSubscriptionBatch([symbol]); }
+function subscribeToDepth(symbol) { /* Fyers v3 auto sends depth if requested */ }
+function unsubscribeFromDepth(symbol) {}
+
+module.exports = {
+    setPriceCache,
+    registerTokens,
+    addSubscription,
+    subscribeToDepth,
+    unsubscribeFromDepth,
+    initFyers,
+    getFyersAuthURL,
+    verifyFyersAuth,
+    fetchBatchLTPs,
+    fetchCandleData,
+    addSubscriptionBatch,
+    removeSubscriptionBatch
+};

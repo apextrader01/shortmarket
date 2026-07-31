@@ -164,6 +164,30 @@ export default function AdminDashboard() {
         </div>
         
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              try {
+                const API_URL = import.meta.env.VITE_API_URL || '';
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/fyers/auth-url`, {
+                  headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+                });
+                const data = await res.json();
+                if (data.url) {
+                  window.location.href = data.url;
+                } else {
+                  alert('Failed to get Fyers auth URL');
+                }
+              } catch (e) {
+                console.error(e);
+                alert('Error connecting Fyers');
+              }
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-blue)', color: '#fff' }}
+          >
+            Connect Fyers API
+          </button>
           <div className="input-group" style={{ width: '250px' }}>
             <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
             <input 

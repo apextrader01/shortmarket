@@ -44,6 +44,41 @@ function App() {
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
 
+  // Fyers API OAuth Callback Interceptor
+  useEffect(() => {
+    const checkFyersCallback = async () => {
+      if (window.location.pathname === '/api/fyers/callback') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const authCode = urlParams.get('auth_code');
+        if (authCode) {
+          try {
+            const API_URL = import.meta.env.VITE_API_URL || '';
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/fyers/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({ auth_code: authCode })
+            });
+            const data = await res.json();
+            if (data.success) {
+              alert('Fyers API connected successfully!');
+            } else {
+              alert('Fyers API connection failed: ' + (data.error || 'Unknown error'));
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Error connecting Fyers API');
+          }
+        }
+        // Remove callback from URL and go back to home
+        window.history.replaceState({}, document.title, '/');
+      }
+    };
+    checkFyersCallback();
+  }, []);
   // Pre-fetch top index prices (runs on mount regardless of auth state)
   useEffect(() => {
     fetchBatchPrices(TOP_INDICES);

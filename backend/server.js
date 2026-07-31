@@ -49,7 +49,7 @@ app.get('/api/prices/batch', async (req, res) => {
   const symbols = req.query.symbols?.split(',') || [];
   if (symbols.length === 0) return res.json({});
   
-  const { fetchBatchLTPs } = require('./services/angelOne');
+  const { fetchBatchLTPs } = require('./services/fyers');
   if (fetchBatchLTPs) {
     const prices = await fetchBatchLTPs(symbols);
     Object.assign(priceCache, prices);
@@ -64,7 +64,7 @@ let cachedStocksArray = null;
 app.get('/api/stocks', (req, res) => {
   if (cachedStocksArray) return res.json(cachedStocksArray);
   
-  const { STOCK_MASTER } = require('./services/angelOne');
+  const { STOCK_MASTER } = require('./services/instruments');
   if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
   
   // Only send NSE equities and Indices to the frontend to avoid huge payloads (options/futures are massive)
@@ -80,7 +80,7 @@ app.get('/api/stocks', (req, res) => {
     const q = req.query.q;
     if (!q || q.length < 2) return res.json([]);
     
-    const { STOCK_MASTER, globalNfoOptions, globalNfoFutures, globalBseSpots } = require('./services/angelOne');
+    const { STOCK_MASTER, globalNfoOptions, globalNfoFutures, globalBseSpots } = require('./services/instruments');
 
     const queryParts = q.toLowerCase().split(/\s+/).filter(Boolean);
     const matchesQuery = (str) => {
@@ -1570,7 +1570,7 @@ app.post('/api/ltp-batch', async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid symbols array' });
     }
     
-    const { fetchBatchLTPs, registerTokens } = require('./services/angelOne');
+    const { fetchBatchLTPs, registerTokens } = require('./services/fyers');
     if (registerTokens) registerTokens(symbols);
     
     const result = {};
@@ -2014,7 +2014,7 @@ const CACHE_DURATION_MS = 60 * 1000; // 1 minute cache
 
 app.get('/api/candles/:symbol', async (req, res) => {
   try {
-    const { fetchCandleData } = require('./services/angelOne');
+    const { fetchCandleData } = require('./services/fyers');
     const interval = req.query.interval || 'ONE_DAY';
     let cleanSymbol = req.params.symbol;
     if (cleanSymbol.includes('CE') || cleanSymbol.includes('PE')) {
@@ -2144,13 +2144,13 @@ io.on('connection', (socket) => {
   socket.on('subscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
     socket.join(symbol);
-    const { addSubscription } = require('./services/angelOne');
+    const { addSubscription } = require('./services/fyers');
     if (addSubscription) addSubscription(data, io, priceCache);
   });
 
   socket.on('subscribe_batch', (dataArray) => {
     if (!Array.isArray(dataArray)) return;
-    const { addSubscriptionBatch } = require('./services/angelOne');
+    const { addSubscriptionBatch } = require('./services/fyers');
     if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
   });
 
@@ -2162,14 +2162,14 @@ io.on('connection', (socket) => {
   socket.on('subscribe_depth', (symbol) => {
     if (!symbol) return;
     socket.join(`${symbol}_depth`);
-    const { subscribeToDepth } = require('./services/angelOne');
+    const { subscribeToDepth } = require('./services/fyers');
     if (subscribeToDepth) subscribeToDepth(symbol);
   });
 
   socket.on('unsubscribe_depth', (symbol) => {
     if (!symbol) return;
     socket.leave(`${symbol}_depth`);
-    const { unsubscribeFromDepth } = require('./services/angelOne');
+    const { unsubscribeFromDepth } = require('./services/fyers');
     if (unsubscribeFromDepth) unsubscribeFromDepth(symbol);
   });
 
@@ -2179,10 +2179,10 @@ io.on('connection', (socket) => {
 });
 
 app.get('/api/debug-state', (req, res) => {
-  const { getDebugState } = require('./services/angelOne');
+  const { getFyersAuthURL } = require('./services/fyers');
   let state = {};
-  if (getDebugState) {
-    state = getDebugState();
+  if (getFyersAuthURL) {
+    state = getFyersAuthURL();
   }
   res.json({
     state,
@@ -2205,7 +2205,7 @@ app.use((req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────
-const { loginAngelOne, setPriceCache } = require('./services/angelOne');
+const { initFyers, setPriceCache } = require('./services/fyers');
 setPriceCache(priceCache);
 
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
@@ -2220,7 +2220,7 @@ server.listen(PORT, '0.0.0.0', async () => {
   if (!process.env.ANGEL_TOTP_SECRET) {
       console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
   } else {
-      await loginAngelOne(io, priceCache);
+      await initFyers(io, priceCache);
   }
   
   // Start Cron Jobs
@@ -2240,7 +2240,7 @@ server.listen(PORT, '0.0.0.0', async () => {
   loginRule.tz = 'Asia/Kolkata';
   schedule.scheduleJob(loginRule, async () => {
     console.log('⏰ Daily 2:00 AM Cron: Refreshing Angel One Token...');
-    await loginAngelOne(io, priceCache);
+    await initFyers(io, priceCache);
   });
 
   // Initialize TriggerEngine: matches LIMIT + PENDING_TRIGGER (SL/TP/CO/BO) orders
