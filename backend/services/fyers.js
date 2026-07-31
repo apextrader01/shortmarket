@@ -449,7 +449,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     }
 
     try {
-        const response = await fyers.history({
+        const response = await fyers.getHistory({
             symbol: fSym,
             resolution: res,
             date_format: 1,
