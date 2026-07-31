@@ -67,12 +67,12 @@ function fromFyersSymbol(fyersSymbol) {
         }
     } catch(e) {}
 
-    // Fallback logic
-    if (fyersSymbol === 'NSE:NIFTY50-INDEX') return 'NIFTY';
-    if (fyersSymbol === 'NSE:NIFTYBANK-INDEX') return 'BANKNIFTY';
-    if (fyersSymbol === 'BSE:SENSEX-INDEX') return 'SENSEX';
-    if (fyersSymbol === 'NSE:FINNIFTY-INDEX') return 'FINNIFTY';
-    if (fyersSymbol === 'NSE:MIDCPNIFTY-INDEX') return 'MIDCPNIFTY';
+    // Fallback logic - MUST return uniqueSymbol format with exchange suffix
+    if (fyersSymbol === 'NSE:NIFTY50-INDEX') return 'NIFTY-NSE';
+    if (fyersSymbol === 'NSE:NIFTYBANK-INDEX') return 'BANKNIFTY-NSE';
+    if (fyersSymbol === 'BSE:SENSEX-INDEX') return 'SENSEX-BSE';
+    if (fyersSymbol === 'NSE:FINNIFTY-INDEX') return 'FINNIFTY-NSE';
+    if (fyersSymbol === 'NSE:MIDCPNIFTY-INDEX') return 'MIDCPNIFTY-NSE';
 
     const parts = fyersSymbol.split(':');
     if (parts.length !== 2) return fyersSymbol;
@@ -80,8 +80,9 @@ function fromFyersSymbol(fyersSymbol) {
     
     if (exchange === 'MCX') return `${name}-MCX`;
     if (name.endsWith('-EQ')) {
-        if (exchange === 'BSE') return `${name.replace('-EQ', '')}-BSE`;
-        return name;
+        const baseName = name.replace('-EQ', '');
+        if (exchange === 'BSE') return `${baseName}-BSE`;
+        return `${baseName}-NSE`;  // SBIN-EQ → SBIN-NSE (matches instruments.js uniqueSymbol)
     }
     
     if (exchange === 'NSE') return `${name}-NFO`;
