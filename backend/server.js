@@ -2066,6 +2066,19 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     return res.json(stockDetailsCache[rawName].data);
   }
 
+  // Derivatives (Options/Futures) won't be found on Groww stock search.
+  // Return a mock payload so the frontend doesn't crash with 404.
+  const isDerivative = symbol.includes('-NFO') || symbol.includes('-BFO') || symbol.includes('-MCX');
+  if (isDerivative) {
+    return res.json({
+      header: { companyName: rawName },
+      priceData: {},
+      stats: {},
+      details: {},
+      isDerivative: true
+    });
+  }
+
   try {
     // 1. Find Groww search_id
     const searchRes = await fetch(`https://groww.in/v1/api/search/v1/entity?app=false&entity_type=stocks&size=1&q=${encodeURIComponent(rawName)}`);
