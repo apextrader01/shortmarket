@@ -39,6 +39,10 @@ function toFyersSymbol(symbol) {
     if (symbol.endsWith('-MCX')) return `MCX:${symbol.replace('-MCX', '')}`;
     if (symbol.endsWith('-NFO')) return `NSE:${symbol.replace('-NFO', '')}`;
     if (symbol.endsWith('-BFO')) return `BSE:${symbol.replace('-BFO', '')}`;
+    
+    // Equity
+    if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
+    if (symbol.endsWith('-BSE')) return `BSE:${symbol.replace('-BSE', '')}-EQ`;
 
     // Default to NSE Equity
     return `NSE:${symbol.replace('-NSE', '')}-EQ`;
@@ -59,13 +63,16 @@ function fromFyersSymbol(fyersSymbol) {
     
     if (exchange === 'MCX') return `${name}-MCX`;
     
-    // Options/Futures
-    if (exchange === 'NSE' && !name.endsWith('-EQ') && !name.endsWith('-INDEX')) return `${name}-NFO`;
-    if (exchange === 'BSE' && !name.endsWith('-EQ') && !name.endsWith('-INDEX')) return `${name}-BFO`;
+    // If it's Equity (ends with -EQ), just return the name (e.g. RELIANCE-EQ)
+    if (name.endsWith('-EQ')) {
+        if (exchange === 'BSE') return `${name.replace('-EQ', '')}-BSE`; // Or keep it if frontend handles it? Actually, frontend uses RELIANCE-EQ for NSE, RELIANCE-BSE for BSE.
+        return name;
+    }
     
-    // Equity
-    if (name.endsWith('-EQ')) return name.replace('-EQ', '');
-    
+    // Otherwise it's a derivative
+    if (exchange === 'NSE') return `${name}-NFO`;
+    if (exchange === 'BSE') return `${name}-BFO`;
+
     return name;
 }
 
