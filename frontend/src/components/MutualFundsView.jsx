@@ -4,7 +4,7 @@ import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react'
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, mfWatchlist, toggleMfWatchlist } = useStore();
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore();
   const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
@@ -83,6 +83,23 @@ export default function MutualFundsView() {
           enrichFundsBatch(idsToEnrich);
       }
   }, [paginatedFunds, enrichFundsBatch]);
+
+  const combinedInvestments = [
+    ...(holdings || []).filter(h => h.symbol.endsWith('-MF')),
+    ...(positions || []).filter(p => p.symbol.endsWith('-MF'))
+  ];
+  const investmentMap = {};
+  for (const inv of combinedInvestments) {
+      if (!investmentMap[inv.symbol]) {
+          investmentMap[inv.symbol] = { id: inv.id, symbol: inv.symbol, quantity: 0, totalCost: 0 };
+      }
+      investmentMap[inv.symbol].quantity += Number(inv.quantity);
+      investmentMap[inv.symbol].totalCost += Number(inv.quantity) * Number(inv.average_price);
+  }
+  const finalInvestments = Object.values(investmentMap).map(inv => ({
+      ...inv,
+      average_price: inv.totalCost / inv.quantity,
+  })).filter(inv => inv.quantity > 0);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
@@ -309,7 +326,11 @@ export default function MutualFundsView() {
                                 <td style={{ padding: '16px', fontWeight: '600' }}>{sip.symbol}</td>
                                 <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
                                 <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>{new Date(sip.next_execution_date).toLocaleDateString()}</td>
+                                <td style={{ padding: '16px', textAlign: 'center' }}>
+                                    <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                        {new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </span>
+                                </td>
                                 <td style={{ padding: '16px', textAlign: 'center' }}>
                                     <span style={{ padding: '4px 8px', borderRadius: '12px', background: sip.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: sip.status === 'ACTIVE' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '11px', fontWeight: '600' }}>
                                         {sip.status}
@@ -329,7 +350,7 @@ export default function MutualFundsView() {
         ) : mainTab === 'Dashboard' ? (
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>
-            {holdings?.filter(h => h.symbol.endsWith('-MF')).length > 0 ? (
+            {finalInvestments.length > 0 ? (
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
@@ -340,10 +361,10 @@ export default function MutualFundsView() {
                         </tr>
                     </thead>
                     <tbody>
-                        {holdings.filter(h => h.symbol.endsWith('-MF')).map(h => (
+                        {finalInvestments.map(h => (
                             <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                 <td style={{ padding: '16px', fontWeight: '600' }}>{h.symbol.replace('-MF', '')}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity}</td>
+                                <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity.toFixed(4)}</td>
                                 <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
                                 <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
                             </tr>
