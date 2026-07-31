@@ -95,8 +95,8 @@ async function initSchema() {
         table.increments('id').primary();
         table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
         table.string('symbol').notNullable();
-        table.integer('quantity').notNullable().defaultTo(0);
-        table.integer('closed_quantity').defaultTo(0);
+        table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
+        table.decimal('closed_quantity', 14, 4).defaultTo(0);
         table.decimal('average_price', 14, 2).notNullable();
         table.decimal('exit_price', 14, 2).nullable();
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
@@ -158,7 +158,7 @@ async function initSchema() {
         table.string('side').notNullable(); // BUY, SELL
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.string('trigger_type').notNullable().defaultTo('REGULAR'); // REGULAR, CO, BO
-        table.integer('quantity').notNullable();
+        table.decimal('quantity', 14, 4).notNullable();
         table.decimal('price', 14, 2); // Nullable for MARKET orders
         table.string('status').notNullable().defaultTo('PENDING'); // PENDING, EXECUTED, CANCELLED, REJECTED
         table.decimal('trigger_price', 14, 2);
@@ -197,7 +197,7 @@ async function initSchema() {
           table.increments('id').primary();
           table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
           table.string('symbol').notNullable();
-          table.integer('quantity').notNullable().defaultTo(0);
+          table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
           table.decimal('average_price', 14, 2).notNullable();
           table.string('asset_class').notNullable().defaultTo('STOCK');
           table.timestamps(true, true);
@@ -358,6 +358,12 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
+    
+    // Fix integer quantities to support fractional SIP units
+    await db.raw(`ALTER TABLE orders ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE positions ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE positions ALTER COLUMN closed_quantity TYPE DECIMAL(14,4) USING closed_quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE holdings ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
     
     // Ensure system_configs exists even if migration skipped
     await db.raw(`
