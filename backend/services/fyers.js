@@ -316,24 +316,36 @@ async function fetchBatchLTPs(symbols) {
     }
 
     try {
-        const response = await fyers.getQuotes(fyersSymbols);
-        if (response.s === 'ok' && response.d) {
-            const results = {};
-            response.d.forEach(item => {
-                if (item.v && item.v.lp) {
-                    const uniqueSymbol = fromFyersSymbol(item.n);
-                    if (uniqueSymbol) {
-                        results[uniqueSymbol] = item.v.lp.toFixed(2);
-                        // Update cache as well
-                        if (!sharedPriceCache[uniqueSymbol]) {
-                            sharedPriceCache[uniqueSymbol] = { symbol: uniqueSymbol };
+        const results = {};
+        
+        // Fyers getQuotes has a strict limit of 50 symbols per request
+        const chunkSize = 50;
+        for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+            const chunk = fyersSymbols.slice(i, i + chunkSize);
+            
+            try {
+                const response = await fyers.getQuotes(chunk);
+                if (response && response.s === 'ok' && response.d) {
+                    response.d.forEach(item => {
+                        if (item.v && item.v.lp) {
+                            const uniqueSymbol = fromFyersSymbol(item.n);
+                            if (uniqueSymbol) {
+                                results[uniqueSymbol] = item.v.lp.toFixed(2);
+                                // Update cache as well
+                                if (!sharedPriceCache[uniqueSymbol]) {
+                                    sharedPriceCache[uniqueSymbol] = { symbol: uniqueSymbol };
+                                }
+                                sharedPriceCache[uniqueSymbol].ltp = item.v.lp.toFixed(2);
+                            }
                         }
-                        sharedPriceCache[uniqueSymbol].ltp = item.v.lp.toFixed(2);
-                    }
+                    });
                 }
-            });
-            return results;
+            } catch(chunkErr) {
+                console.error("Fyers getQuotes chunk error:", chunkErr);
+            }
         }
+        
+        return results;
     } catch(e) {
         console.error("Fyers fetchBatchLTPs error:", e);
     }
