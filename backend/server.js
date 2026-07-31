@@ -2191,6 +2191,35 @@ app.get('/api/debug-state', (req, res) => {
   });
 });
 
+app.get('/api/fyers/auth-url', (req, res) => {
+  const { getFyersAuthURL } = require('./services/fyers');
+  try {
+    const url = getFyersAuthURL();
+    res.json({ url });
+  } catch (err) {
+    console.error("Error generating Fyers Auth URL:", err);
+    res.status(500).json({ error: "Failed to generate auth URL" });
+  }
+});
+
+app.post('/api/fyers/verify', async (req, res) => {
+  const { auth_code } = req.body;
+  if (!auth_code) return res.status(400).json({ error: "Missing auth_code" });
+  
+  const { verifyFyersAuth } = require('./services/fyers');
+  try {
+    const success = await verifyFyersAuth(auth_code);
+    if (success) {
+      res.json({ success: true, message: "Fyers authenticated successfully!" });
+    } else {
+      res.status(401).json({ success: false, error: "Fyers authentication failed." });
+    }
+  } catch (err) {
+    console.error("Fyers Verify Error:", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist'), {
   setHeaders: (res, filePath) => {
