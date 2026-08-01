@@ -153,24 +153,30 @@ function loadTokenFromDisk() {
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 
-async function initFyers(io, pc) {
+async function initFyers(io, pc, isMaster = true) {
     global_io = io;
     sharedPriceCache = pc;
     
     await loadFyersSymbolMaps();
     
     if (loadTokenFromDisk()) {
-        startLiveWebSocket();
+        if (isMaster) {
+            startLiveWebSocket();
+        } else {
+            console.log("🔌 Loaded Fyers token for Worker instance. REST API enabled.");
+        }
     } else {
         console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
     }
     
-    // Start interval to broadcast LTPs
-    setInterval(() => {
-        if (Object.keys(sharedPriceCache).length > 0) {
-            global_io.emit('price_snapshot', sharedPriceCache);
-        }
-    }, 1000);
+    // Start interval to broadcast LTPs ONLY on Master to prevent duplicate network traffic
+    if (isMaster) {
+        setInterval(() => {
+            if (Object.keys(sharedPriceCache).length > 0) {
+                global_io.emit('price_snapshot', sharedPriceCache);
+            }
+        }, 1000);
+    }
 }
 
 // ─── WEBSOCKET ──────────────────────────────────────────────────────────────

@@ -2290,27 +2290,27 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 
-  if (isMaster) {
-    console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
-    
-    // Listen for WebSocket subscriptions from Worker nodes
-    const { subClient: cacheSubClient } = require('./services/redisClient');
-    cacheSubClient.subscribe('fyers_subscribe', (message) => {
-        try {
-            const symbols = JSON.parse(message);
-            const { addSubscriptionBatch } = require('./services/fyers');
-            if (addSubscriptionBatch) addSubscriptionBatch(symbols);
-        } catch(e){}
-    });
-
-    // Update options master in background
-    updateOptionsMaster().catch(e => console.error(e));
-
     if (!process.env.FYERS_APP_ID) {
         console.log('⚠️ WARNING: Missing Fyers Environment Variables! (FYERS_APP_ID not found)');
     } else {
-        await initFyers(io, priceCache);
+        await initFyers(io, priceCache, isMaster);
     }
+
+    if (isMaster) {
+      console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
+      
+      // Listen for WebSocket subscriptions from Worker nodes
+      const { subClient: cacheSubClient } = require('./services/redisClient');
+      cacheSubClient.subscribe('fyers_subscribe', (message) => {
+          try {
+              const symbols = JSON.parse(message);
+              const { addSubscriptionBatch } = require('./services/fyers');
+              if (addSubscriptionBatch) addSubscriptionBatch(symbols);
+          } catch(e){}
+      });
+
+      // Update options master in background
+      updateOptionsMaster().catch(e => console.error(e));
     
     // Start Cron Jobs
     const { startSquareOffJobs } = require('./services/autoSquareOff');
@@ -2329,7 +2329,7 @@ server.listen(PORT, '0.0.0.0', async () => {
     loginRule.tz = 'Asia/Kolkata';
     schedule.scheduleJob(loginRule, async () => {
       console.log('⏰ Daily 2:00 AM Cron: Refreshing Fyers Token...');
-      await initFyers(io, priceCache);
+      await initFyers(io, priceCache, true);
     });
 
     // Initialize TriggerEngine
