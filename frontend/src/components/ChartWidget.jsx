@@ -195,13 +195,14 @@ export default function ChartWidget() {
     if (!mountedRef.current || !candleSeriesRef.current || candles.length === 0) return;
 
     try {
-      // Deduplicate candles by time to prevent Lightweight Charts from silently crashing
+      // Deduplicate candles by time and adjust from UTC to IST (+5h30m = 19800s)
       const uniqueCandles = [];
       const seenTime = new Set();
       for (const c of candles) {
-        if (!seenTime.has(c.time)) {
-          seenTime.add(c.time);
-          uniqueCandles.push(c);
+        const adjustedTime = typeof c.time === 'number' ? c.time + 19800 : c.time;
+        if (!seenTime.has(adjustedTime)) {
+          seenTime.add(adjustedTime);
+          uniqueCandles.push({ ...c, time: adjustedTime });
         }
       }
 
@@ -283,7 +284,7 @@ export default function ChartWidget() {
         macdHistSeriesRef.current.setData(histLine);
       }
 
-      const last = candles[candles.length - 1];
+      const last = uniqueCandles[uniqueCandles.length - 1];
       if (last) liveLineRef.current?.setData([{ time: last.time, value: last.close }]);
 
       chartRef.current?.timeScale().fitContent();
