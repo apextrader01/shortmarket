@@ -2281,8 +2281,8 @@ server.listen(PORT, '0.0.0.0', async () => {
     // Update options master in background
     updateOptionsMaster().catch(e => console.error(e));
 
-    if (!process.env.ANGEL_TOTP_SECRET) {
-        console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
+    if (!process.env.FYERS_APP_ID) {
+        console.log('⚠️ WARNING: Missing Fyers Environment Variables! (FYERS_APP_ID not found)');
     } else {
         await initFyers(io, priceCache);
     }
@@ -2296,14 +2296,14 @@ server.listen(PORT, '0.0.0.0', async () => {
     const { initCronJobs } = require('./services/cronJobs');
     const schedule = require('node-schedule');
 
-    // Refresh Angel One Token daily at 2:00 AM IST
+    // Refresh Fyers Token daily at 2:00 AM IST
     const loginRule = new schedule.RecurrenceRule();
     loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
     loginRule.hour = 2;
     loginRule.minute = 0;
     loginRule.tz = 'Asia/Kolkata';
     schedule.scheduleJob(loginRule, async () => {
-      console.log('⏰ Daily 2:00 AM Cron: Refreshing Angel One Token...');
+      console.log('⏰ Daily 2:00 AM Cron: Refreshing Fyers Token...');
       await initFyers(io, priceCache);
     });
 
