@@ -157,7 +157,9 @@ async function initFyers(io, pc, isMaster = true) {
     global_io = io;
     sharedPriceCache = pc;
     
-    await loadFyersSymbolMaps();
+    // loadFyersSymbolMaps is intentionally removed. 
+    // Fyers tokens do not match Angel tokens, making the CSV maps useless. 
+    // The fallback regex logic works perfectly and doesn't block startup for 20 seconds.
     
     if (loadTokenFromDisk()) {
         if (isMaster) {
@@ -442,48 +444,6 @@ const INTERVAL_MAP = {
     'ONE_HOUR': '60',
     'ONE_DAY': '1D'
 };
-
-
-// Universal Mapping Dictionaries
-let tokenToFyers = {};
-let fyersToToken = {};
-
-async function loadFyersSymbolMaps() {
-    const urls = [
-        'https://public.fyers.in/sym_details/NSE_CM.csv',
-        'https://public.fyers.in/sym_details/NSE_FO.csv',
-        'https://public.fyers.in/sym_details/BSE_CM.csv',
-        'https://public.fyers.in/sym_details/BSE_FO.csv',
-        'https://public.fyers.in/sym_details/MCX_COM.csv'
-    ];
-
-    const https = require('https');
-    const readline = require('readline');
-
-    for (const url of urls) {
-        try {
-            await new Promise((resolve) => {
-                https.get(url, (res) => {
-                    const rl = readline.createInterface({ input: res });
-                    rl.on('line', line => {
-                        const parts = line.split(',');
-                        if (parts.length > 12) {
-                            const fyersSym = parts[9];
-                            const token = parts[12];
-                            tokenToFyers[token] = fyersSym;
-                            fyersToToken[fyersSym] = token;
-                        }
-                    });
-                    rl.on('close', resolve);
-                }).on('error', resolve);
-            });
-        } catch(e) {
-            console.error("Error loading Fyers map from", url, e);
-        }
-    }
-
-    console.log(`✅ Built Fyers mapping for ${Object.keys(fyersToToken).length} symbols.`);
-}
 
 const { generalClient } = require('./redisClient');
 
