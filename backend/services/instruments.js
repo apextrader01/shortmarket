@@ -93,7 +93,10 @@ function loadInstrumentMaster() {
 
         if (Array.isArray(nseStocks)) {
             for (const stock of nseStocks) {
-                const uniqueSymbol = stock.symbol; // keep -EQ
+                let uniqueSymbol = stock.symbol; // keep -EQ
+                if (stock.exchange === 'BSE' && !uniqueSymbol.endsWith('-BSE')) {
+                    uniqueSymbol += '-BSE';
+                }
                 
                 STOCK_MASTER[stock.token] = {
                     symbol: stock.symbol.replace('-EQ', ''),

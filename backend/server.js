@@ -69,7 +69,7 @@ app.get('/api/stocks', (req, res) => {
   
   // Only send NSE equities and Indices to the frontend to avoid huge payloads (options/futures are massive)
   cachedStocksArray = Object.entries(STOCK_MASTER)
-    .filter(([token, info]) => info.exchange === 'NSE')
+    .filter(([token, info]) => info.exchange === 'NSE' || info.exchange === 'BSE')
     .map(([token, info]) => ({
       token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
     }));
@@ -83,10 +83,10 @@ app.get('/api/stocks', (req, res) => {
     const { STOCK_MASTER, globalNfoOptions, globalNfoFutures, globalBseSpots } = require('./services/instruments');
 
     const queryParts = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const matchesQuery = (str) => {
-      if (!str) return false;
-      const lowerStr = str.toLowerCase();
-      return queryParts.every(part => lowerStr.includes(part));
+    const matchesQuery = (value) => {
+      if (!value) return false;
+      const searchStr = `${value.symbol} ${value.name} ${value.exchange}`.toLowerCase();
+      return queryParts.every(part => searchStr.includes(part));
     };
 
     const resultsMap = new Map();
@@ -108,7 +108,7 @@ app.get('/api/stocks', (req, res) => {
       for (const [key, value] of Object.entries(STOCK_MASTER)) {
         if (!value) continue;
         if (value.symbol && value.name) {
-          if (matchesQuery(value.symbol) || matchesQuery(value.name)) {
+          if (matchesQuery(value)) {
             addResult({
               token: key, 
               symbol: value.symbol, 
@@ -125,7 +125,7 @@ app.get('/api/stocks', (req, res) => {
     // 2. Search BSE Spots
     if (globalBseSpots) {
       for (const [key, value] of Object.entries(globalBseSpots)) {
-        if (value && value.symbol && matchesQuery(value.symbol)) {
+        if (value && value.symbol && matchesQuery(value)) {
           addResult({
             token: value.token, symbol: value.symbol, name: value.name, 
             exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
