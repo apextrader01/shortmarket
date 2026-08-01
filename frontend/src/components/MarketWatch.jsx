@@ -40,7 +40,7 @@ export default function MarketWatch({ className = '' }) {
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 100);
     return () => clearTimeout(timer);
   }, [searchQuery, isSearchMode]);
 
