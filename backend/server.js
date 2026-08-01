@@ -155,18 +155,6 @@ app.get('/api/stocks', (req, res) => {
       }
     }
 
-    // 2. Search BSE Spots
-    if (globalBseSpots) {
-      for (const [key, value] of Object.entries(globalBseSpots)) {
-        if (value && value.symbol && matchesQuery(value.symbol, value.name, value.exchange)) {
-          addResult({
-            token: value.token, symbol: value.symbol, name: value.name, 
-            exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
-          });
-        }
-      }
-    }
-
     // Helper to check if a derivative is expired (expiryDate < today midnight)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -186,24 +174,7 @@ app.get('/api/stocks', (req, res) => {
       return false;
     };
 
-    // 3. Search Futures
-    if (globalNfoFutures) {
-      for (const [key, value] of Object.entries(globalNfoFutures)) {
-        if (Array.isArray(value)) {
-          for (const fut of value) {
-            if (fut && fut.symbol && matchesQuery(fut.symbol, key, fut.exchange || 'NFO')) {
-               if (fut.expiry && isExpired(fut.expiry)) continue;
-               addResult({
-                 token: fut.token, symbol: fut.symbol, name: key, 
-                 exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
-               });
-            }
-          }
-        }
-      }
-    }
-
-    // 4. Search Options
+    // 2. Search Options (Prioritized for strikes like 78000)
     if (globalNfoOptions) {
       for (const [key, value] of Object.entries(globalNfoOptions)) {
         if (typeof value === 'object') {
@@ -223,6 +194,35 @@ app.get('/api/stocks', (req, res) => {
                }
             }
           }
+        }
+      }
+    }
+
+    // 3. Search Futures
+    if (globalNfoFutures) {
+      for (const [key, value] of Object.entries(globalNfoFutures)) {
+        if (Array.isArray(value)) {
+          for (const fut of value) {
+            if (fut && fut.symbol && matchesQuery(fut.symbol, key, fut.exchange || 'NFO')) {
+               if (fut.expiry && isExpired(fut.expiry)) continue;
+               addResult({
+                 token: fut.token, symbol: fut.symbol, name: key, 
+                 exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
+               });
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Search BSE Spots (Lowest priority, heavily polluted with bonds/g-secs)
+    if (globalBseSpots) {
+      for (const [key, value] of Object.entries(globalBseSpots)) {
+        if (value && value.symbol && matchesQuery(value.symbol, value.name, value.exchange)) {
+          addResult({
+            token: value.token, symbol: value.symbol, name: value.name, 
+            exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
+          });
         }
       }
     }
