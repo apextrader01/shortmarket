@@ -504,7 +504,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
         
         if (response.s === 'ok' && response.candles) {
             return response.candles.map(c => ({
-                time: c[0],
+                time: c[0] + 19800,
                 open: c[1],
                 high: c[2],
                 low: c[3],
