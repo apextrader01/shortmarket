@@ -210,7 +210,6 @@ app.get('/api/stocks', (req, res) => {
     let finalResults = Array.from(resultsMap.values());
     
     // Sort exact matches and indices to the top
-    const qLower = q.toLowerCase();
     finalResults.sort((a, b) => {
       const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
       const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
