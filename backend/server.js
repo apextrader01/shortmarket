@@ -2176,14 +2176,29 @@ io.on('connection', (socket) => {
   socket.on('subscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
     socket.join(symbol);
-    const { addSubscription } = require('./services/fyers');
-    if (addSubscription) addSubscription(data, io, priceCache);
+    if (isMaster) {
+      const { addSubscription } = require('./services/fyers');
+      if (addSubscription) addSubscription(data, io, priceCache);
+    } else {
+      const { pubClient } = require('./services/redisClient');
+      pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
+    }
   });
 
   socket.on('subscribe_batch', (dataArray) => {
     if (!Array.isArray(dataArray)) return;
-    const { addSubscriptionBatch } = require('./services/fyers');
-    if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
+    dataArray.forEach(item => {
+      let symbol = typeof item === 'string' ? item : item.symbol;
+      socket.join(symbol);
+    });
+    
+    if (isMaster) {
+      const { addSubscriptionBatch } = require('./services/fyers');
+      if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
+    } else {
+      const { pubClient } = require('./services/redisClient');
+      pubClient.publish('fyers_subscribe', JSON.stringify(dataArray.map(i => typeof i === 'string' ? i : i.symbol)));
+    }
   });
 
   socket.on('unsubscribe', (data) => {
@@ -2278,6 +2293,16 @@ server.listen(PORT, '0.0.0.0', async () => {
   if (isMaster) {
     console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
     
+    // Listen for WebSocket subscriptions from Worker nodes
+    const { subClient: cacheSubClient } = require('./services/redisClient');
+    cacheSubClient.subscribe('fyers_subscribe', (message) => {
+        try {
+            const symbols = JSON.parse(message);
+            const { addSubscriptionBatch } = require('./services/fyers');
+            if (addSubscriptionBatch) addSubscriptionBatch(symbols);
+        } catch(e){}
+    });
+
     // Update options master in background
     updateOptionsMaster().catch(e => console.error(e));
 
