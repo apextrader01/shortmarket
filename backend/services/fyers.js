@@ -246,7 +246,7 @@ function startLiveWebSocket() {
                 const change = ltp - prev;
                 const pct = prev > 0 ? (change / prev) * 100 : 0;
 
-                sharedPriceCache[uniqueSymbol] = {
+                const priceObj = {
                     symbol: uniqueSymbol,
                     ltp: ltp,
                     open: tick.open_price || null,
@@ -260,6 +260,16 @@ function startLiveWebSocket() {
                     bids: bids,
                     asks: asks
                 };
+                
+                sharedPriceCache[uniqueSymbol] = priceObj;
+                
+                // Publish to Redis for PM2 Workers
+                try {
+                    const { pubClient } = require('./redisClient');
+                    if (pubClient) {
+                        pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
+                    }
+                } catch(e) {}
             }
         });
     });
@@ -469,6 +479,8 @@ async function loadFyersSymbolMaps() {
     console.log(`✅ Built Fyers mapping for ${Object.keys(fyersToToken).length} symbols.`);
 }
 
+const { generalClient } = require('./redisClient');
+
 async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     if (!activeAccessToken || !symbol) return [];
     
@@ -476,6 +488,17 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     if (!fSym) return [];
 
     const res = INTERVAL_MAP[interval] || '1D';
+    
+    // Check Redis cache first
+    const cacheKey = `chart:${fSym}:${res}`;
+    try {
+        const cached = await generalClient.get(cacheKey);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (err) {
+        console.error("Redis get error in fetchCandleData", err);
+    }
     
     // Fyers expects range in yyyy-mm-dd
     const formatDate = (d) => {
@@ -503,7 +526,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
         });
         
         if (response.s === 'ok' && response.candles) {
-            return response.candles.map(c => ({
+            const formattedCandles = response.candles.map(c => ({
                 time: c[0] + 19800,
                 open: c[1],
                 high: c[2],
@@ -511,6 +534,15 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
                 close: c[4],
                 volume: c[5]
             }));
+            
+            // Save to Redis for 60 seconds (1 minute caching)
+            try {
+                await generalClient.setEx(cacheKey, 60, JSON.stringify(formattedCandles));
+            } catch (err) {
+                console.error("Redis set error in fetchCandleData", err);
+            }
+            
+            return formattedCandles;
         }
     } catch (e) {
         console.error("Fyers fetchCandleData error:", e);

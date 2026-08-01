@@ -20,15 +20,35 @@ const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
 
+const { pubClient, subClient } = require('./services/redisClient');
+const { createAdapter } = require('@socket.io/redis-adapter');
+
 const app = express();
 const server = http.createServer(app);
 
 // ─── Price Cache (lives in server.js to avoid module issues) ─────────────────
 const priceCache = {};
 
+// When running in PM2 Cluster Mode, NODE_APP_INSTANCE tells us the worker ID
+const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
+
 const io = new Server(server, {
-  cors: { origin: true, credentials: true, methods: ['GET', 'POST'] }
+  cors: { origin: true, credentials: true, methods: ['GET', 'POST'] },
+  adapter: createAdapter(pubClient, subClient)
 });
+
+// Redis Pub/Sub for syncing priceCache across cluster nodes
+if (!isMaster) {
+  const { subClient: cacheSubClient } = require('./services/redisClient');
+  cacheSubClient.subscribe('price_cache_sync', (message) => {
+    try {
+      const data = JSON.parse(message);
+      if (data.symbol && data.priceObj) {
+        priceCache[data.symbol] = data.priceObj;
+      }
+    } catch(e){}
+  });
+}
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
@@ -2253,57 +2273,58 @@ const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 
-  // Update options master in background
-  updateOptionsMaster().catch(e => console.error(e));
+  if (isMaster) {
+    console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
+    
+    // Update options master in background
+    updateOptionsMaster().catch(e => console.error(e));
 
-  if (!process.env.ANGEL_TOTP_SECRET) {
-      console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
-  } else {
+    if (!process.env.ANGEL_TOTP_SECRET) {
+        console.log('⚠️ WARNING: Missing Angel One Environment Variables! Please add them in Railway > Variables.');
+    } else {
+        await initFyers(io, priceCache);
+    }
+    
+    // Start Cron Jobs
+    const { startSquareOffJobs } = require('./services/autoSquareOff');
+    const { initRiskyStocksSync } = require('./services/riskyStocksSync');
+    const { initOrderExecutor } = require('./services/orderExecutor');
+    const triggerEngine = require('./services/triggerEngine');
+    const MTMRiskManager = require('./services/mtmRiskManager');
+    const { initCronJobs } = require('./services/cronJobs');
+    const schedule = require('node-schedule');
+
+    // Refresh Angel One Token daily at 2:00 AM IST
+    const loginRule = new schedule.RecurrenceRule();
+    loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
+    loginRule.hour = 2;
+    loginRule.minute = 0;
+    loginRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(loginRule, async () => {
+      console.log('⏰ Daily 2:00 AM Cron: Refreshing Angel One Token...');
       await initFyers(io, priceCache);
+    });
+
+    // Initialize TriggerEngine
+    triggerEngine.setSocketIo(io);
+    await triggerEngine.loadPendingOrders();
+    console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
+
+    // Initialize EOD Positions Engine (Cron Automations)
+    require('./services/positionsEngine');
+
+    // Initialize MTM Risk Manager
+    new MTMRiskManager(priceCache).start();
+    console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
+
+    startSquareOffJobs();
+    initRiskyStocksSync();
+    initOrderExecutor(priceCache);
+  } else {
+    console.log(`👷 Worker Instance: Listening for API requests and WS connections...`);
   }
-  
-  // Start Cron Jobs
-  const { startSquareOffJobs } = require('./services/autoSquareOff');
-  const { initRiskyStocksSync } = require('./services/riskyStocksSync');
-  const { initOrderExecutor } = require('./services/orderExecutor');
-  const triggerEngine = require('./services/triggerEngine');
-  const MTMRiskManager = require('./services/mtmRiskManager');
-  const { initCronJobs } = require('./services/cronJobs');
-  const schedule = require('node-schedule');
-
-  // Refresh Angel One Token daily at 2:00 AM IST
-  const loginRule = new schedule.RecurrenceRule();
-  loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
-  loginRule.hour = 2;
-  loginRule.minute = 0;
-  loginRule.tz = 'Asia/Kolkata';
-  schedule.scheduleJob(loginRule, async () => {
-    console.log('⏰ Daily 2:00 AM Cron: Refreshing Angel One Token...');
-    await initFyers(io, priceCache);
-  });
-
-  // Initialize TriggerEngine: matches LIMIT + PENDING_TRIGGER (SL/TP/CO/BO) orders
-  // against live WS price ticks. angelOne.js already calls triggerEngine.evaluateTick()
-  // on every tick — this just loads existing orders into memory on startup.
-  triggerEngine.setSocketIo(io);
-  await triggerEngine.loadPendingOrders();
-  console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
-
-  // Initialize EOD Positions Engine (Cron Automations)
-  require('./services/positionsEngine');
-
-  // Initialize MTM Risk Manager: 95% auto-liquidation rule (checks every 2s)
-  new MTMRiskManager(priceCache).start();
-  console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
-
-  // EOD Automations (sweeps, square-offs, holdings migration, expiry settlement) are handled by positionsEngine.js above.
-
-  // Legacy square-off jobs (expiry + intraday via HTTP self-calls) + remaining services
-  startSquareOffJobs();
-  initRiskyStocksSync();
-  initOrderExecutor(priceCache);
 });
 
 // Clean shutdown handlers to instantly release port when PM2 restarts/stops the process

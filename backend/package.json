@@ -13,6 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
@@ -29,6 +30,7 @@
     "node-schedule": "^2.1.1",
     "otplib": "^13.4.1",
     "pg": "^8.22.0",
+    "redis": "^6.2.0",
     "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
     "totp-generator": "^2.0.1"
