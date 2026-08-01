@@ -24,6 +24,9 @@ fyers.setRedirectUrl(REDIRECT_URL);
 let activeAccessToken = null;
 let isFyersConnected = false;
 
+// Global map to ensure Fyers symbols map perfectly back to the exact requested frontend symbol
+const globalFyersToRequested = {};
+
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
 function toFyersSymbol(symbol) {
     if (!symbol) return null;
@@ -43,7 +46,11 @@ function toFyersSymbol(symbol) {
     if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
     if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
 
-    if (symbol.endsWith('-MCX')) return `MCX:${symbol.replace('-MCX', '')}`;
+    if (symbol.endsWith('-MCX')) {
+        let name = symbol.replace('-MCX', '');
+        if (name.endsWith('FUT')) name = name.replace(/\d{2}FUT$/, 'FUT'); // Strip year (e.g. 26AUG26FUT -> 26AUGFUT)
+        return `MCX:${name}`;
+    }
     if (symbol.endsWith('-NFO')) return `NSE:${symbol.replace('-NFO', '')}`;
     if (symbol.endsWith('-BFO')) return `BSE:${symbol.replace('-BFO', '')}`;
     if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
@@ -214,7 +221,7 @@ function startLiveWebSocket() {
         
         data.forEach(tick => {
             if (!tick || !tick.symbol) return;
-            const uniqueSymbol = fromFyersSymbol(tick.symbol);
+            const uniqueSymbol = globalFyersToRequested[tick.symbol] || fromFyersSymbol(tick.symbol);
             if (!uniqueSymbol) return;
             
             // Fyers WebSocket v3 sends tick data as an object
@@ -277,7 +284,10 @@ function addSubscriptionBatch(symbols) {
         if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
-        if (fSym) fyersSymbols.push(fSym);
+        if (fSym) {
+            fyersSymbols.push(fSym);
+            globalFyersToRequested[fSym] = s;
+        }
     });
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
@@ -296,7 +306,10 @@ function removeSubscriptionBatch(symbols) {
     symbols.forEach(s => {
         clientSubscriptions.delete(s);
         const fSym = toFyersSymbol(s);
-        if (fSym) fyersSymbols.push(fSym);
+        if (fSym) {
+            fyersSymbols.push(fSym);
+            delete globalFyersToRequested[fSym];
+        }
     });
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
@@ -313,7 +326,15 @@ async function fetchBatchLTPs(symbols) {
     const validSymbols = symbols.filter(s => s && !s.endsWith('-MF'));
     if (validSymbols.length === 0) return {};
     
-    const fyersSymbols = validSymbols.map(toFyersSymbol).filter(Boolean);
+    const fyersToRequested = {};
+    const fyersSymbols = validSymbols.map(s => {
+        const fSym = toFyersSymbol(s);
+        if (fSym) {
+            fyersToRequested[fSym] = s;
+            return fSym;
+        }
+        return null;
+    }).filter(Boolean);
     
     console.log(`📡 fetchBatchLTPs called: ${validSymbols.length} symbols, ${fyersSymbols.length} mapped to Fyers, token=${activeAccessToken ? 'SET' : 'NONE'}`);
     if (fyersSymbols.length > 0 && fyersSymbols.length <= 5) {
@@ -344,7 +365,7 @@ async function fetchBatchLTPs(symbols) {
                     if (res && res.s === 'ok' && res.d) {
                         res.d.forEach(item => {
                             if (item.v && item.v.lp !== undefined) {
-                                const uniqueSymbol = fromFyersSymbol(item.n);
+                                const uniqueSymbol = fyersToRequested[item.n] || fromFyersSymbol(item.n);
                                 if (uniqueSymbol) {
                                     const priceObj = {
                                         symbol: uniqueSymbol,

@@ -61,13 +61,15 @@ function loadInstrumentMaster() {
                 Object.values(expiries).forEach(strikes => {
                     Object.values(strikes).forEach(types => {
                         if (types.CE) {
-                            const suffix = types.CE.exch_seg === 'MCX' ? 'MCX' : types.CE.exch_seg === 'BFO' ? 'BFO' : 'NFO';
+                            const ex = types.CE.exch_seg || types.CE.exchange;
+                            const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                             types.CE.uniqueSymbol = `${types.CE.symbol}-${suffix}`;
                             symbolToToken[types.CE.uniqueSymbol] = types.CE.token;
                             STOCK_MASTER[types.CE.token] = types.CE;
                         }
                         if (types.PE) {
-                            const suffix = types.PE.exch_seg === 'MCX' ? 'MCX' : types.PE.exch_seg === 'BFO' ? 'BFO' : 'NFO';
+                            const ex = types.PE.exch_seg || types.PE.exchange;
+                            const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                             types.PE.uniqueSymbol = `${types.PE.symbol}-${suffix}`;
                             symbolToToken[types.PE.uniqueSymbol] = types.PE.token;
                             STOCK_MASTER[types.PE.token] = types.PE;
@@ -80,7 +82,8 @@ function loadInstrumentMaster() {
         if (typeof nfoFutures === 'object') {
             Object.values(nfoFutures).forEach(expiries => {
                 Object.values(expiries).forEach(fut => {
-                    const suffix = fut.exch_seg === 'MCX' ? 'MCX' : fut.exch_seg === 'BFO' ? 'BFO' : 'NFO';
+                    const ex = fut.exch_seg || fut.exchange;
+                    const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
                     symbolToToken[fut.uniqueSymbol] = fut.token;
                     STOCK_MASTER[fut.token] = fut;
