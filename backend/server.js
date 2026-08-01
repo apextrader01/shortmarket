@@ -82,17 +82,30 @@ app.get('/api/stocks', (req, res) => {
     
     const { STOCK_MASTER, globalNfoOptions, globalNfoFutures, globalBseSpots } = require('./services/instruments');
 
-    const queryParts = q.toLowerCase().split(/\s+/).filter(Boolean);
-    const matchesQuery = (value) => {
-      if (!value) return false;
-      const searchStr = `${value.symbol} ${value.name} ${value.exchange}`.toLowerCase();
-      return queryParts.every(part => searchStr.includes(part));
+    const qLower = q.toLowerCase();
+    const queryParts = qLower.split(/\s+/).filter(Boolean);
+    const matchesQuery = (symbol, name, exchange) => {
+      const sym = symbol ? symbol.toLowerCase() : '';
+      const nm = name ? name.toLowerCase() : '';
+      const ex = exchange ? exchange.toLowerCase() : '';
+      
+      for (let i = 0; i < queryParts.length; i++) {
+        const part = queryParts[i];
+        if (!sym.includes(part) && !nm.includes(part) && !ex.includes(part)) {
+          return false;
+        }
+      }
+      return true;
     };
 
     const resultsMap = new Map();
     
     // Helper to add to map, preferring higher lotsizes
     const addResult = (resObj) => {
+      // Prevent massive performance delay by capping results added to the map.
+      // If the query is broad (e.g. 'nifty'), we don't need to add and sort 40,000 options.
+      if (resultsMap.size > 500 && !resultsMap.has(resObj.uniqueSymbol)) return;
+      
       if (resultsMap.has(resObj.uniqueSymbol)) {
         const existing = resultsMap.get(resObj.uniqueSymbol);
         if (resObj.lotsize > existing.lotsize) {
@@ -108,7 +121,7 @@ app.get('/api/stocks', (req, res) => {
       for (const [key, value] of Object.entries(STOCK_MASTER)) {
         if (!value) continue;
         if (value.symbol && value.name) {
-          if (matchesQuery(value)) {
+          if (matchesQuery(value.symbol, value.name, value.exchange)) {
             addResult({
               token: key, 
               symbol: value.symbol, 
@@ -125,7 +138,7 @@ app.get('/api/stocks', (req, res) => {
     // 2. Search BSE Spots
     if (globalBseSpots) {
       for (const [key, value] of Object.entries(globalBseSpots)) {
-        if (value && value.symbol && matchesQuery(value)) {
+        if (value && value.symbol && matchesQuery(value.symbol, value.name, value.exchange)) {
           addResult({
             token: value.token, symbol: value.symbol, name: value.name, 
             exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
@@ -158,7 +171,7 @@ app.get('/api/stocks', (req, res) => {
       for (const [key, value] of Object.entries(globalNfoFutures)) {
         if (Array.isArray(value)) {
           for (const fut of value) {
-            if (fut && fut.symbol && matchesQuery(fut.symbol)) {
+            if (fut && fut.symbol && matchesQuery(fut.symbol, key, fut.exchange || 'NFO')) {
                if (fut.expiry && isExpired(fut.expiry)) continue;
                addResult({
                  token: fut.token, symbol: fut.symbol, name: key, 
@@ -181,7 +194,7 @@ app.get('/api/stocks', (req, res) => {
                if (typeof value[expiry][strike] !== 'object') continue;
                for (const type in value[expiry][strike]) {
                   const opt = value[expiry][strike][type];
-                  if (opt && opt.symbol && matchesQuery(opt.symbol)) {
+                  if (opt && opt.symbol && matchesQuery(opt.symbol, key, opt.exch_seg || 'NFO')) {
                      addResult({
                        token: opt.token, symbol: opt.symbol, name: key, 
                        exchange: opt.exch_seg || 'NFO', lotsize: Number(opt.lotsize || 1), uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
