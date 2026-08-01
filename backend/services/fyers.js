@@ -82,7 +82,7 @@ function fromFyersSymbol(fyersSymbol) {
     if (name.endsWith('-EQ')) {
         const baseName = name.replace('-EQ', '');
         if (exchange === 'BSE') return `${baseName}-BSE`;
-        return `${baseName}-NSE`;  // SBIN-EQ → SBIN-NSE (matches instruments.js uniqueSymbol)
+        return `${baseName}-EQ`;  // SBIN-EQ (matches instruments.js uniqueSymbol)
     }
     
     if (exchange === 'NSE') return `${name}-NFO`;
@@ -223,7 +223,7 @@ function startLiveWebSocket() {
             if (tick.type === 'dp' || tick.type === 'if') {
                 // dp = Depth, if = Index
                 const ltp = tick.ltp;
-                if (!ltp) return;
+                if (ltp === undefined) return;
                 
                 let bids = [];
                 let asks = [];
@@ -340,29 +340,46 @@ async function fetchBatchLTPs(symbols) {
                 const response = await fyers.getQuotes(chunk);
                 console.log(`📡 Fyers getQuotes response: s=${response?.s}, d_count=${response?.d?.length || 0}, code=${response?.code || 'none'}, msg=${response?.message || 'none'}`);
                 
-                if (response && response.s === 'ok' && response.d) {
-                    response.d.forEach(item => {
-                        if (item.v && item.v.lp) {
-                            const uniqueSymbol = fromFyersSymbol(item.n);
-                            if (uniqueSymbol) {
-                                const priceObj = {
-                                    symbol: uniqueSymbol,
-                                    ltp: item.v.lp,
-                                    open: item.v.open_price || null,
-                                    high: item.v.high_price || null,
-                                    low: item.v.low_price || null,
-                                    close: item.v.close_price || null,
-                                    volume: item.v.volume || 0,
-                                    change: item.v.ch || 0,
-                                    pct: item.v.chp || 0
-                                };
-                                results[uniqueSymbol] = priceObj;
-                                sharedPriceCache[uniqueSymbol] = priceObj;
+                const processQuotesResponse = (res) => {
+                    if (res && res.s === 'ok' && res.d) {
+                        res.d.forEach(item => {
+                            if (item.v && item.v.lp !== undefined) {
+                                const uniqueSymbol = fromFyersSymbol(item.n);
+                                if (uniqueSymbol) {
+                                    const priceObj = {
+                                        symbol: uniqueSymbol,
+                                        ltp: Number(item.v.lp) || 0,
+                                        open: Number(item.v.open_price) || null,
+                                        high: Number(item.v.high_price) || null,
+                                        low: Number(item.v.low_price) || null,
+                                        close: Number(item.v.close_price) || null,
+                                        volume: Number(item.v.volume) || 0,
+                                        change: Number(item.v.ch) || 0,
+                                        pct: Number(item.v.chp) || 0
+                                    };
+                                    results[uniqueSymbol] = priceObj;
+                                    sharedPriceCache[uniqueSymbol] = priceObj;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
+                };
+
+                if (response && response.s === 'ok') {
+                    processQuotesResponse(response);
                 } else if (response && response.s === 'error') {
-                    console.error(`❌ Fyers getQuotes error: code=${response.code}, message=${response.message}`);
+                    console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
+                    // Retry individually to prevent one invalid symbol from ruining the batch
+                    for (const fSym of chunk) {
+                        try {
+                            const indRes = await fyers.getQuotes([fSym]);
+                            if (indRes && indRes.s === 'ok') {
+                                processQuotesResponse(indRes);
+                            }
+                        } catch(indErr) {
+                            console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
+                        }
+                    }
                 }
             } catch(chunkErr) {
                 console.error("Fyers getQuotes chunk error:", chunkErr);

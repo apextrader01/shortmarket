@@ -90,11 +90,10 @@ function loadInstrumentMaster() {
 
         if (Array.isArray(nseStocks)) {
             for (const stock of nseStocks) {
-                const rawSymbol = stock.symbol.endsWith('-EQ') ? stock.symbol.replace('-EQ', '') : stock.symbol;
-                const uniqueSymbol = `${rawSymbol}-${stock.exchange}`;
+                const uniqueSymbol = stock.symbol; // keep -EQ
                 
                 STOCK_MASTER[stock.token] = {
-                    symbol: rawSymbol,
+                    symbol: stock.symbol.replace('-EQ', ''),
                     name: stock.name,
                     exchange: stock.exchange,
                     lotsize: Number(stock.lotsize || 1),
