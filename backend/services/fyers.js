@@ -354,66 +354,58 @@ async function fetchBatchLTPs(symbols) {
         
         // Fyers getQuotes has a strict limit of 50 symbols per request
         const chunkSize = 50;
-        const promises = [];
-        
         for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
             const chunk = fyersSymbols.slice(i, i + chunkSize);
             
-            const chunkPromise = (async () => {
-                try {
-                    const response = await fyers.getQuotes(chunk);
-                    console.log(`📡 Fyers getQuotes response: s=${response?.s}, d_count=${response?.d?.length || 0}, code=${response?.code || 'none'}, msg=${response?.message || 'none'}`);
-                    
-                    const processQuotesResponse = (res) => {
-                        if (res && res.s === 'ok' && res.d) {
-                            res.d.forEach(item => {
-                                if (item.v && item.v.lp !== undefined) {
-                                    const uniqueSymbol = fyersToRequested[item.n] || fromFyersSymbol(item.n);
-                                    if (uniqueSymbol) {
-                                        const priceObj = {
-                                            symbol: uniqueSymbol,
-                                            ltp: Number(item.v.lp) || 0,
-                                            open: Number(item.v.open_price) || null,
-                                            high: Number(item.v.high_price) || null,
-                                            low: Number(item.v.low_price) || null,
-                                            close: Number(item.v.close_price) || null,
-                                            volume: Number(item.v.volume) || 0,
-                                            change: Number(item.v.ch) || 0,
-                                            pct: Number(item.v.chp) || 0
-                                        };
-                                        results[uniqueSymbol] = priceObj;
-                                        sharedPriceCache[uniqueSymbol] = priceObj;
-                                    }
+            try {
+                const response = await fyers.getQuotes(chunk);
+                console.log(`📡 Fyers getQuotes response: s=${response?.s}, d_count=${response?.d?.length || 0}, code=${response?.code || 'none'}, msg=${response?.message || 'none'}`);
+                
+                const processQuotesResponse = (res) => {
+                    if (res && res.s === 'ok' && res.d) {
+                        res.d.forEach(item => {
+                            if (item.v && item.v.lp !== undefined) {
+                                const uniqueSymbol = fyersToRequested[item.n] || fromFyersSymbol(item.n);
+                                if (uniqueSymbol) {
+                                    const priceObj = {
+                                        symbol: uniqueSymbol,
+                                        ltp: Number(item.v.lp) || 0,
+                                        open: Number(item.v.open_price) || null,
+                                        high: Number(item.v.high_price) || null,
+                                        low: Number(item.v.low_price) || null,
+                                        close: Number(item.v.close_price) || null,
+                                        volume: Number(item.v.volume) || 0,
+                                        change: Number(item.v.ch) || 0,
+                                        pct: Number(item.v.chp) || 0
+                                    };
+                                    results[uniqueSymbol] = priceObj;
+                                    sharedPriceCache[uniqueSymbol] = priceObj;
                                 }
-                            });
-                        }
-                    };
-
-                    if (response && response.s === 'ok') {
-                        processQuotesResponse(response);
-                    } else if (response && response.s === 'error') {
-                        console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
-                        // Retry individually to prevent one invalid symbol from ruining the batch
-                        for (const fSym of chunk) {
-                            try {
-                                const indRes = await fyers.getQuotes([fSym]);
-                                if (indRes && indRes.s === 'ok') {
-                                    processQuotesResponse(indRes);
-                                }
-                            } catch(indErr) {
-                                console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
                             }
+                        });
+                    }
+                };
+
+                if (response && response.s === 'ok') {
+                    processQuotesResponse(response);
+                } else if (response && response.s === 'error') {
+                    console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
+                    // Retry individually to prevent one invalid symbol from ruining the batch
+                    for (const fSym of chunk) {
+                        try {
+                            const indRes = await fyers.getQuotes([fSym]);
+                            if (indRes && indRes.s === 'ok') {
+                                processQuotesResponse(indRes);
+                            }
+                        } catch(indErr) {
+                            console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
                         }
                     }
-                } catch(chunkErr) {
-                    console.error("Fyers getQuotes chunk error:", chunkErr);
                 }
-            })();
-            
-            promises.push(chunkPromise);
+            } catch(chunkErr) {
+                console.error("Fyers getQuotes chunk error:", chunkErr);
+            }
         }
-        
-        await Promise.all(promises);
         
         console.log(`📡 fetchBatchLTPs returning ${Object.keys(results).length} prices`);
         return results;
