@@ -10,7 +10,23 @@ const extractUnderlying = (symbol) => {
 export default function PositionsView() {
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const { positions, holdings, prices } = useStore();
-  const sourceData = viewMode === 'HOLDINGS' ? (holdings || []) : (positions || []);
+  const mergedHoldingsMap = {};
+  if (viewMode === 'HOLDINGS') {
+    (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });
+    (positions || []).filter(p => p.product_type === 'DEL' && p.quantity !== 0).forEach(p => {
+      if (mergedHoldingsMap[p.symbol]) {
+         const existing = mergedHoldingsMap[p.symbol];
+         const newQty = existing.quantity + p.quantity;
+         const totalCost = (existing.quantity * parseFloat(existing.average_price)) + (p.quantity * parseFloat(p.average_price));
+         existing.quantity = newQty;
+         existing.average_price = Math.abs(newQty) > 0 ? totalCost / Math.abs(newQty) : 0;
+      } else {
+         mergedHoldingsMap[p.symbol] = { ...p };
+      }
+    });
+  }
+  
+  const sourceData = viewMode === 'HOLDINGS' ? Object.values(mergedHoldingsMap).filter(h => h.quantity > 0) : (positions || []);
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');

@@ -14,8 +14,27 @@ export default function PortfolioView() {
   let totalInvestedMutualFunds = 0;
   let unrealizedPnl = 0;
 
-  // Render holdings instead of filtering today's positions for DEL (excluding MF)
-  const deliveryPositions = (holdings || []).filter(h => !h.symbol.endsWith('-MF'));
+  // Merge holdings (T+1) with today's DEL positions (T+0) to give a complete portfolio view
+  const allMergedHoldingsMap = {};
+
+  (holdings || []).forEach(h => {
+    allMergedHoldingsMap[h.symbol] = { ...h };
+  });
+
+  (positions || []).filter(p => p.product_type === 'DEL' && p.quantity !== 0).forEach(p => {
+    if (allMergedHoldingsMap[p.symbol]) {
+       const existing = allMergedHoldingsMap[p.symbol];
+       const newQty = existing.quantity + p.quantity;
+       const totalCost = (existing.quantity * parseFloat(existing.average_price)) + (p.quantity * parseFloat(p.average_price));
+       existing.quantity = newQty;
+       existing.average_price = Math.abs(newQty) > 0 ? totalCost / Math.abs(newQty) : 0;
+    } else {
+       allMergedHoldingsMap[p.symbol] = { ...p };
+    }
+  });
+
+  const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);
+  const deliveryPositions = allMergedHoldings.filter(h => !h.symbol.endsWith('-MF'));
 
   const calculatePnL = (pos, isHolding = false) => {
       if (!pos) return;
@@ -50,8 +69,8 @@ export default function PortfolioView() {
       }
   };
 
-  (holdings || []).forEach(h => calculatePnL(h, true));
-  (positions || []).forEach(p => calculatePnL(p, false));
+  allMergedHoldings.forEach(h => calculatePnL(h, true));
+  (positions || []).filter(p => p.product_type !== 'DEL').forEach(p => calculatePnL(p, false));
 
   const isToday = (dateString) => {
      if (!dateString) return false;
