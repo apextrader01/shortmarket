@@ -37,16 +37,31 @@ const io = new Server(server, {
   adapter: createAdapter(pubClient, subClient)
 });
 
+// Listen for Fyers token updates on all cluster nodes
+const { subClient: globalSubClient } = require('./services/redisClient');
+if (globalSubClient) {
+    globalSubClient.on('ready', () => {
+        globalSubClient.subscribe('fyers_token_updated', () => {
+            try {
+                const { reloadFyersToken } = require('./services/fyers');
+                if (reloadFyersToken) reloadFyersToken();
+            } catch(e) {}
+        }).catch(() => {});
+    });
+}
+
 // Redis Pub/Sub for syncing priceCache across cluster nodes
 if (!isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
-  cacheSubClient.subscribe('price_cache_sync', (message) => {
-    try {
-      const data = JSON.parse(message);
-      if (data.symbol && data.priceObj) {
-        priceCache[data.symbol] = data.priceObj;
-      }
-    } catch(e){}
+  cacheSubClient.on('ready', () => {
+    cacheSubClient.subscribe('price_cache_sync', (message) => {
+      try {
+        const data = JSON.parse(message);
+        if (data.symbol && data.priceObj) {
+          priceCache[data.symbol] = data.priceObj;
+        }
+      } catch(e){}
+    }).catch(err => { /* ignore */ });
   });
 }
 
@@ -2290,11 +2305,8 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 
-    if (!process.env.FYERS_APP_ID) {
-        console.log('⚠️ WARNING: Missing Fyers Environment Variables! (FYERS_APP_ID not found)');
-    } else {
-        await initFyers(io, priceCache, isMaster);
-    }
+    // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
+    await initFyers(io, priceCache, isMaster);
 
     if (isMaster) {
       console.log('👑 Master Instance: Starting background tasks and Fyers connection...');

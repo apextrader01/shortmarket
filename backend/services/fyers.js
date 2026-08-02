@@ -27,6 +27,10 @@ let isFyersConnected = false;
 // Global map to ensure Fyers symbols map perfectly back to the exact requested frontend symbol
 const globalFyersToRequested = {};
 
+// Maps for token-based symbol lookups (populated if CSV maps are loaded, empty otherwise)
+const tokenToFyers = {};
+const fyersToToken = {};
+
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
 function toFyersSymbol(symbol) {
     if (!symbol) return null;
@@ -120,8 +124,14 @@ async function verifyFyersAuth(auth_code) {
             // Save token to disk so it survives restarts for the rest of the day
             fs.writeFileSync(path.join(__dirname, '../fyers_token.txt'), activeAccessToken);
             
-            // Start WebSocket
-            startLiveWebSocket();
+            // Publish to Redis so all PM2 workers reload the token
+            try {
+                const { pubClient } = require('./redisClient');
+                if (pubClient) {
+                    pubClient.publish('fyers_token_updated', 'updated');
+                }
+            } catch (err) {}
+            
             return { success: true };
         } else {
             console.error("Fyers Auth Error:", response);
@@ -186,7 +196,11 @@ async function initFyers(io, pc, isMaster = true) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
-    if (wsInstance) return;
+    // If there's an existing connection, close it before reconnecting
+    if (wsInstance) {
+        try { wsInstance.close(); } catch(e) {}
+        wsInstance = null;
+    }
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
     const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
@@ -310,7 +324,10 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            wsInstance.subscribe(fyersSymbols);
+            // Subscribe in chunks of 10 to isolate invalid symbols from dropping the whole batch
+            for (let i = 0; i < fyersSymbols.length; i += 10) {
+                wsInstance.subscribe(fyersSymbols.slice(i, i + 10));
+            }
         } catch(e) {
             console.error("Fyers subscribe error:", e);
         }
@@ -332,7 +349,9 @@ function removeSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            wsInstance.unsubscribe(fyersSymbols);
+            for (let i = 0; i < fyersSymbols.length; i += 10) {
+                wsInstance.unsubscribe(fyersSymbols.slice(i, i + 10));
+            }
         } catch(e) {}
     }
 }
@@ -409,14 +428,22 @@ async function fetchBatchLTPs(symbols) {
                 } else if (response && response.s === 'error') {
                     console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
                     // Retry individually to prevent one invalid symbol from ruining the batch
-                    for (const fSym of chunk) {
-                        try {
-                            const indRes = await fyers.getQuotes([fSym]);
-                            if (indRes && indRes.s === 'ok') {
-                                processQuotesResponse(indRes);
+                    // Process in mini-chunks of 10 with 1s delay to respect 10 req/sec limit
+                    for (let j = 0; j < chunk.length; j += 10) {
+                        const miniChunk = chunk.slice(j, j + 10);
+                        const promises = miniChunk.map(async (fSym) => {
+                            try {
+                                const indRes = await fyers.getQuotes([fSym]);
+                                if (indRes && indRes.s === 'ok') {
+                                    processQuotesResponse(indRes);
+                                }
+                            } catch(indErr) {
+                                console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
                             }
-                        } catch(indErr) {
-                            console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
+                        });
+                        await Promise.allSettled(promises);
+                        if (j + 10 < chunk.length) {
+                            await new Promise(resolve => setTimeout(resolve, 1000));
                         }
                     }
                 }
@@ -522,6 +549,18 @@ function addSubscription(symbol) { addSubscriptionBatch([symbol]); }
 function subscribeToDepth(symbol) { /* Fyers v3 auto sends depth if requested */ }
 function unsubscribeFromDepth(symbol) {}
 
+function reloadFyersToken() {
+    console.log("🔄 Redis Event: Fyers token updated! Reloading...");
+    if (loadTokenFromDisk()) {
+        const isMaster = process.env.pm_id === undefined || process.env.pm_id === '0';
+        if (isMaster) {
+            startLiveWebSocket();
+        } else {
+            console.log("🔌 Reloaded Fyers token for Worker instance.");
+        }
+    }
+}
+
 module.exports = {
     setPriceCache,
     registerTokens,
@@ -529,6 +568,7 @@ module.exports = {
     subscribeToDepth,
     unsubscribeFromDepth,
     initFyers,
+    reloadFyersToken,
     getFyersAuthURL,
     verifyFyersAuth,
     fetchBatchLTPs,
