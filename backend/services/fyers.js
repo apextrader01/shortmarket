@@ -526,7 +526,7 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
     }
 
     try {
-        const response = await fyers.getHistory({
+        const fetchPromise = fyers.getHistory({
             symbol: fSym,
             resolution: res,
             date_format: 1,
@@ -535,7 +535,12 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
             cont_flag: 1
         });
         
-        if (response.s === 'ok' && response.candles) {
+        // 10 second timeout to prevent hanging the route
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Fyers API Timeout')), 10000));
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (response && response.s === 'ok' && response.candles) {
             const formattedCandles = response.candles.map(c => ({
                 time: c[0] + 19800,
                 open: c[1],

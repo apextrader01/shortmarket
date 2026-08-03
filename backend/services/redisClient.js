@@ -8,7 +8,10 @@ const { createClient } = require('redis');
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const createRedisClient = () => {
-    const client = createClient({ url: redisUrl });
+    const client = createClient({ 
+        url: redisUrl,
+        disableOfflineQueue: true // Prevent hanging when Redis is offline
+    });
     
     client.on('error', (err) => console.error('Redis Client Error', err));
     
