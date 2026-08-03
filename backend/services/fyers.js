@@ -445,11 +445,11 @@ async function fetchBatchLTPs(symbols) {
                                     syms.forEach(uniqueSymbol => {
                                         const priceObj = {
                                             symbol: uniqueSymbol,
-                                            ltp: Number(item.v.lp) || 0,
+                                            ltp: Number(item.v.lp) || Number(item.v.prev_close_price) || Number(item.v.close_price) || 0,
                                             open: Number(item.v.open_price) || null,
                                             high: Number(item.v.high_price) || null,
                                             low: Number(item.v.low_price) || null,
-                                            close: Number(item.v.close_price) || null,
+                                            close: Number(item.v.prev_close_price) || Number(item.v.close_price) || null,
                                             volume: Number(item.v.volume) || 0,
                                             change: Number(item.v.ch) || 0,
                                             pct: Number(item.v.chp) || 0
