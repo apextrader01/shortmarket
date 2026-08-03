@@ -614,7 +614,9 @@ async function loadFyersSymbolMaps() {
         const urls = [
             'https://public.fyers.in/sym_details/NSE_FO.csv',
             'https://public.fyers.in/sym_details/BSE_FO.csv',
-            'https://public.fyers.in/sym_details/MCX_COM.csv'
+            'https://public.fyers.in/sym_details/MCX_COM.csv',
+            'https://public.fyers.in/sym_details/NSE_CM.csv',
+            'https://public.fyers.in/sym_details/BSE_CM.csv'
         ];
         
         const newMap = {};
