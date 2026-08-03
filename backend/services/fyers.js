@@ -264,8 +264,8 @@ function startLiveWebSocket() {
             // Fyers WebSocket v3 sends tick data as an object
             // ltp, ch, chp, vol, bid, ask, etc.
             
-            if (tick.type === 'dp' || tick.type === 'if') {
-                // dp = Depth, if = Index
+            if (tick.type === 'dp' || tick.type === 'if' || tick.type === 'sf') {
+                // dp = Depth, if = Index, sf = Symbol Update (Lite)
                 const ltp = tick.ltp;
                 if (ltp === undefined) return;
                 
