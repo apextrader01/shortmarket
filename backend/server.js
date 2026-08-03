@@ -2241,15 +2241,22 @@ io.on('connection', (socket) => {
 });
 
 app.get('/api/debug-state', (req, res) => {
-  const { getFyersAuthURL } = require('./services/fyers');
+  const { getFyersAuthURL, getFyersStatus } = require('./services/fyers');
   let state = {};
   if (getFyersAuthURL) {
     state = getFyersAuthURL();
   }
+  let fyersStatus = {};
+  if (getFyersStatus) {
+    fyersStatus = getFyersStatus();
+  }
   res.json({
     state,
+    fyers: fyersStatus,
     lastOrderError,
-    time: new Date().toISOString()
+    time: new Date().toISOString(),
+    isMaster: process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE,
+    pmId: process.env.pm_id
   });
 });
 

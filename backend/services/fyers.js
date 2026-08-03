@@ -9,6 +9,7 @@ let wsInstance = null;
 let clientSubscriptions = new Set();
 let watchdogInterval = null;
 let lastTickTime = Date.now();
+let isMasterNode = false;
 
 const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
 
@@ -166,6 +167,7 @@ function loadTokenFromDisk() {
 async function initFyers(io, pc, isMaster = true) {
     global_io = io;
     sharedPriceCache = pc;
+    isMasterNode = isMaster;
     
     // loadFyersSymbolMaps is intentionally removed. 
     // Fyers tokens do not match Angel tokens, making the CSV maps useless. 
@@ -552,13 +554,25 @@ function unsubscribeFromDepth(symbol) {}
 function reloadFyersToken() {
     console.log("🔄 Redis Event: Fyers token updated! Reloading...");
     if (loadTokenFromDisk()) {
-        const isMaster = process.env.pm_id === undefined || process.env.pm_id === '0';
-        if (isMaster) {
+        if (isMasterNode) {
             startLiveWebSocket();
         } else {
             console.log("🔌 Reloaded Fyers token for Worker instance.");
         }
     }
+}
+
+function getFyersStatus() {
+    return {
+        isMasterNode,
+        isFyersConnected,
+        hasAccessToken: !!activeAccessToken,
+        wsInstanceExists: !!wsInstance,
+        subscriptions: Array.from(clientSubscriptions),
+        lastTickTime: new Date(lastTickTime).toISOString(),
+        secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,
+        fyersToRequestedMap: globalFyersToRequested
+    };
 }
 
 module.exports = {
@@ -574,5 +588,6 @@ module.exports = {
     fetchBatchLTPs,
     fetchCandleData,
     addSubscriptionBatch,
-    removeSubscriptionBatch
+    removeSubscriptionBatch,
+    getFyersStatus
 };
