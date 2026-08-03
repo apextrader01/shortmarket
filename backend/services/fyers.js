@@ -29,8 +29,9 @@ let isFyersConnected = false;
 const globalFyersToRequested = {};
 
 // Maps for token-based symbol lookups (populated if CSV maps are loaded, empty otherwise)
-const tokenToFyers = {};
-const fyersToToken = {};
+let tokenToFyers = {};
+let fyersToToken = {};
+
 
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
 function toFyersSymbol(symbol) {
@@ -169,9 +170,9 @@ async function initFyers(io, pc, isMaster = true) {
     sharedPriceCache = pc;
     isMasterNode = isMaster;
     
-    // loadFyersSymbolMaps is intentionally removed. 
-    // Fyers tokens do not match Angel tokens, making the CSV maps useless. 
-    // The fallback regex logic works perfectly and doesn't block startup for 20 seconds.
+    // Asynchronously load the Fyers Token maps (Angel Token -> Fyers Symbol)
+    // This runs in the background and does not block PM2 startup.
+    loadFyersSymbolMaps();
     
     if (loadTokenFromDisk()) {
         if (isMaster) {
@@ -326,9 +327,9 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            // Subscribe in chunks of 10 to isolate invalid symbols from dropping the whole batch
-            for (let i = 0; i < fyersSymbols.length; i += 10) {
-                wsInstance.subscribe(fyersSymbols.slice(i, i + 10));
+            // Subscribe individually to completely isolate invalid symbols from dropping others
+            for (let i = 0; i < fyersSymbols.length; i++) {
+                wsInstance.subscribe([fyersSymbols[i]]);
             }
         } catch(e) {
             console.error("Fyers subscribe error:", e);
@@ -351,8 +352,8 @@ function removeSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            for (let i = 0; i < fyersSymbols.length; i += 10) {
-                wsInstance.unsubscribe(fyersSymbols.slice(i, i + 10));
+            for (let i = 0; i < fyersSymbols.length; i++) {
+                wsInstance.unsubscribe([fyersSymbols[i]]);
             }
         } catch(e) {}
     }
@@ -444,6 +445,8 @@ async function fetchBatchLTPs(symbols) {
                             }
                         });
                         await Promise.allSettled(promises);
+                        // Delay 1s to avoid hitting 10 req/s rate limit
+                        await new Promise(r => setTimeout(r, 1000));
                         if (j + 10 < chunk.length) {
                             await new Promise(resolve => setTimeout(resolve, 1000));
                         }
@@ -571,8 +574,76 @@ function getFyersStatus() {
         subscriptions: Array.from(clientSubscriptions),
         lastTickTime: new Date(lastTickTime).toISOString(),
         secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,
-        fyersToRequestedMap: globalFyersToRequested
+        fyersToRequestedMap: globalFyersToRequested,
+        tokensMapped: Object.keys(tokenToFyers).length
     };
+}
+
+async function loadFyersSymbolMaps() {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const https = require('https');
+        const mapPath = path.join(__dirname, '../database/fyers_map.json');
+        
+        // 1. Load from local cache immediately so we have instant startup mapping
+        if (fs.existsSync(mapPath)) {
+            const data = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+            tokenToFyers = data.tokenToFyers || {};
+            fyersToToken = data.fyersToToken || {};
+            console.log(`🔌 Loaded ${Object.keys(tokenToFyers).length} Fyers F&O symbols from cache.`);
+        }
+        
+        // 2. Download latest CSVs asynchronously in the background
+        const download = (url) => new Promise((resolve, reject) => {
+            https.get(url, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve(data));
+            }).on('error', reject);
+        });
+
+        console.log("🔄 Downloading Fyers Master CSVs in background...");
+        const urls = [
+            'https://public.fyers.in/sym_details/NSE_FO.csv',
+            'https://public.fyers.in/sym_details/BSE_FO.csv',
+            'https://public.fyers.in/sym_details/MCX_COM.csv'
+        ];
+        
+        const newMap = {};
+        const revMap = {};
+        
+        for (const url of urls) {
+            try {
+                const csv = await download(url);
+                const lines = csv.split('\n');
+                for (const line of lines) {
+                    if (!line) continue;
+                    const parts = line.split(',');
+                    if (parts.length > 12) {
+                        const fyersSym = parts[9];
+                        const exchangeToken = parts[12];
+                        if (exchangeToken && fyersSym) {
+                            newMap[exchangeToken] = fyersSym;
+                            revMap[fyersSym] = exchangeToken;
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error(`Failed to download ${url}:`, e.message);
+            }
+        }
+        
+        if (Object.keys(newMap).length > 1000) {
+            tokenToFyers = newMap;
+            fyersToToken = revMap;
+            fs.writeFileSync(mapPath, JSON.stringify({ tokenToFyers, fyersToToken }));
+            console.log(`✅ Fyers Symbol Maps updated successfully (${Object.keys(newMap).length} symbols).`);
+        }
+        
+    } catch(err) {
+        console.error("Fyers Map Error:", err);
+    }
 }
 
 module.exports = {
