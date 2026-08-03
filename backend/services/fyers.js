@@ -45,6 +45,10 @@ function toFyersSymbol(symbol) {
         if (token && tokenToFyers[token]) {
             return tokenToFyers[token];
         }
+        // Fallback for legacy watchlists that saved the raw Angel One token instead of the uniqueSymbol
+        if (tokenToFyers[symbol]) {
+            return tokenToFyers[symbol];
+        }
     } catch(e) {}
     
     // Fallback logic for indices and equities
@@ -258,8 +262,13 @@ function startLiveWebSocket() {
         
         data.forEach(tick => {
             if (!tick || !tick.symbol) return;
-            const uniqueSymbol = globalFyersToRequested[tick.symbol] || fromFyersSymbol(tick.symbol);
-            if (!uniqueSymbol) return;
+            
+            let syms = globalFyersToRequested[tick.symbol];
+            if (!syms || syms.length === 0) {
+                const mapped = fromFyersSymbol(tick.symbol);
+                if (mapped) syms = [mapped];
+            }
+            if (!syms || syms.length === 0) return;
             
             // Fyers WebSocket v3 sends tick data as an object
             // ltp, ch, chp, vol, bid, ask, etc.
@@ -283,22 +292,24 @@ function startLiveWebSocket() {
                 const change = ltp - prev;
                 const pct = prev > 0 ? (change / prev) * 100 : 0;
 
-                const priceObj = {
-                    symbol: uniqueSymbol,
-                    ltp: ltp,
-                    open: tick.open_price || null,
-                    high: tick.high_price || null,
-                    low: tick.low_price || null,
-                    close: prev || null,
-                    volume: tick.vol_traded_today || 0,
-                    ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : null,
-                    change: change,
-                    pct: pct,
-                    bids: bids,
-                    asks: asks
-                };
-                
-                sharedPriceCache[uniqueSymbol] = priceObj;
+                syms.forEach(uniqueSymbol => {
+                    const priceObj = {
+                        symbol: uniqueSymbol,
+                        ltp: ltp,
+                        open: tick.open_price || null,
+                        high: tick.high_price || null,
+                        low: tick.low_price || null,
+                        close: prev || null,
+                        volume: tick.vol_traded_today || 0,
+                        ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : null,
+                        change: change,
+                        pct: pct,
+                        bids: bids,
+                        asks: asks
+                    };
+                    
+                    sharedPriceCache[uniqueSymbol] = priceObj;
+                });
                 
                 // Publish to Redis for PM2 Workers
                 try {
@@ -333,7 +344,8 @@ function addSubscriptionBatch(symbols) {
         const fSym = toFyersSymbol(s);
         if (fSym) {
             fyersSymbols.push(fSym);
-            globalFyersToRequested[fSym] = s;
+            if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+            if (!globalFyersToRequested[fSym].includes(s)) globalFyersToRequested[fSym].push(s);
         }
     });
     
@@ -358,7 +370,12 @@ function removeSubscriptionBatch(symbols) {
         const fSym = toFyersSymbol(s);
         if (fSym) {
             fyersSymbols.push(fSym);
-            delete globalFyersToRequested[fSym];
+            if (globalFyersToRequested[fSym]) {
+                globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== s);
+                if (globalFyersToRequested[fSym].length === 0) {
+                    delete globalFyersToRequested[fSym];
+                }
+            }
         }
     });
     
@@ -382,7 +399,8 @@ async function fetchBatchLTPs(symbols) {
     const fyersSymbols = validSymbols.map(s => {
         const fSym = toFyersSymbol(s);
         if (fSym) {
-            fyersToRequested[fSym] = s;
+            if (!fyersToRequested[fSym]) fyersToRequested[fSym] = [];
+            if (!fyersToRequested[fSym].includes(s)) fyersToRequested[fSym].push(s);
             return fSym;
         }
         return null;
@@ -417,21 +435,28 @@ async function fetchBatchLTPs(symbols) {
                     if (res && res.s === 'ok' && res.d) {
                         res.d.forEach(item => {
                             if (item.v && item.v.lp !== undefined) {
-                                const uniqueSymbol = fyersToRequested[item.n] || fromFyersSymbol(item.n);
-                                if (uniqueSymbol) {
-                                    const priceObj = {
-                                        symbol: uniqueSymbol,
-                                        ltp: Number(item.v.lp) || 0,
-                                        open: Number(item.v.open_price) || null,
-                                        high: Number(item.v.high_price) || null,
-                                        low: Number(item.v.low_price) || null,
-                                        close: Number(item.v.close_price) || null,
-                                        volume: Number(item.v.volume) || 0,
-                                        change: Number(item.v.ch) || 0,
-                                        pct: Number(item.v.chp) || 0
-                                    };
-                                    results[uniqueSymbol] = priceObj;
-                                    sharedPriceCache[uniqueSymbol] = priceObj;
+                                let syms = fyersToRequested[item.n];
+                                if (!syms || syms.length === 0) {
+                                    const mapped = fromFyersSymbol(item.n);
+                                    if (mapped) syms = [mapped];
+                                }
+                                
+                                if (syms && syms.length > 0) {
+                                    syms.forEach(uniqueSymbol => {
+                                        const priceObj = {
+                                            symbol: uniqueSymbol,
+                                            ltp: Number(item.v.lp) || 0,
+                                            open: Number(item.v.open_price) || null,
+                                            high: Number(item.v.high_price) || null,
+                                            low: Number(item.v.low_price) || null,
+                                            close: Number(item.v.close_price) || null,
+                                            volume: Number(item.v.volume) || 0,
+                                            change: Number(item.v.ch) || 0,
+                                            pct: Number(item.v.chp) || 0
+                                        };
+                                        results[uniqueSymbol] = priceObj;
+                                        sharedPriceCache[uniqueSymbol] = priceObj;
+                                    });
                                 }
                             }
                         });
