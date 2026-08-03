@@ -330,7 +330,7 @@ export default function ChartWidget() {
               )}
             </div>
           ) : (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Loading price…</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>No live price</div>
           )}
         </div>
 

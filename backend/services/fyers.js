@@ -31,6 +31,8 @@ const globalFyersToRequested = {};
 // Maps for token-based symbol lookups (populated if CSV maps are loaded, empty otherwise)
 let tokenToFyers = {};
 let fyersToToken = {};
+// Fallback name-based map for indices whose Angel One token ≠ exchange token (e.g. POWER-BSE)
+let nameToFyers = {};
 
 
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
@@ -45,16 +47,28 @@ function toFyersSymbol(symbol) {
         }
     } catch(e) {}
     
-    // Fallback logic
+    // Fallback logic for indices and equities
     if (symbol === 'NIFTY' || symbol === 'NIFTY-NSE') return 'NSE:NIFTY50-INDEX';
     if (symbol === 'BANKNIFTY' || symbol === 'BANKNIFTY-NSE') return 'NSE:NIFTYBANK-INDEX';
     if (symbol === 'SENSEX' || symbol === 'SENSEX-BSE') return 'BSE:SENSEX-INDEX';
     if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
     if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
+    if (symbol === 'BANKEX' || symbol === 'BANKEX-BSE') return 'BSE:BANKEX-INDEX';
 
     if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
-    if (symbol.endsWith('-BSE')) return `BSE:${symbol.replace('-BSE', '')}-EQ`;
-    if (symbol.endsWith('-NSE')) return `NSE:${symbol.replace('-NSE', '')}-EQ`;
+    
+    if (symbol.endsWith('-BSE')) {
+        const baseName = symbol.replace('-BSE', '');
+        // Check name-based index map first (handles BSE sector indices whose Angel token differs from exchange token)
+        if (nameToFyers[baseName]) return nameToFyers[baseName];
+        return `BSE:${baseName}-EQ`;
+    }
+    
+    if (symbol.endsWith('-NSE')) {
+        const baseName = symbol.replace('-NSE', '');
+        if (nameToFyers[baseName]) return nameToFyers[baseName];
+        return `NSE:${baseName}-EQ`;
+    }
     
     // For F&O, if it wasn't in the token map, we should not guess it.
     // However, if it has no exchange suffix, it's likely an NSE equity.
@@ -593,7 +607,8 @@ async function loadFyersSymbolMaps() {
             const data = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
             tokenToFyers = data.tokenToFyers || {};
             fyersToToken = data.fyersToToken || {};
-            console.log(`🔌 Loaded ${Object.keys(tokenToFyers).length} Fyers F&O symbols from cache.`);
+            nameToFyers  = data.nameToFyers  || {};
+            console.log(`🔌 Loaded ${Object.keys(tokenToFyers).length} Fyers symbols + ${Object.keys(nameToFyers).length} indices from cache.`);
         }
         
         if (!isMasterNode) {
@@ -621,6 +636,7 @@ async function loadFyersSymbolMaps() {
         
         const newMap = {};
         const revMap = {};
+        const newNameMap = {};
         
         for (const url of urls) {
             try {
@@ -629,12 +645,17 @@ async function loadFyersSymbolMaps() {
                 for (const line of lines) {
                     if (!line) continue;
                     const parts = line.split(',');
-                    if (parts.length > 12) {
+                    if (parts.length > 13) {
                         const fyersSym = parts[9];
                         const exchangeToken = parts[12];
-                        if (exchangeToken && fyersSym) {
+                        const underlyingName = parts[13]; // e.g. 'POWER', 'RELIANCE'
+                        if (exchangeToken && fyersSym && fyersSym.includes(':')) {
                             newMap[exchangeToken] = fyersSym;
                             revMap[fyersSym] = exchangeToken;
+                            // Build name map for indices (e.g. POWER → BSE:POWER-INDEX)
+                            if (fyersSym.endsWith('-INDEX') && underlyingName) {
+                                newNameMap[underlyingName] = fyersSym;
+                            }
                         }
                     }
                 }
@@ -646,8 +667,9 @@ async function loadFyersSymbolMaps() {
         if (Object.keys(newMap).length > 1000) {
             tokenToFyers = newMap;
             fyersToToken = revMap;
-            fs.writeFileSync(mapPath, JSON.stringify({ tokenToFyers, fyersToToken }));
-            console.log(`✅ Fyers Symbol Maps updated successfully (${Object.keys(newMap).length} symbols).`);
+            nameToFyers = newNameMap;
+            fs.writeFileSync(mapPath, JSON.stringify({ tokenToFyers, fyersToToken, nameToFyers }));
+            console.log(`✅ Fyers Symbol Maps updated successfully (${Object.keys(newMap).length} tokens, ${Object.keys(newNameMap).length} indices).`);
         }
         
     } catch(err) {
