@@ -434,7 +434,7 @@ async function fetchBatchLTPs(symbols) {
                 const processQuotesResponse = (res) => {
                     if (res && res.s === 'ok' && res.d) {
                         res.d.forEach(item => {
-                            if (item.v && item.v.lp !== undefined) {
+                            if (item.v && (item.v.lp !== undefined || item.v.prev_close_price !== undefined || item.v.close_price !== undefined)) {
                                 let syms = fyersToRequested[item.n];
                                 if (!syms || syms.length === 0) {
                                     const mapped = fromFyersSymbol(item.n);
