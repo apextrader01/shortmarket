@@ -168,7 +168,7 @@ async function initFyers(io, pc, isMaster = true) {
     sharedPriceCache = pc;
     isMasterNode = isMaster;
     
-    // Asynchronously load the Fyers Token maps (Angel Token -> Fyers Symbol)
+    // Asynchronously load the Fyers Token maps (Fyers Exchange Token -> Fyers Symbol)
     // This runs in the background and does not block PM2 startup.
     loadFyersSymbolMaps();
     
@@ -563,6 +563,10 @@ function reloadFyersToken() {
     }
 }
 
+function getPriceFromCache() {
+    return sharedPriceCache || {};
+}
+
 function getFyersStatus() {
     return {
         isMasterNode,
@@ -650,6 +654,7 @@ async function loadFyersSymbolMaps() {
 }
 
 module.exports = {
+    getPriceFromCache,
     setPriceCache,
     registerTokens,
     addSubscription,

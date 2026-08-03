@@ -1,4 +1,32 @@
-const { lookupDerivativeBySymbol } = require('./angelOne');
+const { globalNfoFutures, globalNfoOptions } = require('./instruments');
+
+// Helper to lookup lot size from instruments master
+function lookupDerivativeBySymbol(symbol) {
+    if (!symbol) return null;
+    // Check futures first
+    for (const underlying of Object.keys(globalNfoFutures || {})) {
+        const list = globalNfoFutures[underlying];
+        if (Array.isArray(list)) {
+            const match = list.find(x => x.symbol === symbol || x.uniqueSymbol === symbol);
+            if (match) return match;
+        }
+    }
+    // Check options (flat search by expiry -> strike)
+    for (const underlying of Object.keys(globalNfoOptions || {})) {
+        const expiries = globalNfoOptions[underlying];
+        if (expiries && typeof expiries === 'object') {
+            for (const expiry of Object.keys(expiries)) {
+                const strikes = expiries[expiry];
+                for (const strike of Object.keys(strikes || {})) {
+                    const { CE, PE } = strikes[strike] || {};
+                    if (CE && (CE.symbol === symbol || CE.uniqueSymbol === symbol)) return CE;
+                    if (PE && (PE.symbol === symbol || PE.uniqueSymbol === symbol)) return PE;
+                }
+            }
+        }
+    }
+    return null;
+}
 
 /**
  * Calculates the required margin for an order based on asset class and product type.
@@ -55,7 +83,7 @@ function calculateRequiredMargin(symbol, product_type, side, quantity, price, as
 }
 
 function getLotSize(symbol) {
-    // Attempt to lookup via angelOne derivative master
+    // Lookup lot size from instruments master
     const deriv = lookupDerivativeBySymbol(symbol);
     if (deriv && deriv.lotsize) {
         return Number(deriv.lotsize);

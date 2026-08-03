@@ -9,7 +9,7 @@ async function fetchRiskyStocks() {
         // or a broker's free margin API (e.g., Zerodha margin calculator API).
         // For demonstration, we're fetching from a generic source or building a known list.
         
-        // This is a placeholder for where the actual HTTP GET request to NSE/AngelOne would go.
+        // This is a placeholder for where the actual HTTP GET request to NSE would go.
         // const response = await fetch('https://some-open-api.com/asm-gsm-list');
         // const data = await response.json();
         

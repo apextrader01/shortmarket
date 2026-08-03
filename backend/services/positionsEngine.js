@@ -161,8 +161,8 @@ class PositionsEngine {
             const expiringHoldings = await holdQuery;
 
             const triggerEngine = require('./triggerEngine');
-            const { getPriceCache } = require('./angelOne');
-            const priceCache = getPriceCache() || {}; 
+            const { getPriceFromCache } = require('./fyers');
+            const priceCache = getPriceFromCache ? getPriceFromCache() : {}; 
             
             // Helper to submit market order
             const submitSettlementOrder = async (item, isHolding) => {

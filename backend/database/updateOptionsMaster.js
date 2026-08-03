@@ -1,16 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 
-const URL = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
+// Public instrument master file (provides all NSE/BSE/MCX scrip data)
+const MASTER_URL = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
 const OUTPUT_FILE = path.join(__dirname, 'options.json');
 
 // We want ALL options (Index, Stock, Commodity, Currency)
 const OPTION_TYPES = ['OPTIDX', 'OPTSTK', 'OPTFUT', 'OPTCOM', 'OPTFOC', 'OPTCUR'];
 
 async function updateOptionsMaster() {
-  console.log('Downloading Angel One Script Master...');
+  console.log('Downloading Instrument Master...');
   try {
-    const res = await fetch(URL);
+    const res = await fetch(MASTER_URL);
     if (!res.ok) {
       throw new Error(`Failed to fetch master: ${res.statusText}`);
     }
@@ -41,7 +42,7 @@ async function updateOptionsMaster() {
           continue;
         }
 
-        // Expiry format from Angel One is "27JUN2024"
+        // Expiry format is "27JUN2024"
         const expiry = item.expiry;
         
         // Strike comes as "2350000.000000". Convert it back.

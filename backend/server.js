@@ -1635,7 +1635,7 @@ app.post('/api/ltp-batch', async (req, res) => {
       }
     }
     
-    // 2. Fetch only missing symbols from Angel One REST API
+    // 2. Fetch only missing symbols from Fyers REST API
     if (missingSymbols.length > 0) {
       const data = await fetchBatchLTPs(missingSymbols);
       for (const [sym, ltpData] of Object.entries(data)) {
@@ -2056,7 +2056,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
 
 // ─── Historical Chart Data (Candles) ──────────────────────────────────────────────────
-const candleCache = {}; // Cache to protect Angel One from rate limits (e.g. 1000 users opening charts)
+const candleCache = {}; // Cache to protect Fyers from rate limits (e.g. 1000 users opening charts)
 const CACHE_DURATION_MS = 60 * 1000; // 1 minute cache
 
 app.get('/api/candles/:symbol', async (req, res) => {
@@ -2077,7 +2077,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
 
     const candles = await fetchCandleData(cleanSymbol, interval);
 
-    // Retry once if empty — the Angel One token may still be initializing at boot
+    // Retry once if empty — the Fyers token may still be initializing at boot
     // (login is async; the first candle request can arrive before setAccessToken finishes)
     if ((!candles || candles.length === 0)) {
       await new Promise(r => setTimeout(r, 500));
