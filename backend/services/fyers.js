@@ -52,17 +52,15 @@ function toFyersSymbol(symbol) {
     if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
     if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
 
-    if (symbol.endsWith('-MCX')) {
-        let name = symbol.replace('-MCX', '');
-        if (name.endsWith('FUT')) name = name.replace(/\d{2}FUT$/, 'FUT'); // Strip year (e.g. 26AUG26FUT -> 26AUGFUT)
-        return `MCX:${name}`;
-    }
-    if (symbol.endsWith('-NFO')) return `NSE:${symbol.replace('-NFO', '')}`;
-    if (symbol.endsWith('-BFO')) return `BSE:${symbol.replace('-BFO', '')}`;
     if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
     if (symbol.endsWith('-BSE')) return `BSE:${symbol.replace('-BSE', '')}-EQ`;
-
-    return `NSE:${symbol.replace('-NSE', '')}-EQ`;
+    if (symbol.endsWith('-NSE')) return `NSE:${symbol.replace('-NSE', '')}-EQ`;
+    
+    // For F&O, if it wasn't in the token map, we should not guess it.
+    // However, if it has no exchange suffix, it's likely an NSE equity.
+    if (!symbol.includes('-')) return `NSE:${symbol}-EQ`;
+    
+    return null;
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols
@@ -592,6 +590,11 @@ async function loadFyersSymbolMaps() {
             tokenToFyers = data.tokenToFyers || {};
             fyersToToken = data.fyersToToken || {};
             console.log(`🔌 Loaded ${Object.keys(tokenToFyers).length} Fyers F&O symbols from cache.`);
+        }
+        
+        if (!isMasterNode) {
+            console.log("ℹ️ Worker node skipping Fyers CSV download.");
+            return;
         }
         
         // 2. Download latest CSVs asynchronously in the background
