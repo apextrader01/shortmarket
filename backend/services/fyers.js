@@ -224,7 +224,7 @@ function startLiveWebSocket() {
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
     const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     
-    wsInstance = DataSocket.getInstance(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
+    wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
     
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');
