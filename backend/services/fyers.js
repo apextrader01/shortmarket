@@ -251,6 +251,8 @@ function startLiveWebSocket() {
                 } catch(e) { console.error(e); }
             }
         }
+    });
+
     wsInstance.on('message', (message) => {
         lastTickTime = Date.now();
         const data = Array.isArray(message) ? message : [message];
@@ -304,15 +306,15 @@ function startLiveWebSocket() {
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
+                    
+                    // Publish to Redis for PM2 Workers
+                    try {
+                        const { pubClient } = require('./redisClient');
+                        if (pubClient) {
+                            pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
+                        }
+                    } catch(e) {}
                 });
-                
-                // Publish to Redis for PM2 Workers
-                try {
-                    const { pubClient } = require('./redisClient');
-                    if (pubClient) {
-                        pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
-                    }
-                } catch(e) {}
             }
         });
     });
