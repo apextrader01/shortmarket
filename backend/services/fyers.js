@@ -352,10 +352,7 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            // Subscribe individually to completely isolate invalid symbols from dropping others
-            for (let i = 0; i < fyersSymbols.length; i++) {
-                wsInstance.subscribe([fyersSymbols[i]]);
-            }
+            wsInstance.subscribe(fyersSymbols);
         } catch(e) {
             console.error("Fyers subscribe error:", e);
         }
