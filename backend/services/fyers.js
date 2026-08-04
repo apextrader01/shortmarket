@@ -58,6 +58,7 @@ function toFyersSymbol(symbol) {
     if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
     if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
     if (symbol === 'BANKEX' || symbol === 'BANKEX-BSE') return 'BSE:BANKEX-INDEX';
+    if (symbol === 'POWER-BSE' || symbol === 'POWER') return 'BSE:POWER-INDEX';
 
     if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
     
