@@ -468,24 +468,17 @@ async function fetchBatchLTPs(symbols) {
                 } else if (response && response.s === 'error') {
                     console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
                     // Retry individually to prevent one invalid symbol from ruining the batch
-                    // Process in mini-chunks of 10 with 1s delay to respect 10 req/sec limit
-                    for (let j = 0; j < chunk.length; j += 10) {
-                        const miniChunk = chunk.slice(j, j + 10);
-                        const promises = miniChunk.map(async (fSym) => {
-                            try {
-                                const indRes = await fyers.getQuotes([fSym]);
-                                if (indRes && indRes.s === 'ok') {
-                                    processQuotesResponse(indRes);
-                                }
-                            } catch(indErr) {
-                                console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr);
+                    // Fyers API limit is 10 req/sec. We process sequentially with 150ms delay
+                    for (let j = 0; j < chunk.length; j++) {
+                        const fSym = chunk[j];
+                        try {
+                            await new Promise(r => setTimeout(r, 150));
+                            const indRes = await fyers.getQuotes([fSym]);
+                            if (indRes && indRes.s === 'ok') {
+                                processQuotesResponse(indRes);
                             }
-                        });
-                        await Promise.allSettled(promises);
-                        // Delay 1s to avoid hitting 10 req/s rate limit
-                        await new Promise(r => setTimeout(r, 1000));
-                        if (j + 10 < chunk.length) {
-                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } catch(indErr) {
+                            console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr.message || indErr);
                         }
                     }
                 }
