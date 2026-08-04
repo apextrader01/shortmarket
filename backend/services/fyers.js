@@ -238,8 +238,16 @@ function startLiveWebSocket() {
                 .filter(Boolean);
             
             if (fyersSymbols.length > 0) {
-                wsInstance.subscribe(fyersSymbols);
-                wsInstance.autoreconnect();
+                // Subscribe individually with a tiny delay to avoid spamming the websocket
+                // and to prevent one invalid symbol from dropping the entire batch
+                (async () => {
+                    for (let i = 0; i < fyersSymbols.length; i++) {
+                        if (!wsInstance) break;
+                        wsInstance.subscribe([fyersSymbols[i]]);
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                    if (wsInstance) wsInstance.autoreconnect();
+                })();
             }
         }
         
@@ -352,7 +360,13 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            wsInstance.subscribe(fyersSymbols);
+            (async () => {
+                for (let i = 0; i < fyersSymbols.length; i++) {
+                    if (!wsInstance) break;
+                    wsInstance.subscribe([fyersSymbols[i]]);
+                    await new Promise(r => setTimeout(r, 50));
+                }
+            })();
         } catch(e) {
             console.error("Fyers subscribe error:", e);
         }
