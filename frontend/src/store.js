@@ -456,21 +456,6 @@ export const useStore = create(persist((set, get) => ({
     }
     
     // ── Heartbeat: Periodic REST price polling as safety net ──
-    // Fetches fresh prices every 5 seconds as a fallback in case WebSocket
-    // silently stops delivering ticks (cloud proxy drops, token expiry, etc.)
-    if (window._priceHeartbeat) clearInterval(window._priceHeartbeat);
-    window._priceHeartbeat = setInterval(() => {
-      // Only poll during Indian market hours (9:15 AM - 3:35 PM IST)
-      const now = new Date();
-      const istHour = (now.getUTCHours() + 5) % 24 + (now.getUTCMinutes() + 30 >= 60 ? 1 : 0);
-      const istMin = (now.getUTCMinutes() + 30) % 60;
-      const marketMinutes = istHour * 60 + istMin;
-      const isMarketOpen = marketMinutes >= 555 && marketMinutes <= 935; // 9:15 AM to 3:35 PM
-      
-      if (isMarketOpen && get().user) {
-        get().refreshPrices(false); // respect 2s throttle
-      }
-    }, 5000);
   },
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
