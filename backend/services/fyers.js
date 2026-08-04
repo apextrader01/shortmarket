@@ -37,6 +37,7 @@ let nameToFyers = {};
 
 // Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
 function toFyersSymbol(symbol) {
+    if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
 
     try {
@@ -351,6 +352,7 @@ function startLiveWebSocket() {
 }
 
 function addSubscriptionBatch(symbols) {
+    if (Array.isArray(symbols)) symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
     if (!Array.isArray(symbols) || symbols.length === 0) return;
     
     const fyersSymbols = [];
@@ -412,6 +414,7 @@ function removeSubscriptionBatch(symbols) {
 
 // Helper for HTTP fallback
 async function fetchBatchLTPs(symbols) {
+    symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
     const validSymbols = symbols.filter(s => s && !s.endsWith('-MF'));
     if (validSymbols.length === 0) return {};
     
