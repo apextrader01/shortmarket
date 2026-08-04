@@ -246,13 +246,16 @@ function startLiveWebSocket() {
                 .filter(Boolean);
             
             if (fyersSymbols.length > 0) {
-                // Subscribe in chunks of 50 to avoid Fyers rate limits or payload size limits
-                const chunkSize = 50;
-                for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
-                    const chunk = fyersSymbols.slice(i, i + chunkSize);
-                    wsInstance.subscribe(chunk);
-                }
-                wsInstance.autoreconnect();
+                // Subscribe individually with 120ms delay to avoid Fyers rate limit (10 msgs/sec)
+                // and to prevent one invalid symbol from dropping the entire batch
+                (async () => {
+                    for (let i = 0; i < fyersSymbols.length; i++) {
+                        if (!wsInstance) break;
+                        wsInstance.subscribe([fyersSymbols[i]]);
+                        await new Promise(r => setTimeout(r, 120));
+                    }
+                    if (wsInstance) wsInstance.autoreconnect();
+                })();
             }
         }
         
@@ -365,11 +368,13 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            const chunkSize = 50;
-            for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
-                const chunk = fyersSymbols.slice(i, i + chunkSize);
-                wsInstance.subscribe(chunk);
-            }
+            (async () => {
+                for (let i = 0; i < fyersSymbols.length; i++) {
+                    if (!wsInstance) break;
+                    wsInstance.subscribe([fyersSymbols[i]]);
+                    await new Promise(r => setTimeout(r, 120));
+                }
+            })();
         } catch(e) {
             console.error("Fyers subscribe error:", e);
         }
@@ -437,8 +442,8 @@ async function fetchBatchLTPs(symbols) {
     try {
         const results = {};
         
-        // Fyers getQuotes has a strict limit of 50 symbols per request
-        const chunkSize = 50;
+        // Fyers max batch size is usually 50. But we use 10 to minimize the impact of an invalid symbol
+        const chunkSize = 10;
         for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
             const chunk = fyersSymbols.slice(i, i + chunkSize);
             
