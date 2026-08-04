@@ -367,6 +367,7 @@ function addSubscriptionBatch(symbols) {
     }
 }
 
+
 module.exports = {
     getPriceFromCache,
     setPriceCache,
