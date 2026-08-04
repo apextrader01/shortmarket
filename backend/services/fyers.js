@@ -227,6 +227,14 @@ function startLiveWebSocket() {
     
     wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
     
+    // IMPORTANT: Mode must be set for Equities/Futures to receive ticks (LiteMode = 'sf')
+    if (wsInstance.LiteMode) {
+        wsInstance.mode(wsInstance.LiteMode);
+    } else {
+        // Fallback literal if instance property is somehow missing
+        wsInstance.mode('LiteMode');
+    }
+    
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');
         lastTickTime = Date.now();
@@ -238,16 +246,13 @@ function startLiveWebSocket() {
                 .filter(Boolean);
             
             if (fyersSymbols.length > 0) {
-                // Subscribe individually with a tiny delay to avoid spamming the websocket
-                // and to prevent one invalid symbol from dropping the entire batch
-                (async () => {
-                    for (let i = 0; i < fyersSymbols.length; i++) {
-                        if (!wsInstance) break;
-                        wsInstance.subscribe([fyersSymbols[i]]);
-                        await new Promise(r => setTimeout(r, 50));
-                    }
-                    if (wsInstance) wsInstance.autoreconnect();
-                })();
+                // Subscribe in chunks of 50 to avoid Fyers rate limits or payload size limits
+                const chunkSize = 50;
+                for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+                    const chunk = fyersSymbols.slice(i, i + chunkSize);
+                    wsInstance.subscribe(chunk);
+                }
+                wsInstance.autoreconnect();
             }
         }
         
@@ -360,13 +365,11 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
         try {
-            (async () => {
-                for (let i = 0; i < fyersSymbols.length; i++) {
-                    if (!wsInstance) break;
-                    wsInstance.subscribe([fyersSymbols[i]]);
-                    await new Promise(r => setTimeout(r, 50));
-                }
-            })();
+            const chunkSize = 50;
+            for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+                const chunk = fyersSymbols.slice(i, i + chunkSize);
+                wsInstance.subscribe(chunk);
+            }
         } catch(e) {
             console.error("Fyers subscribe error:", e);
         }
