@@ -208,7 +208,7 @@ async function initFyers(io, pc, isMaster = true) {
             if (Object.keys(sharedPriceCache).length > 0) {
                 global_io.emit('price_snapshot', sharedPriceCache);
             }
-        }, 1000);
+        }, 200); // Changed from 1000ms to 200ms for ultra-fast LTP updates
     }
 }
 
@@ -352,35 +352,46 @@ function startLiveWebSocket() {
     wsInstance.connect();
 }
 
+let subQueue = [];
+let isProcessingSubQueue = false;
+
+async function processSubQueue() {
+    if (isProcessingSubQueue || !wsInstance || !isFyersConnected) return;
+    isProcessingSubQueue = true;
+    try {
+        while (subQueue.length > 0) {
+            if (!wsInstance) break;
+            const sym = subQueue.shift();
+            wsInstance.subscribe([sym]); // Must be array of 1
+            await new Promise(r => setTimeout(r, 120)); // Limit to ~8 msgs/sec
+        }
+    } catch (e) {
+        console.error("Fyers subscribe error:", e);
+    } finally {
+        isProcessingSubQueue = false;
+    }
+}
+
 function addSubscriptionBatch(symbols) {
     if (Array.isArray(symbols)) symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
     if (!Array.isArray(symbols) || symbols.length === 0) return;
     
-    const fyersSymbols = [];
     symbols.forEach(item => {
         let s = typeof item === 'string' ? item : item?.symbol;
         if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
         if (fSym) {
-            fyersSymbols.push(fSym);
+            if (!subQueue.includes(fSym)) {
+                subQueue.push(fSym);
+            }
             if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
             if (!globalFyersToRequested[fSym].includes(s)) globalFyersToRequested[fSym].push(s);
         }
     });
     
-    if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
-        try {
-            (async () => {
-                for (let i = 0; i < fyersSymbols.length; i++) {
-                    if (!wsInstance) break;
-                    wsInstance.subscribe([fyersSymbols[i]]);
-                    await new Promise(r => setTimeout(r, 120));
-                }
-            })();
-        } catch(e) {
-            console.error("Fyers subscribe error:", e);
-        }
+    if (wsInstance && isFyersConnected && subQueue.length > 0) {
+        processSubQueue();
     }
 }
 
