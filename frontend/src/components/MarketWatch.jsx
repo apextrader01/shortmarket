@@ -23,10 +23,14 @@ export default function MarketWatch({ className = '' }) {
       setSearchResults([]);
       return;
     }
+    
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
+        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(searchQuery)}`, { signal });
         if (res.ok) {
           const data = await res.json();
           // Cache the lotsize locally so we have it instantly if the user adds to watchlist
@@ -36,12 +40,20 @@ export default function MarketWatch({ className = '' }) {
           setSearchResults(data);
         }
       } catch (e) {
-        console.error("Search error:", e);
+        if (e.name !== 'AbortError') {
+          console.error("Search error:", e);
+        }
       } finally {
-        setIsSearching(false);
+        if (!signal.aborted) {
+          setIsSearching(false);
+        }
       }
-    }, 100);
-    return () => clearTimeout(timer);
+    }, 300);
+    
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchQuery, isSearchMode]);
 
   // Watchlist Mode
@@ -84,6 +96,18 @@ export default function MarketWatch({ className = '' }) {
       
       // 2. Also fetch latest snapshot manually (fallback)
       useStore.getState().fetchBatchPrices(visibleStocks.map(s => s.uniqueSymbol));
+      
+      // 3. Fetch missing lotsizes for derivatives not in main stocks list
+      const missingLotsizes = visibleStocks.filter(s => !s.lotsize && !searchLotsizes.current[s.uniqueSymbol]).map(s => s.uniqueSymbol);
+      if (missingLotsizes.length > 0) {
+        fetch(`${API}/api/stocks/lotsizes?symbols=${missingLotsizes.join(',')}`)
+          .then(r => r.json())
+          .then(data => {
+            Object.keys(data).forEach(sym => {
+              searchLotsizes.current[sym] = data[sym];
+            });
+          }).catch(console.error);
+      }
       
       return () => {
         unsubscribeBatch(tokensToSub);
