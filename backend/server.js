@@ -20,8 +20,13 @@ const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
 
-const { pubClient, subClient } = require('./services/redisClient');
+const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
+
+const adapterPubClient = generalClient.duplicate();
+const adapterSubClient = generalClient.duplicate();
+adapterPubClient.connect().catch(() => {});
+adapterSubClient.connect().catch(() => {});
 
 const app = express();
 const server = http.createServer(app);
@@ -34,7 +39,7 @@ const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_
 
 const io = new Server(server, {
   cors: { origin: true, credentials: true, methods: ['GET', 'POST'] },
-  adapter: createAdapter(pubClient, subClient)
+  adapter: createAdapter(adapterPubClient, adapterSubClient)
 });
 
 // Listen for Fyers token updates on all cluster nodes
