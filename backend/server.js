@@ -2277,11 +2277,11 @@ app.post('/api/fyers/verify', async (req, res) => {
   
   const { verifyFyersAuth } = require('./services/fyers');
   try {
-    const success = await verifyFyersAuth(auth_code);
-    if (success) {
+    const result = await verifyFyersAuth(auth_code);
+    if (result && result.success) {
       res.json({ success: true, message: "Fyers authenticated successfully!" });
     } else {
-      res.status(401).json({ success: false, error: "Fyers authentication failed." });
+      res.status(401).json({ success: false, error: result?.error || "Fyers authentication failed." });
     }
   } catch (err) {
     console.error("Fyers Verify Error:", err);
