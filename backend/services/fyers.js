@@ -256,7 +256,6 @@ function startLiveWebSocket() {
                     }
                     if (wsInstance) wsInstance.autoreconnect();
                 })();
-            }
         }
         
         // Watchdog
