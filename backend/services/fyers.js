@@ -263,10 +263,10 @@ function startLiveWebSocket() {
         if (watchdogInterval) clearInterval(watchdogInterval);
         watchdogInterval = setInterval(() => {
             const staleSec = (Date.now() - lastTickTime) / 1000;
-            // Only warn if market is open (9:15 - 3:30 approx, simple check for now)
+            // MCX is open until 23:30/23:55, so we need to run watchdog until hour 23
             const d = new Date();
             const h = d.getHours();
-            if (staleSec > 30 && (h >= 9 && h <= 15) && clientSubscriptions.size > 0) {
+            if (staleSec > 30 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
                 console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! Forcing reconnect...`);
                 startLiveWebSocket();
             }
