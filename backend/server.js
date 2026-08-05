@@ -171,6 +171,13 @@ app.get('/api/stocks', (req, res) => {
       if (aIsFut && !bIsFut) return -1;
       if (!aIsFut && bIsFut) return 1;
       
+      // Sort by nearest expiry if available
+      const aExpiry = a.expiryTimestamp || Infinity;
+      const bExpiry = b.expiryTimestamp || Infinity;
+      if (aExpiry !== bExpiry) {
+        return aExpiry - bExpiry;
+      }
+      
       return 0;
     });
 

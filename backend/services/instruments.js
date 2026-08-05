@@ -67,6 +67,21 @@ function loadInstrumentMaster() {
             return false;
         };
 
+        const getExpiryTimestamp = (expiryStr) => {
+            if (!expiryStr) return Infinity;
+            const day = parseInt(expiryStr.slice(0, 2), 10);
+            const monthStr = expiryStr.slice(2, 5).toUpperCase();
+            let year = parseInt(expiryStr.slice(5), 10);
+            if (year < 100) year += 2000;
+            
+            const monthMap = { 'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5, 'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11 };
+            const month = monthMap[monthStr];
+            if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+                return new Date(year, month, day).getTime();
+            }
+            return Infinity;
+        };
+
         STOCK_MASTER = { ...indices };
         symbolToToken = {};
 
@@ -79,11 +94,13 @@ function loadInstrumentMaster() {
             Object.values(nfoOptions).forEach(expiries => {
                 for (const [expiry, strikes] of Object.entries(expiries)) {
                     if (isExpired(expiry)) continue;
+                    const expiryTs = getExpiryTimestamp(expiry);
                     Object.values(strikes).forEach(types => {
                         if (types.CE) {
                             const ex = types.CE.exch_seg || types.CE.exchange;
                             const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                             types.CE.uniqueSymbol = `${types.CE.symbol}-${suffix}`;
+                            types.CE.expiryTimestamp = expiryTs;
                             symbolToToken[types.CE.uniqueSymbol] = types.CE.token;
                             STOCK_MASTER[types.CE.token] = types.CE;
                         }
@@ -91,6 +108,7 @@ function loadInstrumentMaster() {
                             const ex = types.PE.exch_seg || types.PE.exchange;
                             const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                             types.PE.uniqueSymbol = `${types.PE.symbol}-${suffix}`;
+                            types.PE.expiryTimestamp = expiryTs;
                             symbolToToken[types.PE.uniqueSymbol] = types.PE.token;
                             STOCK_MASTER[types.PE.token] = types.PE;
                         }
@@ -103,9 +121,11 @@ function loadInstrumentMaster() {
             Object.values(nfoFutures).forEach(expiries => {
                 for (const [expiry, fut] of Object.entries(expiries)) {
                     if (isExpired(expiry)) continue;
+                    const expiryTs = getExpiryTimestamp(expiry);
                     const ex = fut.exch_seg || fut.exchange;
                     const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
+                    fut.expiryTimestamp = expiryTs;
                     symbolToToken[fut.uniqueSymbol] = fut.token;
                     STOCK_MASTER[fut.token] = fut;
                 }
@@ -149,6 +169,7 @@ function loadInstrumentMaster() {
                 name: name,
                 exchange: ex,
                 lotsize: Number(value.lotsize || 1),
+                expiryTimestamp: value.expiryTimestamp || Infinity,
                 uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${ex}`,
                 searchString: `${value.symbol} ${name} ${ex}`.toLowerCase()
             });
