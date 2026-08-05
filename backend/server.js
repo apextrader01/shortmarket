@@ -100,6 +100,23 @@ app.get('/api/prices/batch', async (req, res) => {
 });
 
 // ─── Stocks (full instrument master) ──────────────────────────────────────
+app.get('/api/stocks/lotsizes', (req, res) => {
+  const symbols = req.query.symbols?.split(',') || [];
+  if (symbols.length === 0) return res.json({});
+  
+  const { symbolToToken, STOCK_MASTER } = require('./services/instruments');
+  const result = {};
+  symbols.forEach(sym => {
+    const token = symbolToToken[sym];
+    if (token && STOCK_MASTER[token] && STOCK_MASTER[token].lotsize) {
+      result[sym] = Number(STOCK_MASTER[token].lotsize);
+    } else {
+      result[sym] = 1;
+    }
+  });
+  res.json(result);
+});
+
 let cachedStocksArray = null;
 app.get('/api/stocks', (req, res) => {
   if (cachedStocksArray) return res.json(cachedStocksArray);
@@ -1658,6 +1675,16 @@ app.post('/api/ltp-batch', async (req, res) => {
 });
 
 // 🧮 Estimate Charges 🧮
+// TEMPORARY FIX ROUTE FOR TCS POSITION
+app.get('/api/admin/fix-tcs-position', async (req, res) => {
+  try {
+     const count = await db('positions').where({ symbol: 'TCS-BSE', quantity: 1 }).update({ quantity: 11, average_price: 2429.00 });
+     res.json({ message: `Fixed ${count} position(s) for TCS.` });
+  } catch(e) {
+     res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/estimate-charges', authenticateToken, (req, res) => {
   try {
     const { symbol, product_type, side, quantity, price } = req.query;
