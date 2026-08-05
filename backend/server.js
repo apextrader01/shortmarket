@@ -2271,6 +2271,24 @@ app.get('/api/fyers/auth-url', (req, res) => {
   }
 });
 
+app.get('/api/diagnostics/logs', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const logFile = path.join(__dirname, today + '.log');
+    if (fs.existsSync(logFile)) {
+      const content = fs.readFileSync(logFile, 'utf8');
+      const lines = content.split('\n');
+      res.type('text/plain').send(lines.slice(Math.max(lines.length - 200, 0)).join('\n'));
+    } else {
+      res.type('text/plain').send('No log file found for today.');
+    }
+  } catch (err) {
+    res.type('text/plain').send(err.message);
+  }
+});
+
 app.get('/api/fyers/status', (req, res) => {
   try {
     const { getFyersStatus } = require('./services/fyers');
