@@ -246,13 +246,14 @@ function startLiveWebSocket() {
                 .filter(Boolean);
             
             if (fyersSymbols.length > 0) {
-                // Subscribe individually with 120ms delay to avoid Fyers rate limit (10 msgs/sec)
-                // and to prevent one invalid symbol from dropping the entire batch
+                // Subscribe in chunks of 10 to speed up initial connection while avoiding rate limits
                 (async () => {
-                    for (let i = 0; i < fyersSymbols.length; i++) {
+                    const chunkSize = 10;
+                    for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
                         if (!wsInstance) break;
-                        wsInstance.subscribe([fyersSymbols[i]]);
-                        await new Promise(r => setTimeout(r, 120));
+                        const chunk = fyersSymbols.slice(i, i + chunkSize);
+                        wsInstance.subscribe(chunk);
+                        await new Promise(r => setTimeout(r, 200));
                     }
                     if (wsInstance) wsInstance.autoreconnect();
                 })();
@@ -361,9 +362,9 @@ async function processSubQueue() {
     try {
         while (subQueue.length > 0) {
             if (!wsInstance) break;
-            const sym = subQueue.shift();
-            wsInstance.subscribe([sym]); // Must be array of 1
-            await new Promise(r => setTimeout(r, 120)); // Limit to ~8 msgs/sec
+            const chunk = subQueue.splice(0, 10);
+            wsInstance.subscribe(chunk);
+            await new Promise(r => setTimeout(r, 200)); // Limit rate while batching
         }
     } catch (e) {
         console.error("Fyers subscribe error:", e);
