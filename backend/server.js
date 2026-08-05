@@ -2271,6 +2271,19 @@ app.get('/api/fyers/auth-url', (req, res) => {
   }
 });
 
+app.get('/api/fyers/status', (req, res) => {
+  try {
+    const { getFyersStatus } = require('./services/fyers');
+    if (getFyersStatus) {
+      res.json(getFyersStatus());
+    } else {
+      res.status(500).json({ error: 'getFyersStatus not exported' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/fyers/verify', async (req, res) => {
   const { auth_code } = req.body;
   if (!auth_code) return res.status(400).json({ error: "Missing auth_code" });
