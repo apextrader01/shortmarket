@@ -58,7 +58,7 @@ if (globalSubClient) {
 // Redis Pub/Sub for syncing priceCache across cluster nodes
 if (!isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
-  cacheSubClient.on('ready', () => {
+  const setupCacheSync = () => {
     cacheSubClient.subscribe('price_cache_sync', (message) => {
       try {
         const data = JSON.parse(message);
@@ -66,8 +66,11 @@ if (!isMaster) {
           priceCache[data.symbol] = data.priceObj;
         }
       } catch(e){}
-    }).catch(err => { /* ignore */ });
-  });
+    }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
+  };
+  
+  if (cacheSubClient.isReady) setupCacheSync();
+  else cacheSubClient.on('ready', setupCacheSync);
 }
 
 app.use(cors({ origin: true, credentials: true }));
