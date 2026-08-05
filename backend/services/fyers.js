@@ -228,12 +228,11 @@ function startLiveWebSocket() {
     
     wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
     
-    // IMPORTANT: Mode must be set for Equities/Futures to receive ticks (LiteMode = 'sf')
-    if (wsInstance.LiteMode) {
-        wsInstance.mode(wsInstance.LiteMode);
+    // IMPORTANT: Use SymbolUpdate to receive change and pct along with LTP
+    if (wsInstance.SymbolUpdate) {
+        wsInstance.mode(wsInstance.SymbolUpdate);
     } else {
-        // Fallback literal if instance property is somehow missing
-        wsInstance.mode('LiteMode');
+        wsInstance.mode('SymbolUpdate');
     }
     
     wsInstance.on('connect', () => {
@@ -306,24 +305,26 @@ function startLiveWebSocket() {
                     asks = tick.asks.map(a => ({ price: a.price.toFixed(2), qty: a.volume, orders: a.ord }));
                 }
                 
-                const prev = tick.prev_close_price || ltp;
-                const change = ltp - prev;
-                const pct = prev > 0 ? (change / prev) * 100 : 0;
-
                 syms.forEach(uniqueSymbol => {
+                    let oldPriceObj = sharedPriceCache[uniqueSymbol] || {};
+                    
+                    const prev = tick.prev_close_price !== undefined ? tick.prev_close_price : (oldPriceObj.close !== undefined ? oldPriceObj.close : ltp);
+                    const change = tick.ch !== undefined ? tick.ch : (ltp - prev);
+                    const pct = tick.chp !== undefined ? tick.chp : (prev > 0 ? (change / prev) * 100 : 0);
+                    
                     const priceObj = {
                         symbol: uniqueSymbol,
                         ltp: ltp,
-                        open: tick.open_price || null,
-                        high: tick.high_price || null,
-                        low: tick.low_price || null,
+                        open: tick.open_price !== undefined ? tick.open_price : (oldPriceObj.open || null),
+                        high: tick.high_price !== undefined ? tick.high_price : (oldPriceObj.high || null),
+                        low: tick.low_price !== undefined ? tick.low_price : (oldPriceObj.low || null),
                         close: prev || null,
-                        volume: tick.vol_traded_today || 0,
-                        ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : null,
+                        volume: tick.vol_traded_today !== undefined ? tick.vol_traded_today : (oldPriceObj.volume || 0),
+                        ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : (oldPriceObj.ltt || null),
                         change: change,
                         pct: pct,
-                        bids: bids,
-                        asks: asks
+                        bids: bids.length > 0 ? bids : (oldPriceObj.bids || []),
+                        asks: asks.length > 0 ? asks : (oldPriceObj.asks || [])
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
