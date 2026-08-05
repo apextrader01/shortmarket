@@ -2276,7 +2276,7 @@ app.get('/api/diagnostics/logs', (req, res) => {
   const path = require('path');
   try {
     const today = new Date().toISOString().split('T')[0];
-    const logFile = path.join(__dirname, today + '.log');
+    const logFile = path.join(__dirname, 'error.log');
     if (fs.existsSync(logFile)) {
       const content = fs.readFileSync(logFile, 'utf8');
       const lines = content.split('\n');
