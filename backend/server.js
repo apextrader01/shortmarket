@@ -137,135 +137,21 @@ app.get('/api/stocks', (req, res) => {
     const q = req.query.q;
     if (!q || q.length < 2) return res.json([]);
     
-    const { STOCK_MASTER, globalNfoOptions, globalNfoFutures, globalBseSpots } = require('./services/instruments');
+    const { SEARCH_INDEX } = require('./services/instruments');
 
     const qLower = q.toLowerCase();
     const queryParts = qLower.split(/\s+/).filter(Boolean);
-    const matchesQuery = (symbol, name, exchange) => {
-      const sym = symbol ? symbol.toLowerCase() : '';
-      const nm = name ? name.toLowerCase() : '';
-      const ex = exchange ? exchange.toLowerCase() : '';
-      
+    
+    // Extremely fast filter against pre-computed search string
+    let finalResults = SEARCH_INDEX.filter(item => {
       for (let i = 0; i < queryParts.length; i++) {
-        const part = queryParts[i];
-        if (!sym.includes(part) && !nm.includes(part) && !ex.includes(part)) {
+        if (!item.searchString.includes(queryParts[i])) {
           return false;
         }
       }
       return true;
-    };
+    });
 
-    const resultsMap = new Map();
-    
-    // Helper to add to map, preferring higher lotsizes
-    const addResult = (resObj) => {
-      // Prevent massive performance delay by capping results added to the map.
-      // If the query is broad (e.g. 'nifty'), we don't need to add and sort 40,000 options.
-      if (resultsMap.size > 500 && !resultsMap.has(resObj.uniqueSymbol)) return;
-      
-      if (resultsMap.has(resObj.uniqueSymbol)) {
-        const existing = resultsMap.get(resObj.uniqueSymbol);
-        if (resObj.lotsize > existing.lotsize) {
-           resultsMap.set(resObj.uniqueSymbol, resObj);
-        }
-      } else {
-        resultsMap.set(resObj.uniqueSymbol, resObj);
-      }
-    };
-
-    // 1. Search regular stocks and indices
-    if (STOCK_MASTER) {
-      for (const [key, value] of Object.entries(STOCK_MASTER)) {
-        if (!value) continue;
-        if (value.symbol && value.name) {
-          if (matchesQuery(value.symbol, value.name, value.exchange)) {
-            addResult({
-              token: key, 
-              symbol: value.symbol, 
-              name: value.name, 
-              exchange: value.exchange, 
-              lotsize: Number(value.lotsize || 1),
-              uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${value.exchange || 'NSE'}`
-            });
-          }
-        }
-      }
-    }
-
-    // Helper to check if a derivative is expired (expiryDate < today midnight)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isExpired = (expiryStr) => {
-      if (!expiryStr) return false;
-      const day = parseInt(expiryStr.slice(0, 2), 10);
-      const monthStr = expiryStr.slice(2, 5).toUpperCase();
-      let year = parseInt(expiryStr.slice(5), 10);
-      if (year < 100) year += 2000;
-      
-      const monthMap = { 'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5, 'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11 };
-      const month = monthMap[monthStr];
-      if (!isNaN(day) && month !== undefined && !isNaN(year)) {
-        const expiryDate = new Date(year, month, day);
-        return expiryDate < today;
-      }
-      return false;
-    };
-
-    // 2. Search Options (Prioritized for strikes like 78000)
-    if (globalNfoOptions) {
-      for (const [key, value] of Object.entries(globalNfoOptions)) {
-        if (typeof value === 'object') {
-          for (const expiry in value) {
-            if (isExpired(expiry)) continue;
-            if (typeof value[expiry] !== 'object') continue;
-            for (const strike in value[expiry]) {
-               if (typeof value[expiry][strike] !== 'object') continue;
-               for (const type in value[expiry][strike]) {
-                  const opt = value[expiry][strike][type];
-                  if (opt && opt.symbol && matchesQuery(opt.symbol, key, opt.exch_seg || 'NFO')) {
-                     addResult({
-                       token: opt.token, symbol: opt.symbol, name: key, 
-                       exchange: opt.exch_seg || 'NFO', lotsize: Number(opt.lotsize || 1), uniqueSymbol: `${opt.symbol}-${opt.exch_seg || 'NFO'}`
-                     });
-                  }
-               }
-            }
-          }
-        }
-      }
-    }
-
-    // 3. Search Futures
-    if (globalNfoFutures) {
-      for (const [key, value] of Object.entries(globalNfoFutures)) {
-        if (Array.isArray(value)) {
-          for (const fut of value) {
-            if (fut && fut.symbol && matchesQuery(fut.symbol, key, fut.exchange || 'NFO')) {
-               if (fut.expiry && isExpired(fut.expiry)) continue;
-               addResult({
-                 token: fut.token, symbol: fut.symbol, name: key, 
-                 exchange: fut.exchange || 'NFO', lotsize: Number(fut.lotsize || 1), uniqueSymbol: `${fut.symbol}-${fut.exchange || 'NFO'}`
-               });
-            }
-          }
-        }
-      }
-    }
-
-    // 4. Search BSE Spots (Lowest priority, heavily polluted with bonds/g-secs)
-    if (globalBseSpots) {
-      for (const [key, value] of Object.entries(globalBseSpots)) {
-        if (value && value.symbol && matchesQuery(value.symbol, value.name, value.exchange)) {
-          addResult({
-            token: value.token, symbol: value.symbol, name: value.name, 
-            exchange: value.exchange || 'BSE', lotsize: Number(value.lotsize || 1), uniqueSymbol: `${value.symbol}-${value.exchange || 'BSE'}`
-          });
-        }
-      }
-    }
-    
-    let finalResults = Array.from(resultsMap.values());
-    
     // Sort exact matches and indices to the top
     finalResults.sort((a, b) => {
       const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
@@ -273,9 +159,9 @@ app.get('/api/stocks', (req, res) => {
       if (aExact && !bExact) return -1;
       if (!aExact && bExact) return 1;
       
-      // Prefer Cash/Indices (NSE/BSE) over derivatives
-      const aIsCash = (a.exchange === 'NSE' || a.exchange === 'BSE');
-      const bIsCash = (b.exchange === 'NSE' || b.exchange === 'BSE');
+      // Prefer Cash/Indices (NSE) over derivatives
+      const aIsCash = (a.exchange === 'NSE');
+      const bIsCash = (b.exchange === 'NSE');
       if (aIsCash && !bIsCash) return -1;
       if (!aIsCash && bIsCash) return 1;
       
@@ -288,7 +174,7 @@ app.get('/api/stocks', (req, res) => {
       return 0;
     });
 
-    res.json(finalResults.slice(0, 100));
+    res.json(finalResults.slice(0, 50));
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────

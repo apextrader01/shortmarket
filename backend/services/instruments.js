@@ -4,6 +4,7 @@ const path = require('path');
 let STOCK_MASTER = {};
 let symbolToToken = {};
 let allTokens = [];
+let SEARCH_INDEX = [];
 
 let globalNfoOptions = {};
 let globalNfoFutures = {};
@@ -48,6 +49,24 @@ function loadInstrumentMaster() {
         globalNfoFutures = nfoFutures;
         globalBseSpots = bseSpots;
 
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isExpired = (expiryStr) => {
+            if (!expiryStr) return false;
+            const day = parseInt(expiryStr.slice(0, 2), 10);
+            const monthStr = expiryStr.slice(2, 5).toUpperCase();
+            let year = parseInt(expiryStr.slice(5), 10);
+            if (year < 100) year += 2000;
+            
+            const monthMap = { 'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5, 'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11 };
+            const month = monthMap[monthStr];
+            if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+                const expiryDate = new Date(year, month, day);
+                return expiryDate < today;
+            }
+            return false;
+        };
+
         STOCK_MASTER = { ...indices };
         symbolToToken = {};
 
@@ -58,7 +77,8 @@ function loadInstrumentMaster() {
 
         if (typeof nfoOptions === 'object') {
             Object.values(nfoOptions).forEach(expiries => {
-                Object.values(expiries).forEach(strikes => {
+                for (const [expiry, strikes] of Object.entries(expiries)) {
+                    if (isExpired(expiry)) continue;
                     Object.values(strikes).forEach(types => {
                         if (types.CE) {
                             const ex = types.CE.exch_seg || types.CE.exchange;
@@ -75,19 +95,20 @@ function loadInstrumentMaster() {
                             STOCK_MASTER[types.PE.token] = types.PE;
                         }
                     });
-                });
+                }
             });
         }
 
         if (typeof nfoFutures === 'object') {
             Object.values(nfoFutures).forEach(expiries => {
-                Object.values(expiries).forEach(fut => {
+                for (const [expiry, fut] of Object.entries(expiries)) {
+                    if (isExpired(expiry)) continue;
                     const ex = fut.exch_seg || fut.exchange;
                     const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
                     symbolToToken[fut.uniqueSymbol] = fut.token;
                     STOCK_MASTER[fut.token] = fut;
-                });
+                }
             });
         }
 
@@ -113,7 +134,28 @@ function loadInstrumentMaster() {
         if (Array.isArray(nseStocks)) {
             allTokens = allTokens.concat(nseStocks.map(s => s.token));
         }
+
+        // Build SEARCH_INDEX
+        SEARCH_INDEX = [];
+        for (const [token, value] of Object.entries(STOCK_MASTER)) {
+            if (!value || !value.symbol) continue;
+            const ex = value.exchange || value.exch_seg || 'NSE';
+            if (ex === 'BSE' && value.symbol.length > 5) continue; // Skip junk BSE spots (keep only major BSE stocks if any)
+            
+            const name = value.name || value.symbol;
+            SEARCH_INDEX.push({
+                token,
+                symbol: value.symbol,
+                name: name,
+                exchange: ex,
+                lotsize: Number(value.lotsize || 1),
+                uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${ex}`,
+                searchString: `${value.symbol} ${name} ${ex}`.toLowerCase()
+            });
+        }
+
         console.log(`📦 Loaded ${Object.keys(STOCK_MASTER).length} instruments`);
+        console.log(`🔍 Built Search Index with ${SEARCH_INDEX.length} instruments`);
     } catch (e) {
         console.error('Failed to load local instrument master:', e.message);
     }
@@ -128,5 +170,6 @@ module.exports = {
     allTokens,
     globalNfoOptions,
     globalNfoFutures,
-    globalBseSpots
+    globalBseSpots,
+    SEARCH_INDEX
 };
