@@ -2195,8 +2195,12 @@ io.on('connection', (socket) => {
       const { addSubscription } = require('./services/fyers');
       if (addSubscription) addSubscription(data, io, priceCache);
     } else {
-      const { pubClient } = require('./services/redisClient');
-      pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
+      try {
+        const { pubClient } = require('./services/redisClient');
+        pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
+      } catch (err) {
+        console.error('Redis Publish Error for subscribe:', err.message);
+      }
     }
   });
 
@@ -2211,8 +2215,12 @@ io.on('connection', (socket) => {
       const { addSubscriptionBatch } = require('./services/fyers');
       if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
     } else {
-      const { pubClient } = require('./services/redisClient');
-      pubClient.publish('fyers_subscribe', JSON.stringify(dataArray.map(i => typeof i === 'string' ? i : i.symbol)));
+      try {
+        const { pubClient } = require('./services/redisClient');
+        pubClient.publish('fyers_subscribe', JSON.stringify(dataArray.map(i => typeof i === 'string' ? i : i.symbol)));
+      } catch (err) {
+        console.error('Redis Publish Error for fyers_subscribe:', err.message);
+      }
     }
   });
 
