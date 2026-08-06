@@ -202,14 +202,12 @@ async function initFyers(io, pc, isMaster = true) {
         console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
     }
     
-    // Start interval to broadcast LTPs ONLY on Master to prevent duplicate network traffic
-    if (isMaster) {
-        setInterval(() => {
-            if (Object.keys(sharedPriceCache).length > 0) {
-                global_io.emit('price_snapshot', sharedPriceCache);
-            }
-        }, 200); // Changed from 1000ms to 200ms for ultra-fast LTP updates
-    }
+    // Start interval to broadcast LTPs to all clients connected to this instance
+    setInterval(() => {
+        if (Object.keys(sharedPriceCache).length > 0) {
+            global_io.emit('price_snapshot', sharedPriceCache);
+        }
+    }, 200); // Ultra-fast LTP updates
 }
 
 // ─── WEBSOCKET ──────────────────────────────────────────────────────────────
