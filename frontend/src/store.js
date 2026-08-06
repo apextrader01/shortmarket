@@ -26,6 +26,7 @@ window.fetch = async function (url, options = {}) {
 export const socket = io(API, { withCredentials: false });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const temporaryOptionSubscriptions = new Set();
 
 /** Merge a price snapshot object into the current prices map, tagging each tick direction */
 function applySnapshot(snapshot, state) {
@@ -301,6 +302,18 @@ export const useStore = create(persist((set, get) => ({
   subscribeToSymbol: (symbol) => socket.emit('subscribe', symbol),
   unsubscribeFromSymbol: (symbol) => socket.emit('unsubscribe', symbol),
   subscribeToOption: (data) => socket.emit('subscribe', data),
+  subscribeToOptionBatch: (dataArray) => {
+    if(Array.isArray(dataArray)) {
+      dataArray.forEach(data => temporaryOptionSubscriptions.add(data.symbol || data.token));
+      get().pingSubscriptions();
+    }
+  },
+  unsubscribeFromOptionBatch: (dataArray) => {
+    if(Array.isArray(dataArray)) {
+      dataArray.forEach(data => temporaryOptionSubscriptions.delete(data.symbol || data.token));
+      get().pingSubscriptions();
+    }
+  },
   pingSubscriptions: () => {
     const { watchlists, activeWatchlistId, positions } = get();
     const activeWl = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
@@ -313,6 +326,9 @@ export const useStore = create(persist((set, get) => ({
     if (positions && positions.length > 0) {
       positions.forEach(p => symbols.add(p.symbol));
     }
+    
+    // Add temporary options
+    temporaryOptionSubscriptions.forEach(s => symbols.add(s));
     
     // Add indices which are always needed for the header
     symbols.add('NIFTY-NSE');

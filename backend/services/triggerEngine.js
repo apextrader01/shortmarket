@@ -188,6 +188,11 @@ class TriggerEngine {
             };
 
             if (existingPos) {
+                // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "10.0000" + 1 = "10.00001")
+                existingPos.quantity = Number(existingPos.quantity);
+                existingPos.average_price = Number(existingPos.average_price);
+                existingPos.margin = Number(existingPos.margin || 0);
+                
                 // Calculate if closing or averaging
                 let isPartialClose = false;
                 if ((existingPos.quantity > 0 && order.side === 'SELL') || (existingPos.quantity < 0 && order.side === 'BUY')) {

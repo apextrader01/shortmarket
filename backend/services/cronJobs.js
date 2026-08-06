@@ -125,9 +125,14 @@ function initCronJobs(priceCache, triggerEngine) {
                 for (const pos of delPositions) {
                     const existingHold = await trx('holdings').where({ user_id: pos.user_id, symbol: pos.symbol }).first();
                     if (existingHold) {
-                        const currentTotal = existingHold.quantity * existingHold.average_price;
-                        const newTotal = pos.quantity * pos.average_price;
-                        const totalQty = existingHold.quantity + pos.quantity;
+                        const eHoldQty = Number(existingHold.quantity);
+                        const eHoldAvg = Number(existingHold.average_price);
+                        const posQty = Number(pos.quantity);
+                        const posAvg = Number(pos.average_price);
+                        
+                        const currentTotal = eHoldQty * eHoldAvg;
+                        const newTotal = posQty * posAvg;
+                        const totalQty = eHoldQty + posQty;
                         const newAvg = (currentTotal + newTotal) / totalQty;
                         
                         await trx('holdings').where({ id: existingHold.id }).update({

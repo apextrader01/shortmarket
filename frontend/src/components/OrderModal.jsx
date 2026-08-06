@@ -75,7 +75,8 @@ export default function OrderModal() {
     return () => clearTimeout(timer);
   }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
 
-  const leverageMultiplier = (productType === 'INT' && !isOption) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
+  const isFuture = symbol.includes('FUT');
+  const leverageMultiplier = (productType === 'INT' && !isOption && !isFuture) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
   
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
   
@@ -109,7 +110,7 @@ export default function OrderModal() {
       // Fallback
       baseMargin = totalQuantity * (isIndex ? 4000 : 8000);
     }
-  } else if (symbol.includes('FUT')) {
+  } else if (isFuture) {
     // Futures Margin Calculation (Symmetric for Buy and Sell)
     const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
     const marginRate = isIndex ? 0.10 : 0.15; // 10% for Index Futures, 15% for Stock/Commodity Futures
@@ -118,6 +119,15 @@ export default function OrderModal() {
 
   const requiredMargin = baseMargin * leverageMultiplier;
   const isInsufficient = balanceNum < requiredMargin;
+
+  let leverageText = '';
+  if (isOption) {
+      leverageText = isBuy ? '1x' : 'SPAN';
+  } else {
+      const totalValue = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
+      const effectiveLeverage = requiredMargin > 0 ? (totalValue / requiredMargin) : 1;
+      leverageText = `${Math.round(effectiveLeverage)}x`;
+  }
 
   const isRestricted = restrictedStocks.includes(symbol);
   
@@ -455,7 +465,7 @@ export default function OrderModal() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Required:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>₹{requiredMargin.toFixed(2)} ({productType === 'INT' && !isOption ? '4x' : '1x'})</span>
+                  <span style={{ color: 'var(--text-primary)' }}>₹{requiredMargin.toFixed(2)} ({leverageText})</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Available:</span>

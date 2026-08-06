@@ -39,7 +39,8 @@ export default function PositionsView() {
     const symbolAgg = {};
 
     sourceData.forEach(pos => {
-      const isOpen = pos.quantity !== 0;
+      const posQty = Number(pos.quantity) || 0;
+      const isOpen = posQty !== 0;
       if (viewMode === 'OPEN' && !isOpen) return;
       if (viewMode === 'CLOSED' && isOpen) return;
 
@@ -56,9 +57,9 @@ export default function PositionsView() {
          
          if (isOpen) {
            // For open positions: aggregate quantity and recalculate avg price
-           agg.quantity += pos.quantity;
-           const currentTotal = Math.abs(prevQty) * parseFloat(agg.average_price || 0);
-           const newTotal = Math.abs(pos.quantity) * parseFloat(pos.average_price || 0);
+           const currentTotal = Math.abs(Number(agg.quantity)) * parseFloat(agg.average_price || 0);
+           const newTotal = Math.abs(posQty) * parseFloat(pos.average_price || 0);
+           agg.quantity = Number(agg.quantity) + posQty;
            agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : agg.average_price;
          } else {
            // For closed positions: keep the first non-zero avg price, and use weighted avg for exit_price
@@ -79,14 +80,15 @@ export default function PositionsView() {
       }
       
       if (pos.product_type === 'BO' || pos.product_type === 'CO') {
-         agg.encumberedQty += Math.abs(pos.quantity);
+         agg.encumberedQty += Math.abs(posQty);
       } else {
-         agg.unencumberedQty += Math.abs(pos.quantity);
+         agg.unencumberedQty += Math.abs(posQty);
       }
     });
 
     Object.values(symbolAgg).forEach(pos => {
-      if (pos.quantity === 0 && viewMode === 'OPEN') return;
+      const posQty = Number(pos.quantity) || 0;
+      if (posQty === 0 && viewMode === 'OPEN') return;
 
       const underlying = extractUnderlying(pos.symbol);
       if (!groups[underlying]) {
@@ -96,7 +98,7 @@ export default function PositionsView() {
       const priceData = prices[pos.symbol] || {};
       const ltp = priceData.ltp || 0;
       const avg = parseFloat(pos.average_price) || 0;
-      const qty = pos.quantity || 0;
+      const qty = posQty;
       
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
@@ -323,7 +325,7 @@ export default function PositionsView() {
                           }}>{pos.product_type || 'DEL'}</span>
                         </td>
                         <td style={{ textAlign: 'right', color: viewMode === 'CLOSED' ? 'var(--text-secondary)' : (pos.qty > 0 ? '#60A5FA' : '#F87171'), fontWeight: 'bold' }}>
-                          {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : (pos.qty > 0 ? '+' : '') + pos.qty}
+                          {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : (pos.qty > 0 ? '+' : '') + Number(pos.qty)}
                         </td>
                         <td style={{ textAlign: 'right' }}>₹{pos.avg.toFixed(2)}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>

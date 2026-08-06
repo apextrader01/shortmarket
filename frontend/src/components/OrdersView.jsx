@@ -222,7 +222,7 @@ export default function OrdersView() {
                           <span style={{ fontSize: '10px', opacity: 0.8 }}>({trigger.productType})</span>
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>{trigger.quantity}</td>
+                      <td style={{ padding: '12px 16px' }}>{Number(trigger.quantity)}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-blue)' }}>₹{(trigger.triggerPrice || trigger.limitPrice || 0).toFixed(2)}</td>
                       <td style={{ padding: '12px 16px' }}>{trigger.trailingJump ? `₹${trigger.trailingJump}` : '—'}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.type.replace('_', ' ')}</td>
@@ -290,7 +290,7 @@ export default function OrdersView() {
                         </span>
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>{order.quantity}</td>
+                    <td style={{ padding: '12px 16px' }}>{Number(order.quantity)}</td>
                     <td style={{ padding: '12px 16px' }}>
                       {order.type === 'TRAILING_STOP' ? (
                         <span title="Trailing Stop Loss" style={{ color: 'var(--color-yellow)' }}>
@@ -403,11 +403,11 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
-                <span style={{ fontWeight: '600' }}>{selectedOrder.quantity}</span>
+                <span style={{ fontWeight: '600' }}>{Number(selectedOrder.quantity)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Order Value:</span>
-                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0) * selectedOrder.quantity).toFixed(2)}</span>
+                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0) * Number(selectedOrder.quantity)).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>

@@ -24,8 +24,10 @@ export default function PortfolioView() {
   (positions || []).filter(p => p.product_type === 'DEL' && p.quantity !== 0).forEach(p => {
     if (allMergedHoldingsMap[p.symbol]) {
        const existing = allMergedHoldingsMap[p.symbol];
-       const newQty = existing.quantity + p.quantity;
-       const totalCost = (existing.quantity * parseFloat(existing.average_price)) + (p.quantity * parseFloat(p.average_price));
+       const existingQty = Number(existing.quantity) || 0;
+       const pQty = Number(p.quantity) || 0;
+       const newQty = existingQty + pQty;
+       const totalCost = (existingQty * parseFloat(existing.average_price)) + (pQty * parseFloat(p.average_price));
        existing.quantity = newQty;
        existing.average_price = Math.abs(newQty) > 0 ? totalCost / Math.abs(newQty) : 0;
     } else {
@@ -40,14 +42,14 @@ export default function PortfolioView() {
       if (!pos) return;
       const priceData = prices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
-      const qty = Math.abs(pos.quantity);
+      const qty = Math.abs(Number(pos.quantity) || 0);
       
       const invested = parseFloat(pos.average_price) * qty;
       const current = ltp * qty;
       
       let pnl = 0;
-      if (pos.quantity > 0) pnl = current - invested;
-      else if (pos.quantity < 0) pnl = invested - current;
+      if (Number(pos.quantity) > 0) pnl = current - invested;
+      else if (Number(pos.quantity) < 0) pnl = invested - current;
       unrealizedPnl += pnl;
 
       // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)

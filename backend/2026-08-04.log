@@ -1,0 +1,13 @@
+{"level":"error","datetime":"2026-08-04T03:53:36.078Z","message":"HSM key not found in token","data":null,"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T03:53:36.080Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:09:48.539Z","message":"HSM key not found in token","data":null,"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:09:48.540Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:13:40.613Z","message":"HSM key not found in token","data":{"iss":"fyers","aud":"api","iat":1611000000,"exp":1699999999},"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:13:40.613Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:13:40.615Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:13:40.615Z","message":"HSM key not found in token","data":{"iss":"fyers","aud":"api","iat":1611000000,"exp":1699999999},"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:19:22.977Z","message":"HSM key not found in token","data":{"iss":"fyers","aud":"api","iat":1611000000,"exp":1699999999},"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:19:22.980Z","message":"HSM key not found in token","data":{"iss":"fyers","aud":"api","iat":1611000000,"exp":1699999999},"functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:19:22.981Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:19:22.979Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
+{"level":"error","datetime":"2026-08-04T04:53:04.337Z","message":"getQuotes response","data":{"Error":{"message":"Please provide valid token","code":-15,"s":"error"},"inputs":["BSE:POWER-EQ"]},"functionName":"getQuotes"}
