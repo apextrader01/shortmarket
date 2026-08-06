@@ -327,15 +327,15 @@ function startLiveWebSocket() {
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
+                    
+                    // Publish to Redis for PM2 Workers
+                    try {
+                        const { pubClient } = require('./redisClient');
+                        if (pubClient) {
+                            pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
+                        }
+                    } catch(e) {}
                 });
-                
-                // Publish to Redis for PM2 Workers
-                try {
-                    const { pubClient } = require('./redisClient');
-                    if (pubClient) {
-                        pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
-                    }
-                } catch(e) {}
             }
         });
     });
@@ -394,28 +394,78 @@ function addSubscriptionBatch(symbols) {
     }
 }
 
-function removeSubscriptionBatch(symbols) {
-    if (!Array.isArray(symbols) || symbols.length === 0) return;
+let symbolLastSeen = new Map();
+let gcInterval = null;
+
+function handlePingSubscriptions(symbols) {
+    if (!Array.isArray(symbols)) return;
     
-    const fyersSymbols = [];
+    const now = Date.now();
+    const newSymbols = [];
+    
     symbols.forEach(s => {
-        clientSubscriptions.delete(s);
-        const fSym = toFyersSymbol(s);
-        if (fSym) {
-            fyersSymbols.push(fSym);
-            if (globalFyersToRequested[fSym]) {
-                globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== s);
-                if (globalFyersToRequested[fSym].length === 0) {
-                    delete globalFyersToRequested[fSym];
-                }
-            }
+        if (!s || typeof s !== 'string' || s.endsWith('-MF')) return;
+        
+        symbolLastSeen.set(s, now);
+        
+        if (!clientSubscriptions.has(s)) {
+            clientSubscriptions.add(s);
+            newSymbols.push(s);
         }
     });
     
-    if (wsInstance && isFyersConnected && fyersSymbols.length > 0) {
+    // Subscribe to new symbols that we aren't already tracking
+    if (newSymbols.length > 0) {
+        newSymbols.forEach(s => {
+            const fSym = toFyersSymbol(s);
+            if (fSym) {
+                if (!subQueue.includes(fSym)) subQueue.push(fSym);
+                if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+                if (!globalFyersToRequested[fSym].includes(s)) globalFyersToRequested[fSym].push(s);
+            }
+        });
+        
+        if (wsInstance && isFyersConnected && subQueue.length > 0) {
+            processSubQueue();
+        }
+    }
+    
+    // Start GC if not running
+    if (!gcInterval) {
+        gcInterval = setInterval(garbageCollectSubscriptions, 10000); // Check every 10 seconds
+    }
+}
+
+function garbageCollectSubscriptions() {
+    if (!wsInstance || !isFyersConnected) return;
+    
+    const now = Date.now();
+    const staleFyersSymbols = [];
+    
+    for (const [symbol, lastSeen] of symbolLastSeen.entries()) {
+        // If a symbol hasn't been pinged in 30 seconds by ANY user, unsubscribe it
+        if (now - lastSeen > 30000) {
+            clientSubscriptions.delete(symbol);
+            symbolLastSeen.delete(symbol);
+            
+            const fSym = toFyersSymbol(symbol);
+            if (fSym) {
+                if (globalFyersToRequested[fSym]) {
+                    globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== symbol);
+                    if (globalFyersToRequested[fSym].length === 0) {
+                        delete globalFyersToRequested[fSym];
+                        staleFyersSymbols.push(fSym);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (staleFyersSymbols.length > 0) {
+        console.log(`[GC] Unsubscribing ${staleFyersSymbols.length} stale symbols from Fyers...`);
         try {
-            for (let i = 0; i < fyersSymbols.length; i++) {
-                wsInstance.unsubscribe([fyersSymbols[i]]);
+            for (let i = 0; i < staleFyersSymbols.length; i++) {
+                wsInstance.unsubscribe([staleFyersSymbols[i]]);
             }
         } catch(e) {}
     }
@@ -748,6 +798,6 @@ module.exports = {
     fetchBatchLTPs,
     fetchCandleData,
     addSubscriptionBatch,
-    removeSubscriptionBatch,
+    handlePingSubscriptions,
     getFyersStatus
 };

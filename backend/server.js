@@ -2135,22 +2135,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('subscribe_batch', (dataArray) => {
-    if (!Array.isArray(dataArray)) return;
-    dataArray.forEach(item => {
-      let symbol = typeof item === 'string' ? item : item.symbol;
-      socket.join(symbol);
-    });
+  socket.on('ping_subscriptions', (symbolsArray) => {
+    if (!Array.isArray(symbolsArray)) return;
     
+    // We don't join socket.io rooms anymore since we broadcast price_snapshot to everyone
     if (isMaster) {
-      const { addSubscriptionBatch } = require('./services/fyers');
-      if (addSubscriptionBatch) addSubscriptionBatch(dataArray, io, priceCache, socket);
+      const { handlePingSubscriptions } = require('./services/fyers');
+      if (handlePingSubscriptions) handlePingSubscriptions(symbolsArray);
     } else {
       try {
         const { pubClient } = require('./services/redisClient');
-        pubClient.publish('fyers_subscribe', JSON.stringify(dataArray.map(i => typeof i === 'string' ? i : i.symbol)));
+        pubClient.publish('fyers_ping', JSON.stringify(symbolsArray));
       } catch (err) {
-        console.error('Redis Publish Error for fyers_subscribe:', err.message);
+        console.error('Redis Publish Error for fyers_ping:', err.message);
       }
     }
   });
@@ -2290,13 +2287,26 @@ server.listen(PORT, '0.0.0.0', async () => {
       
       // Listen for WebSocket subscriptions from Worker nodes
       const { subClient: cacheSubClient } = require('./services/redisClient');
-      cacheSubClient.subscribe('fyers_subscribe', (message) => {
-          try {
-              const symbols = JSON.parse(message);
-              const { addSubscriptionBatch } = require('./services/fyers');
-              if (addSubscriptionBatch) addSubscriptionBatch(symbols);
-          } catch(e){}
-      });
+      const setupMasterSubscriptions = () => {
+          cacheSubClient.subscribe('fyers_subscribe', (message) => {
+              try {
+                  const symbols = JSON.parse(message);
+                  const { addSubscriptionBatch } = require('./services/fyers');
+                  if (addSubscriptionBatch) addSubscriptionBatch(symbols);
+              } catch(e){}
+          }).catch(console.error);
+
+          cacheSubClient.subscribe('fyers_ping', (message) => {
+              try {
+                  const symbols = JSON.parse(message);
+                  const { handlePingSubscriptions } = require('./services/fyers');
+                  if (handlePingSubscriptions) handlePingSubscriptions(symbols);
+              } catch(e){}
+          }).catch(console.error);
+      };
+      
+      if (cacheSubClient.isReady) setupMasterSubscriptions();
+      else cacheSubClient.on('ready', setupMasterSubscriptions);
 
       // Update options master in background
       updateOptionsMaster().catch(e => console.error(e));

@@ -159,7 +159,10 @@ export const useStore = create(persist((set, get) => ({
     get().syncWatchlists(newWatchlists);
   },
 
-  setActiveWatchlist: (id) => set({ activeWatchlistId: id }),
+  setActiveWatchlist: (id) => {
+    set({ activeWatchlistId: id });
+    get().pingSubscriptions();
+  },
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
     const newWatchlists = get().watchlists.map(w => {
@@ -169,8 +172,8 @@ export const useStore = create(persist((set, get) => ({
       return w;
     });
     set({ watchlists: newWatchlists });
-    socket.emit('subscribe', uniqueSymbol);
     get().syncWatchlists(newWatchlists);
+    get().pingSubscriptions();
   },
 
   removeStockFromWatchlist: (watchlistId, uniqueSymbol) => {
@@ -180,11 +183,7 @@ export const useStore = create(persist((set, get) => ({
     });
     set({ watchlists: newWatchlists });
     get().syncWatchlists(newWatchlists);
-    // Unsubscribe if not used in any other watchlist
-    setTimeout(() => {
-      const isUsedElsewhere = get().watchlists.some(w => w.symbols.includes(uniqueSymbol));
-      if (!isUsedElsewhere) socket.emit('unsubscribe', uniqueSymbol);
-    }, 100);
+    get().pingSubscriptions();
   },
 
   // ── Order Modal ─────────────────────────────────────────────────────────────
@@ -302,11 +301,28 @@ export const useStore = create(persist((set, get) => ({
   subscribeToSymbol: (symbol) => socket.emit('subscribe', symbol),
   unsubscribeFromSymbol: (symbol) => socket.emit('unsubscribe', symbol),
   subscribeToOption: (data) => socket.emit('subscribe', data),
-  subscribeToOptionBatch: (dataArray) => socket.emit('subscribe_batch', dataArray),
-  unsubscribeFromOption: (data) => socket.emit('unsubscribe', data),
-  unsubscribeFromOptionBatch: (dataArray) => {
-    if(Array.isArray(dataArray)) {
-      dataArray.forEach(data => socket.emit('unsubscribe', data));
+  pingSubscriptions: () => {
+    const { watchlists, activeWatchlistId, positions } = get();
+    const activeWl = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
+    
+    const symbols = new Set();
+    if (activeWl?.symbols) {
+      activeWl.symbols.forEach(s => symbols.add(s));
+    }
+    
+    if (positions && positions.length > 0) {
+      positions.forEach(p => symbols.add(p.symbol));
+    }
+    
+    // Add indices which are always needed for the header
+    symbols.add('NIFTY-NSE');
+    symbols.add('BANKNIFTY-NSE');
+    symbols.add('SENSEX-BSE');
+    
+    const symbolsArray = Array.from(symbols);
+    
+    if (symbolsArray.length > 0) {
+        socket.emit('ping_subscriptions', symbolsArray);
     }
   },
 
@@ -392,46 +408,19 @@ export const useStore = create(persist((set, get) => ({
         socket.emit('register_user', currentUser.id);
       }
       // Force a fresh REST price fetch on every socket connect/reconnect
-      // (bypass the throttle so we always get fresh prices after reconnect)
       get().refreshPrices(true);
       
-      // Helper to determine exchange from a uniqueSymbol
-      const getExchange = (sym) => {
-        const dashIdx = sym.lastIndexOf('-');
-        if (dashIdx > 0) {
-          return sym.substring(dashIdx + 1);
-        }
-        // No dash — try to detect type from symbol pattern
-        if (/\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/.test(sym)) return 'NFO';
-        return 'NSE';
-      };
+      // Send the active subscriptions to the backend
+      get().pingSubscriptions();
       
-      // Resubscribe to ALL watchlists (not just active)
-      const { watchlists, subscribeToOptionBatch, positions } = get();
-      
-      const tokensToSub = [];
-      const seenSymbols = new Set();
-      
-      for (const wl of watchlists) {
-        if (!wl?.symbols) continue;
-        for (const sym of wl.symbols) {
-          if (seenSymbols.has(sym)) continue;
-          seenSymbols.add(sym);
-          tokensToSub.push({ symbol: sym, exchange: getExchange(sym) });
-        }
-      }
-      
-      // Resubscribe to positions
-      if (positions && positions.length > 0) {
-        positions.forEach(pos => {
-          if (seenSymbols.has(pos.symbol)) return;
-          seenSymbols.add(pos.symbol);
-          tokensToSub.push({ symbol: pos.symbol, exchange: getExchange(pos.symbol) });
-        });
-      }
-      
-      if (tokensToSub.length > 0) {
-        subscribeToOptionBatch(tokensToSub);
+      // Start a 10-second heartbeat to keep subscriptions alive and garbage collect old ones
+      if (!get().subscriptionPingInterval) {
+          const interval = setInterval(() => {
+              if (get().isConnected) {
+                  get().pingSubscriptions();
+              }
+          }, 10000);
+          set({ subscriptionPingInterval: interval });
       }
     };
 
@@ -443,6 +432,11 @@ export const useStore = create(persist((set, get) => ({
     socket.on('disconnect', (reason) => {
       console.warn('⚠️ Socket disconnected:', reason);
       set({ isConnected: false });
+      const interval = get().subscriptionPingInterval;
+      if (interval) {
+          clearInterval(interval);
+          set({ subscriptionPingInterval: null });
+      }
     });
     
     socket.off('connect_error');
