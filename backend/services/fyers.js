@@ -16,7 +16,7 @@ const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableL
 // Set Fyers Credentials
 const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
 const SECRET_ID = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
-const REDIRECT_URL = 'https://shortmarket-staging.web.app/api/fyers/callback';
+const REDIRECT_URL = 'https://34-93-99-22.nip.io/api/fyers/callback';
 
 fyers.setAppId(APP_ID);
 fyers.setRedirectUrl(REDIRECT_URL);
