@@ -224,7 +224,14 @@ function startLiveWebSocket() {
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
     const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     
-    wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, path.join(__dirname, '../logs'), false);
+    try {
+        const logPath = path.join(__dirname, '../logs');
+        if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
+        wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, logPath, false);
+    } catch(err) {
+        console.error("🚨 Failed to initialize Fyers DataSocket:", err);
+        return;
+    }
     
     // IMPORTANT: Use SymbolUpdate to receive change and pct along with LTP
     if (wsInstance.SymbolUpdate) {
@@ -236,6 +243,7 @@ function startLiveWebSocket() {
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');
         lastTickTime = Date.now();
+        isFyersConnected = true;
         
         // Re-subscribe to all existing client subscriptions
         if (clientSubscriptions.size > 0) {
