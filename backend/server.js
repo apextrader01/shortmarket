@@ -45,14 +45,17 @@ const io = new Server(server, {
 // Listen for Fyers token updates on all cluster nodes
 const { subClient: globalSubClient } = require('./services/redisClient');
 if (globalSubClient) {
-    globalSubClient.on('ready', () => {
+    const setupTokenSync = () => {
         globalSubClient.subscribe('fyers_token_updated', () => {
             try {
                 const { reloadFyersToken } = require('./services/fyers');
                 if (reloadFyersToken) reloadFyersToken();
             } catch(e) {}
-        }).catch(() => {});
-    });
+        }).catch((err) => { console.error('Redis token sync subscribe error:', err); });
+    };
+    
+    if (globalSubClient.isReady) setupTokenSync();
+    else globalSubClient.on('ready', setupTokenSync);
 }
 
 // Redis Pub/Sub for syncing priceCache across cluster nodes
