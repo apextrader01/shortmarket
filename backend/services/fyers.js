@@ -169,8 +169,8 @@ function loadTokenFromDisk() {
         const p = path.join(__dirname, '../fyers_token.txt');
         if (fs.existsSync(p)) {
             const token = fs.readFileSync(p, 'utf8');
-            if (token && token.length > 20) {
-                activeAccessToken = token;
+            if (token && token.trim().length > 20) {
+                activeAccessToken = token.trim();
                 fyers.setAccessToken(activeAccessToken);
                 isFyersConnected = true;
                 console.log("🔌 Loaded Fyers token from disk.");
@@ -227,7 +227,7 @@ function startLiveWebSocket() {
     try {
         const logPath = path.join(__dirname, '../logs');
         if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
-        wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken}`, logPath, false);
+        wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken.trim()}`, logPath, false);
     } catch(err) {
         console.error("🚨 Failed to initialize Fyers DataSocket:", err);
         return;
