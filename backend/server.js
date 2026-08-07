@@ -2238,6 +2238,26 @@ app.get('/api/fyers/status', (req, res) => {
   }
 });
 
+// Fyers OAuth Callback directly handled by backend
+app.get('/api/fyers/callback', async (req, res) => {
+  const { auth_code } = req.query;
+  if (!auth_code) {
+    return res.redirect('/?fyers_error=no_auth_code');
+  }
+  try {
+    const { verifyFyersAuth } = require('./services/fyers');
+    const result = await verifyFyersAuth(auth_code);
+    if (result.success) {
+      res.redirect('/?fyers_success=true');
+    } else {
+      res.redirect('/?fyers_error=' + encodeURIComponent(result.error));
+    }
+  } catch (err) {
+    console.error(err);
+    res.redirect('/?fyers_error=server_error');
+  }
+});
+
 app.post('/api/fyers/verify', async (req, res) => {
   const { auth_code } = req.body;
   if (!auth_code) return res.status(400).json({ error: "Missing auth_code" });
