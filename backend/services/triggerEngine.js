@@ -303,7 +303,14 @@ class TriggerEngine {
             if (this.io) {
                 this.io.to(order.user_id.toString()).emit('sync_user_data');
             }
+            
         });
+        
+        // Broadcast to other PM2 workers to sync their trigger memory (AFTER transaction commits)
+        try {
+            const { pubClient } = require('./redisClient');
+            if (pubClient) pubClient.publish('reload_triggers', '1');
+        } catch (e) {}
     }
 
     async spawnBracketLegs(trx, order) {

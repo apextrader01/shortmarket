@@ -207,11 +207,13 @@ async function initFyers(io, pc, isMaster = true) {
     }
     
     // Start interval to broadcast LTPs to all clients connected to this instance
-    setInterval(() => {
-        if (Object.keys(sharedPriceCache).length > 0) {
-            global_io.emit('price_snapshot', sharedPriceCache);
-        }
-    }, 200); // Ultra-fast LTP updates
+    if (isMasterNode) {
+        setInterval(() => {
+            if (Object.keys(sharedPriceCache).length > 0) {
+                global_io.emit('price_snapshot', sharedPriceCache);
+            }
+        }, 200); // Ultra-fast LTP updates
+    }
 }
 
 // ─── WEBSOCKET ──────────────────────────────────────────────────────────────
@@ -219,11 +221,9 @@ async function initFyers(io, pc, isMaster = true) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
-    // If there's an existing connection, close it before reconnecting
-    if (wsInstance) {
-        try { wsInstance.close(); } catch(e) {}
-        wsInstance = null;
-    }
+    // With fyers-api-v3, we MUST use getInstance() instead of new DataSocket
+    // to prevent 'Only one instance of DataSocket is allowed' errors during reconnects.
+    // If wsInstance exists, we just let it be, but we will call connect() later.
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
     const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
@@ -231,7 +231,7 @@ function startLiveWebSocket() {
     try {
         const logPath = path.join(__dirname, '../logs');
         if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
-        wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken.trim()}`, logPath, false);
+        wsInstance = DataSocket.getInstance(`${APP_ID}:${activeAccessToken.trim()}`, logPath, false);
         lastDataSocketError = null;
     } catch(err) {
         lastDataSocketError = err.stack || err.message || err.toString();
@@ -245,6 +245,14 @@ function startLiveWebSocket() {
     } else {
         wsInstance.mode('SymbolUpdate');
     }
+    
+    // Check if listeners are already attached to this singleton instance
+    if (wsInstance.hasListenersAttached) {
+        // Just attempt to connect if it's not connected
+        try { wsInstance.connect(); } catch(e) {}
+        return;
+    }
+    wsInstance.hasListenersAttached = true;
     
     wsInstance.on('connect', () => {
         console.log('✅ Fyers WebSocket Connected!');

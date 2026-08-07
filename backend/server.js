@@ -1418,6 +1418,13 @@ app.post('/api/order', authenticateToken, async (req, res) => {
         status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: marginToSave
       });
       
+      setTimeout(() => {
+          try {
+              const { pubClient } = require('./services/redisClient');
+              if (pubClient) pubClient.publish('reload_triggers', '1');
+          } catch(e) {}
+      }, 500);
+      
       // Manually trigger an evaluation to instantly process Market orders in the background
       // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
       // Using the order's own price would cause LIMIT orders to self-trigger immediately.
@@ -1498,6 +1505,10 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
         id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
         status: 'PENDING', product_type: 'SIP', margin: finalMargin
       });
+      try {
+          const { pubClient } = require('./services/redisClient');
+          if (pubClient) pubClient.publish('reload_triggers', '1');
+      } catch(e) {}
 
       try {
         await triggerEngine.evaluateTick(symbol, execPrice);
@@ -1806,6 +1817,10 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       
       const triggerEngine = require('./services/triggerEngine');
       triggerEngine.removeOrderFromMemory(req.params.id, order.symbol);
+      try {
+          const { pubClient } = require('./services/redisClient');
+          if (pubClient) pubClient.publish('reload_triggers', '1');
+      } catch(e) {}
       
       res.json({ success: true });
     });
@@ -1969,6 +1984,10 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       
       const triggerEngine = require('./services/triggerEngine');
       triggerEngine.addOrderToMemory({ ...order, ...updateObj });
+      try {
+          const { pubClient } = require('./services/redisClient');
+          if (pubClient) pubClient.publish('reload_triggers', '1');
+      } catch(e) {}
       
       res.json({ success: true });
     });

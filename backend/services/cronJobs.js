@@ -62,7 +62,7 @@ function initCronJobs(priceCache, triggerEngine) {
     cron.schedule('19 15 * * *', () => phase2Sweep('EQ'), TZ);
     cron.schedule('59 22 * * *', () => phase2Sweep('COM'), TZ);
 
-    // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
+    // ─── PHASE 3: Auto Square-Off (15:50 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
         console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
         try {
