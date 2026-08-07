@@ -8,8 +8,12 @@ let sharedPriceCache = null;
 let wsInstance = null;
 let clientSubscriptions = new Set();
 let watchdogInterval = null;
+let reconnectAttempts = 0;
+let lastDataSocketError = null;
 let lastTickTime = Date.now();
 let isMasterNode = false;
+
+// The global map of ALL subscriptions we care about (used by PM2 master);
 
 const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
 
@@ -228,7 +232,9 @@ function startLiveWebSocket() {
         const logPath = path.join(__dirname, '../logs');
         if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
         wsInstance = new DataSocket(`${APP_ID}:${activeAccessToken.trim()}`, logPath, false);
+        lastDataSocketError = null;
     } catch(err) {
+        lastDataSocketError = err.stack || err.message || err.toString();
         console.error("🚨 Failed to initialize Fyers DataSocket:", err);
         return;
     }
@@ -700,6 +706,7 @@ function getFyersStatus() {
         isFyersConnected,
         hasAccessToken: !!activeAccessToken,
         wsInstanceExists: !!wsInstance,
+        lastDataSocketError: lastDataSocketError,
         subscriptions: Array.from(clientSubscriptions),
         lastTickTime: new Date(lastTickTime).toISOString(),
         secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,
