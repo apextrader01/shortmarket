@@ -17,8 +17,8 @@ export default function PricingView() {
     });
   };
 
-  const handleUpgrade = async () => {
-    setLoading(true);
+  const handleUpgrade = async (plan) => {
+    setLoading(plan);
     try {
       const res = await loadRazorpay();
       if (!res) {
@@ -31,18 +31,22 @@ export default function PricingView() {
       // 1. Create order
       const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-order`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create order');
 
       // 2. Open Razorpay Checkout
       const options = {
-        key: 'rzp_test_placeholder', // Should Ideally come from backend or env
+        key: orderData.key_id || 'rzp_test_placeholder', // Comes from backend
         amount: orderData.amount,
         currency: orderData.currency,
         name: 'ShortMarket',
-        description: 'Upgrade to PRO',
+        description: `Upgrade to PRO (${plan})`,
         image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Placeholder logo
         order_id: orderData.id,
         handler: async function (response) {
@@ -56,7 +60,8 @@ export default function PricingView() {
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
+                razorpay_signature: response.razorpay_signature,
+                plan: plan
               })
             });
             const verifyData = await verifyRes.json();
@@ -127,16 +132,19 @@ export default function PricingView() {
           </button>
         </div>
 
-        {/* PRO PLAN */}
+        {/* MONTHLY PRO PLAN */}
         <div style={{ background: 'var(--bg-card)', border: '2px solid var(--color-blue)', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 8px 32px rgba(59, 130, 246, 0.15)' }}>
           <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-blue)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Star size={12} /> MOST POPULAR
+            <Zap size={12} /> PRO MONTHLY
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <Zap style={{ color: 'var(--color-yellow)' }} />
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>PRO</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>Monthly</h3>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-blue-light)' }}>₹999<span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / year</span></div>
+          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-blue-light)' }}>
+            ₹99 
+            <span style={{ fontSize: '18px', color: 'var(--text-secondary)', textDecoration: 'line-through', marginLeft: '8px' }}>₹149</span>
+            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / mo</span>
+          </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', minHeight: '40px' }}>Advanced tools for serious traders and investors.</p>
           
           <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
@@ -158,10 +166,52 @@ export default function PricingView() {
             <button 
               className="btn btn-primary" 
               style={{ width: '100%', padding: '12px', fontWeight: 'bold' }}
-              onClick={handleUpgrade}
+              onClick={() => handleUpgrade('monthly')}
               disabled={loading}
             >
-              {loading ? 'Processing...' : 'Upgrade to PRO'}
+              {loading === 'monthly' ? 'Processing...' : 'Upgrade Monthly'}
+            </button>
+          )}
+        </div>
+
+        {/* YEARLY PRO PLAN */}
+        <div style={{ background: 'var(--bg-card)', border: '2px solid var(--color-yellow)', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 8px 32px rgba(234, 179, 8, 0.15)' }}>
+          <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-yellow)', color: 'black', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Star size={12} /> BEST VALUE
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>Yearly</h3>
+          </div>
+          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-yellow)' }}>
+            ₹499
+            <span style={{ fontSize: '18px', color: 'var(--text-secondary)', textDecoration: 'line-through', marginLeft: '8px' }}>₹999</span>
+            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / year</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', minHeight: '40px' }}>Massive savings. The ultimate trading experience.</p>
+          
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Up to 5 Watchlists</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> All Basic Features</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Priority Support</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Advanced Analytics (Coming Soon)</li>
+          </ul>
+
+          {isPro ? (
+            <button 
+              className="btn btn-secondary" 
+              style={{ width: '100%', padding: '12px', background: 'var(--color-green)', color: 'white', border: 'none' }}
+              disabled
+            >
+              Active Subscription
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', padding: '12px', fontWeight: 'bold', background: 'var(--color-yellow)', color: 'black', border: 'none' }}
+              onClick={() => handleUpgrade('yearly')}
+              disabled={loading}
+            >
+              {loading === 'yearly' ? 'Processing...' : 'Upgrade Yearly'}
             </button>
           )}
         </div>
