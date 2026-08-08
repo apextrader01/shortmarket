@@ -354,6 +354,10 @@ function startLiveWebSocket() {
                         if (pubClient) {
                             pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
                         }
+                        
+                        // Evaluate triggers on the master node
+                        const triggerEngine = require('./triggerEngine');
+                        triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(err => console.error('Master trigger evaluation error:', err));
                     } catch(e) {}
                 });
             }

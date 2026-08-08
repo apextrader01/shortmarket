@@ -21,6 +21,7 @@ import AlertModal from './components/AlertModal';
 import ChartModal from './components/ChartModal';
 import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
+import PricingView from './components/PricingView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X } from 'lucide-react';
@@ -326,7 +327,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds',
+                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds', 'Pricing',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -425,8 +426,13 @@ function App() {
             </div>
           )}
           {activeTab === 'Settings' && (
-            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
+            <div style={{ flex: 1, padding: '12px' }}>
               <SettingsView />
+            </div>
+          )}
+          {activeTab === 'Pricing' && (
+            <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
+              <PricingView />
             </div>
           )}
           {activeTab === 'AdminPanel' && user?.is_admin && (
@@ -455,7 +461,12 @@ function App() {
               {user?.profile_picture_url ? <img src={user.profile_picture_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={20} />}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user.username}</span>
+                {user.subscription_tier === 'PRO' && (
+                  <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>PRO</span>
+                )}
+              </div>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
             </div>
           </div>

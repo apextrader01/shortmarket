@@ -59,17 +59,40 @@ if (globalSubClient) {
 }
 
 // Redis Pub/Sub for syncing priceCache across cluster nodes
+if (isMaster) {
+  // Master node also needs to listen to reload_triggers (when an order is placed via API on Master)
+  const { subClient: cacheSubClient } = require('./services/redisClient');
+  const triggerEngine = require('./services/triggerEngine');
+  const setupMasterSync = () => {
+    cacheSubClient.subscribe('reload_triggers', (message) => {
+        console.log('[Master] Reloading triggers from DB');
+        triggerEngine.loadPendingOrders();
+    }).catch(err => console.error(err));
+  };
+  if (cacheSubClient.isReady) setupMasterSync();
+  else cacheSubClient.on('ready', setupMasterSync);
+}
 if (!isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
+  const triggerEngine = require('./services/triggerEngine');
+  
   const setupCacheSync = () => {
     cacheSubClient.subscribe('price_cache_sync', (message) => {
       try {
         const data = JSON.parse(message);
         if (data.symbol && data.priceObj) {
           priceCache[data.symbol] = data.priceObj;
+          // Trigger evaluation on worker nodes
+          triggerEngine.evaluateTick(data.symbol, data.priceObj.ltp).catch(err => console.error(err));
         }
       } catch(e){}
     }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
+    
+    // Subscribe to trigger reloads
+    cacheSubClient.subscribe('reload_triggers', (message) => {
+        console.log('[Worker] Reloading triggers from DB');
+        triggerEngine.loadPendingOrders();
+    }).catch(err => console.error(err));
   };
   
   if (cacheSubClient.isReady) setupCacheSync();
@@ -216,7 +239,7 @@ app.post('/api/auth/register', async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist) } });
+    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
@@ -249,7 +272,7 @@ app.post('/api/auth/login', async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists } });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
@@ -370,6 +393,59 @@ app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
     res.json({ success: true, profile_picture_url });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Razorpay Payment Integration ───────────────────────────────────────────
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
+});
+
+app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
+  try {
+    const options = {
+      amount: 999 * 100, // Rs 999
+      currency: "INR",
+      receipt: "receipt_order_" + req.user.id + "_" + Date.now()
+    };
+    const order = await razorpay.orders.create(options);
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ error: 'Razorpay error: ' + error.message });
+  }
+});
+
+app.post('/api/payment/verify', authenticateToken, async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder')
+      .update(body.toString())
+      .digest('hex');
+      
+    const isAuthentic = expectedSignature === razorpay_signature;
+    if (isAuthentic) {
+      // 1 Year expiry for PRO
+      const expires = new Date();
+      expires.setFullYear(expires.getFullYear() + 1);
+      
+      await db('users').where({ id: req.user.id }).update({
+        subscription_tier: 'PRO',
+        subscription_expires: expires
+      });
+      
+      res.json({ success: true, message: 'Upgraded to PRO successfully!' });
+    } else {
+      res.status(400).json({ error: 'Invalid Payment Signature' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -515,6 +591,22 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'User account reset to ₹10,00,000.' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to reset user' });
+  }
+});
+
+app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res) => {
+  try {
+    const admin = await db('users').where({ id: req.user.id }).first();
+    if (!admin || !admin.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { tier, expires } = req.body;
+    await db('users').where({ id: req.params.id }).update({
+      subscription_tier: tier,
+      subscription_expires: expires || null
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -732,6 +824,16 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
 app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;
+    
+    // Check subscription tier
+    const user = await db('users').where({ id: req.user.id }).first();
+    const isPro = user.subscription_tier === 'PRO' && (!user.subscription_expires || new Date(user.subscription_expires) > new Date());
+    const limit = isPro ? 5 : 3;
+    
+    if (watchlists && watchlists.length > limit) {
+      return res.status(403).json({ error: `Your ${isPro ? 'PRO' : 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
+    }
+
     await db('users').where({ id: req.user.id }).update({ watchlists: JSON.stringify(watchlists) });
     res.json({ success: true });
   } catch (err) {

@@ -227,8 +227,15 @@ class TriggerEngine {
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
                         });
-                        // Cancel dangling pending orders for this specific product type
-                        await trx('orders').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type, status: 'PENDING' }).update({ status: 'CANCELLED', updated_at: new Date() });
+                        // Cancel dangling pending and trigger orders for this specific product type
+                        const danglingOrders = await trx('orders')
+                            .where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type })
+                            .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+                            
+                        for (const dangler of danglingOrders) {
+                            await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                            this.removeOrderFromMemory(dangler.id, dangler.symbol);
+                        }
                     } else {
                         await trx('positions').where({ id: existingPos.id }).update({
                            quantity: newQty,

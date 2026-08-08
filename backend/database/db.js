@@ -40,6 +40,8 @@ async function initSchema() {
         table.string('kyc_pan_url');
         table.string('kyc_aadhar_url');
         table.boolean('is_admin').defaultTo(false);
+        table.string('subscription_tier').defaultTo('BASIC');
+        table.datetime('subscription_expires');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -85,6 +87,15 @@ async function initSchema() {
         await db('users').where({ id: 1 }).orWhere({ username: 'mock_trader' }).update({ is_admin: true });
         
         console.log('Added is_admin to users table');
+      }
+
+      const hasSubscription = await db.schema.hasColumn('users', 'subscription_tier');
+      if (!hasSubscription) {
+        await db.schema.alterTable('users', table => {
+          table.string('subscription_tier').defaultTo('BASIC');
+          table.datetime('subscription_expires');
+        });
+        console.log('Added subscription columns to users table');
       }
     }
 

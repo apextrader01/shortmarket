@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
   const [newBalance, setNewBalance] = useState('');
+  const [newSubTier, setNewSubTier] = useState('BASIC');
   const [updating, setUpdating] = useState(false);
 
   const loadData = async () => {
@@ -57,6 +58,39 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  const handleUpdateSubscription = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !newSubTier) return;
+    
+    // Set expiry to 1 year from now if PRO, else null
+    let expires = null;
+    if (newSubTier === 'PRO') {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      expires = d.toISOString();
+    }
+    
+    setUpdating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/user/${selectedUser.id}/subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ tier: newSubTier, expires })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Subscription updated successfully!');
+        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, subscription_tier: newSubTier, subscription_expires: expires } : u));
+        setSelectedUser({ ...selectedUser, subscription_tier: newSubTier, subscription_expires: expires });
+      } else throw new Error(data.error);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const handleUpdateBalance = async (e) => {
     e.preventDefault();
@@ -417,7 +451,7 @@ export default function AdminDashboard() {
                         <button 
                           className="btn btn-primary" 
                           style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => { setSelectedUser(u); setNewBalance(u.balance); }}
+                          onClick={() => { setSelectedUser(u); setNewBalance(u.balance); setNewSubTier(u.subscription_tier || 'BASIC'); }}
                         >
                           Manage Client
                         </button>
@@ -518,6 +552,31 @@ export default function AdminDashboard() {
                   </div>
                   <button type="submit" className="btn btn-primary" disabled={updating}>
                     {updating ? 'Saving...' : 'Update Balance'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Subscription Editor */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={14} style={{ color: 'var(--color-blue)' }} /> Subscription Tier
+                </h4>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  Current Tier: <strong style={{ color: selectedUser.subscription_tier === 'PRO' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>{selectedUser.subscription_tier || 'BASIC'}</strong>
+                  {selectedUser.subscription_expires && ` (Expires: ${new Date(selectedUser.subscription_expires).toLocaleDateString()})`}
+                </div>
+                <form onSubmit={handleUpdateSubscription} style={{ display: 'flex', gap: '12px' }}>
+                  <select 
+                    className="input-field" 
+                    value={newSubTier} 
+                    onChange={e => setNewSubTier(e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="BASIC">Basic (3 Watchlists)</option>
+                    <option value="PRO">PRO (5 Watchlists)</option>
+                  </select>
+                  <button type="submit" className="btn btn-primary" disabled={updating}>
+                    {updating ? 'Saving...' : 'Update Tier'}
                   </button>
                 </form>
               </div>

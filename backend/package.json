@@ -30,6 +30,7 @@
     "node-schedule": "^2.1.1",
     "otplib": "^13.4.1",
     "pg": "^8.22.0",
+    "razorpay": "^2.9.8",
     "redis": "^6.2.0",
     "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
