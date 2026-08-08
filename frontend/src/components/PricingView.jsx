@@ -6,94 +6,11 @@ export default function PricingView() {
   const { user } = useStore();
   const [loading, setLoading] = useState(false);
 
-  // Initialize Razorpay logic
-  const loadRazorpay = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
-  const handleUpgrade = async (plan) => {
-    setLoading(plan);
-    try {
-      const res = await loadRazorpay();
-      if (!res) {
-        alert('Razorpay SDK failed to load. Are you online?');
-        setLoading(false);
-        return;
-      }
-
-      const token = localStorage.getItem('token');
-      // 1. Create order
-      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-order`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ plan })
-      });
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create order');
-
-      // 2. Open Razorpay Checkout
-      const options = {
-        key: orderData.key_id || 'rzp_test_placeholder', // Comes from backend
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'ShortMarket',
-        description: `Upgrade to PRO (${plan})`,
-        image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Placeholder logo
-        order_id: orderData.id,
-        handler: async function (response) {
-          try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                plan: plan
-              })
-            });
-            const verifyData = await verifyRes.json();
-            if (verifyRes.ok && verifyData.success) {
-              alert('Successfully upgraded to PRO! Please log out and log back in to apply changes.');
-              window.location.reload();
-            } else {
-              alert(verifyData.error || 'Payment verification failed');
-            }
-          } catch (e) {
-            alert('Error verifying payment: ' + e.message);
-          }
-        },
-        prefill: {
-          name: user.username,
-          email: user.email,
-          contact: user.phone || '9999999999'
-        },
-        theme: {
-          color: '#3b82f6'
-        }
-      };
-      
-      const rzp1 = new window.Razorpay(options);
-      rzp1.on('payment.failed', function (response){
-        alert(response.error.description);
-      });
-      rzp1.open();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setLoading(false);
+  const handleUpgrade = (plan) => {
+    if (plan === 'monthly') {
+      window.open('https://rzp.io/rzp/rwUOadc', '_blank');
+    } else if (plan === 'yearly') {
+      window.open('https://rzp.io/rzp/HTOdZnf', '_blank');
     }
   };
 
@@ -167,9 +84,8 @@ export default function PricingView() {
               className="btn btn-primary" 
               style={{ width: '100%', padding: '12px', fontWeight: 'bold' }}
               onClick={() => handleUpgrade('monthly')}
-              disabled={loading}
             >
-              {loading === 'monthly' ? 'Processing...' : 'Upgrade Monthly'}
+              Upgrade Monthly
             </button>
           )}
         </div>
@@ -209,9 +125,8 @@ export default function PricingView() {
               className="btn btn-primary" 
               style={{ width: '100%', padding: '12px', fontWeight: 'bold', background: 'var(--color-yellow)', color: 'black', border: 'none' }}
               onClick={() => handleUpgrade('yearly')}
-              disabled={loading}
             >
-              {loading === 'yearly' ? 'Processing...' : 'Upgrade Yearly'}
+              Upgrade Yearly
             </button>
           )}
         </div>
