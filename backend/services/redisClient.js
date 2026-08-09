@@ -3,9 +3,7 @@ const { createClient } = require('redis');
 // Initialize 3 clients:
 // 1. generalClient: For normal GET/SET (chart caching, price caching)
 // 2. pubClient: For Socket.io adapter and broadcasting price ticks
-// 3. subClient: For Socket.io adapter and listening for price ticks
-
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 const createRedisClient = () => {
     const client = createClient({ 
