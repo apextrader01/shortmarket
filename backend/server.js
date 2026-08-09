@@ -1527,6 +1527,35 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     }
   }
 
+  // BUG FIX 4: Block new BUY orders for F&O/FUT contracts on their expiry day after trading closes.
+  // Without this, users can queue orders on contracts that have already expired and they remain
+  // as stale PENDING orders that fire incorrectly later.
+  // SELL orders are still allowed so users can exit existing positions/holdings.
+  const isDerivativeSymbol = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
+  if (isDerivativeSymbol && side === 'BUY') {
+    const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const dayStr = String(istNow.getDate()).padStart(2, '0');
+    const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const monthStr = monthNames[istNow.getMonth()];
+    const yearStr = String(istNow.getFullYear()).slice(-2);
+    const todayExpiryToken = `${dayStr}${monthStr}${yearStr}`; // e.g. "10AUG26"
+    
+    const isExpiringToday = symbol.includes(todayExpiryToken);
+    if (isExpiringToday) {
+      const h = istNow.getHours();
+      const min = istNow.getMinutes();
+      const isMCXSymbol = symbol.endsWith('-MCX');
+      // Equity/NFO/BFO: block after 3:15 PM; MCX: block after 7:00 PM
+      const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 15));
+      const mcxExpiryClosed   =  isMCXSymbol && h >= 19;
+      if (equityExpiryClosed || mcxExpiryClosed) {
+        return res.status(400).json({
+          error: `Cannot place new BUY orders on ${symbol.split('-')[0]}. This contract expires today and new positions are no longer allowed.`
+        });
+      }
+    }
+  }
+
   try {
     await db.transaction(async (trx) => {
       // 1. Determine execution status
