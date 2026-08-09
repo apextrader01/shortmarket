@@ -16,7 +16,7 @@ git pull origin main || git pull origin development
 # 2. Build Frontend
 echo "🌐 Building Frontend..."
 cd frontend
-npm install --omit=dev
+npm install
 npm run build
 cd ..
 
