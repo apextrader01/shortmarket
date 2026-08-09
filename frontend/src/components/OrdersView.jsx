@@ -51,9 +51,7 @@ export default function OrdersView() {
 
   let displayTriggers = [...(pendingTriggers || []), ...boLegTriggers];
   
-  console.log('ALL ORDERS:', orders);
-  console.log('BO LEG TRIGGERS:', boLegTriggers);
-  console.log('DISPLAY TRIGGERS:', displayTriggers);
+
 
   if (statusFilter !== 'ALL') {
     displayOrders = displayOrders.filter(order => order.status === statusFilter);
@@ -269,7 +267,7 @@ export default function OrdersView() {
                       borderBottom: '1px solid rgba(255,255,255,0.05)', 
                       cursor: activeTab === 'Order History' ? 'pointer' : 'default',
                       transition: 'background 0.2s',
-                      ...(activeTab === 'Order History' ? { '&:hover': { background: 'rgba(255,255,255,0.05)' } } : {})
+                      ...({})
                     }}
                     onMouseEnter={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                     onMouseLeave={(e) => activeTab === 'Order History' && (e.currentTarget.style.background = 'transparent')}

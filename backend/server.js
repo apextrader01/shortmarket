@@ -975,13 +975,12 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
 // ─── Holdings ─────────────────────────────────────────────────────────────
 app.get('/api/holdings', authenticateToken, async (req, res) => {
   try {
+    // BUG FIX: Filter zero-qty holdings in SQL, not in JS after fetching
     const holdings = await db('holdings')
       .where({ user_id: req.user.id })
+      .whereNot({ quantity: 0 })
       .orderBy('id', 'desc');
-      
-    // Filter out zero quantities just in case
-    const filteredHoldings = holdings.filter(h => h.quantity !== 0);
-    res.json(filteredHoldings);
+    res.json(holdings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1608,9 +1607,10 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       const orderId = typeof id === 'object' ? id.id : id;
       
       const triggerEngine = require('./services/triggerEngine');
+      // BUG FIX: Use effectiveProductType (not raw product_type from req.body which may be undefined)
       triggerEngine.addOrderToMemory({
         id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: product_type || 'DEL', margin: marginToSave
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
       });
       
       setTimeout(() => {
@@ -1963,64 +1963,94 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 // ─── Cancel Order ─────────────────────────────────────────────────────────
 app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
   try {
+    let cancelledOrder = null;
     await db.transaction(async (trx) => {
       const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
-      if (!order) return res.status(404).json({ error: 'Order not found' });
-      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') return res.status(400).json({ error: 'Only pending orders can be cancelled' });
+      // BUG FIX: Use throw instead of return res.status() inside a transaction.
+      // 'return' only exits the callback arrow function, NOT the transaction — throw aborts it properly.
+      if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
+      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER')
+        throw Object.assign(new Error('Only pending orders can be cancelled'), { statusCode: 400 });
       
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
       
-      // OCO: Cancel sibling if it exists
+      // OCO: Cancel sibling legs if this is a BO leg
       if (order.parent_order_id) {
-          await trx('orders')
+          const cancelledSiblings = await trx('orders')
             .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
-            .whereNot({ id: order.id })
-            .update({ status: 'CANCELLED', updated_at: new Date() });
-            
+            .whereNot({ id: order.id });
+
+          for (const sib of cancelledSiblings) {
+            await trx('orders').where({ id: sib.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+          }
+
           // Bracket order cancelled: Auto-exit the underlying position at market
           const parentOrder = await trx('orders').where({ id: order.parent_order_id }).first();
           if (parentOrder && parentOrder.status === 'EXECUTED') {
-              const pos = await trx('positions').where({ user_id: req.user.id, symbol: order.symbol, product_type: parentOrder.product_type }).first();
-              if (pos && pos.quantity !== 0) {
+              const pos = await trx('positions').where({ user_id: req.user.id, symbol: order.symbol, product_type: parentOrder.product_type }).whereNot({ quantity: 0 }).first();
+              if (pos) {
                  const exitQty = Math.min(Math.abs(pos.quantity), Number(parentOrder.quantity));
                  const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
                  
                  if (exitQty > 0) {
-                   await trx('orders').insert({
+                   const [exitOrderId] = await trx('orders').insert({
                      user_id: req.user.id,
                      symbol: pos.symbol,
                      type: 'MARKET',
                      side: exitSide,
                      quantity: exitQty,
                      price: null,
-                     status: 'PENDING', // orderExecutor will pick this up instantly
+                     status: 'PENDING',
                      product_type: pos.product_type || 'INT',
-                     margin: 0
+                     margin: 0,
+                     created_at: new Date(),
+                     updated_at: new Date()
+                   }).returning('id');
+                   const exitOrderIdVal = typeof exitOrderId === 'object' ? exitOrderId.id : exitOrderId;
+                   // BUG FIX: Immediately add the auto-exit order to trigger engine memory
+                   // so it doesn't wait for reload_triggers pub/sub delay
+                   const triggerEngineLocal = require('./services/triggerEngine');
+                   await triggerEngineLocal.addOrderToMemory({
+                     id: exitOrderIdVal, user_id: req.user.id, symbol: pos.symbol, type: 'MARKET',
+                     side: exitSide, quantity: exitQty, price: null, status: 'PENDING',
+                     product_type: pos.product_type || 'INT', margin: 0
                    });
                  }
               }
           }
       }
       
-      // Refund Margin
-      const refundAmount = order.margin ? parseFloat(order.margin) : (order.quantity * parseFloat(order.price || 0));
+      // BUG FIX: Always use order.margin for refund.
+      // Previous fallback (order.quantity * order.price) gave ₹0 refund for MARKET orders
+      // because market order price is null at placement time.
+      const refundAmount = parseFloat(order.margin) || 0;
       if (refundAmount > 0) {
           const user = await trx('users').where({ id: req.user.id }).first();
           await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
+          // BUG FIX: Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
+          await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: refundAmount,
+            type: 'MARGIN_RELEASE',
+            description: `Margin refunded for cancelled order: ${order.quantity} ${order.symbol} ${order.side}`
+          });
       }
       
-      const triggerEngine = require('./services/triggerEngine');
-      triggerEngine.removeOrderFromMemory(req.params.id, order.symbol);
-      try {
-          const { pubClient } = require('./services/redisClient');
-          if (pubClient) pubClient.publish('reload_triggers', '1');
-      } catch(e) {}
-      
-      res.json({ success: true });
+      cancelledOrder = order;
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    triggerEngine.removeOrderFromMemory(req.params.id, cancelledOrder.symbol);
+    try {
+        const { pubClient } = require('./services/redisClient');
+        if (pubClient) pubClient.publish('reload_triggers', '1');
+    } catch(e) {}
+    
+    res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({ error: err.message });
   }
 });
 
