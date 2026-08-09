@@ -294,7 +294,9 @@ function startLiveWebSocket() {
             // MCX is open until 23:30/23:55, so we need to run watchdog until hour 23
             const d = new Date();
             const h = d.getHours();
-            if (staleSec > 30 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
+            const day = d.getDay();
+            const isWeekend = (day === 0 || day === 6);
+            if (!isWeekend && staleSec > 30 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
                 console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! Forcing reconnect...`);
                 startLiveWebSocket();
             }
