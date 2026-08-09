@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { X, Wallet, ArrowRight } from 'lucide-react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function DepositModal({ onClose }) {
-  const { requestDeposit, user } = useStore();
+  const { requestDeposit, user } = useStore(useShallow(state => ({ requestDeposit: state.requestDeposit, user: state.user })));
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);

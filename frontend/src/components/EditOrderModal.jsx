@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { X, Maximize2, Info } from 'lucide-react';
 
 export default function EditOrderModal() {
-  const { editOrderModal, closeEditOrderModal, user, updateOrder, prices } = useStore();
+  const { editOrderModal, closeEditOrderModal, user, updateOrder, prices } = useStore(useShallow(state => ({ editOrderModal: state.editOrderModal, closeEditOrderModal: state.closeEditOrderModal, user: state.user, updateOrder: state.updateOrder, prices: state.prices })));
   const order = editOrderModal.order;
   
   const [quantity, setQuantity] = useState(1);

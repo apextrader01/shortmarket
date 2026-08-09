@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Box } from 'lucide-react';
 
 export default function OrdersView() {
-  const { orders, pendingTriggers, removePendingTrigger } = useStore();
+  const { orders, pendingTriggers, removePendingTrigger } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger })));
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');

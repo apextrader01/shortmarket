@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function LoginView() {
-  const { login, register, forgotPassword, resetPassword, authError } = useStore();
+  const { login, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset'
   const [view, setView] = useState('login');

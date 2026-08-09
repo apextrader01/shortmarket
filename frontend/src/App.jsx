@@ -24,18 +24,13 @@ import LoginView from './components/LoginView';
 import PricingView from './components/PricingView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
+import { useShallow } from 'zustand/react/shallow';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X } from 'lucide-react';
 
 const TOP_INDICES = ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE'];
 
 function App() {
-  const {
-    user, logout,
-    initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices,
-    selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal,
-    alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder,
-    oneClickMultiplier, stocks
-  } = useStore();
+  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, prices, toggleTheme, theme, orderModal, editOrderModal, alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder, oneClickMultiplier, stocks } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, prices: state.prices, toggleTheme: state.toggleTheme, theme: state.theme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, alerts: state.alerts, updateAlert: state.updateAlert, clearOldAlerts: state.clearOldAlerts, pendingTriggers: state.pendingTriggers, updatePendingTrigger: state.updatePendingTrigger, placeOrder: state.placeOrder, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
 

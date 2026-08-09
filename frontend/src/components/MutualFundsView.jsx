@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore();
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
   const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');

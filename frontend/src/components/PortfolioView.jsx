@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PortfolioView() {
   const [activeTab, setActiveTab] = useState('Overview');
-  const { positions, holdings, prices, orders } = useStore();
+  const { positions, holdings, prices, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices, orders: state.orders })));
 
   let totalInvested = 0;
   let totalCurrent = 0;

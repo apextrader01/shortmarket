@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
-  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount } = useStore();
+  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, updateProfilePicture: state.updateProfilePicture, theme: state.theme, toggleTheme: state.toggleTheme, setTheme: state.setTheme, resetAccount: state.resetAccount })));
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);

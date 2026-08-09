@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function PositionsTable() {
   const [viewMode, setViewMode] = useState('OPEN');
-  const { positions, orders, prices, user } = useStore();
+  const { positions, orders, prices, user } = useStore(useShallow(state => ({ positions: state.positions, orders: state.orders, prices: state.prices, user: state.user })));
 
   const filteredPositions = positions.filter(pos => viewMode === 'OPEN' ? pos.quantity !== 0 : pos.quantity === 0);
 

@@ -1,9 +1,10 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore();
+  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal })));
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP

@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { FileText, PieChart, BarChart2, Download, Search, Filter, ArrowLeft, Calendar, FileDown } from 'lucide-react';
@@ -46,7 +47,7 @@ const LedgerStatement = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  const { token } = useStore();
+  const { token } = useStore(useShallow(state => ({ token: state.token })));
 
   useEffect(() => {
     const fetchLedger = async () => {
@@ -304,7 +305,7 @@ const TradesAndCharges = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Date-Wise View');
-  const { orders } = useStore();
+  const { orders } = useStore(useShallow(state => ({ orders: state.orders })));
 
   const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
 
@@ -655,7 +656,7 @@ const ProfitAndLoss = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Month-Wise View');
-  const { positions, orders } = useStore();
+  const { positions, orders } = useStore(useShallow(state => ({ positions: state.positions, orders: state.orders })));
 
   const filteredPositions = (positions || []).filter(entry => {
     const entryDate = new Date(entry.updated_at || entry.created_at);

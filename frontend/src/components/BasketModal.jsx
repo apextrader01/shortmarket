@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag } from 'lucide-react';
 
 export default function BasketModal() {
-  const { 
-    basketModalOpen, setBasketModalOpen, 
-    basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, 
-    prices, user, restrictedStocks 
-  } = useStore();
+  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks })));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);

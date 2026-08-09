@@ -1,12 +1,10 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore, socket } from '../store';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
-  const { 
-    domLadderModal, closeDomLadderModal, marketDepthData, prices, 
-    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal
-  } = useStore();
+  const { domLadderModal, closeDomLadderModal, marketDepthData, prices, oneClickMode, oneClickMultiplier, placeOrder, openOrderModal } = useStore(useShallow(state => ({ domLadderModal: state.domLadderModal, closeDomLadderModal: state.closeDomLadderModal, marketDepthData: state.marketDepthData, prices: state.prices, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder, openOrderModal: state.openOrderModal })));
 
   const symbol = domLadderModal.symbol;
   const basicData = prices[symbol] || {};

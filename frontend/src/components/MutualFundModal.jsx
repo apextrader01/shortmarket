@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, TrendingUp, Calendar, Info } from 'lucide-react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundModal({ fund, onClose }) {
@@ -8,7 +9,7 @@ export default function MutualFundModal({ fund, onClose }) {
   const [amount, setAmount] = useState('5000');
   const [sipDate, setSipDate] = useState('5'); // Day of month
 
-  const { user } = useStore();
+  const { user } = useStore(useShallow(state => ({ user: state.user })));
   const balanceNum = Number(user?.balance) || 0;
   const isInsufficient = tab === 'Lumpsum' && balanceNum < Number(amount);
 

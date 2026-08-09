@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Briefcase, TrendingUp, TrendingDown, Target, Activity, X } from 'lucide-react';
 
 const extractUnderlying = (symbol) => {
@@ -9,7 +10,7 @@ const extractUnderlying = (symbol) => {
 
 export default function PositionsView() {
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
-  const { positions, holdings, prices } = useStore();
+  const { positions, holdings, prices } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices })));
   const mergedHoldingsMap = {};
   if (viewMode === 'HOLDINGS') {
     (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });

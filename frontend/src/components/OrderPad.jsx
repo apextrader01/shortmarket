@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { CheckCircle, XCircle } from 'lucide-react';
 
 export default function OrderPad() {
-  const { selectedSymbol, prices, placeOrder, orders, cancelOrder } = useStore();
+  const { selectedSymbol, prices, placeOrder, orders, cancelOrder } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, prices: state.prices, placeOrder: state.placeOrder, orders: state.orders, cancelOrder: state.cancelOrder })));
   const [type, setType] = useState('MARKET');
   const [quantity, setQuantity] = useState('1');
   const [price, setPrice] = useState('');

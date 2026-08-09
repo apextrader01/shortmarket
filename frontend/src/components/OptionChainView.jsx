@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
@@ -98,7 +99,7 @@ const OptionChainView = () => {
   const basketMode = useStore((state) => state.basketMode);
   const setBasketMode = useStore((state) => state.setBasketMode);
   const addToBasket = useStore((state) => state.addToBasket);
-  const { basketItems, setBasketModalOpen, oneClickMode, oneClickMultiplier, placeOrder } = useStore();
+  const { basketItems, setBasketModalOpen, oneClickMode, oneClickMultiplier, placeOrder } = useStore(useShallow(state => ({ basketItems: state.basketItems, setBasketModalOpen: state.setBasketModalOpen, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder })));
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
   const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
   const openMarketDepthModal = useStore((state) => state.openMarketDepthModal);

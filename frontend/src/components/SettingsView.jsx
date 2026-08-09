@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap } from 'lucide-react';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier } = useStore();
+  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier } = useStore(useShallow(state => ({ user: state.user, updatePassword: state.updatePassword, logout: state.logout, oneClickMode: state.oneClickMode, setOneClickMode: state.setOneClickMode, oneClickMultiplier: state.oneClickMultiplier, setOneClickMultiplier: state.setOneClickMultiplier })));
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

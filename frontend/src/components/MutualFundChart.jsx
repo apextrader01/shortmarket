@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, AreaSeries } from 'lightweight-charts';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Loader2 } from 'lucide-react';
 
 export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
     const chartContainerRef = useRef();
-    const { fetchFundHistory, fundHistoryCache } = useStore();
+    const { fetchFundHistory, fundHistoryCache } = useStore(useShallow(state => ({ fetchFundHistory: state.fetchFundHistory, fundHistoryCache: state.fundHistoryCache })));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 

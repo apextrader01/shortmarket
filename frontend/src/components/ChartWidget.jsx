@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import { SMA, EMA, RSI, MACD } from 'technicalindicators';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import StockDetails from './StockDetails';
 
@@ -38,12 +39,7 @@ export default function ChartWidget() {
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
 
-  const {
-    selectedSymbol, prices, candleData,
-    isLoadingCandles, candleError,
-    chartInterval, setChartInterval, loadCandleData,
-    openOrderModal
-  } = useStore();
+  const { selectedSymbol, prices, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, prices: state.prices, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal })));
 
   const price   = prices[selectedSymbol];
   const candles = candleData[selectedSymbol] || [];

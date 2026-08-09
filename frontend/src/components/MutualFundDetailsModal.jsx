@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { X, TrendingUp, Info, CheckCircle, XCircle, ChevronRight, Activity, PieChart, Shield, Calculator } from 'lucide-react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, fetchFundHistory, placeOrder, setupSip } = useStore();
+    const { fetchFundDetails, fetchFundHistory, placeOrder, setupSip } = useStore(useShallow(state => ({ fetchFundDetails: state.fetchFundDetails, fetchFundHistory: state.fetchFundHistory, placeOrder: state.placeOrder, setupSip: state.setupSip })));
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isInvesting, setIsInvesting] = useState(false);

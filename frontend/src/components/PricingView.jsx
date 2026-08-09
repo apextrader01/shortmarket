@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Check, Star, Shield, Zap } from 'lucide-react';
 
 export default function PricingView() {
-  const { user } = useStore();
+  const { user } = useStore(useShallow(state => ({ user: state.user })));
   const [loading, setLoading] = useState(false);
 
   // Initialize Razorpay logic

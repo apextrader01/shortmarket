@@ -1,10 +1,11 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState } from 'react';
 import { useStore, API } from '../store';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
 
 export default function AnalyticsView() {
-  const { user } = useStore();
+  const { user } = useStore(useShallow(state => ({ user: state.user })));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
