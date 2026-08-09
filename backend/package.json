@@ -32,9 +32,10 @@
     "pg": "^8.22.0",
     "razorpay": "^2.9.8",
     "redis": "^6.2.0",
-    "smartapi-javascript": "^1.0.27",
     "socket.io": "^4.8.3",
-    "totp-generator": "^2.0.1"
+    "totp-generator": "^2.0.1",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "overrides": {
     "axios": "^1.7.2",

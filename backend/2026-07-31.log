@@ -1,2 +1,0 @@
-{"level":"error","datetime":"2026-07-31T13:44:38.328Z","message":"getQuotes response","data":{"Error":{"message":"Please provide valid token","code":-15,"s":"error"},"inputs":["NSE:SBIN-EQ"]},"functionName":"getQuotes"}
-{"level":"error","datetime":"2026-07-31T14:06:55.170Z","message":"getQuotes response","data":{"Error":{"message":"Please provide valid token","code":-15,"s":"error"},"inputs":["INVALID:SYMBOL-EQ"]},"functionName":"getQuotes"}

@@ -13,6 +13,8 @@ let lastDataSocketError = null;
 let lastTickTime = Date.now();
 let isMasterNode = false;
 
+let dirtySymbols = new Set(); // Track symbols that changed in the last 300ms
+
 // The global map of ALL subscriptions we care about (used by PM2 master);
 
 const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
@@ -206,13 +208,20 @@ async function initFyers(io, pc, isMaster = true) {
         console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
     }
     
-    // Start interval to broadcast LTPs to all clients connected to this instance
+    // Start interval to broadcast LTPs to clients using WebSocket Rooms (Debounced)
     if (isMasterNode) {
         setInterval(() => {
-            if (Object.keys(sharedPriceCache).length > 0) {
-                global_io.emit('price_snapshot', sharedPriceCache);
+            if (dirtySymbols.size > 0) {
+                dirtySymbols.forEach(sym => {
+                    const priceObj = sharedPriceCache[sym];
+                    if (priceObj && global_io) {
+                        // Broadcast ONLY to the specific room for this symbol
+                        global_io.to(sym).emit('price_snapshot', { [sym]: priceObj });
+                    }
+                });
+                dirtySymbols.clear();
             }
-        }, 200); // Ultra-fast LTP updates
+        }, 300); // 300ms debounce
     }
 }
 
@@ -347,6 +356,7 @@ function startLiveWebSocket() {
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
+                    dirtySymbols.add(uniqueSymbol); // Mark as dirty for the debounce interval
                     
                     // Publish to Redis for PM2 Workers
                     try {

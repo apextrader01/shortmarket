@@ -3,6 +3,13 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 process.env.TZ = 'Asia/Kolkata';
 
 // Ultimate Crash Reporter
+const logger = require('./services/logger');
+
+// Override global console methods for Winston integration
+console.log = (...args) => logger.info(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+console.error = (...args) => logger.error(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+console.warn = (...args) => logger.warn(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+
 process.on('uncaughtException', err => {
   console.error('FATAL UNCAUGHT EXCEPTION:', err);
   // Do not exit, just log it so Railway doesn't crash
@@ -146,71 +153,111 @@ app.get('/api/stocks/lotsizes', (req, res) => {
   res.json(result);
 });
 
-let cachedStocksArray = null;
-app.get('/api/stocks', (req, res) => {
-  if (cachedStocksArray) return res.json(cachedStocksArray);
-  
-  const { STOCK_MASTER } = require('./services/instruments');
-  if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
-  
-  // Only send NSE equities and Indices to the frontend to avoid huge payloads (options/futures are massive)
-  cachedStocksArray = Object.entries(STOCK_MASTER)
-    .filter(([token, info]) => info.exchange === 'NSE' || info.exchange === 'BSE')
-    .map(([token, info]) => ({
-      token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
-    }));
-  res.json(cachedStocksArray);
+app.get('/api/stocks', async (req, res) => {
+  try {
+    const { generalClient } = require('./services/redisClient');
+    const cacheKey = 'api:stocks:nse_bse';
+    
+    // 1. Try Redis cache first
+    if (generalClient && generalClient.isReady) {
+      const cached = await generalClient.get(cacheKey);
+      if (cached) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(cached);
+      }
+    }
+    
+    // 2. Compute if not in cache
+    const { STOCK_MASTER } = require('./services/instruments');
+    if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
+    
+    const stocksArray = Object.entries(STOCK_MASTER)
+      .filter(([token, info]) => info.exchange === 'NSE' || info.exchange === 'BSE')
+      .map(([token, info]) => ({
+        token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
+      }));
+      
+    const responseData = JSON.stringify(stocksArray);
+    
+    // 3. Save to Redis (cache for 6 hours)
+    if (generalClient && generalClient.isReady) {
+      await generalClient.set(cacheKey, responseData, { EX: 21600 }).catch(console.error);
+    }
+    
+    res.setHeader('Content-Type', 'application/json');
+    res.send(responseData);
+  } catch (err) {
+    console.error('Stocks API Error:', err);
+    res.status(500).json([]);
+  }
 });
 
-  app.get('/api/stocks/search', (req, res) => {
+  app.get('/api/stocks/search', async (req, res) => {
     const q = req.query.q;
     if (!q || q.length < 2) return res.json([]);
     
-    const { SEARCH_INDEX } = require('./services/instruments');
-
     const qLower = q.toLowerCase();
-    const queryParts = qLower.split(/\s+/).filter(Boolean);
     
-    // Extremely fast filter against pre-computed search string
-    let finalResults = SEARCH_INDEX.filter(item => {
-      for (let i = 0; i < queryParts.length; i++) {
-        if (!item.searchString.includes(queryParts[i])) {
-          return false;
+    try {
+      const { generalClient } = require('./services/redisClient');
+      const cacheKey = `api:search:${qLower}`;
+      
+      if (generalClient && generalClient.isReady) {
+        const cached = await generalClient.get(cacheKey);
+        if (cached) {
+          res.setHeader('Content-Type', 'application/json');
+          return res.send(cached);
         }
       }
-      return true;
-    });
 
-    // Sort exact matches and indices to the top
-    finalResults.sort((a, b) => {
-      const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
-      const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
+      const { SEARCH_INDEX } = require('./services/instruments');
+      const queryParts = qLower.split(/\s+/).filter(Boolean);
       
-      // Prefer Cash/Indices (NSE) over derivatives
-      const aIsCash = (a.exchange === 'NSE');
-      const bIsCash = (b.exchange === 'NSE');
-      if (aIsCash && !bIsCash) return -1;
-      if (!aIsCash && bIsCash) return 1;
+      let finalResults = SEARCH_INDEX.filter(item => {
+        for (let i = 0; i < queryParts.length; i++) {
+          if (!item.searchString.includes(queryParts[i])) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      finalResults.sort((a, b) => {
+        const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
+        const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        
+        const aIsCash = (a.exchange === 'NSE');
+        const bIsCash = (b.exchange === 'NSE');
+        if (aIsCash && !bIsCash) return -1;
+        if (!aIsCash && bIsCash) return 1;
+        
+        const aIsFut = a.symbol.includes('FUT');
+        const bIsFut = b.symbol.includes('FUT');
+        if (aIsFut && !bIsFut) return -1;
+        if (!aIsFut && bIsFut) return 1;
+        
+        const aExpiry = a.expiryTimestamp || Infinity;
+        const bExpiry = b.expiryTimestamp || Infinity;
+        if (aExpiry !== bExpiry) return aExpiry - bExpiry;
+        
+        return 0;
+      });
+
+      const results = finalResults.slice(0, 50);
+      const responseData = JSON.stringify(results);
       
-      // Prefer Futures over Options
-      const aIsFut = a.symbol.includes('FUT');
-      const bIsFut = b.symbol.includes('FUT');
-      if (aIsFut && !bIsFut) return -1;
-      if (!aIsFut && bIsFut) return 1;
-      
-      // Sort by nearest expiry if available
-      const aExpiry = a.expiryTimestamp || Infinity;
-      const bExpiry = b.expiryTimestamp || Infinity;
-      if (aExpiry !== bExpiry) {
-        return aExpiry - bExpiry;
+      if (generalClient && generalClient.isReady) {
+        await generalClient.set(cacheKey, responseData, { EX: 3600 }).catch(console.error); // 1 hour cache
       }
       
-      return 0;
-    });
-
-    res.json(finalResults.slice(0, 50));
+      res.setHeader('Content-Type', 'application/json');
+      res.send(responseData);
+    } catch (err) {
+      console.error('Search API Error:', err);
+      res.json([]);
+    }
   });
 
 // ─── Auth ───────────────────────────────────────────────────────────────────

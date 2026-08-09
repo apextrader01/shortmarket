@@ -1,2 +1,0 @@
-{"level":"error","datetime":"2026-08-03T14:34:23.850Z","message":"HSM key not found in token","data":null,"functionName":"decodeJWTAndExtractHSMKey"}
-{"level":"error","datetime":"2026-08-03T14:34:23.861Z","message":"HSM key not found in token","data":"Invalid JWT: \"hsm_key\" missing or token is invalid.","functionName":"decodeJWTAndExtractHSMKey"}
