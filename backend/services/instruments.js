@@ -3,6 +3,7 @@ const path = require('path');
 
 let STOCK_MASTER = {};
 let symbolToToken = {};
+let tokenToSymbol = {};
 let allTokens = [];
 let SEARCH_INDEX = [];
 
@@ -10,9 +11,13 @@ let globalNfoOptions = {};
 let globalNfoFutures = {};
 let globalBseSpots = {};
 
-function loadInstrumentMaster() {
+async function loadInstrumentMaster() {
     try {
-        console.log('🔌 Loading instruments master from local cache...');
+        console.log('🔌 Loading instruments master into PostgreSQL...');
+        const db = require('../database/db');
+        
+        // Wait for DB schema to be ready (rudimentary check)
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         let nseStocks = {};
         try {
@@ -68,7 +73,7 @@ function loadInstrumentMaster() {
         };
 
         const getExpiryTimestamp = (expiryStr) => {
-            if (!expiryStr) return Infinity;
+            if (!expiryStr) return null;
             const day = parseInt(expiryStr.slice(0, 2), 10);
             const monthStr = expiryStr.slice(2, 5).toUpperCase();
             let year = parseInt(expiryStr.slice(5), 10);
@@ -79,13 +84,13 @@ function loadInstrumentMaster() {
             if (!isNaN(day) && month !== undefined && !isNaN(year)) {
                 return new Date(year, month, day).getTime();
             }
-            return Infinity;
+            return null;
         };
 
-        STOCK_MASTER = { ...indices };
+        let tempStockMaster = { ...indices };
         symbolToToken = {};
 
-        for (const [token, info] of Object.entries(STOCK_MASTER)) {
+        for (const [token, info] of Object.entries(tempStockMaster)) {
             info.uniqueSymbol = `${info.symbol}-${info.exchange}`;
             symbolToToken[info.uniqueSymbol] = token;
         }
@@ -102,7 +107,7 @@ function loadInstrumentMaster() {
                             types.CE.uniqueSymbol = `${types.CE.symbol}-${suffix}`;
                             types.CE.expiryTimestamp = expiryTs;
                             symbolToToken[types.CE.uniqueSymbol] = types.CE.token;
-                            STOCK_MASTER[types.CE.token] = types.CE;
+                            tempStockMaster[types.CE.token] = types.CE;
                         }
                         if (types.PE) {
                             const ex = types.PE.exch_seg || types.PE.exchange;
@@ -110,7 +115,7 @@ function loadInstrumentMaster() {
                             types.PE.uniqueSymbol = `${types.PE.symbol}-${suffix}`;
                             types.PE.expiryTimestamp = expiryTs;
                             symbolToToken[types.PE.uniqueSymbol] = types.PE.token;
-                            STOCK_MASTER[types.PE.token] = types.PE;
+                            tempStockMaster[types.PE.token] = types.PE;
                         }
                     });
                 }
@@ -127,7 +132,7 @@ function loadInstrumentMaster() {
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
                     fut.expiryTimestamp = expiryTs;
                     symbolToToken[fut.uniqueSymbol] = fut.token;
-                    STOCK_MASTER[fut.token] = fut;
+                    tempStockMaster[fut.token] = fut;
                 }
             });
         }
@@ -139,7 +144,7 @@ function loadInstrumentMaster() {
                     uniqueSymbol += '-BSE';
                 }
                 
-                STOCK_MASTER[stock.token] = {
+                tempStockMaster[stock.token] = {
                     symbol: stock.symbol.replace('-EQ', ''),
                     name: stock.name,
                     exchange: stock.exchange,
@@ -155,39 +160,63 @@ function loadInstrumentMaster() {
             allTokens = allTokens.concat(nseStocks.map(s => s.token));
         }
 
-        // Build SEARCH_INDEX
-        SEARCH_INDEX = [];
-        for (const [token, value] of Object.entries(STOCK_MASTER)) {
+        // Build records for PostgreSQL
+        let dbRecords = [];
+        tokenToSymbol = {};
+        for (const [token, value] of Object.entries(tempStockMaster)) {
             if (!value || !value.symbol) continue;
             const ex = value.exchange || value.exch_seg || 'NSE';
-            if (ex === 'BSE' && value.symbol.length > 5) continue; // Skip junk BSE spots (keep only major BSE stocks if any)
+            if (ex === 'BSE' && value.symbol.length > 5) continue; 
+            
+            const uniqueSym = value.uniqueSymbol || `${value.symbol}-${ex}`;
+            tokenToSymbol[token] = uniqueSym;
             
             const name = value.name || value.symbol;
-            SEARCH_INDEX.push({
+            dbRecords.push({
                 token,
                 symbol: value.symbol,
                 name: name,
                 exchange: ex,
                 lotsize: Number(value.lotsize || 1),
-                expiryTimestamp: value.expiryTimestamp || Infinity,
-                uniqueSymbol: value.uniqueSymbol || `${value.symbol}-${ex}`,
-                searchString: `${value.symbol} ${name} ${ex}`.toLowerCase()
+                expiry_timestamp: value.expiryTimestamp || null,
+                unique_symbol: uniqueSym,
+                search_string: `${value.symbol} ${name} ${ex}`.toLowerCase()
             });
         }
+        
+        // Insert in batches of 2000 to prevent query size limits
+        const existingCount = await db('instruments').count('token as count').first();
+        
+        if (existingCount && existingCount.count == 0) {
+            console.log(`📦 Inserting ${dbRecords.length} instruments to Postgres...`);
+            const BATCH_SIZE = 2000;
+            for (let i = 0; i < dbRecords.length; i += BATCH_SIZE) {
+                const batch = dbRecords.slice(i, i + BATCH_SIZE);
+                await db('instruments').insert(batch).onConflict('token').merge();
+            }
+            console.log(`✅ Postgres instruments populated successfully!`);
+        } else {
+            console.log(`✅ Postgres instruments already populated (Found ${existingCount.count}).`);
+        }
 
-        console.log(`📦 Loaded ${Object.keys(STOCK_MASTER).length} instruments`);
-        console.log(`🔍 Built Search Index with ${SEARCH_INDEX.length} instruments`);
+        // FREE MEMORY (GC will clean these up now)
+        tempStockMaster = null;
+        dbRecords = null;
+        SEARCH_INDEX = []; 
+        STOCK_MASTER = {}; // Deprecated, left empty to avoid breaking legacy requires
+        
     } catch (e) {
         console.error('Failed to load local instrument master:', e.message);
     }
 }
 
-// Load synchronously on startup
+// Load asynchronously on startup
 loadInstrumentMaster();
 
 module.exports = {
     STOCK_MASTER,
     symbolToToken,
+    tokenToSymbol,
     allTokens,
     globalNfoOptions,
     globalNfoFutures,

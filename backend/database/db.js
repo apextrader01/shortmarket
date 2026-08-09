@@ -353,6 +353,23 @@ async function initSchema() {
       console.log('Created system_configs table');
     }
 
+    // 8. Instruments Table (For Memory Optimization)
+    const hasInstruments = await db.schema.hasTable('instruments');
+    if (!hasInstruments) {
+      await db.schema.createTable('instruments', table => {
+        table.string('token').primary();
+        table.string('symbol').notNullable().index();
+        table.string('name');
+        table.string('exchange');
+        table.integer('lotsize').defaultTo(1);
+        table.string('unique_symbol').index();
+        table.bigInteger('expiry_timestamp');
+        table.string('search_string').index(); // Simple B-tree index for ILIKE fallback or perfect matching
+        table.timestamps(true, true);
+      });
+      console.log('Created instruments table');
+    }
+
     // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {

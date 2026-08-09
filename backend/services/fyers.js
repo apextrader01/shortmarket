@@ -96,10 +96,10 @@ function fromFyersSymbol(fyersSymbol) {
     try {
         const token = fyersToToken[fyersSymbol];
         if (token) {
-            const { STOCK_MASTER } = require('./instruments');
-            const stock = STOCK_MASTER[token];
-            if (stock && stock.uniqueSymbol) {
-                return stock.uniqueSymbol;
+            const { tokenToSymbol } = require('./instruments');
+            const uniqueSym = tokenToSymbol[token];
+            if (uniqueSym) {
+                return uniqueSym;
             }
         }
     } catch(e) {}

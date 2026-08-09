@@ -136,21 +136,37 @@ app.get('/api/prices/batch', async (req, res) => {
 });
 
 // ─── Stocks (full instrument master) ──────────────────────────────────────
-app.get('/api/stocks/lotsizes', (req, res) => {
+app.get('/api/stocks/lotsizes', async (req, res) => {
   const symbols = req.query.symbols?.split(',') || [];
   if (symbols.length === 0) return res.json({});
   
-  const { symbolToToken, STOCK_MASTER } = require('./services/instruments');
-  const result = {};
-  symbols.forEach(sym => {
-    const token = symbolToToken[sym];
-    if (token && STOCK_MASTER[token] && STOCK_MASTER[token].lotsize) {
-      result[sym] = Number(STOCK_MASTER[token].lotsize);
-    } else {
-      result[sym] = 1;
+  try {
+    const db = require('./database/db');
+    const { symbolToToken } = require('./services/instruments');
+    
+    // Fallback if symbolToToken is empty before fully booted
+    const tokens = symbols.map(s => symbolToToken[s]).filter(Boolean);
+    
+    const result = {};
+    if (tokens.length > 0) {
+      const dbLots = await db('instruments').whereIn('token', tokens).select('token', 'unique_symbol', 'lotsize');
+      for (const row of dbLots) {
+        if (row.unique_symbol) {
+          result[row.unique_symbol] = row.lotsize || 1;
+        }
+      }
     }
-  });
-  res.json(result);
+    
+    // Ensure all requested symbols have at least lotsize 1 fallback
+    symbols.forEach(sym => {
+      if (!result[sym]) result[sym] = 1;
+    });
+    
+    res.json(result);
+  } catch (err) {
+    console.error('/api/lotsizes Error:', err);
+    res.json({});
+  }
 });
 
 app.get('/api/stocks', async (req, res) => {
@@ -167,15 +183,25 @@ app.get('/api/stocks', async (req, res) => {
       }
     }
     
-    // 2. Compute if not in cache
-    const { STOCK_MASTER } = require('./services/instruments');
-    if (!STOCK_MASTER || Object.keys(STOCK_MASTER).length === 0) return res.json([]);
+    // 2. Compute if not in cache (Query Postgres)
+    const db = require('./database/db');
     
-    const stocksArray = Object.entries(STOCK_MASTER)
-      .filter(([token, info]) => info.exchange === 'NSE' || info.exchange === 'BSE')
-      .map(([token, info]) => ({
-        token, symbol: info.symbol, name: info.name, exchange: info.exchange, uniqueSymbol: info.uniqueSymbol
-      }));
+    // Fetch all NSE/BSE cash equities
+    const dbResults = await db('instruments')
+      .whereIn('exchange', ['NSE', 'BSE'])
+      .whereRaw("symbol NOT LIKE '%FUT%'")
+      .whereRaw("symbol NOT LIKE '%CE%'")
+      .whereRaw("symbol NOT LIKE '%PE%'");
+      
+    if (!dbResults || dbResults.length === 0) return res.json([]);
+    
+    const stocksArray = dbResults.map(item => ({
+        token: item.token, 
+        symbol: item.symbol, 
+        name: item.name, 
+        exchange: item.exchange, 
+        uniqueSymbol: item.unique_symbol
+    }));
       
     const responseData = JSON.stringify(stocksArray);
     
@@ -210,19 +236,21 @@ app.get('/api/stocks', async (req, res) => {
         }
       }
 
-      const { SEARCH_INDEX } = require('./services/instruments');
-      const queryParts = qLower.split(/\s+/).filter(Boolean);
+      // 2. Compute if not in cache (Query Postgres)
+      const db = require('./database/db');
       
-      let finalResults = SEARCH_INDEX.filter(item => {
-        for (let i = 0; i < queryParts.length; i++) {
-          if (!item.searchString.includes(queryParts[i])) {
-            return false;
-          }
-        }
-        return true;
+      const queryParts = qLower.split(/\s+/).filter(Boolean);
+      let query = db('instruments');
+      
+      // Build ILIKE query for each term
+      queryParts.forEach(term => {
+          query = query.where('search_string', 'ILIKE', `%${term}%`);
       });
 
-      finalResults.sort((a, b) => {
+      // Execute query and fetch up to 200 results to sort
+      let dbResults = await query.limit(200);
+
+      dbResults.sort((a, b) => {
         const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
         const bExact = b.symbol.toLowerCase() === qLower || (b.name && b.name.toLowerCase() === qLower);
         if (aExact && !bExact) return -1;
@@ -238,14 +266,24 @@ app.get('/api/stocks', async (req, res) => {
         if (aIsFut && !bIsFut) return -1;
         if (!aIsFut && bIsFut) return 1;
         
-        const aExpiry = a.expiryTimestamp || Infinity;
-        const bExpiry = b.expiryTimestamp || Infinity;
+        const aExpiry = a.expiry_timestamp ? Number(a.expiry_timestamp) : Infinity;
+        const bExpiry = b.expiry_timestamp ? Number(b.expiry_timestamp) : Infinity;
         if (aExpiry !== bExpiry) return aExpiry - bExpiry;
         
         return 0;
       });
 
-      const results = finalResults.slice(0, 50);
+      const results = dbResults.slice(0, 50).map(item => ({
+          token: item.token,
+          symbol: item.symbol,
+          name: item.name,
+          exchange: item.exchange,
+          lotsize: item.lotsize,
+          expiryTimestamp: item.expiry_timestamp,
+          uniqueSymbol: item.unique_symbol,
+          searchString: item.search_string
+      }));
+      
       const responseData = JSON.stringify(results);
       
       if (generalClient && generalClient.isReady) {
