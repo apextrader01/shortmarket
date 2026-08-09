@@ -67,7 +67,7 @@ export default function StockDetails({ symbol, price, candles }) {
     const similarAssets = details.similarAssets?.peerList || [];
     const financials = details.financialStatement || [];
     
-    // Fallbacks if price is missing from AngelOne
+    // Fallbacks if price is missing
     const livePrice = price?.ltp || details.priceData?.ltp || 0;
     
     // Get latest daily candle for today's high/low and volume
