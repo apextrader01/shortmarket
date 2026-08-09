@@ -15,85 +15,161 @@ class TriggerEngine {
     }
 
     /**
-     * Load all PENDING and PENDING_TRIGGER orders from DB into memory.
+     * Load all PENDING and PENDING_TRIGGER orders from DB into Redis ZSETs.
      */
     async loadPendingOrders() {
         try {
             const orders = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-            this.activeTriggers.clear();
+            
+            // Clear existing triggers in Redis
+            const { generalClient } = require('./redisClient');
+            if (generalClient && generalClient.isReady) {
+                const keys = await generalClient.keys('trigger:*');
+                if (keys.length > 0) {
+                    await generalClient.del(keys);
+                }
+            }
             
             for (const order of orders) {
-                this.addOrderToMemory(order);
+                await this.addOrderToMemory(order);
             }
-            console.log(`Loaded ${orders.length} active triggers into memory.`);
+            console.log(`Loaded ${orders.length} active triggers into Redis ZSETs.`);
         } catch (err) {
             console.error('Failed to load pending orders into TriggerEngine:', err);
         }
     }
 
-    addOrderToMemory(order) {
-        const triggers = this.activeTriggers.get(order.symbol) || [];
-        // Ensure no duplicates
-        const existingIdx = triggers.findIndex(o => o.id === order.id);
-        if (existingIdx >= 0) {
-            triggers[existingIdx] = order;
-        } else {
-            triggers.push(order);
+    async addOrderToMemory(order) {
+        const { generalClient } = require('./redisClient');
+        if (!generalClient || !generalClient.isReady) return;
+        
+        let key = null;
+        let score = null;
+        
+        if (order.status === 'PENDING') {
+            if (order.type === 'LIMIT') {
+                key = `trigger:${order.symbol}:${order.side}:LIMIT`;
+                score = Number(order.price);
+            } else if (order.type === 'MARKET') {
+                // Market orders should execute immediately, they won't normally sit in PENDING for ticks.
+                // But if they do, we can just give them a 0 (Buy) or Infinity (Sell) score to trigger instantly.
+                key = `trigger:${order.symbol}:${order.side}:LIMIT`;
+                score = order.side === 'BUY' ? 999999999 : 0;
+            }
+        } else if (order.status === 'PENDING_TRIGGER') {
+            const trigger = Number(order.trigger_price);
+            if (order.type.startsWith('SL') || order.type === 'LIMIT') {
+                // Determine if this leg triggers on >= or <=
+                // Buy SL triggers when LTP >= Trigger
+                // Sell SL triggers when LTP <= Trigger
+                // Buy Target (LIMIT) triggers when LTP <= Target
+                // Sell Target (LIMIT) triggers when LTP >= Target
+                let isGreaterOrEqual = false;
+                if (order.side === 'BUY' && order.type.startsWith('SL')) isGreaterOrEqual = true;
+                if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                
+                if (isGreaterOrEqual) {
+                    key = `trigger:${order.symbol}:GTE`;
+                } else {
+                    key = `trigger:${order.symbol}:LTE`;
+                }
+                score = trigger;
+            }
         }
-        this.activeTriggers.set(order.symbol, triggers);
+
+        if (key && score !== null) {
+            await generalClient.zAdd(key, [{ score: score, value: order.id.toString() }]);
+        }
     }
 
-    removeOrderFromMemory(orderId, symbol) {
-        const triggers = this.activeTriggers.get(symbol);
-        if (triggers) {
-            const filtered = triggers.filter(o => o.id !== orderId);
-            if (filtered.length === 0) {
-                this.activeTriggers.delete(symbol);
-            } else {
-                this.activeTriggers.set(symbol, filtered);
-            }
+    async removeOrderFromMemory(orderId, symbol) {
+        const { generalClient } = require('./redisClient');
+        if (!generalClient || !generalClient.isReady) return;
+        
+        // We just attempt to remove it from all 4 possible sets to be safe
+        const keys = [
+            `trigger:${symbol}:BUY:LIMIT`,
+            `trigger:${symbol}:SELL:LIMIT`,
+            `trigger:${symbol}:GTE`,
+            `trigger:${symbol}:LTE`
+        ];
+        
+        for (const key of keys) {
+            await generalClient.zRem(key, orderId.toString());
         }
     }
 
     /**
-     * Evaluates a live LTP tick from the WebSocket.
+     * Evaluates a live LTP tick using a blazing fast O(log N) Redis Lua Script.
+     * This atomically finds triggered orders and removes them from Redis.
      */
     async evaluateTick(symbol, ltp) {
         if (!ltp) return;
-        const triggers = this.activeTriggers.get(symbol);
-        if (!triggers || triggers.length === 0) return;
+        const { generalClient } = require('./redisClient');
+        if (!generalClient || !generalClient.isReady) return;
 
-        for (const order of triggers) {
-            let shouldExecute = false;
+        const luaScript = `
+            local results = {}
+            
+            -- Buy Limit (Execute if LTP <= Target) -> Score >= LTP
+            local buy_limits = redis.call('ZRANGEBYSCORE', KEYS[1], ARGV[1], '+inf')
+            if #buy_limits > 0 then
+                redis.call('ZREMRANGEBYSCORE', KEYS[1], ARGV[1], '+inf')
+                for i=1, #buy_limits do table.insert(results, buy_limits[i]) end
+            end
+            
+            -- Sell Limit (Execute if LTP >= Target) -> Score <= LTP
+            local sell_limits = redis.call('ZRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+            if #sell_limits > 0 then
+                redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+                for i=1, #sell_limits do table.insert(results, sell_limits[i]) end
+            end
+            
+            -- GTE Triggers (Execute if LTP >= Trigger) -> Score <= LTP
+            local gte_triggers = redis.call('ZRANGEBYSCORE', KEYS[3], '-inf', ARGV[1])
+            if #gte_triggers > 0 then
+                redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', ARGV[1])
+                for i=1, #gte_triggers do table.insert(results, gte_triggers[i]) end
+            end
+            
+            -- LTE Triggers (Execute if LTP <= Trigger) -> Score >= LTP
+            local lte_triggers = redis.call('ZRANGEBYSCORE', KEYS[4], ARGV[1], '+inf')
+            if #lte_triggers > 0 then
+                redis.call('ZREMRANGEBYSCORE', KEYS[4], ARGV[1], '+inf')
+                for i=1, #lte_triggers do table.insert(results, lte_triggers[i]) end
+            end
+            
+            return results
+        `;
 
-            if (order.status === 'PENDING') {
-                if (order.type === 'MARKET') {
-                    shouldExecute = true;
-                } else if (order.type === 'LIMIT') {
-                    if (order.side === 'BUY' && ltp <= order.price) shouldExecute = true;
-                    if (order.side === 'SELL' && ltp >= order.price) shouldExecute = true;
-                }
-            } else if (order.status === 'PENDING_TRIGGER') {
-                // Stop Loss or Target legs for CO/BO
-                const trigger = Number(order.trigger_price);
-                if (order.side === 'BUY') {
-                    if (order.type.startsWith('SL') && ltp >= trigger) shouldExecute = true; // Stop Loss Hit
-                    if (order.type === 'LIMIT' && ltp <= trigger) shouldExecute = true; // Target Hit
-                } else if (order.side === 'SELL') {
-                    if (order.type.startsWith('SL') && ltp <= trigger) shouldExecute = true; // Stop Loss Hit
-                    if (order.type === 'LIMIT' && ltp >= trigger) shouldExecute = true; // Target Hit
+        try {
+            const keys = [
+                `trigger:${symbol}:BUY:LIMIT`,
+                `trigger:${symbol}:SELL:LIMIT`,
+                `trigger:${symbol}:GTE`,
+                `trigger:${symbol}:LTE`
+            ];
+            
+            // eval(script, options) in node-redis v4
+            const triggeredOrderIds = await generalClient.eval(luaScript, {
+                keys: keys,
+                arguments: [ltp.toString()]
+            });
+
+            if (triggeredOrderIds && triggeredOrderIds.length > 0) {
+                for (const orderId of triggeredOrderIds) {
+                    const order = await db('orders').where({ id: orderId }).first();
+                    if (order) {
+                        this.executeOrder(order, ltp).catch(err => {
+                            console.error('Execution Error:', err);
+                            // On failure, re-add to Redis to try again on next tick
+                            this.addOrderToMemory(order);
+                        });
+                    }
                 }
             }
-
-            if (shouldExecute) {
-                // Remove from memory immediately to prevent double-execution while DB processes
-                this.removeOrderFromMemory(order.id, symbol);
-                this.executeOrder(order, ltp).catch(err => {
-                    console.error('Execution Error:', err);
-                    // On failure, re-add to memory to try again on next tick
-                    this.addOrderToMemory(order);
-                });
-            }
+        } catch (err) {
+            console.error('Redis Lua Trigger Error:', err.message);
         }
     }
 
