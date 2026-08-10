@@ -82,10 +82,24 @@ function toFyersSymbol(symbol) {
         return `NSE:${baseName}-EQ`;
     }
     
-    // For F&O, if it wasn't in the token map, we should not guess it.
-    // However, if it has no exchange suffix, it's likely an NSE equity.
+    // Fallback for F&O and MCX symbols not found in the token map.
+    // Symbol format: NIFTY10AUG2626000CE-NFO, SENSEX82000PE-BFO, GOLDM10AUG26-MCX
+    if (symbol.endsWith('-NFO')) {
+        const base = symbol.slice(0, -4); // strip '-NFO'
+        return `NSE:${base}`;
+    }
+    if (symbol.endsWith('-BFO')) {
+        const base = symbol.slice(0, -4); // strip '-BFO'
+        return `BSE:${base}`;
+    }
+    if (symbol.endsWith('-MCX')) {
+        const base = symbol.slice(0, -4); // strip '-MCX'
+        return `MCX:${base}`;
+    }
+
+    // For plain symbols without a dash, assume NSE equity
     if (!symbol.includes('-')) return `NSE:${symbol}-EQ`;
-    
+
     return null;
 }
 
