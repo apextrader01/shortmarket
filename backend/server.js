@@ -32,8 +32,13 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 
 const adapterPubClient = generalClient.duplicate();
 const adapterSubClient = generalClient.duplicate();
-adapterPubClient.connect().catch(() => {});
-adapterSubClient.connect().catch(() => {});
+// CRITICAL: Must attach error handlers BEFORE connect() or unhandled
+// Redis reconnection timeouts will throw UnhandledRejection and kill the process.
+adapterPubClient.on('error', (err) => console.error('[Redis Adapter Pub] Error:', err.message));
+adapterSubClient.on('error', (err) => console.error('[Redis Adapter Sub] Error:', err.message));
+adapterPubClient.connect().catch((err) => console.error('[Redis Adapter Pub] Connect failed:', err.message));
+adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Connect failed:', err.message));
+
 
 const app = express();
 const server = http.createServer(app);
