@@ -7,19 +7,16 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // Disable service worker registration completely.
-      // Service workers intercept page requests and return stale cached content,
-      // causing a blank screen on refresh. Trading platforms need live data
-      // on every load — offline caching is actively harmful here.
+      // We must use injectManifest strategy to supply our own custom sw.js.
+      // Otherwise, VitePWA ignores our public/sw.js and generates its own
+      // which caches index.html and causes the blank screen!
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       injectRegister: null,
       registerType: 'prompt', // don't auto-register
-      workbox: {
-        // Don't precache anything
-        globPatterns: [],
-        // Immediately claim and clear old caches to fix users with the old broken SW
-        clientsClaim: true,
-        skipWaiting: true,
-        runtimeCaching: [],
+      injectManifest: {
+        injectionPoint: undefined, // Don't try to inject precache manifest into our sw.js
       },
       manifest: {
         name: 'ShortMarket',
