@@ -2411,7 +2411,12 @@ io.on('connection', (socket) => {
   socket.on('ping_subscriptions', (symbolsArray) => {
     if (!Array.isArray(symbolsArray)) return;
     
-    // We don't join socket.io rooms anymore since we broadcast price_snapshot to everyone
+    // Join socket.io rooms for each symbol so targeted price_snapshot broadcasts reach this client.
+    // fyers.js emits price_snapshot via global_io.to(sym).emit() — clients MUST be in the room to receive it.
+    symbolsArray.forEach(sym => {
+      if (sym && typeof sym === 'string') socket.join(sym);
+    });
+
     if (isMaster) {
       const { handlePingSubscriptions } = require('./services/fyers');
       if (handlePingSubscriptions) handlePingSubscriptions(symbolsArray);
@@ -2424,6 +2429,7 @@ io.on('connection', (socket) => {
       }
     }
   });
+
 
   socket.on('unsubscribe', (data) => {
     let symbol = typeof data === 'string' ? data : data.symbol;
