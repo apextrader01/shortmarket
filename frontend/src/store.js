@@ -23,7 +23,10 @@ window.fetch = async function (url, options = {}) {
   return originalFetch(url, options);
 };
 
-export const socket = io(API, { withCredentials: false });
+export const socket = io(API, { 
+  withCredentials: false,
+  transports: ['websocket'] // Force websocket to bypass PM2 cluster long-polling issues
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const temporaryOptionSubscriptions = new Set();
