@@ -12,6 +12,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Remove any old service worker that causes blank screen on refresh -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => reg.unregister());
+        });
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
+
   </body>
 </html>

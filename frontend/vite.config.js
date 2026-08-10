@@ -7,13 +7,20 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // Disable service worker registration completely.
+      // Service workers intercept page requests and return stale cached content,
+      // causing a blank screen on refresh. Trading platforms need live data
+      // on every load — offline caching is actively harmful here.
+      injectRegister: null,
+      registerType: 'prompt', // don't auto-register
       workbox: {
-        inlineWorkboxRuntime: false,
-        sourcemap: false,
+        // Don't precache anything
+        globPatterns: [],
+        // Immediately claim and clear old caches to fix users with the old broken SW
+        clientsClaim: true,
+        skipWaiting: true,
+        runtimeCaching: [],
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'ShortMarket',
         short_name: 'ShortMarket',
