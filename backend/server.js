@@ -2560,6 +2560,15 @@ app.post('/api/fyers/verify', async (req, res) => {
   }
 });
 
+app.get('/api/fyers-debug', (req, res) => {
+  const { getFyersStatus } = require('./services/fyers');
+  if (getFyersStatus) {
+    res.json(getFyersStatus());
+  } else {
+    res.json({ error: 'getFyersStatus not found' });
+  }
+});
+
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist'), {
   setHeaders: (res, filePath) => {
@@ -2569,6 +2578,10 @@ app.use(express.static(path.join(__dirname, '../frontend/dist'), {
   }
 }));
 app.use((req, res) => {
+  // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    return res.status(404).send('Asset not found');
+  }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
