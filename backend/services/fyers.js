@@ -48,7 +48,13 @@ function toFyersSymbol(symbol) {
 
     try {
         const { symbolToToken } = require('./instruments');
-        const token = symbolToToken[symbol];
+        let token = symbolToToken[symbol];
+        
+        // Fallback for options/futures that might be stored without their exchange suffix
+        if (!token && (symbol.endsWith('CE') || symbol.endsWith('PE') || symbol.endsWith('FUT'))) {
+            token = symbolToToken[`${symbol}-NFO`] || symbolToToken[`${symbol}-MCX`] || symbolToToken[`${symbol}-BFO`];
+        }
+        
         if (token && tokenToFyers[token]) {
             return tokenToFyers[token];
         }
