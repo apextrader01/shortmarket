@@ -1,3 +1,4 @@
+process.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason); });
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 process.env.TZ = 'Asia/Kolkata';
@@ -2713,3 +2714,4 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
