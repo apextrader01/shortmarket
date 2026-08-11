@@ -48,6 +48,8 @@ async function loadInstrumentMaster() {
             "99926009": { symbol: "BANKNIFTY", name: "Bank Nifty",  exchange: "NSE" },
             "99926037": { symbol: "MIDCPNIFTY",name: "MidCap Nifty",exchange: "NSE" },
             "99926074": { symbol: "FINNIFTY",  name: "Fin Nifty",   exchange: "NSE" },
+            "99990000": { symbol: "SENSEX",    name: "Sensex",      exchange: "BSE" },
+            "99990001": { symbol: "BANKEX",    name: "Bankex",      exchange: "BSE" },
         };
 
         globalNfoOptions = nfoOptions;
