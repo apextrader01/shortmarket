@@ -155,9 +155,32 @@ async function loadInstrumentMaster() {
             }
         }
 
+        // Add BSE Spots (like SENSEX) to tempStockMaster so they get inserted into Postgres
+        if (typeof bseSpots === 'object') {
+            for (const [token, info] of Object.entries(bseSpots)) {
+                if (isExpired(info.expiry)) continue;
+                
+                // Add -BSE suffix if not already present, similar to NFO
+                let uniqueSymbol = info.symbol;
+                if (!uniqueSymbol.endsWith('-BSE')) uniqueSymbol += '-BSE';
+                
+                tempStockMaster[token] = {
+                    symbol: info.symbol,
+                    name: info.name || info.symbol,
+                    exchange: 'BSE',
+                    lotsize: Number(info.lotsize || 1),
+                    uniqueSymbol
+                };
+                symbolToToken[uniqueSymbol] = token;
+            }
+        }
+
         allTokens = [...Object.keys(indices)];
         if (Array.isArray(nseStocks)) {
             allTokens = allTokens.concat(nseStocks.map(s => s.token));
+        }
+        if (typeof bseSpots === 'object') {
+            allTokens = allTokens.concat(Object.keys(bseSpots));
         }
 
         // Build records for PostgreSQL

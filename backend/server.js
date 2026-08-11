@@ -252,8 +252,17 @@ app.get('/api/stocks', async (req, res) => {
           query = query.where('search_string', 'ILIKE', `%${term}%`);
       });
 
-      // Execute query and fetch up to 200 results to sort
-      let dbResults = await query.limit(200);
+      // Prioritize exact matches and non-derivatives in the DB query to ensure they aren't buried
+      query = query.orderByRaw(`
+        CASE 
+          WHEN LOWER(symbol) = ? THEN 1
+          WHEN is_derivative = false THEN 2
+          ELSE 3
+        END ASC
+      `, [qLower]);
+
+      // Execute query and fetch up to 500 results to sort
+      let dbResults = await query.limit(500);
 
       dbResults.sort((a, b) => {
         const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
