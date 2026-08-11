@@ -9,10 +9,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>ShortMarket | Trading Platform</title>
-    <script type="module" crossorigin src="/assets/index-DivcW676.js"></script>
+    <script type="module" crossorigin src="/assets/index-swQNMtBM.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-D34TbDrS.css">
-  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <link rel="manifest" href="/manifest.webmanifest"></head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+    <!-- Remove any old service worker that causes blank screen on refresh -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => reg.unregister());
+        });
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+      }
+    </script>
+
   </body>
 </html>

@@ -36,6 +36,17 @@ export default function OrderModal() {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
       setPrice(livePrice ? livePrice.toFixed(2) : '');
+      
+      // Auto-fetch lotsize if it's 1 and looks like a derivative (contains numbers)
+      if ((orderModal.lotsize || 1) === 1 && /\d/.test(orderModal.symbol)) {
+        fetch(`${API}/api/stocks/lotsizes?symbols=${orderModal.symbol}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data[orderModal.symbol] && data[orderModal.symbol] > 1) {
+              useStore.getState().setOrderModalLotsize(data[orderModal.symbol]);
+            }
+          }).catch(console.error);
+      }
     }
   }, [orderModal.isOpen, orderModal.symbol, orderModal.type, livePrice]);
 
