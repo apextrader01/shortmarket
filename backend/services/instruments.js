@@ -191,7 +191,7 @@ async function loadInstrumentMaster() {
         for (const [token, value] of Object.entries(tempStockMaster)) {
             if (!value || !value.symbol) continue;
             const ex = value.exchange || value.exch_seg || 'NSE';
-            if (ex === 'BSE' && value.symbol.length > 5) continue; 
+            if (ex === 'BSE' && value.symbol.length > 5 && value.symbol !== 'SENSEX' && value.symbol !== 'BANKEX') continue; 
             
             const uniqueSym = value.uniqueSymbol || `${value.symbol}-${ex}`;
             tokenToSymbol[token] = uniqueSym;
