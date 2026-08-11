@@ -2398,18 +2398,34 @@ io.on('connection', (socket) => {
   });
 
   socket.on('subscribe', (data) => {
-    let symbol = typeof data === 'string' ? data : data.symbol;
-    socket.join(symbol);
-    if (isMaster) {
-      const { addSubscription } = require('./services/fyers');
-      if (addSubscription) addSubscription(data, io, priceCache);
+    if (Array.isArray(data)) {
+        data.forEach(sym => {
+            let symbol = typeof sym === 'string' ? sym : sym.symbol;
+            if (symbol) socket.join(symbol);
+        });
+        if (isMaster) {
+            const { addSubscriptionBatch } = require('./services/fyers');
+            if (addSubscriptionBatch) addSubscriptionBatch(data);
+        } else {
+            try {
+                const { pubClient } = require('./services/redisClient');
+                pubClient.publish('fyers_subscribe', JSON.stringify(data));
+            } catch (err) {}
+        }
     } else {
-      try {
-        const { pubClient } = require('./services/redisClient');
-        pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
-      } catch (err) {
-        console.error('Redis Publish Error for subscribe:', err.message);
-      }
+        let symbol = typeof data === 'string' ? data : data.symbol;
+        if (symbol) socket.join(symbol);
+        if (isMaster) {
+            const { addSubscription } = require('./services/fyers');
+            if (addSubscription) addSubscription(data, io, priceCache);
+        } else {
+            try {
+                const { pubClient } = require('./services/redisClient');
+                pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
+            } catch (err) {
+                console.error('Redis Publish Error for subscribe:', err.message);
+            }
+        }
     }
   });
 

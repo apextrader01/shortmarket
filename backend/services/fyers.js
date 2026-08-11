@@ -316,9 +316,9 @@ function startLiveWebSocket() {
             const h = d.getHours();
             const day = d.getDay();
             const isWeekend = (day === 0 || day === 6);
-            if (!isWeekend && staleSec > 30 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
-                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! Forcing reconnect...`);
-                startLiveWebSocket();
+            if (!isWeekend && staleSec > 45 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
+                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck. Forcing PM2 restart...`);
+                process.exit(0);
             }
         }, 15000);
     });
