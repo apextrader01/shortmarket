@@ -1993,7 +1993,6 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     }, 500);
 
     res.json({ success: true, orders: finalResponseOrders });
-    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
