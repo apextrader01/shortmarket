@@ -1640,41 +1640,46 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
-      const triggerEngine = require('./services/triggerEngine');
-      // BUG FIX: Use effectiveProductType (not raw product_type from req.body which may be undefined)
-      triggerEngine.addOrderToMemory({
+      req.orderToProcess = {
         id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
-      });
-      
-      setTimeout(() => {
-          try {
-              const { pubClient } = require('./services/redisClient');
-              if (pubClient) pubClient.publish('reload_triggers', '1');
-          } catch(e) {}
-      }, 500);
-      
-      // Manually trigger an evaluation to instantly process Market orders in the background
-      // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
-      // Using the order's own price would cause LIMIT orders to self-trigger immediately.
-      if (isMarket) {
-        const isMutualFund = symbol.endsWith('-MF');
-        const realLtp = isMutualFund ? execPrice : (priceCache[symbol]?.ltp || 0);
-        if (realLtp > 0) {
-          try {
-            await triggerEngine.evaluateTick(symbol, realLtp);
-          } catch (err) {
-            console.error('Immediate evaluation error:', err);
-          }
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        isMarket
+      };
+    });
+
+    const triggerEngine = require('./services/triggerEngine');
+    const ord = req.orderToProcess;
+    
+    // BUG FIX: Use effectiveProductType (not raw product_type from req.body which may be undefined)
+    triggerEngine.addOrderToMemory(ord);
+    
+    setTimeout(() => {
+        try {
+            const { pubClient } = require('./services/redisClient');
+            if (pubClient) pubClient.publish('reload_triggers', '1');
+        } catch(e) {}
+    }, 500);
+    
+    // Manually trigger an evaluation to instantly process Market orders in the background
+    // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
+    // Using the order's own price would cause LIMIT orders to self-trigger immediately.
+    if (ord.isMarket) {
+      const isMutualFund = ord.symbol.endsWith('-MF');
+      const realLtp = isMutualFund ? ord.price : (priceCache[ord.symbol]?.ltp || 0);
+      if (realLtp > 0) {
+        try {
+          await triggerEngine.evaluateTick(ord.symbol, realLtp);
+        } catch (err) {
+          console.error('Immediate evaluation error:', err);
         }
       }
+    }
 
-      // Fetch the final status after evaluation to send back to frontend
-      const finalOrder = await trx('orders').where({ id: orderId }).first();
-      const finalStatus = finalOrder ? finalOrder.status : status;
+    // Fetch the final status after evaluation to send back to frontend
+    const finalOrder = await db('orders').where({ id: ord.id }).first();
+    const finalStatus = finalOrder ? finalOrder.status : ord.status;
 
-      res.json({ success: true, orderId, status: finalStatus });
-    });
+    res.json({ success: true, orderId: ord.id, status: finalStatus });
 
   } catch (error) {
     lastOrderError = { message: error.message, stack: error.stack, payload: req.body };
@@ -1931,63 +1936,63 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
       // 3. Process each item
       const executedOrders = [];
-      const triggerEngine = require('./services/triggerEngine');
 
       for (const item of items) {
         const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin } = item;
         const status = 'PENDING';
+        const isMarket = type === 'MARKET';
+        const effectiveProductType = product_type || 'INT';
+        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
         
         const [orderId] = await trx('orders').insert({
           user_id: req.user.id,
-          symbol, type, side, quantity, price, sl_price, tgt_price,
+          symbol, type, side, quantity, price: execPrice || null, sl_price, tgt_price,
           status,
           margin: margin || 0, // Individual margin recorded for cancellations
-          product_type: product_type || 'INT'
+          product_type: effectiveProductType
+        }).returning('id');
+
+        const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
+        executedOrders.push({
+          id: orderIdVal, symbol, status, isMarket, execPrice, type, side, quantity, sl_price, tgt_price, margin: margin || 0, product_type: effectiveProductType
         });
-
-        executedOrders.push({ id: orderId, symbol, status });
-
-        // If executed immediately, create positions
-        if (isMarket) {
-          const pos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: product_type || 'INT' }).first();
-          
-          if (pos) {
-            let newQty = pos.quantity;
-            let newAvgPrice = pos.average_price;
-            
-            if (side === 'BUY') {
-              if (pos.quantity >= 0) {
-                newAvgPrice = ((pos.quantity * pos.average_price) + (quantity * price)) / (pos.quantity + quantity);
-                newQty += quantity;
-              } else {
-                newQty += quantity;
-              }
-            } else {
-              if (pos.quantity <= 0) {
-                newAvgPrice = ((Math.abs(pos.quantity) * pos.average_price) + (quantity * price)) / (Math.abs(pos.quantity) + quantity);
-                newQty -= quantity;
-              } else {
-                newQty -= quantity;
-              }
-            }
-
-            if (newQty === 0) {
-              await trx('positions').where({ id: pos.id }).del();
-            } else {
-              await trx('positions').where({ id: pos.id }).update({ quantity: newQty, average_price: newAvgPrice });
-            }
-          } else {
-            await trx('positions').insert({
-              user_id: req.user.id,
-              symbol,
-              quantity: side === 'BUY' ? quantity : -quantity,
-              average_price: price,
-              product_type: product_type || 'INT'
-            });
-          }
-        }
       }
-      res.json({ success: true, orders: executedOrders });
+      
+      req.basketOrdersToProcess = executedOrders;
+    });
+
+    const triggerEngine = require('./services/triggerEngine');
+    const finalResponseOrders = [];
+    
+    for (const ord of req.basketOrdersToProcess) {
+       triggerEngine.addOrderToMemory({
+          id: ord.id, user_id: req.user.id, symbol: ord.symbol, type: ord.type, side: ord.side, quantity: ord.quantity, price: ord.execPrice || null,
+          status: ord.status, sl_price: ord.sl_price || null, tgt_price: ord.tgt_price || null, trigger_price: null, trail_amount: null, product_type: ord.product_type, margin: ord.margin
+       });
+       
+       if (ord.isMarket) {
+          const isMutualFund = ord.symbol.endsWith('-MF');
+          const realLtp = isMutualFund ? ord.execPrice : (priceCache[ord.symbol]?.ltp || 0);
+          if (realLtp > 0) {
+            try {
+              await triggerEngine.evaluateTick(ord.symbol, realLtp);
+            } catch (err) {
+              console.error('Immediate evaluation error for basket item:', err);
+            }
+          }
+       }
+       
+       finalResponseOrders.push({ id: ord.id, symbol: ord.symbol, status: ord.status });
+    }
+    
+    setTimeout(() => {
+        try {
+            const { pubClient } = require('./services/redisClient');
+            if (pubClient) pubClient.publish('reload_triggers', '1');
+        } catch(e) {}
+    }, 500);
+
+    res.json({ success: true, orders: finalResponseOrders });
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
