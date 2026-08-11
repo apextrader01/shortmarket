@@ -724,14 +724,10 @@ function subscribeToDepth(symbol) { /* Fyers v3 auto sends depth if requested */
 function unsubscribeFromDepth(symbol) {}
 
 function reloadFyersToken() {
-    console.log("🔄 Redis Event: Fyers token updated! Reloading...");
-    if (loadTokenFromDisk()) {
-        if (isMasterNode) {
-            startLiveWebSocket();
-        } else {
-            console.log("🔌 Reloaded Fyers token for Worker instance.");
-        }
-    }
+    console.log("🔄 Redis Event: Fyers token updated! Forcing PM2 restart to clear DataSocket cache...");
+    // fyers-api-v3 caches the DataSocket singleton. The only reliable way to force 
+    // it to use the new token is to exit the process and let PM2 restart it.
+    process.exit(0);
 }
 
 function getPriceFromCache() {
