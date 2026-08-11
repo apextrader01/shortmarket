@@ -385,6 +385,13 @@ export const useStore = create(persist((set, get) => ({
     socket.on('price_snapshot', (snapshot) => {
       set((state) => ({ prices: applySnapshot(snapshot, state) }));
     });
+    
+    // Keep TOP_INDICES alive in the backend so they don't freeze after 30s
+    if (!window._topIndicesPingInterval) {
+      window._topIndicesPingInterval = setInterval(() => {
+        socket.emit('ping_symbols', ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE']);
+      }, 15000);
+    }
 
     let batchedPrices = {};
     let batchTimeout = null;
