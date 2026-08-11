@@ -133,6 +133,7 @@ async function loadInstrumentMaster() {
                     const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
                     fut.expiryTimestamp = expiryTs;
+                    fut.lotsize = 1; // Force futures to have a lot size of 1
                     symbolToToken[fut.uniqueSymbol] = fut.token;
                     tempStockMaster[fut.token] = fut;
                 }
