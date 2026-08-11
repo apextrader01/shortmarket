@@ -252,13 +252,12 @@ app.get('/api/stocks', async (req, res) => {
           query = query.where('search_string', 'ILIKE', `%${term}%`);
       });
 
-      // Prioritize exact matches and non-derivatives in the DB query to ensure they aren't buried
+      // Prioritize exact matches and shorter symbols in the DB query to ensure they aren't buried
       query = query.orderByRaw(`
         CASE 
           WHEN LOWER(symbol) = ? THEN 1
-          WHEN is_derivative = false THEN 2
-          ELSE 3
-        END ASC
+          ELSE 2
+        END ASC, LENGTH(symbol) ASC
       `, [qLower]);
 
       // Execute query and fetch up to 500 results to sort
@@ -270,8 +269,8 @@ app.get('/api/stocks', async (req, res) => {
         if (aExact && !bExact) return -1;
         if (!aExact && bExact) return 1;
         
-        const aIsCash = (a.exchange === 'NSE');
-        const bIsCash = (b.exchange === 'NSE');
+        const aIsCash = (a.exchange === 'NSE' || a.exchange === 'BSE');
+        const bIsCash = (b.exchange === 'NSE' || b.exchange === 'BSE');
         if (aIsCash && !bIsCash) return -1;
         if (!aIsCash && bIsCash) return 1;
         
