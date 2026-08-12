@@ -837,65 +837,7 @@ async function loadFyersSymbolMaps() {
     }
 }
 
-// -------------------------------------------------------------
-// MOCK PRICE SIMULATOR FOR 2025/2026 F&O CONTRACTS
-// Since 2026/2025 F&O contracts exist in the Fyers Symbol Master 
-// but have no real-world trading volume (0 live ticks), this 
-// simulator randomly fluctuates their prices so they show as 
-// "live" in the frontend watchlist for testing purposes.
-// -------------------------------------------------------------
-setInterval(() => {
-    if (!isMasterNode || !global_io || !sharedPriceCache) return;
-    
-    // We only simulate prices during active hours, or if we want them to always move for testing
-    Object.keys(globalFyersToRequested).forEach(fSym => {
-        // Only simulate for options and futures that contain '26' or '25' in the symbol 
-        // (representing illiquid far-month expiries that won't get real ticks)
-        if (fSym.includes('26') || fSym.includes('25')) {
-            const requestedSyms = globalFyersToRequested[fSym];
-            if (!requestedSyms || requestedSyms.length === 0) return;
-            
-            // Generate a synthetic price based on its existing cache, or start at 100
-            requestedSyms.forEach(sym => {
-                let currentLtp = 100.0; // Default fallback
-                if (sharedPriceCache[sym] && sharedPriceCache[sym].ltp) {
-                    currentLtp = sharedPriceCache[sym].ltp;
-                }
-                
-                // Add a small random walk (-0.5 to +0.5)
-                const change = (Math.random() - 0.5) * 1.0;
-                let newLtp = currentLtp + change;
-                if (newLtp < 0.05) newLtp = 0.05; // F&O minimum tick size
-                
-                // Construct a mock tick
-                const mockTick = {
-                    ltp: parseFloat(newLtp.toFixed(2)),
-                    ch: parseFloat((newLtp - 100.0).toFixed(2)), // Mock change
-                    chp: parseFloat(((newLtp - 100.0) / 100.0 * 100).toFixed(2)), // Mock chp
-                    open: 100.0,
-                    high: parseFloat((newLtp + 5.0).toFixed(2)),
-                    low: parseFloat(Math.max(0.05, newLtp - 5.0).toFixed(2)),
-                    close: 100.0,
-                    vol: Math.floor(Math.random() * 50000)
-                };
-                
-                // Update cache
-                sharedPriceCache[sym] = mockTick;
-                
-                // Broadcast to frontend
-                global_io.to(sym).emit('price_snapshot', { symbol: sym, priceObj: mockTick });
-                
-                // Forward to redis cache sync
-                try {
-                    const { pubClient } = require('./redisClient');
-                    if (pubClient) {
-                        pubClient.publish('fyers_price_update', JSON.stringify({ symbol: sym, priceObj: mockTick }));
-                    }
-                } catch(e) {}
-            });
-        }
-    });
-}, 1500);
+
 
 module.exports = {
     getPriceFromCache,
@@ -916,3 +858,4 @@ module.exports = {
 };
 
 module.exports.toFyersSymbol = toFyersSymbol;
+
