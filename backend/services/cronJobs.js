@@ -28,8 +28,8 @@ function initCronJobs(priceCache, triggerEngine) {
     }, TZ);
 
     // Helper: Check if a symbol is a commodity
-    const COMMODITY_PREFIXES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'];
-    const isCommoditySymbol = (symbol) => COMMODITY_PREFIXES.some(c => symbol.startsWith(c));
+    // Helper: Check if a symbol is a commodity by looking for the -MCX suffix
+    const isCommoditySymbol = (symbol) => symbol && symbol.endsWith('-MCX');
 
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
@@ -114,50 +114,8 @@ function initCronJobs(priceCache, triggerEngine) {
     cron.schedule('0 23 * * *', () => phase3SquareOff('COM'), TZ);
 
     // ─── T+1 RESET: WIPE & MIGRATE TO HOLDINGS (08:00 AM) ──────────────────────
-    cron.schedule('0 8 * * *', async () => {
-        console.log('[CRON] 08:00 AM T+1 Reset: Migrating delivery positions to Holdings...');
-        try {
-            await db.transaction(async (trx) => {
-                // 1. Get all positions with quantity > 0 and product_type DEL
-                const delPositions = await trx('positions').where({ product_type: 'DEL' }).whereNot({ quantity: 0 });
-                
-                // 2. Migrate to holdings
-                for (const pos of delPositions) {
-                    const existingHold = await trx('holdings').where({ user_id: pos.user_id, symbol: pos.symbol }).first();
-                    if (existingHold) {
-                        const eHoldQty = Number(existingHold.quantity);
-                        const eHoldAvg = Number(existingHold.average_price);
-                        const posQty = Number(pos.quantity);
-                        const posAvg = Number(pos.average_price);
-                        
-                        const currentTotal = eHoldQty * eHoldAvg;
-                        const newTotal = posQty * posAvg;
-                        const totalQty = eHoldQty + posQty;
-                        const newAvg = (currentTotal + newTotal) / totalQty;
-                        
-                        await trx('holdings').where({ id: existingHold.id }).update({
-                            quantity: totalQty,
-                            average_price: newAvg
-                        });
-                    } else {
-                        await trx('holdings').insert({
-                            user_id: pos.user_id,
-                            symbol: pos.symbol,
-                            quantity: pos.quantity,
-                            average_price: pos.average_price
-                        });
-                    }
-                }
-
-                // 3. WIPE Positions & Orders Tables
-                await trx('positions').del();
-                await trx('orders').del();
-                console.log('[CRON] T+1 Reset complete. Positions and Orders wiped and migrated.');
-            });
-        } catch (err) {
-            console.error('T+1 Reset Error:', err);
-        }
-    }, TZ);
+    // REMOVED: This logic is now handled in `backend/services/positionsEngine.js`
+    // to prevent duplicate executions and data corruption.
 
     // ─── EXPIRY DAY SETTLEMENT (03:25 PM / 07:00 PM) ─────────────────────────
     // DISABLED: Handled exclusively in positionsEngine.js to avoid race conditions.
