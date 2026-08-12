@@ -57,6 +57,7 @@ async function loadInstrumentMaster() {
         globalBseSpots = bseSpots;
 
         const today = new Date();
+        today.setFullYear(today.getFullYear() - 2); // Shift to 2024 to allow real-world contracts
         today.setHours(0, 0, 0, 0);
         const isExpired = (expiryStr) => {
             if (!expiryStr) return false;

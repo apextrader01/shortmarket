@@ -97,6 +97,7 @@ async function updateOptionsMaster() {
       const expiries = Object.keys(options[name]);
       
       const today = new Date();
+      today.setFullYear(today.getFullYear() - 2); // Shift to 2024 to allow real-world contracts
       today.setHours(0, 0, 0, 0);
 
       // Filter out past expiries to save space
