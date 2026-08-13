@@ -182,11 +182,20 @@ class PositionsEngine {
             const todayStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' }).split(',')[0].replace(/\//g, '-');
             const [d, m, y] = todayStr.split('-');
             const monthMap = { '01':'JAN', '02':'FEB', '03':'MAR', '04':'APR', '05':'MAY', '06':'JUN', '07':'JUL', '08':'AUG', '09':'SEP', '10':'OCT', '11':'NOV', '12':'DEC' };
-            const expiryToken = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 14JUL26
+            const monthCharMap = { '01': '1', '02': '2', '03': '3', '04': '4', '05': '5', '06': '6', '07': '7', '08': '8', '09': '9', '10': 'O', '11': 'N', '12': 'D' };
+            
+            const expiryToken1 = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 13AUG26 (Standard)
+            const expiryToken2 = `${y.slice(-2)}${monthCharMap[m]}${d}`; // e.g. 26813 (Fyers Weekly)
 
             // Find all expiring assets in Holdings OR Positions
-            let posQuery = db('positions').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
-            let holdQuery = db('holdings').whereNot({ quantity: 0 }).where('symbol', 'like', `%${expiryToken}%`);
+            let posQuery = db('positions').whereNot({ quantity: 0 }).where(function() {
+                this.where('symbol', 'like', `%${expiryToken1}%`)
+                    .orWhere('symbol', 'like', `%${expiryToken2}%`);
+            });
+            let holdQuery = db('holdings').whereNot({ quantity: 0 }).where(function() {
+                this.where('symbol', 'like', `%${expiryToken1}%`)
+                    .orWhere('symbol', 'like', `%${expiryToken2}%`);
+            });
             
             if (isCommodity) {
                 posQuery = posQuery.where('symbol', 'like', '%MCX%');
@@ -288,8 +297,13 @@ class PositionsEngine {
 
                     if (existingHolding) {
                         // Average the price
-                        const newTotalQty = existingHolding.quantity + pos.quantity;
-                        const totalCost = (existingHolding.quantity * existingHolding.average_price) + (pos.quantity * pos.average_price);
+                        const existingQty = Number(existingHolding.quantity);
+                        const posQty = Number(pos.quantity);
+                        const existingAvgPrice = Number(existingHolding.average_price);
+                        const posAvgPrice = Number(pos.average_price);
+
+                        const newTotalQty = existingQty + posQty;
+                        const totalCost = (existingQty * existingAvgPrice) + (posQty * posAvgPrice);
                         const newAvgPrice = totalCost / newTotalQty;
 
                         await trx('holdings')
@@ -300,8 +314,8 @@ class PositionsEngine {
                         await trx('holdings').insert({
                             user_id: pos.user_id,
                             symbol: pos.symbol,
-                            quantity: pos.quantity,
-                            average_price: pos.average_price,
+                            quantity: Number(pos.quantity),
+                            average_price: Number(pos.average_price),
                             asset_class: assetClass
                         });
                     }
@@ -318,3 +332,4 @@ class PositionsEngine {
 }
 
 module.exports = new PositionsEngine();
+
