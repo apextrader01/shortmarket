@@ -187,14 +187,25 @@ class PositionsEngine {
             const expiryToken1 = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 13AUG26 (Standard)
             const expiryToken2 = `${y.slice(-2)}${monthCharMap[m]}${d}`; // e.g. 26813 (Fyers Weekly)
 
+            const startOfToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).setHours(0, 0, 0, 0);
+            const endOfToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).setHours(23, 59, 59, 999);
+            
+            const expiringInstruments = await db('instruments')
+                .where('expiry_timestamp', '>=', startOfToday)
+                .where('expiry_timestamp', '<=', endOfToday)
+                .select('unique_symbol');
+            const expiringUniqueSymbols = expiringInstruments.map(i => i.unique_symbol);
+
             // Find all expiring assets in Holdings OR Positions
             let posQuery = db('positions').whereNot({ quantity: 0 }).where(function() {
                 this.where('symbol', 'like', `%${expiryToken1}%`)
-                    .orWhere('symbol', 'like', `%${expiryToken2}%`);
+                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
+                    .orWhereIn('symbol', expiringUniqueSymbols);
             });
             let holdQuery = db('holdings').whereNot({ quantity: 0 }).where(function() {
                 this.where('symbol', 'like', `%${expiryToken1}%`)
-                    .orWhere('symbol', 'like', `%${expiryToken2}%`);
+                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
+                    .orWhereIn('symbol', expiringUniqueSymbols);
             });
             
             if (isCommodity) {
