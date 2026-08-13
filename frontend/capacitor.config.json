@@ -3,7 +3,7 @@
   "appName": "shortmarket",
   "webDir": "dist",
   "server": {
-    "url": "http://34.93.99.22.nip.io",
+    "url": "https://34.93.99.22.nip.io",
     "cleartext": true
   }
 }

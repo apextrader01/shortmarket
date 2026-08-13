@@ -6,8 +6,8 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-DOMAIN="34-131-25-109.nip.io"
-PORT=3000
+DOMAIN="34.93.99.22.nip.io"
+PORT=5000
 
 echo "Installing Nginx and Certbot..."
 apt update
