@@ -126,10 +126,10 @@ async function loadInstrumentMaster() {
         }
 
         if (typeof nfoFutures === 'object') {
-            Object.values(nfoFutures).forEach(expiries => {
-                for (const [expiry, fut] of Object.entries(expiries)) {
-                    if (isExpired(expiry)) continue;
-                    const expiryTs = getExpiryTimestamp(expiry);
+            Object.values(nfoFutures).forEach(futureArray => {
+                for (const fut of futureArray) {
+                    if (isExpired(fut.expiry)) continue;
+                    const expiryTs = getExpiryTimestamp(fut.expiry);
                     const ex = fut.exch_seg || fut.exchange;
                     const suffix = ex === 'MCX' ? 'MCX' : ex === 'BFO' ? 'BFO' : 'NFO';
                     fut.uniqueSymbol = `${fut.symbol}-${suffix}`;
