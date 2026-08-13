@@ -30,17 +30,6 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
 
-      - name: Set Dynamic Live Wrapper URL
-        working-directory: ./frontend
-        run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            URL="https://shortmarket-production.up.railway.app"
-          else
-            URL="https://shortmarket-staging.up.railway.app"
-          fi
-          echo "Setting Live Wrapper URL to $URL"
-          jq --arg url "$URL" '.server = {"url": $url, "cleartext": true}' capacitor.config.json > tmp.json && mv tmp.json capacitor.config.json
-
       - name: Sync Capacitor
         working-directory: ./frontend
         run: npx cap sync android
