@@ -3,7 +3,7 @@
   "appName": "shortmarket",
   "webDir": "dist",
   "server": {
-    "url": "https://shortmarket-production.up.railway.app",
+    "url": "http://34.93.99.22.nip.io",
     "cleartext": true
   }
 }
