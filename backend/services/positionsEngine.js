@@ -8,6 +8,12 @@ class PositionsEngine {
     constructor() {
         console.log('PositionsEngine Initialized (EOD Automation)');
         this.initCronJobs();
+        // Run catchup migration on startup (in case the server was down at 8:00 AM)
+        setTimeout(() => {
+            if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+                this.runHoldingsMigration(true);
+            }
+        }, 15000);
     }
 
     initCronJobs() {
@@ -288,14 +294,22 @@ class PositionsEngine {
         }
     }
 
-    async runHoldingsMigration() {
-        console.log(`[8:00 AM WIPE] Starting T+1 Holdings Migration...`);
+    async runHoldingsMigration(onlyBeforeToday = false) {
+        console.log(`[HOLDINGS MIGRATION] Starting T+1 Holdings Migration (Startup Catchup: ${onlyBeforeToday})...`);
         try {
             await db.transaction(async (trx) => {
                 // 1. Fetch all Delivery positions with Qty > 0
-                const deliveryPositions = await trx('positions')
+                let query = trx('positions')
                     .where('product_type', 'DEL')
                     .where('quantity', '>', 0);
+                    
+                if (onlyBeforeToday) {
+                    const startOfTodayStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+                    const startOfToday = new Date(startOfTodayStr).setHours(0, 0, 0, 0);
+                    query = query.where('created_at', '<', new Date(startOfToday));
+                }
+
+                const deliveryPositions = await query;
 
                 for (const pos of deliveryPositions) {
                     const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
@@ -332,12 +346,19 @@ class PositionsEngine {
                     }
                 }
 
-                // 2. Completely wipe the positions table to clear UI history
-                await trx('positions').del();
-                console.log(`[8:00 AM WIPE] Successfully migrated ${deliveryPositions.length} DEL positions and wiped today's history.`);
+                // 2. Wipe the positions table to clear UI history
+                if (onlyBeforeToday) {
+                    const startOfTodayStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+                    const startOfToday = new Date(startOfTodayStr).setHours(0, 0, 0, 0);
+                    await trx('positions').where('created_at', '<', new Date(startOfToday)).del();
+                } else {
+                    await trx('positions').del();
+                }
+                
+                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions and wiped old history.`);
             });
         } catch (error) {
-            console.error(`[8:00 AM WIPE ERROR]:`, error);
+            console.error(`[HOLDINGS MIGRATION ERROR]:`, error);
         }
     }
 }
