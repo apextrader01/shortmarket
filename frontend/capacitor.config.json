@@ -4,6 +4,7 @@
   "webDir": "dist",
   "server": {
     "url": "https://34-93-99-22.nip.io",
-    "cleartext": true
+    "cleartext": true,
+    "allowNavigation": ["api-hsm.fyers.in"]
   }
 }
