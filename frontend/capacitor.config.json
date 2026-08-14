@@ -1,6 +1,6 @@
 {
-  "appId": "com.shortmarket.app",
-  "appName": "shortmarket",
+  "appId": "com.shortedge.app",
+  "appName": "shortedge",
   "webDir": "dist",
   "server": {
     "url": "https://34-93-99-22.nip.io",

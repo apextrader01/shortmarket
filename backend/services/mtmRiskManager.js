@@ -21,8 +21,10 @@ class MTMRiskManager {
         if (this.isChecking) return;
         this.isChecking = true;
         try {
-            // Group active positions by user
-            const openPositions = await db('positions').whereNot({ quantity: 0 });
+            // Group active positions by user (Exclude Delivery, which is cash-and-carry and has no margin risk)
+            const openPositions = await db('positions')
+                .whereNot({ quantity: 0 })
+                .whereNotIn('product_type', ['DEL']);
             if (openPositions.length === 0) {
                 this.isChecking = false;
                 return;

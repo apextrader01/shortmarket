@@ -84,66 +84,85 @@ export default function LoginView() {
   };
 
   return (
-    <div style={{
-      width:          '100%',
-      minHeight:      '100dvh',
-      display:        'flex',
-      alignItems:     'center',
-      justifyContent: 'center',
-      background:     'var(--bg-primary)',
-    }}>
-      <div style={{
-        width:        '100%',
-        maxWidth:     '400px',
-        padding:      'min(40px, 6vw)',
-        background:   'var(--bg-secondary)',
-        borderRadius: '12px',
-        border:       '1px solid var(--border-color)',
-        boxShadow:    '0 25px 50px -12px rgba(0,0,0,0.5)',
-      }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div className="logo-text" style={{ fontSize: '28px', marginBottom: '8px' }}>
-            SHORT <span>MARKET</span>
+    <div className="login-container">
+      {/* Left Visual Panel (Desktop Only) */}
+      <div className="login-visual-panel">
+        <div className="login-visual-bg"></div>
+        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="logo-text-premium" style={{ marginBottom: 'auto' }}>
+            SHORT <span>EDGE</span>
           </div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            {view === 'login' && 'Log in to your terminal'}
-            {view === 'register' && 'Create your trading account'}
-            {view === 'forgot' && 'Reset your password'}
-            {view === 'otp' && 'Verify OTP'}
-            {view === 'reset' && 'Create new password'}
+          <div>
+            <h1 style={{ fontSize: '48px', fontWeight: '800', lineHeight: '1.1', marginBottom: '16px', color: '#fff' }}>
+              The future of<br />algorithmic trading.
+            </h1>
+            <p style={{ fontSize: '18px', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: '1.5' }}>
+              Experience sub-millisecond execution, advanced order routing, and a terminal designed for professional traders.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Form Panel */}
+      <div className="login-form-panel">
+        <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '8px' }}>
+            SHORT <span>EDGE</span>
+          </div>
+        </div>
+        
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
+            {view === 'login' && 'Welcome back'}
+            {view === 'register' && 'Create your account'}
+            {view === 'forgot' && 'Reset password'}
+            {view === 'otp' && 'Verify identity'}
+            {view === 'reset' && 'Secure your account'}
+          </h2>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
+            {view === 'login' && 'Enter your details to access your terminal.'}
+            {view === 'register' && 'Join the edge in professional trading.'}
+            {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
+            {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
+            {view === 'reset' && 'Choose a strong, unique password.'}
           </div>
         </div>
 
         {/* Error Banner */}
         {authError && (
           <div style={{
-            background:   'rgba(225, 42, 31, 0.1)',
+            background:   'rgba(239, 68, 68, 0.1)',
             color:        'var(--color-red-light)',
-            padding:      '12px',
-            borderRadius: '6px',
-            fontSize:     '13px',
+            padding:      '12px 16px',
+            borderRadius: '8px',
+            fontSize:     '14px',
+            fontWeight:   '600',
             marginBottom: '24px',
-            textAlign:    'center',
-            border:       '1px solid rgba(225, 42, 31, 0.3)',
+            border:       '1px solid rgba(239, 68, 68, 0.2)',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '8px'
           }}>
-            {authError}
+            ⚠️ {authError}
           </div>
         )}
 
         {/* Success Banner */}
         {message && (
           <div style={{
-            background:   'rgba(34, 197, 94, 0.1)',
+            background:   'rgba(16, 185, 129, 0.1)',
             color:        'var(--color-green-light)',
-            padding:      '12px',
-            borderRadius: '6px',
-            fontSize:     '13px',
+            padding:      '12px 16px',
+            borderRadius: '8px',
+            fontSize:     '14px',
+            fontWeight:   '600',
             marginBottom: '24px',
-            textAlign:    'center',
-            border:       '1px solid rgba(34, 197, 94, 0.3)',
+            border:       '1px solid rgba(16, 185, 129, 0.2)',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '8px'
           }}>
-            {message}
+            ✓ {message}
           </div>
         )}
 
@@ -152,75 +171,57 @@ export default function LoginView() {
           {view === 'register' && (
             <div>
               <label style={labelStyle}>Username</label>
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} style={inputStyle} />
+              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="premium-input" placeholder="johndoe" />
             </div>
           )}
 
           {(view === 'login' || view === 'register' || view === 'forgot') && (
             <div>
               <label style={labelStyle}>Email Address</label>
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" placeholder="john@example.com" />
             </div>
           )}
 
           {view === 'otp' && (
             <div>
-              <label style={labelStyle}>6-Digit OTP</label>
-              <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={(e) => setOtp(e.target.value)} style={inputStyle} placeholder="Enter the code sent to your email" />
+              <label style={labelStyle}>6-Digit Security Code</label>
+              <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={otp} onChange={(e) => setOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
             </div>
           )}
 
           {(view === 'login' || view === 'register' || view === 'reset') && (
             <div>
-              <label style={labelStyle}>{view === 'reset' ? 'New Password' : 'Password'}</label>
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>{view === 'reset' ? 'New Password' : 'Password'}</label>
+                {view === 'login' && (
+                  <span onClick={() => switchMode('forgot')} style={{ color: 'var(--color-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>Forgot password?</span>
+                )}
+              </div>
+              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="premium-input" placeholder="••••••••" />
             </div>
           )}
 
-          {view === 'login' && (
-            <div style={{ textAlign: 'right', marginTop: '-10px' }}>
-               <span onClick={() => switchMode('forgot')} style={{ color: 'var(--color-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: '600' }}>Forgot Password?</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              background:    'var(--color-blue)',
-              color:         'white',
-              border:        'none',
-              padding:       '14px',
-              borderRadius:  '6px',
-              fontSize:      '14px',
-              fontWeight:    '700',
-              letterSpacing: '0.5px',
-              cursor:        loading ? 'not-allowed' : 'pointer',
-              marginTop:     '8px',
-              opacity:       loading ? 0.7 : 1,
-              transition:    'opacity 0.2s ease',
-            }}
-          >
+          <button type="submit" disabled={loading} className="premium-btn" style={{ marginTop: '12px' }}>
             {loading ? 'PROCESSING...' : 
               (view === 'login' ? 'LOG IN' : 
-               view === 'register' ? 'SIGN UP' : 
+               view === 'register' ? 'CREATE ACCOUNT' : 
                view === 'forgot' ? 'SEND RESET LINK' : 
-               view === 'otp' ? 'VERIFY OTP' : 'RESET PASSWORD')}
+               view === 'otp' ? 'VERIFY CODE' : 'RESET PASSWORD')}
           </button>
         </form>
 
         {/* Toggle */}
-        <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+        <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: 'var(--text-secondary)' }}>
           {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
           <span
             onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
-            style={{ color: 'var(--color-blue)', cursor: 'pointer', fontWeight: '600' }}
+            style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
           >
-            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'reset') ? 'Sign up' : 'Log in'}
+            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
           </span>
           {(view === 'forgot' || view === 'otp' || view === 'reset') && (
-            <div style={{ marginTop: '12px' }}>
-              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer' }}>Back to login</span>
+            <div style={{ marginTop: '16px' }}>
+              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
             </div>
           )}
         </div>
