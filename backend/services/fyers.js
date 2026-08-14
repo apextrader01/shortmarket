@@ -235,8 +235,15 @@ async function initFyers(io, pc, isMaster = true) {
                 dirtySymbols.forEach(sym => {
                     const priceObj = sharedPriceCache[sym];
                     if (priceObj && global_io) {
-                        // Broadcast ONLY to the specific room for this symbol
-                        global_io.to(sym).emit('price_snapshot', { [sym]: priceObj });
+                        // The frontend joins Socket.IO rooms using the TRADING symbol (e.g. NIFTY-NSE),
+                        // but 'sym' here is the FYERS symbol (e.g. NSE:NIFTY50-INDEX).
+                        // We must use fyersToRequestedMap to broadcast to the correct rooms.
+                        const mappedSymbols = fyersToRequestedMap[sym];
+                        if (mappedSymbols && mappedSymbols.length > 0) {
+                            mappedSymbols.forEach(reqSym => {
+                                global_io.to(reqSym).emit('price_snapshot', { [reqSym]: priceObj });
+                            });
+                        }
                     }
                 });
                 dirtySymbols.clear();
