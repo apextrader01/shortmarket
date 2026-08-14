@@ -148,19 +148,13 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
   
   try {
     const db = require('./database/db');
-    const { symbolToToken } = require('./services/instruments');
     
-    // Fallback if symbolToToken is empty before fully booted
-    const tokens = symbols.map(s => symbolToToken[s]).filter(Boolean);
+    const dbLots = await db('instruments').whereIn('symbol', symbols).orWhereIn('unique_symbol', symbols).select('symbol', 'unique_symbol', 'lotsize');
     
     const result = {};
-    if (tokens.length > 0) {
-      const dbLots = await db('instruments').whereIn('token', tokens).select('token', 'unique_symbol', 'lotsize');
-      for (const row of dbLots) {
-        if (row.unique_symbol) {
-          result[row.unique_symbol] = row.lotsize || 1;
-        }
-      }
+    for (const row of dbLots) {
+      if (row.unique_symbol) result[row.unique_symbol] = row.lotsize || 1;
+      if (row.symbol) result[row.symbol] = row.lotsize || 1;
     }
     
     // Ensure all requested symbols have at least lotsize 1 fallback
