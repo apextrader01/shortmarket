@@ -253,6 +253,13 @@ app.get('/api/stocks', async (req, res) => {
           query = query.where('search_string', 'ILIKE', `%${term}%`);
       });
 
+      // Filter out expired contracts (allow if expiry is null OR if expiry is today or later)
+      const startOfToday = new Date().setHours(0, 0, 0, 0);
+      query = query.where(function() {
+          this.whereNull('expiry_timestamp')
+              .orWhere('expiry_timestamp', '>=', startOfToday);
+      });
+
       // Prioritize exact matches and shorter symbols in the DB query to ensure they aren't buried
       query = query.orderByRaw(`
         CASE 
