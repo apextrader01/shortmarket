@@ -268,11 +268,8 @@ function startLiveWebSocket() {
         return;
     }
     
-    // IMPORTANT: Use SymbolUpdate to receive change and pct along with LTP
-    if (wsInstance.SymbolUpdate) {
-        wsInstance.mode(wsInstance.SymbolUpdate);
-    } else {
-        wsInstance.mode('SymbolUpdate');
+    if (wsInstance.FullMode) {
+        wsInstance.mode(wsInstance.FullMode);
     }
     
     // Check if listeners are already attached to this singleton instance
