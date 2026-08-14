@@ -35,7 +35,10 @@ export default function OrderModal() {
   useEffect(() => {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
-      setPrice(livePrice ? livePrice.toFixed(2) : '');
+      
+      // Fetch initial price imperatively to avoid re-running on every live tick
+      const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
+      setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
       
       // Auto-fetch lotsize if it's 1 and looks like a derivative (contains numbers)
       if ((orderModal.lotsize || 1) === 1 && /\d/.test(orderModal.symbol)) {
@@ -48,7 +51,7 @@ export default function OrderModal() {
           }).catch(console.error);
       }
     }
-  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, livePrice]);
+  }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
 
   if (!orderModal.isOpen || !symbol) return null;
 
@@ -369,7 +372,7 @@ export default function OrderModal() {
                 <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Price(Tick: 0.05)</legend>
                 <input 
                   type="text" 
-                  value={price} 
+                  value={orderType === 'MARKET' ? (livePrice ? livePrice.toFixed(2) : '0.00') : price} 
                   onChange={e => setPrice(e.target.value)} 
                   disabled={orderType === 'MARKET'}
                   style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
