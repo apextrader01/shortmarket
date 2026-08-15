@@ -34,9 +34,52 @@ function App() {
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
 
-  const [activeTab, setActiveTab] = useState('Markets');
+  const [activeTab, setActiveTab] = useState(() => {
+    const path = window.location.pathname.replace('/', '');
+    if (!path) return 'Markets';
+    
+    // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
+    const tabsMap = {
+      'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
+      'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
+      'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
+      'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
+      'reports': 'Reports'
+    };
+    return tabsMap[path.toLowerCase()] || 'Markets';
+  });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Sync activeTab to URL and handle browser back/forward buttons
+  useEffect(() => {
+    if (activeTab) {
+      const newPath = `/${activeTab.toLowerCase()}`;
+      if (window.location.pathname !== newPath) {
+        window.history.pushState(null, '', newPath);
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.replace('/', '');
+      if (!path) {
+        setActiveTab('Markets');
+        return;
+      }
+      const tabsMap = {
+        'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
+        'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
+        'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
+        'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
+        'reports': 'Reports'
+      };
+      setActiveTab(tabsMap[path.toLowerCase()] || 'Markets');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
 
