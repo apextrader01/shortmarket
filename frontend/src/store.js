@@ -295,7 +295,7 @@ export const useStore = create(persist((set, get) => ({
   holdings:       [],
   sips:           [],
   orders:         [],
-  selectedSymbol: 'RELIANCE-EQ',
+  selectedSymbol: localStorage.getItem('lastSelectedSymbol') || 'NSE:NIFTY50-INDEX',
   isConnected: false,
 
   setSelectedSymbol: (symbol) => {
