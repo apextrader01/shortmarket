@@ -113,7 +113,7 @@ export default function MarketWatch({ className = '' }) {
   }, [isSearchMode, searchResults.map(s => s.uniqueSymbol).join(','), activeWatchlist.symbols.join(',')]);
 
   return (
-    <div className={`sidebar ${className}`}>
+    <div className={`sidebar glass-panel ${className}`}>
       {/* Watchlist Tabs */}
       <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--border-color)', padding: '0 8px', background: 'var(--bg-panel)' }} className="scrollbar-hide">
         {watchlists.map(w => (
@@ -161,7 +161,7 @@ export default function MarketWatch({ className = '' }) {
         <input
           type="text"
           placeholder="Search stocks to add..."
-          className="input-field"
+          className="input-field search-pill"
           style={{ width: '100%', paddingLeft: '32px', fontSize: '13px', background: 'var(--bg-dark)' }}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

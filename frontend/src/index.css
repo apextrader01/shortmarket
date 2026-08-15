@@ -1083,3 +1083,127 @@ input:checked + .slider:before {
   -webkit-text-fill-color: transparent;
 }
 
+
+/* =========================================
+   PREMIUM TERMINAL REDESIGN CLASSES
+   ========================================= */
+
+/* Glassmorphism Panel */
+.glass-panel {
+  background: rgba(10, 15, 25, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.glass-header {
+  background: rgba(5, 11, 20, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Typography Enhancements */
+.font-outfit {
+  font-family: 'Outfit', sans-serif;
+}
+
+.glow-text-green {
+  color: var(--color-green-light);
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
+
+.glow-text-red {
+  color: var(--color-red-light);
+  text-shadow: 0 0 10px rgba(255, 74, 63, 0.4);
+}
+
+.glow-text-blue {
+  color: var(--color-blue-light);
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+}
+
+/* Nav Pills & Buttons */
+.nav-pill {
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  font-weight: 500;
+  position: relative;
+}
+
+.nav-pill:hover {
+  color: #fff;
+  text-shadow: 0 0 8px rgba(255,255,255,0.3);
+}
+
+.nav-pill.active {
+  color: #fff;
+}
+
+.nav-pill.active::after {
+  content: "";
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-blue);
+  box-shadow: 0 -2px 10px var(--color-blue);
+  border-radius: 2px;
+}
+
+/* Search Bar Pill */
+.search-pill {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.search-pill:focus-within {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), inset 0 0 10px rgba(59, 130, 246, 0.05);
+  background: rgba(0,0,0,0.5);
+}
+
+/* Watchlist Item Hover */
+.watchlist-item {
+  transition: background 0.2s ease, border-left 0.2s ease;
+  border-left: 2px solid transparent;
+}
+
+.watchlist-item:hover {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+  border-left: 2px solid rgba(255,255,255,0.1);
+}
+
+.watchlist-item.selected {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+  border-left: 2px solid var(--color-blue);
+}
+
+/* Exchange Badges */
+.badge-mcx { background: rgba(234, 179, 8, 0.15); color: #FDE047; border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-nse { background: rgba(59, 130, 246, 0.15); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.3); }
+.badge-bse { background: rgba(168, 85, 247, 0.15); color: #D8B4FE; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+/* Chart Tool Pills */
+.chart-tool-pill {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+.chart-tool-pill:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+.chart-tool-pill.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+}
+
