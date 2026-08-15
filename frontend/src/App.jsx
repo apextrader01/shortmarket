@@ -54,12 +54,15 @@ function App() {
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
-      const newPath = `/${activeTab.toLowerCase()}`;
+      let newPath = `/${activeTab.toLowerCase()}`;
+      if (activeTab === 'Portfolio' && typeof portfolioSubTab !== 'undefined') {
+        newPath = `/portfolio/${portfolioSubTab.toLowerCase()}`;
+      }
       if (window.location.pathname !== newPath) {
         window.history.pushState(null, '', newPath);
       }
     }
-  }, [activeTab]);
+  }, [activeTab, typeof portfolioSubTab !== 'undefined' ? portfolioSubTab : null]);
 
   useEffect(() => {
     const handlePopState = () => {
