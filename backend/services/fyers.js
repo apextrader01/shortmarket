@@ -544,6 +544,17 @@ async function fetchBatchLTPs(symbols) {
         if (fSym) {
             if (!fyersToRequested[fSym]) fyersToRequested[fSym] = [];
             if (!fyersToRequested[fSym].includes(s)) fyersToRequested[fSym].push(s);
+            
+            // Self-heal: If the mapping was incorrect during initial boot (before CSVs loaded),
+            // ensure the correct Fyers symbol is now registered and subscribed.
+            if (!globalFyersToRequested[fSym]) {
+                globalFyersToRequested[fSym] = [];
+                if (!subQueue.includes(fSym)) subQueue.push(fSym);
+            }
+            if (!globalFyersToRequested[fSym].includes(s)) {
+                globalFyersToRequested[fSym].push(s);
+            }
+            
             return fSym;
         }
         return null;
