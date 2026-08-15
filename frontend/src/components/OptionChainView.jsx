@@ -135,7 +135,7 @@ const OptionChainView = () => {
         if (futRes.ok) {
           futDataResult = await futRes.json();
           setFutureData(futDataResult);
-          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          const futKey = futDataResult.symbol;
           setFutureTokenKey(futKey);
           
           // For commodities, now that we have the futures symbol/exchange, fetch its price
@@ -153,7 +153,7 @@ const OptionChainView = () => {
         if (idxKey && storeState[idxKey]?.ltp > 0) {
           resolvedSpotPrice = storeState[idxKey].ltp;
         } else if (isCommodity && futDataResult) {
-          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          const futKey = futDataResult.symbol;
           if (storeState[futKey]?.ltp > 0) {
             resolvedSpotPrice = storeState[futKey].ltp;
           }
@@ -274,12 +274,12 @@ const OptionChainView = () => {
           const uniqueSymbolsToFetch = [];
           if (indexKey) uniqueSymbolsToFetch.push(indexKey);
           uniqueSymbolsToFetch.push('INDIA VIX-NSE');
-          if (futureData) uniqueSymbolsToFetch.push(`${futureData.symbol}-${futureData.exchange}`);
+          if (futureData) uniqueSymbolsToFetch.push(futureData.symbol);
 
           visibleStrikes.forEach((strike) => {
             const data = optionsData[expiry]?.[strike];
-            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: `${data.CE.symbol}-${data.CE.exch_seg}`, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
-            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: `${data.PE.symbol}-${data.PE.exch_seg}`, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
+            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
+            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
           });
 
           if (uniqueSymbolsToFetch.length > 0) {
@@ -340,8 +340,8 @@ const OptionChainView = () => {
   const handleTrade = (opt, type, optionType, iv) => {
     if (!opt) return;
     
-    // Construct unique symbol with exchange suffix (e.g. SENSEX2672378000CE-BFO)
-    const optKey = opt.symbol.includes('-') ? opt.symbol : `${opt.symbol}-${opt.exch_seg}`;
+    // Construct unique symbol
+    const optKey = opt.symbol;
     
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
@@ -509,7 +509,7 @@ const OptionChainView = () => {
   };
 
   return (
-    <div className="option-chain-container">
+    <div className="option-chain-container glass-panel">
       {/* Header */}
       <div className="option-chain-top-bar">
         {/* Section 1: Search & Spot */}

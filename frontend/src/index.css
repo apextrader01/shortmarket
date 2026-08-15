@@ -108,7 +108,7 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar {
   width: 300px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
@@ -123,7 +123,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .topbar {
   height: 64px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   padding: 0 24px;
@@ -155,7 +155,7 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
     height: 40vh;
     border-right: none;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
   .main-content {
     height: 60vh;
@@ -244,7 +244,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .logo-text {
@@ -311,7 +311,7 @@ th {
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 14px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 td {
@@ -411,7 +411,7 @@ tbody tr:hover {
 
   /* MutualFundDetailsModal: stack main info above sidebar on mobile */
   .mf-details-content { flex-direction: column !important; }
-  .mf-details-content > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border-color); }
+  .mf-details-content > div:first-child { border-right: none !important; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
   .mf-details-content > div:last-child { width: 100% !important; }
 
   /* Lift fixed MTM banner above bottom nav on mobile */
@@ -489,7 +489,7 @@ tbody tr:hover {
       overflow-y: auto !important;
     }
     .app-container { flex-direction: column; overflow-y: auto; }
-    .sidebar { width: 100%; height: 50vh; flex-shrink: 0; border-right: none; border-bottom: 1px solid var(--border-color); }
+    .sidebar { width: 100%; height: 50vh; flex-shrink: 0; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
   .main-content { overflow: visible; height: auto; }
   .topbar { flex-wrap: wrap; height: auto; padding: 12px; gap: 12px; }
   .topbar > div { flex-wrap: wrap; }
@@ -516,7 +516,7 @@ tbody tr:hover {
   align-items: center;
   padding: 12px 20px;
   background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
   font-family: inherit;
   gap: 20px;
@@ -784,13 +784,13 @@ input:checked + .slider:before {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #161616;
+  background: rgba(22, 22, 22, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   color: #888;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   padding: 8px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   text-align: right;
 }
 
@@ -799,17 +799,17 @@ input:checked + .slider:before {
 }
 
 .option-chain-table th.header-call {
-  background: #0d0d0d;
+  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   color: white;
   font-size: 14px;
   font-weight: 700;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   text-align: center;
   padding: 12px;
 }
 
 .option-chain-table th.header-put {
-  background: #0d0d0d;
+  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   color: white;
   font-size: 14px;
   font-weight: 700;
@@ -818,9 +818,9 @@ input:checked + .slider:before {
 }
 
 .option-chain-table th.header-strike {
-  background: #0d0d0d;
+  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   text-align: center;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   padding: 8px;
 }
 
@@ -837,7 +837,7 @@ input:checked + .slider:before {
 
 .option-chain-table td {
   padding: 6px 8px;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   text-align: right;
   white-space: nowrap;
 }
@@ -847,11 +847,11 @@ input:checked + .slider:before {
 }
 
 .option-chain-table td.border-right {
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .option-chain-table tr:hover {
-  background: #1a1a1a;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .ltp-container {
@@ -918,7 +918,7 @@ input:checked + .slider:before {
   font-weight: 700;
   color: var(--text-primary);
   text-align: center;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 
@@ -952,7 +952,7 @@ input:checked + .slider:before {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 .mobile-menu-content {
   flex: 1;

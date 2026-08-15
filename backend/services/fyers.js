@@ -41,111 +41,17 @@ let fyersToToken = {};
 let nameToFyers = {};
 
 
-// Convert our platform's unique symbols (e.g. NIFTY, NATURALGAS24AUG26270CE-MCX) to Fyers Symbols
+// Convert our platform's unique symbols to Fyers Symbols
 function toFyersSymbol(symbol) {
     if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
-
-    try {
-        const { symbolToToken } = require('./instruments');
-        let token = symbolToToken[symbol];
-        
-        // Fallback for options/futures that might be stored without their exchange suffix
-        if (!token && (symbol.endsWith('CE') || symbol.endsWith('PE') || symbol.endsWith('FUT'))) {
-            token = symbolToToken[`${symbol}-NFO`] || symbolToToken[`${symbol}-MCX`] || symbolToToken[`${symbol}-BFO`];
-        }
-        
-        if (token && tokenToFyers[token]) {
-            return tokenToFyers[token];
-        }
-        // Fallback for legacy watchlists that saved the raw Angel One token instead of the uniqueSymbol
-        if (tokenToFyers[symbol]) {
-            return tokenToFyers[symbol];
-        }
-    } catch(e) {}
-    
-    // Fallback logic for indices and equities
-    if (symbol === 'NIFTY' || symbol === 'NIFTY-NSE') return 'NSE:NIFTY50-INDEX';
-    if (symbol === 'BANKNIFTY' || symbol === 'BANKNIFTY-NSE') return 'NSE:NIFTYBANK-INDEX';
-    if (symbol === 'SENSEX' || symbol === 'SENSEX-BSE') return 'BSE:SENSEX-INDEX';
-    if (symbol === 'FINNIFTY' || symbol === 'FINNIFTY-NSE') return 'NSE:FINNIFTY-INDEX';
-    if (symbol === 'MIDCPNIFTY' || symbol === 'MIDCPNIFTY-NSE') return 'NSE:MIDCPNIFTY-INDEX';
-    if (symbol === 'BANKEX' || symbol === 'BANKEX-BSE') return 'BSE:BANKEX-INDEX';
-    if (symbol === 'POWER-BSE' || symbol === 'POWER') return 'BSE:POWER-INDEX';
-
-    if (symbol.endsWith('-EQ')) return `NSE:${symbol}`;
-    
-    if (symbol.endsWith('-BSE')) {
-        const baseName = symbol.replace('-BSE', '');
-        // Check name-based index map first (handles BSE sector indices whose Angel token differs from exchange token)
-        if (nameToFyers[baseName]) return nameToFyers[baseName];
-        return `BSE:${baseName}-EQ`;
-    }
-    
-    if (symbol.endsWith('-NSE')) {
-        const baseName = symbol.replace('-NSE', '');
-        if (nameToFyers[baseName]) return nameToFyers[baseName];
-        return `NSE:${baseName}-EQ`;
-    }
-    
-    // Fallback for F&O and MCX symbols not found in the token map.
-    // Symbol format: NIFTY10AUG2626000CE-NFO, SENSEX82000PE-BFO, GOLDM10AUG26-MCX
-    if (symbol.endsWith('-NFO')) {
-        const base = symbol.slice(0, -4); // strip '-NFO'
-        return `NSE:${base}`;
-    }
-    if (symbol.endsWith('-BFO')) {
-        const base = symbol.slice(0, -4); // strip '-BFO'
-        return `BSE:${base}`;
-    }
-    if (symbol.endsWith('-MCX')) {
-        const base = symbol.slice(0, -4); // strip '-MCX'
-        return `MCX:${base}`;
-    }
-
-    // For plain symbols without a dash, assume NSE equity
-    if (!symbol.includes('-')) return `NSE:${symbol}-EQ`;
-
-    return null;
+    return symbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols
 function fromFyersSymbol(fyersSymbol) {
     if (!fyersSymbol) return null;
-
-    try {
-        const token = fyersToToken[fyersSymbol];
-        if (token) {
-            const { tokenToSymbol } = require('./instruments');
-            const uniqueSym = tokenToSymbol[token];
-            if (uniqueSym) {
-                return uniqueSym;
-            }
-        }
-    } catch(e) {}
-
-    // Fallback logic - MUST return uniqueSymbol format with exchange suffix
-    if (fyersSymbol === 'NSE:NIFTY50-INDEX') return 'NIFTY-NSE';
-    if (fyersSymbol === 'NSE:NIFTYBANK-INDEX') return 'BANKNIFTY-NSE';
-    if (fyersSymbol === 'BSE:SENSEX-INDEX') return 'SENSEX-BSE';
-    if (fyersSymbol === 'NSE:FINNIFTY-INDEX') return 'FINNIFTY-NSE';
-    if (fyersSymbol === 'NSE:MIDCPNIFTY-INDEX') return 'MIDCPNIFTY-NSE';
-
-    const parts = fyersSymbol.split(':');
-    if (parts.length !== 2) return fyersSymbol;
-    const [exchange, name] = parts;
-    
-    if (exchange === 'MCX') return `${name}-MCX`;
-    if (name.endsWith('-EQ')) {
-        const baseName = name.replace('-EQ', '');
-        if (exchange === 'BSE') return `${baseName}-BSE`;
-        return `${baseName}-EQ`;  // SBIN-EQ (matches instruments.js uniqueSymbol)
-    }
-    
-    if (exchange === 'NSE') return `${name}-NFO`;
-    if (exchange === 'BSE') return `${name}-BFO`;
-
-    return name;
+    return fyersSymbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 
 // ─── AUTHENTICATION ─────────────────────────────────────────────────────────
@@ -213,10 +119,6 @@ async function initFyers(io, pc, isMaster = true) {
     global_io = io;
     sharedPriceCache = pc;
     isMasterNode = isMaster;
-    
-    // Asynchronously load the Fyers Token maps (Fyers Exchange Token -> Fyers Symbol)
-    // This runs in the background and does not block PM2 startup.
-    loadFyersSymbolMaps();
     
     if (loadTokenFromDisk()) {
         if (isMaster) {
@@ -759,94 +661,9 @@ function getFyersStatus() {
         subscriptions: Array.from(clientSubscriptions),
         lastTickTime: new Date(lastTickTime).toISOString(),
         secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,
-        fyersToRequestedMap: globalFyersToRequested,
-        tokensMapped: Object.keys(tokenToFyers).length
+        fyersToRequestedMap: globalFyersToRequested
     };
 }
-
-async function loadFyersSymbolMaps() {
-    try {
-        const fs = require('fs');
-        const path = require('path');
-        const https = require('https');
-        const mapPath = path.join(__dirname, '../database/fyers_map.json');
-        
-        // 1. Load from local cache immediately so we have instant startup mapping
-        if (fs.existsSync(mapPath)) {
-            const data = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-            tokenToFyers = data.tokenToFyers || {};
-            fyersToToken = data.fyersToToken || {};
-            nameToFyers  = data.nameToFyers  || {};
-            console.log(`🔌 Loaded ${Object.keys(tokenToFyers).length} Fyers symbols + ${Object.keys(nameToFyers).length} indices from cache.`);
-        }
-        
-        if (!isMasterNode) {
-            console.log("ℹ️ Worker node skipping Fyers CSV download.");
-            return;
-        }
-        
-        // 2. Download latest CSVs asynchronously in the background
-        const download = (url) => new Promise((resolve, reject) => {
-            https.get(url, (res) => {
-                let data = '';
-                res.on('data', chunk => data += chunk);
-                res.on('end', () => resolve(data));
-            }).on('error', reject);
-        });
-
-        console.log("🔄 Downloading Fyers Master CSVs in background...");
-        const urls = [
-            'https://public.fyers.in/sym_details/NSE_FO.csv',
-            'https://public.fyers.in/sym_details/BSE_FO.csv',
-            'https://public.fyers.in/sym_details/MCX_COM.csv',
-            'https://public.fyers.in/sym_details/NSE_CM.csv',
-            'https://public.fyers.in/sym_details/BSE_CM.csv'
-        ];
-        
-        const newMap = {};
-        const revMap = {};
-        const newNameMap = {};
-        
-        for (const url of urls) {
-            try {
-                const csv = await download(url);
-                const lines = csv.split('\n');
-                for (const line of lines) {
-                    if (!line) continue;
-                    const parts = line.split(',');
-                    if (parts.length > 13) {
-                        const fyersSym = parts[9];
-                        const exchangeToken = parts[12];
-                        const underlyingName = parts[13]; // e.g. 'POWER', 'RELIANCE'
-                        if (exchangeToken && fyersSym && fyersSym.includes(':')) {
-                            newMap[exchangeToken] = fyersSym;
-                            revMap[fyersSym] = exchangeToken;
-                            // Build name map for indices (e.g. POWER → BSE:POWER-INDEX)
-                            if (fyersSym.endsWith('-INDEX') && underlyingName) {
-                                newNameMap[underlyingName] = fyersSym;
-                            }
-                        }
-                    }
-                }
-            } catch(e) {
-                console.error(`Failed to download ${url}:`, e.message);
-            }
-        }
-        
-        if (Object.keys(newMap).length > 1000) {
-            tokenToFyers = newMap;
-            fyersToToken = revMap;
-            nameToFyers = newNameMap;
-            fs.writeFileSync(mapPath, JSON.stringify({ tokenToFyers, fyersToToken, nameToFyers }));
-            console.log(`✅ Fyers Symbol Maps updated successfully (${Object.keys(newMap).length} tokens, ${Object.keys(newNameMap).length} indices).`);
-        }
-        
-    } catch(err) {
-        console.error("Fyers Map Error:", err);
-    }
-}
-
-
 
 module.exports = {
     getPriceFromCache,
@@ -863,9 +680,7 @@ module.exports = {
     fetchCandleData,
     addSubscriptionBatch,
     handlePingSubscriptions,
-    getFyersStatus
+    getFyersStatus,
+    toFyersSymbol,
+    fromFyersSymbol
 };
-
-module.exports.toFyersSymbol = toFyersSymbol;
-
-

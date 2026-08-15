@@ -72,7 +72,7 @@ const OptionChainRow = React.memo(({
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
           <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            <span className={`ltp-value ${callPriceData?.change >= 0 ? 'neon-text-green' : 'neon-text-red'}`} style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               {cLtp > 0 ? cLtp.toFixed(2) : '-'}
             </span>
             <div className="action-buttons">
@@ -138,7 +138,7 @@ const OptionChainRow = React.memo(({
             )}
           </div>
           <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            <span className={`ltp-value ${putPriceData?.change >= 0 ? 'neon-text-green' : 'neon-text-red'}`} style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               {pLtp > 0 ? pLtp.toFixed(2) : '-'}
             </span>
             <div className="action-buttons">

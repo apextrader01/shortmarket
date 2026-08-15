@@ -58,15 +58,14 @@ export default function MarketWatch({ className = '' }) {
     const found = stocks.find(s => s.uniqueSymbol === sym);
     if (found) return found;
     // For Options/Futures that are not in the stocks list
-    const dashIdx = sym.lastIndexOf('-');
+    const colonIdx = sym.indexOf(':');
     let symbol, exchange;
-    if (dashIdx > 0) {
-      symbol = sym.substring(0, dashIdx);
-      exchange = sym.substring(dashIdx + 1);
+    if (colonIdx > 0) {
+      exchange = sym.substring(0, colonIdx);
+      symbol = sym.substring(colonIdx + 1);
     } else {
       symbol = sym;
-      // Detect derivatives by pattern (e.g. NIFTY07JUL2624000CE)
-      exchange = /\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/.test(sym) ? 'NFO' : 'NSE';
+      exchange = 'NSE';
     }
     return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, token: '' };
   }).filter(Boolean) : [];
@@ -209,7 +208,7 @@ export default function MarketWatch({ className = '' }) {
               onClick={() => setSelectedSymbol(stock.uniqueSymbol)}
               onMouseEnter={() => setHoveredStock(stock.uniqueSymbol)}
               onMouseLeave={() => setHoveredStock(null)}
-              className={`watchlist-item ${isSelected ? 'selected' : ''}`}
+              className={`watchlist-item ${isSelected ? 'selected hover-glow' : 'hover-glow'}`}
               style={{
                 padding: '6px 12px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
