@@ -477,16 +477,10 @@ function IndicatorButton({ label, active, onClick, color }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        background: active ? `${color}20` : 'transparent',
-        color: active ? color : '#64748B',
-        border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
-        borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 'bold',
-        cursor: 'pointer', transition: 'all 0.2s'
-      }}
+      className={`chart-tool-pill ${active ? 'active' : ''}`}
+      style={{ '--pill-color': color }}
     >
-      {active && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />}
+      {active && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />}
       {label}
     </button>
   );

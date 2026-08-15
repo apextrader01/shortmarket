@@ -209,23 +209,22 @@ export default function MarketWatch({ className = '' }) {
               onClick={() => setSelectedSymbol(stock.uniqueSymbol)}
               onMouseEnter={() => setHoveredStock(stock.uniqueSymbol)}
               onMouseLeave={() => setHoveredStock(null)}
+              className={`watchlist-item ${isSelected ? 'selected' : ''}`}
               style={{
                 padding: '6px 12px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 cursor: 'pointer',
-                background: isSelected ? 'rgba(225, 42, 31, 0.08)' : isHovered ? 'rgba(255,255,255,0.02)' : 'transparent',
-                borderLeft: isSelected ? '3px solid var(--color-red)' : '3px solid transparent',
+                background: isSelected ? 'transparent' : isHovered ? 'rgba(255,255,255,0.02)' : 'transparent',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                transition: 'background 0.1s ease',
                 position: 'relative'
               }}
             >
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontWeight: isSelected ? '700' : '600', textShadow: isSelected ? '0 0 8px rgba(255,255,255,0.4)' : 'none', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {stock.symbol}
-                  <span style={{ fontSize: '9px', padding: '1px 3px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', color: 'var(--text-secondary)' }}>
+                  <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '9px', padding: '1px 3px', borderRadius: '3px' }}>
                     {stock.exchange}
                   </span>
                 </div>
