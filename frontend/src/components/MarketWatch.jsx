@@ -69,11 +69,12 @@ export default function MarketWatch({ className = '' }) {
     }
     return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, token: '' };
   }).filter(Boolean) : [];
-  const displayStocks = isSearchMode ? searchResults : watchlistStocks;
+  const filteredSearchResults = searchResults.filter(s => !(activeWatchlist?.symbols || []).includes(s.uniqueSymbol));
+  const displayStocks = isSearchMode ? filteredSearchResults : watchlistStocks;
 
   React.useEffect(() => {
     // Collect all stocks currently visible (watchlist or search results)
-    const visibleStocks = isSearchMode ? searchResults : watchlistStocks;
+    const visibleStocks = isSearchMode ? filteredSearchResults : watchlistStocks;
     
     // Subscribe to all of them for instant updates
     if (visibleStocks.length > 0) {
@@ -238,7 +239,7 @@ export default function MarketWatch({ className = '' }) {
                       <Check size={14} color="var(--color-green-light)" />
                     ) : (
                       <div 
-                        onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); setSearchQuery(''); }}
+                        onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
                         style={{ padding: '3px', background: 'var(--color-blue)', borderRadius: '4px', display: 'flex' }}
                       >
                         <Plus size={12} color="#fff" />
