@@ -2623,7 +2623,7 @@ setPriceCache(priceCache);
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', async () => {
+server.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 
     // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
