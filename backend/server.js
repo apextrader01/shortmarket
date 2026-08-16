@@ -147,21 +147,8 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
   if (symbols.length === 0) return res.json({});
   
   try {
-    const db = require('./database/db');
-    
-    const dbLots = await db('instruments').whereIn('symbol', symbols).orWhereIn('unique_symbol', symbols).select('symbol', 'unique_symbol', 'lotsize');
-    
-    const result = {};
-    for (const row of dbLots) {
-      if (row.unique_symbol) result[row.unique_symbol] = row.lotsize || 1;
-      if (row.symbol) result[row.symbol] = row.lotsize || 1;
-    }
-    
-    // Ensure all requested symbols have at least lotsize 1 fallback
-    symbols.forEach(sym => {
-      if (!result[sym]) result[sym] = 1;
-    });
-    
+    const { getLotSizes } = require('./services/instrumentsCache');
+    const result = getLotSizes(symbols);
     res.json(result);
   } catch (err) {
     console.error('/api/lotsizes Error:', err);
@@ -183,25 +170,11 @@ app.get('/api/stocks', async (req, res) => {
       }
     }
     
-    // 2. Compute if not in cache (Query Postgres)
-    const db = require('./database/db');
-    
-    // Fetch all NSE/BSE cash equities
-    const dbResults = await db('instruments')
-      .whereIn('exchange', ['NSE', 'BSE'])
-      .whereRaw("symbol NOT LIKE '%FUT%'")
-      .whereRaw("symbol NOT LIKE '%CE%'")
-      .whereRaw("symbol NOT LIKE '%PE%'");
+    // 2. Compute if not in cache (Query In-Memory JSON)
+    const { getAllStocks } = require('./services/instrumentsCache');
+    const stocksArray = getAllStocks();
       
-    if (!dbResults || dbResults.length === 0) return res.json([]);
-    
-    const stocksArray = dbResults.map(item => ({
-        token: item.token, 
-        symbol: item.symbol, 
-        name: item.name, 
-        exchange: item.exchange, 
-        uniqueSymbol: item.unique_symbol
-    }));
+    if (!stocksArray || stocksArray.length === 0) return res.json([]);
       
     const responseData = JSON.stringify(stocksArray);
     
@@ -236,34 +209,10 @@ app.get('/api/stocks', async (req, res) => {
         }
       }
 
-      // 2. Compute if not in cache (Query Postgres)
-      const db = require('./database/db');
+      // 2. Compute if not in cache (Query In-Memory JSON)
+      const { searchInstruments } = require('./services/instrumentsCache');
       
-      const queryParts = qLower.split(/\s+/).filter(Boolean);
-      let query = db('instruments');
-      
-      // Build ILIKE query for each term
-      queryParts.forEach(term => {
-          query = query.where('search_string', 'ILIKE', `%${term}%`);
-      });
-
-      // Filter out expired contracts (allow if expiry is null OR if expiry is today or later)
-      const startOfToday = new Date().setHours(0, 0, 0, 0);
-      query = query.where(function() {
-          this.whereNull('expiry_timestamp')
-              .orWhere('expiry_timestamp', '>=', startOfToday);
-      });
-
-      // Prioritize exact matches and shorter symbols in the DB query to ensure they aren't buried
-      query = query.orderByRaw(`
-        CASE 
-          WHEN LOWER(symbol) = ? THEN 1
-          ELSE 2
-        END ASC, LENGTH(symbol) ASC
-      `, [qLower]);
-
-      // Execute query and fetch up to 500 results to sort
-      let dbResults = await query.limit(500);
+      const dbResults = searchInstruments(qLower);
 
       dbResults.sort((a, b) => {
         const aExact = a.symbol.toLowerCase() === qLower || (a.name && a.name.toLowerCase() === qLower);
@@ -281,9 +230,8 @@ app.get('/api/stocks', async (req, res) => {
         if (aIsFut && !bIsFut) return -1;
         if (!aIsFut && bIsFut) return 1;
         
-        const aExpiry = a.expiry_timestamp ? Number(a.expiry_timestamp) : Infinity;
-        const bExpiry = b.expiry_timestamp ? Number(b.expiry_timestamp) : Infinity;
-        if (aExpiry !== bExpiry) return aExpiry - bExpiry;
+        // Sorting by length handles "prioritize shorter symbols"
+        if (a.symbol.length !== b.symbol.length) return a.symbol.length - b.symbol.length;
         
         return 0;
       });
@@ -295,7 +243,7 @@ app.get('/api/stocks', async (req, res) => {
           exchange: item.exchange,
           lotsize: item.lotsize,
           expiryTimestamp: item.expiry_timestamp,
-          uniqueSymbol: item.unique_symbol,
+          uniqueSymbol: item.unique_symbol || item.symbol,
           searchString: item.search_string
       }));
       
