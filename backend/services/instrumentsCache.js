@@ -4,12 +4,26 @@ const path = require('path');
 let allInstruments = [];
 let lotSizeMap = {};
 
+function flattenTree(node, results = []) {
+    if (!node || typeof node !== 'object') return results;
+    
+    if (node.symbol && node.token) {
+        results.push(node);
+        return results;
+    }
+    
+    for (const key in node) {
+        flattenTree(node[key], results);
+    }
+    return results;
+}
+
 function loadJSON(filename) {
     try {
         const filepath = path.join(__dirname, '..', 'database', filename);
         if (fs.existsSync(filepath)) {
             const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
-            return Array.isArray(data) ? data : [];
+            return Array.isArray(data) ? data : flattenTree(data);
         }
     } catch (e) {
         console.error(`Error loading ${filename}:`, e);
