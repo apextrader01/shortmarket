@@ -25,7 +25,6 @@ export default function MarketWatch({ className = '' }) {
     const signal = controller.signal;
     
     const timer = setTimeout(async () => {
-      setIsSearching(true);
       try {
         const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(searchQuery)}`, { signal });
         if (res.ok) {
@@ -160,11 +159,18 @@ export default function MarketWatch({ className = '' }) {
         <Search size={14} style={{ position: 'absolute', left: '28px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
         <input
           type="text"
-          placeholder="Search stocks to add..."
+          placeholder={`Search & add to Watchlist ${watchlists.findIndex(w => String(w.id) === String(activeWatchlistId)) + 1}`}
           className="input-field search-pill"
           style={{ width: '100%', paddingLeft: '32px', fontSize: '13px', background: 'var(--bg-dark)' }}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (e.target.value.trim().length > 0) {
+              setIsSearching(true);
+            } else {
+              setIsSearching(false);
+            }
+          }}
         />
         {isSearchMode && (
           <X 

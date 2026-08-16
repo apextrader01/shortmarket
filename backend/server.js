@@ -180,7 +180,7 @@ app.get('/api/stocks', async (req, res) => {
     
     // 3. Save to Redis (cache for 6 hours)
     if (generalClient && generalClient.isReady) {
-      await generalClient.set(cacheKey, responseData, { EX: 21600 }).catch(console.error);
+      generalClient.set(cacheKey, responseData, { EX: 21600 }).catch(console.error);
     }
     
     res.setHeader('Content-Type', 'application/json');
@@ -199,7 +199,7 @@ app.get('/api/stocks', async (req, res) => {
     
     try {
       const { generalClient } = require('./services/redisClient');
-      const cacheKey = `api:search:${qLower}`;
+      const cacheKey = `api:search:v2:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
@@ -250,7 +250,7 @@ app.get('/api/stocks', async (req, res) => {
       const responseData = JSON.stringify(results);
       
       if (generalClient && generalClient.isReady) {
-        await generalClient.set(cacheKey, responseData, { EX: 3600 }).catch(console.error); // 1 hour cache
+        generalClient.set(cacheKey, responseData, { EX: 3600 }).catch(console.error); // 1 hour cache
       }
       
       res.setHeader('Content-Type', 'application/json');
