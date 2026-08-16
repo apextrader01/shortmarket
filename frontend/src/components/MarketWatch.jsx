@@ -238,7 +238,7 @@ export default function MarketWatch({ className = '' }) {
                       <Check size={14} color="var(--color-green-light)" />
                     ) : (
                       <div 
-                        onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
+                        onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); setSearchQuery(''); }}
                         style={{ padding: '3px', background: 'var(--color-blue)', borderRadius: '4px', display: 'flex' }}
                       >
                         <Plus size={12} color="#fff" />
