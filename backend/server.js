@@ -1734,6 +1734,10 @@ app.delete('/api/sip/:id', authenticateToken, async (req, res) => {
 });
 
 // ⚡ Fetch Batch LTPs (REST) ⚡
+// In-flight deduplication: if 10 users request prices for the same symbols at once,
+// only ONE Fyers REST call is made — all other requests share the same Promise result.
+const _inFlightLtpRequests = new Map(); // key: sorted symbol list → Promise
+
 app.post('/api/ltp-batch', async (req, res) => {
   try {
     const { symbols } = req.body;
@@ -1747,11 +1751,10 @@ app.post('/api/ltp-batch', async (req, res) => {
     const result = {};
     const missingSymbols = [];
     
-    // 1. Try to serve from memory cache instantly
+    // 1. Serve everything we already have in the live priceCache instantly
     for (const item of symbols) {
       const sym = typeof item === 'string' ? item : item.symbol;
       if (!sym) continue;
-      
       if (priceCache[sym] && priceCache[sym].ltp > 0) {
         result[sym] = priceCache[sym];
       } else {
@@ -1759,14 +1762,32 @@ app.post('/api/ltp-batch', async (req, res) => {
       }
     }
     
-    // 2. Fetch only missing symbols from Fyers REST API
+    // 2. For missing symbols, deduplicate concurrent Fyers REST calls
     if (missingSymbols.length > 0) {
-      const data = await fetchBatchLTPs(missingSymbols);
+      // Create a stable cache key from the sorted list of missing symbols
+      const cacheKey = missingSymbols.slice().sort().join(',');
+      
+      let fetchPromise = _inFlightLtpRequests.get(cacheKey);
+      if (!fetchPromise) {
+        // No in-flight request — start a new one
+        fetchPromise = fetchBatchLTPs(missingSymbols).then(data => {
+          // Write results into priceCache for future requests
+          for (const [sym, ltpData] of Object.entries(data)) {
+            if (ltpData && ltpData.ltp > 0) priceCache[sym] = ltpData;
+          }
+          return data;
+        }).finally(() => {
+          // Remove from in-flight map after a short hold (3s) so next request
+          // uses the priceCache above rather than hitting Fyers REST again
+          setTimeout(() => _inFlightLtpRequests.delete(cacheKey), 3000);
+        });
+        _inFlightLtpRequests.set(cacheKey, fetchPromise);
+      }
+      
+      // All concurrent requests for this same symbol set await the SAME promise
+      const data = await fetchPromise;
       for (const [sym, ltpData] of Object.entries(data)) {
         result[sym] = ltpData;
-        if (ltpData && ltpData.ltp > 0) {
-          priceCache[sym] = ltpData;
-        }
       }
     }
     

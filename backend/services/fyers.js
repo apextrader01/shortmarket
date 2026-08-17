@@ -153,19 +153,25 @@ async function initFyers(io, pc, isMaster = true) {
         console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
     }
     
-    // Start interval to broadcast LTPs to clients using WebSocket Rooms (Debounced)
+    // Start interval to broadcast LTPs to clients — BATCHED (1 message for ALL symbols)
+    // This is far more efficient than 1 message per symbol (N messages) for multi-user scenarios.
     if (isMasterNode) {
         setInterval(() => {
-            if (dirtySymbols.size > 0) {
+            if (dirtySymbols.size > 0 && global_io) {
+                // Build one batch object with ALL updated prices
+                const batchUpdate = {};
                 dirtySymbols.forEach(uniqueSymbol => {
                     const priceObj = sharedPriceCache[uniqueSymbol];
-                    if (priceObj && global_io) {
-                        global_io.to(uniqueSymbol).emit('price_snapshot', { [uniqueSymbol]: priceObj });
-                    }
+                    if (priceObj) batchUpdate[uniqueSymbol] = priceObj;
                 });
                 dirtySymbols.clear();
+
+                if (Object.keys(batchUpdate).length > 0) {
+                    // Single broadcast to ALL connected clients — they filter by their own watchlist
+                    global_io.emit('price_snapshot', batchUpdate);
+                }
             }
-        }, 300); // 300ms debounce
+        }, 100); // 100ms — 3x faster than before, safe because it's now 1 message not N
     }
 }
 
