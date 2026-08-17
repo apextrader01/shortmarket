@@ -553,7 +553,8 @@ export const useStore = create(persist((set, get) => ({
         holdings: holdData.success ? holdData.holdings : get().holdings,
         sips: sipsData.success ? sipsData.sips : get().sips,
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
-        user: (user && !user.error) ? user : get().user 
+        user: (user && !user.error) ? user : get().user,
+        watchlists: (user && !user.error && user.watchlists) ? user.watchlists : get().watchlists
       });
       
       const posSymbols = (positions || []).map(p => p.symbol);
