@@ -492,8 +492,8 @@ async function fetchBatchLTPs(symbols) {
     try {
         const results = {};
         
-        // Fyers max batch size is usually 50. But we use 10 to minimize the impact of an invalid symbol
-        const chunkSize = 10;
+        // Fyers max batch size is 50. Use 50 to drastically reduce HTTP overhead and search delays
+        const chunkSize = 50;
         for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
             const chunk = fyersSymbols.slice(i, i + chunkSize);
             
