@@ -215,17 +215,16 @@ function startLiveWebSocket() {
                 .map(toFyersSymbol)
                 .filter(Boolean);
             
-                // Subscribe in chunks of 1 (Fyers max limit per request is 50, but if one fails the whole chunk fails)
-                (async () => {
-                    const chunkSize = 1;
-                    for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
-                        if (!wsInstance) break;
-                        const chunk = fyersSymbols.slice(i, i + chunkSize);
-                        wsInstance.subscribe(chunk);
-                        await new Promise(r => setTimeout(r, 50));
-                    }
-                    if (wsInstance) wsInstance.autoreconnect();
-                })();
+                  (async () => {
+                      const chunkSize = 25;
+                      for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+                          if (!wsInstance) break;
+                          const chunk = fyersSymbols.slice(i, i + chunkSize);
+                          wsInstance.subscribe(chunk);
+                          await new Promise(r => setTimeout(r, 300));
+                      }
+                      if (wsInstance) wsInstance.autoreconnect();
+                  })();
         }
         
         // Watchdog
@@ -337,9 +336,9 @@ async function processSubQueue() {
     try {
         while (subQueue.length > 0) {
             if (!wsInstance) break;
-            const chunk = subQueue.splice(0, 1); // Subscribing 1 by 1 prevents invalid symbol poisoning
+            const chunk = subQueue.splice(0, 25);
             wsInstance.subscribe(chunk);
-            await new Promise(r => setTimeout(r, 50)); // Limit rate while batching
+            await new Promise(r => setTimeout(r, 300)); // Limit rate while batching
         }
     } catch (e) {
         console.error("Error processing Fyers sub queue:", e);
