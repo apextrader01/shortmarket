@@ -100,7 +100,7 @@ export default function OrderModal() {
     // This regex looks for a 3-letter month and 2-digit year before the strike digits.
     const cleanSymbol = symbol.split('-')[0];
     let optionStrike = 0;
-    const robustMatch = cleanSymbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
+    const robustMatch = cleanSymbol.match(/(?:\d{2}[A-Z]{3}|\d{2}[1-9A-Z]\d{2})(\d+)(?:CE|PE)$/i);
     if (robustMatch) {
       optionStrike = parseFloat(robustMatch[1]);
     } else {

@@ -44,11 +44,17 @@ async function updateOptionsMaster() {
                 if (cols.length < 17) continue;
 
                 const desc = cols[1] ? cols[1].trim() : '';
-                const lotsize = parseInt(cols[3], 10) || 1;
+                let lotsize = parseInt(cols[3], 10) || 1;
                 const expiryTs = parseInt(cols[8], 10) * 1000;
                 const symbol = cols[9] ? cols[9].trim() : '';
                 const exchToken = cols[12] ? cols[12].trim() : '';
                 const underlying = cols[13] ? cols[13].trim() : '';
+
+                if (url.includes('MCX_COM')) {
+                    const mcxLotSizes = { 'NATURALGAS': 1250, 'CRUDEOIL': 100, 'GOLD': 100, 'GOLDM': 10, 'SILVER': 30, 'SILVERM': 5, 'SILVERMIC': 1, 'COPPER': 2500, 'ZINC': 5000, 'LEAD': 5000, 'ALUMINIUM': 5000, 'MENTHAOIL': 360, 'COTTON': 25 };
+                    if (mcxLotSizes[underlying]) lotsize = mcxLotSizes[underlying];
+                }
+
                 const strikeStr = cols[15];
                 const strike = parseFloat(strikeStr);
                 const optType = cols[16] ? cols[16].trim() : ''; // CE, PE, XX (Futures)
