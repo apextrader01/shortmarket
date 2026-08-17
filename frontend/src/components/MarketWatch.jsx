@@ -301,15 +301,20 @@ export default function MarketWatch({ className = '' }) {
               {/* Prices (hidden when hovered to make room for actions) */}
               {data && !isHovered ? (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{
-                    fontWeight: '600',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    gap: '4px',
-                    color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)'
-                  }}>
+                  <div 
+                    key={data.last_update_time || data.ltp}
+                    className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''}
+                    style={{
+                      fontWeight: '600',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: '4px',
+                      padding: '2px 4px',
+                      color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)'
+                    }}
+                  >
                     {data.ltp.toFixed(2)}
                     {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
                   </div>

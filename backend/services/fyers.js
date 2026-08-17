@@ -40,17 +40,40 @@ let fyersToToken = {};
 // Fallback name-based map for indices whose Angel One token ≠ exchange token (e.g. POWER-BSE)
 let nameToFyers = {};
 
+try {
+    const fyersMap = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/fyers_map.json'), 'utf8'));
+    if (fyersMap.nameToFyers) nameToFyers = fyersMap.nameToFyers;
+    if (fyersMap.tokenToFyers) tokenToFyers = fyersMap.tokenToFyers;
+    if (fyersMap.fyersToToken) fyersToToken = fyersMap.fyersToToken;
+} catch (e) {
+    console.error("Error loading fyers_map.json:", e);
+}
+
 
 // Convert our platform's unique symbols to Fyers Symbols
 function toFyersSymbol(symbol) {
     if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
+
+    let sym = symbol;
+    if (symbol.includes(':')) {
+        sym = symbol.split(':')[1];
+    }
+    
+    if (nameToFyers[sym]) return nameToFyers[sym];
+    if (nameToFyers[symbol]) return nameToFyers[symbol];
+    
     return symbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols
 function fromFyersSymbol(fyersSymbol) {
     if (!fyersSymbol) return null;
+    
+    for (const [key, val] of Object.entries(nameToFyers)) {
+        if (val === fyersSymbol) return key;
+    }
+    
     return fyersSymbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 

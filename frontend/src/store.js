@@ -308,13 +308,13 @@ export const useStore = create(persist((set, get) => ({
   subscribeToOption: (data) => socket.emit('subscribe', data),
   subscribeToOptionBatch: (dataArray) => {
     if(Array.isArray(dataArray)) {
-      dataArray.forEach(data => temporaryOptionSubscriptions.add(data.symbol || data.token));
+      dataArray.forEach(data => temporaryOptionSubscriptions.add(data.uniqueSymbol || data.symbol || data.token));
       get().pingSubscriptions();
     }
   },
   unsubscribeFromOptionBatch: (dataArray) => {
     if(Array.isArray(dataArray)) {
-      dataArray.forEach(data => temporaryOptionSubscriptions.delete(data.symbol || data.token));
+      dataArray.forEach(data => temporaryOptionSubscriptions.delete(data.uniqueSymbol || data.symbol || data.token));
       get().pingSubscriptions();
     }
   },
