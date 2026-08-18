@@ -193,8 +193,13 @@ class PositionsEngine {
             const expiryToken1 = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 13AUG26 (Standard)
             const expiryToken2 = `${y.slice(-2)}${monthCharMap[m]}${d}`; // e.g. 26813 (Fyers Weekly)
 
-            const startOfToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).setHours(0, 0, 0, 0);
-            const endOfToday = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).setHours(23, 59, 59, 999);
+            const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+            const parts = formatter.formatToParts(new Date());
+            const yearPart = parts.find(p => p.type === 'year').value;
+            const monthPart = parts.find(p => p.type === 'month').value;
+            const dayPart = parts.find(p => p.type === 'day').value;
+            const startOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`).getTime();
+            const endOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T23:59:59.999+05:30`).getTime();
             
             const expiringInstruments = await db('instruments')
                 .where('expiry_timestamp', '>=', startOfToday)
@@ -304,9 +309,13 @@ class PositionsEngine {
                     .where('quantity', '>', 0);
                     
                 if (onlyBeforeToday) {
-                    const startOfTodayStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-                    const startOfToday = new Date(startOfTodayStr).setHours(0, 0, 0, 0);
-                    query = query.where('created_at', '<', new Date(startOfToday));
+                    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+                    const parts = formatter.formatToParts(new Date());
+                    const year = parts.find(p => p.type === 'year').value;
+                    const month = parts.find(p => p.type === 'month').value;
+                    const day = parts.find(p => p.type === 'day').value;
+                    const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+                    query = query.where('created_at', '<', startOfToday);
                 }
 
                 const deliveryPositions = await query;
@@ -348,9 +357,13 @@ class PositionsEngine {
 
                 // 2. Wipe the positions table to clear UI history
                 if (onlyBeforeToday) {
-                    const startOfTodayStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-                    const startOfToday = new Date(startOfTodayStr).setHours(0, 0, 0, 0);
-                    await trx('positions').where('created_at', '<', new Date(startOfToday)).del();
+                    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+                    const parts = formatter.formatToParts(new Date());
+                    const year = parts.find(p => p.type === 'year').value;
+                    const month = parts.find(p => p.type === 'month').value;
+                    const day = parts.find(p => p.type === 'day').value;
+                    const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+                    await trx('positions').where('created_at', '<', startOfToday).del();
                 } else {
                     await trx('positions').del();
                 }

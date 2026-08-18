@@ -1469,9 +1469,10 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   // Block new Intraday orders outside valid time windows
   if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
-    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-    const hours = istTime.getHours();
-    const minutes = istTime.getMinutes();
+    const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const hours = istTime.getUTCHours();
+    const minutes = istTime.getUTCMinutes();
     
     if (!isCommodity) {
       // Equities: 9:15 AM to 3:15 PM
@@ -1496,17 +1497,18 @@ app.post('/api/order', authenticateToken, async (req, res) => {
   // SELL orders are still allowed so users can exit existing positions/holdings.
   const isDerivativeSymbol = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
   if (isDerivativeSymbol && side === 'BUY') {
-    const istNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const dayStr = String(istNow.getDate()).padStart(2, '0');
+    const now = new Date();
+    const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const dayStr = String(istNow.getUTCDate()).padStart(2, '0');
     const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    const monthStr = monthNames[istNow.getMonth()];
-    const yearStr = String(istNow.getFullYear()).slice(-2);
+    const monthStr = monthNames[istNow.getUTCMonth()];
+    const yearStr = String(istNow.getUTCFullYear()).slice(-2);
     const todayExpiryToken = `${dayStr}${monthStr}${yearStr}`; // e.g. "10AUG26"
     
     const isExpiringToday = symbol.includes(todayExpiryToken);
     if (isExpiringToday) {
-      const h = istNow.getHours();
-      const min = istNow.getMinutes();
+      const h = istNow.getUTCHours();
+      const min = istNow.getUTCMinutes();
       const isMCXSymbol = symbol.endsWith('-MCX');
       // Equity/NFO/BFO: block after 3:15 PM; MCX: block after 7:00 PM
       const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 15));
@@ -1848,9 +1850,10 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
   for (const item of items) {
     if (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO') {
       const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => item.symbol.startsWith(c));
-      const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      const hours = istTime.getHours();
-      const minutes = istTime.getMinutes();
+      const now = new Date();
+      const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+      const hours = istTime.getUTCHours();
+      const minutes = istTime.getUTCMinutes();
       
       if (!isCommodity) {
         const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);

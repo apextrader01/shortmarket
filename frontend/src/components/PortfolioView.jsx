@@ -15,25 +15,11 @@ export default function PortfolioView() {
   let totalInvestedMutualFunds = 0;
   let unrealizedPnl = 0;
 
-  // Merge holdings (T+1) with today's DEL positions (T+0) to give a complete portfolio view
+  // Only use T+1 holdings representing the portfolio view
   const allMergedHoldingsMap = {};
 
   (holdings || []).forEach(h => {
     allMergedHoldingsMap[h.symbol] = { ...h };
-  });
-
-  (positions || []).filter(p => p.product_type === 'DEL' && p.quantity !== 0).forEach(p => {
-    if (allMergedHoldingsMap[p.symbol]) {
-       const existing = allMergedHoldingsMap[p.symbol];
-       const existingQty = Number(existing.quantity) || 0;
-       const pQty = Number(p.quantity) || 0;
-       const newQty = existingQty + pQty;
-       const totalCost = (existingQty * parseFloat(existing.average_price)) + (pQty * parseFloat(p.average_price));
-       existing.quantity = newQty;
-       existing.average_price = Math.abs(newQty) > 0 ? totalCost / Math.abs(newQty) : 0;
-    } else {
-       allMergedHoldingsMap[p.symbol] = { ...p };
-    }
   });
 
   const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);

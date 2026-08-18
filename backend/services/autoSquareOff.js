@@ -197,9 +197,12 @@ async function runWatchlistCleanup() {
     console.log(`=========================================\n`);
 
     try {
-        const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        // Reset to midnight IST today
-        istTime.setHours(0, 0, 0, 0);
+        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const parts = formatter.formatToParts(new Date());
+        const yearPart = parts.find(p => p.type === 'year').value;
+        const monthPart = parts.find(p => p.type === 'month').value;
+        const dayPart = parts.find(p => p.type === 'day').value;
+        const istTime = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`);
 
         const users = await db('users').select('id', 'watchlists');
         let totalRemoved = 0;
