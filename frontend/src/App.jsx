@@ -53,6 +53,12 @@ function App() {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  // Apply persisted UI settings on load
+  useEffect(() => {
+    setFontSize(fontSize);
+    if (theme) setTheme(theme);
+  }, []);
+
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
@@ -445,7 +451,7 @@ function App() {
           {activeTab === 'Options' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
               <ErrorBoundary>
-                <OptionChainView />
+                <OptionChainView setActiveTab={setActiveTab} />
               </ErrorBoundary>
             </div>
           )}
@@ -472,7 +478,7 @@ function App() {
           )}
           {activeTab === 'Pricing' && (
             <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
-              <PricingView />
+              <PricingView setActiveTab={setActiveTab} />
             </div>
           )}
           {activeTab === 'AdminPanel' && user?.is_admin && (

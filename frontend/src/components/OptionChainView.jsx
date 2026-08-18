@@ -759,7 +759,7 @@ const OPTIONS_ENABLED = false;
 const ComingSoonScreen = ({ setActiveTab }) => (
   <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4 bg-[#0b0e14]">
     <div className="bg-[#111620] p-8 rounded-2xl border border-slate-800 shadow-xl max-w-md w-full">
-      <div style={{ display: 'flex', alignItems: 'center', position: 'absolute', top: '20px', left: '20px', cursor: 'pointer', color: '#E2E8F0' }} onClick={() => setActiveTab('ClientData')}><ChevronLeft size={20} style={{ marginRight: '8px' }} /><span style={{ fontSize: '16px', fontWeight: '600' }}>Back to Account</span></div>
+      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#E2E8F0', padding: '20px 0', alignSelf: 'flex-start', width: '100%', maxWidth: '800px', margin: '0 auto' }} onClick={() => setActiveTab('ClientData')}><ChevronLeft size={20} style={{ marginRight: '8px' }} /><span style={{ fontSize: '16px', fontWeight: '600' }}>Back to Account</span></div>
         <div className="flex justify-center mb-6">
         <div className="p-4 bg-blue-500/10 rounded-full">
           <Clock className="w-12 h-12 text-blue-400" />

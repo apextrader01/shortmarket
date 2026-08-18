@@ -1061,6 +1061,22 @@ export const useStore = create(persist((set, get) => ({
   setFontSize: (size) => set((state) => {
     document.body.classList.remove('font-small', 'font-medium', 'font-large');
     document.body.classList.add('font-' + size);
+    
+    // Direct DOM manipulation for instant scaling bypassing CSS cache
+    if (size === 'small') {
+      document.body.style.zoom = '0.9';
+      document.body.style.MozTransform = 'scale(0.9)';
+      document.body.style.MozTransformOrigin = 'top left';
+    } else if (size === 'large') {
+      document.body.style.zoom = '1.1';
+      document.body.style.MozTransform = 'scale(1.1)';
+      document.body.style.MozTransformOrigin = 'top left';
+    } else {
+      document.body.style.zoom = '1';
+      document.body.style.MozTransform = 'scale(1)';
+      document.body.style.MozTransformOrigin = 'top left';
+    }
+    
     return { fontSize: size };
   }),
   setAccessibilityMode: (mode) => set({ accessibilityMode: mode }),
