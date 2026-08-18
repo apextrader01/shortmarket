@@ -1301,3 +1301,6 @@ body.font-large {
   -moz-transform-origin: 0 0;
 }
 
+
+@media (max-width: 768px) { .desktop-view { display: none !important; } }
+@media (min-width: 769px) { .mobile-view { display: none !important; } }
