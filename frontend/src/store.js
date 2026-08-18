@@ -1056,6 +1056,14 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Theme ───────────────────────────────────────────────────────────────────
   theme: 'dark', // default to dark
+  fontSize: 'medium',
+  accessibilityMode: false,
+  setFontSize: (size) => set((state) => {
+    document.body.classList.remove('font-small', 'font-medium', 'font-large');
+    document.body.classList.add('font-' + size);
+    return { fontSize: size };
+  }),
+  setAccessibilityMode: (mode) => set({ accessibilityMode: mode }),
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark';
     if (newTheme === 'light') {
@@ -1088,6 +1096,8 @@ export const useStore = create(persist((set, get) => ({
     token:             state.token,
     user:              state.user,
     theme:             state.theme,
+      fontSize:          state.fontSize,
+      accessibilityMode: state.accessibilityMode,
     pendingTriggers:   state.pendingTriggers,
     oneClickMode:      state.oneClickMode,
     oneClickMultiplier: state.oneClickMultiplier,
