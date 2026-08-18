@@ -4,7 +4,7 @@ import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
-import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock, ChevronLeft } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -756,10 +756,11 @@ const OptionChainViewInternal = () => {
 
 const OPTIONS_ENABLED = false;
 
-const ComingSoonScreen = () => (
+const ComingSoonScreen = ({ setActiveTab }) => (
   <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4 bg-[#0b0e14]">
     <div className="bg-[#111620] p-8 rounded-2xl border border-slate-800 shadow-xl max-w-md w-full">
-      <div className="flex justify-center mb-6">
+      <div style={{ display: 'flex', alignItems: 'center', position: 'absolute', top: '20px', left: '20px', cursor: 'pointer', color: '#E2E8F0' }} onClick={() => setActiveTab('ClientData')}><ChevronLeft size={20} style={{ marginRight: '8px' }} /><span style={{ fontSize: '16px', fontWeight: '600' }}>Back to Account</span></div>
+        <div className="flex justify-center mb-6">
         <div className="p-4 bg-blue-500/10 rounded-full">
           <Clock className="w-12 h-12 text-blue-400" />
         </div>
@@ -777,7 +778,7 @@ const ComingSoonScreen = () => (
 
 const OptionChainView = (props) => {
   if (!OPTIONS_ENABLED) {
-    return <ComingSoonScreen />;
+    return <ComingSoonScreen setActiveTab={props.setActiveTab} />;
   }
   return <OptionChainViewInternal {...props} />;
 };

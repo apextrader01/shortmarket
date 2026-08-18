@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Star, Shield, Zap } from 'lucide-react';
+import { Check, Star, Shield, Zap, ChevronLeft } from 'lucide-react';
 
-export default function PricingView() {
+export default function PricingView({ setActiveTab }) {
   const { user } = useStore(useShallow(state => ({ user: state.user })));
   const [loading, setLoading] = useState(false);
 
