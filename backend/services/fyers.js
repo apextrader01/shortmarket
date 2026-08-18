@@ -664,8 +664,20 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
 function setPriceCache(pc) { sharedPriceCache = pc; }
 function registerTokens() {}
 function addSubscription(symbol) { addSubscriptionBatch([symbol]); }
-function subscribeToDepth(symbol) { /* Fyers v3 auto sends depth if requested */ }
-function unsubscribeFromDepth(symbol) {}
+function subscribeToDepth(symbol) { 
+    if (!wsInstance || !isFyersConnected) return;
+    const fSym = toFyersSymbol(symbol);
+    if (fSym) {
+        try { wsInstance.subscribe([fSym], "DepthUpdate"); } catch (e) { console.error(e); }
+    }
+}
+function unsubscribeFromDepth(symbol) {
+    if (!wsInstance || !isFyersConnected) return;
+    const fSym = toFyersSymbol(symbol);
+    if (fSym) {
+        try { wsInstance.subscribe([fSym], "SymbolUpdate"); } catch (e) { console.error(e); }
+    }
+}
 
 function reloadFyersToken() {
     console.log("Redis Event: Fyers token updated! Forcing PM2 restart to clear DataSocket cache in 3s...");
