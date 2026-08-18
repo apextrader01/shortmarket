@@ -212,13 +212,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
         </div>
 
-        {/* Financial Incentives */}
+        {/* Subscription Plan */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Financial Incentives</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Subscription Plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Card icon={Gift} title="Offers & Rewards" desc="Save more with special offers for you" color="#60A5FA" />
             <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Market & get rewarded ₹500" color="#34D399" />
-            <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" />
+            <div onClick={() => setActiveTab('Pricing')} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" />
+            </div>
           </div>
         </div>
 
