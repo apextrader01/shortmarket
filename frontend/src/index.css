@@ -1288,24 +1288,35 @@ html {
   background-color: var(--bg-primary);
 }
 
-/* Font Size Settings via transform to prevent Chrome backdrop-filter bugs */
+/* Font Size Settings via zoom (with width compensation for Chrome gap bug) */
 body.font-small {
-  transform: scale(0.9);
-  transform-origin: 0 0;
+  zoom: 0.9;
   width: 111.11vw;
   height: 111.11vh;
+  overflow-x: hidden;
 }
 body.font-medium {
-  transform: scale(1);
-  transform-origin: 0 0;
-  width: 100vw;
-  height: 100vh;
+  /* Default viewport */
 }
 body.font-large {
-  transform: scale(1.1);
-  transform-origin: 0 0;
+  zoom: 1.1;
   width: 90.90vw;
   height: 90.90vh;
+  overflow-x: hidden;
+}
+
+/* Graceful degradation for Chrome bug where zoom breaks backdrop-filter */
+body.font-small .glass-panel,
+body.font-large .glass-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #0f1624 !important; /* solid opaque dark background to replace blur */
+}
+body.font-small .glass-header,
+body.font-large .glass-header {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #0b1121 !important;
 }
 
 
