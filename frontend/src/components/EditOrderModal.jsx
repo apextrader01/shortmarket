@@ -273,14 +273,16 @@ export default function EditOrderModal() {
 
         {/* Footer */}
         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Change</div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: marginDifference > 0 ? 'var(--color-red-light)' : 'var(--color-green-light)' }}>
-                {marginDifference > 0 ? '-' : '+'}₹{Math.abs(marginDifference).toFixed(2)}
+          {!isPendingTrigger && (
+            <div style={{ display: 'flex', gap: '24px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Change</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: marginDifference > 0 ? 'var(--color-red-light)' : 'var(--color-green-light)' }}>
+                  {marginDifference > 0 ? '-' : '+'}₹{Math.abs(marginDifference).toFixed(2)}
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <button 
             onClick={handleUpdateOrder}
             disabled={isInsufficient}
