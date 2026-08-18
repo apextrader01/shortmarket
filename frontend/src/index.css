@@ -37,6 +37,8 @@
 }
 
 [data-theme='light'] {
+    --color-green-light: #16a34a;
+    --color-red-light: #dc2626;
   --bg-primary: #F8FAFC;
   --bg-secondary: #FFFFFF;
   --bg-panel: rgba(255, 255, 255, 0.7);
@@ -1325,6 +1327,7 @@ body.font-large .glass-header {
 
 @media (max-width: 768px) { .desktop-view { display: none !important; } }
 @media (min-width: 769px) { .mobile-view { display: none !important; } }
+
 
 
 

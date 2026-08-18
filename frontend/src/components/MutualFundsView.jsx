@@ -117,7 +117,7 @@ export default function MutualFundsView() {
                       padding: '0 4px 16px 4px',
                       fontSize: '18px',
                       fontWeight: mainTab === tab ? '700' : '600',
-                      color: mainTab === tab ? '#E2E8F0' : 'var(--text-secondary)',
+                      color: mainTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
                       borderBottom: mainTab === tab ? '3px solid #E2E8F0' : '3px solid transparent',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
@@ -157,9 +157,9 @@ export default function MutualFundsView() {
                     padding: '8px 16px',
                     fontSize: '13px',
                     fontWeight: '600',
-                    background: activeTab === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: activeTab === tab ? '#FFF' : 'var(--text-secondary)',
-                    border: activeTab === tab ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-color)',
+                    background: activeTab === tab ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                    color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
+                    border: activeTab === tab ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
                     borderRadius: '20px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
@@ -235,7 +235,7 @@ export default function MutualFundsView() {
                                     {fund.risk}
                                 </span>
                             </td>
-                            <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>₹{fund.nav.toFixed(2)}</td>
+                            <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{fund.nav.toFixed(2)}</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
@@ -290,7 +290,7 @@ export default function MutualFundsView() {
                 <button 
                     disabled={page === 1}
                     onClick={() => setPage(p => p - 1)}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
                 >
                     Previous
                 </button>
@@ -298,7 +298,7 @@ export default function MutualFundsView() {
                 <button 
                     disabled={page === totalPages}
                     onClick={() => setPage(p => p + 1)}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: '#fff', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}
+                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}
                 >
                     Next
                 </button>
@@ -421,3 +421,7 @@ export default function MutualFundsView() {
     </div>
   );
 }
+
+
+
+
