@@ -7,6 +7,7 @@ import PortfolioView from './components/PortfolioView';
 import OptionChainView from './components/OptionChainView';
 import MutualFundsView from './components/MutualFundsView';
 import ClientDataView from './components/ClientDataView';
+import AboutUsView from './components/AboutUsView';
 import ReportsView from './components/ReportsView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
@@ -44,7 +45,8 @@ function App() {
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
-      'reports': 'Reports'
+      'reports': 'Reports',
+        'aboutus': 'AboutUs'
     };
     return tabsMap[path.toLowerCase()] || 'Markets';
   });
@@ -76,7 +78,8 @@ function App() {
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
-        'reports': 'Reports'
+        'reports': 'Reports',
+        'aboutus': 'AboutUs'
       };
       setActiveTab(tabsMap[path.toLowerCase()] || 'Markets');
     };
