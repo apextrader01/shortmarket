@@ -203,118 +203,205 @@ export default function PositionsView() {
           </p>
         </div>
       ) : (
-        
         <>
           <div className="desktop-view">
-            ��i m
+            <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <th style={{ padding: '16px 20px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Symbol</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Buy/Sell</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Net Quantity</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Avg. Price</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Last Price (LTP)</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Unrealized P&L</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Realized P&L</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Segment</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Exchange</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Product</th>
+                  <th style={{ textAlign: 'center', paddingRight: '20px', fontWeight: '600', color: 'var(--text-secondary)' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {flatPositions.map((pos, idx) => {
+                  const isProfit = pos.pnl >= 0;
+                  const sideText = pos.qty > 0 ? 'Buy' : (pos.qty < 0 ? 'Sell' : '-');
+                  const realizedPnl = parseFloat(pos.realized_pnl) || 0;
+                  
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
+                      <td style={{ padding: '16px 20px' }}>
+                        <span style={{ 
+                          background: 'var(--color-blue)', color: '#fff', 
+                          padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' 
+                        }}>
+                          {pos.symbol.replace(/-(EQ|FUT|CE|PE)$/, '')}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
+                        {sideText}
+                      </td>
+                      <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)}
+                      </td>
+                      <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
+                      <td style={{ fontWeight: '500' }}>
+                        {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
+                      </td>
+                      <td style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                        {viewMode === 'CLOSED' ? '-' : `${pos.pnl > 0 ? '+ ' : ''}₹${Math.abs(pos.pnl).toFixed(2)}`}
+                      </td>
+                      <td style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
+                        {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+ ' : ''}₹${Math.abs(realizedPnl).toFixed(2)}` : '0'}
+                      </td>
+                      <td style={{ fontWeight: '500' }}>{pos.segment}</td>
+                      <td style={{ fontWeight: '500' }}>{pos.exchange}</td>
+                      <td style={{ fontWeight: '500' }}>{pos.productLabel}</td>
+                      <td style={{ textAlign: 'center', paddingRight: '20px' }}>
+                        {viewMode === 'OPEN' && (
+                          <X 
+                            size={18} 
+                            style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                            onClick={() => {
+                              if (pos.unencumberedQty === 0) {
+                                alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+                                return;
+                              }
+                              setPartialExitPos(pos);
+                              const ls = pos.lotSize || 1;
+                              setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+                              setPartialExitType('MARKET');
+                              setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                            }}
+                          />
+                        )}
+                        {viewMode === 'HOLDINGS' && (
+                          <X 
+                            size={18} 
+                            style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                            onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL')}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
           </div>
           <div className="mobile-view">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-                      {flatPositions.map((pos, idx) => {
-                        const isProfit = pos.pnl >= 0;
-                        const realizedPnl = parseFloat(pos.realized_pnl) || 0;
-                        const currentValue = pos.ltp * Math.abs(pos.qty);
-                        const pnlPercent = pos.invested > 0 ? (pos.pnl / pos.invested) * 100 : 0;
-                        
-                        // For closed positions, use realized P&L as the main display
-                        const displayPnl = viewMode === 'CLOSED' ? realizedPnl : pos.pnl;
-                        const isDisplayProfit = displayPnl >= 0;
+          {flatPositions.map((pos, idx) => {
+            const isProfit = pos.pnl >= 0;
+            const realizedPnl = parseFloat(pos.realized_pnl) || 0;
+            const currentValue = pos.ltp * Math.abs(pos.qty);
+            const pnlPercent = pos.invested > 0 ? (pos.pnl / pos.invested) * 100 : 0;
             
-                        return (
-                          <div 
-                            key={idx} 
-                            onClick={() => {
-                              if (viewMode === 'CLOSED') return;
-                              if (viewMode === 'OPEN') {
-                                if (pos.unencumberedQty === 0) {
-                                  alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
-                                  return;
-                                }
-                                setPartialExitPos(pos);
-                                const ls = pos.lotSize || 1;
-                                setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
-                                setPartialExitType('MARKET');
-                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
-                              } else if (viewMode === 'HOLDINGS') {
-                                useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL');
-                              }
-                            }}
-                            style={{ 
-                              background: 'var(--bg-panel)', 
-                              border: '1px solid rgba(255,255,255,0.05)', 
-                              borderRadius: '8px', 
-                              padding: '16px',
-                              cursor: viewMode === 'CLOSED' ? 'default' : 'pointer',
-                              position: 'relative',
-                              overflow: 'hidden',
-                              transition: 'background 0.2s, border-color 0.2s',
-                              ':hover': {
-                                background: 'rgba(255,255,255,0.03)',
-                                borderColor: 'var(--color-blue-dark)'
-                              }
-                            }}
-                          >
-                            {/* Left Accent Bar */}
-                            <div style={{ position: 'absolute', left: 0, top: '16px', bottom: '16px', width: '3px', background: pos.qty > 0 ? 'var(--color-green-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-muted)'), borderRadius: '0 4px 4px 0' }} />
-            
-                            {/* Row 1: Symbol & Avg */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingLeft: '12px' }}>
-                              <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', letterSpacing: '0.3px' }}>
-                                {pos.symbol.replace(/-(EQ|FUT|CE|PE)$/, '')}
-                              </div>
-                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500' }}>
-                                Avg. ₹{pos.avg.toFixed(2)}
-                              </div>
-                            </div>
-            
-                            {/* Row 2: LTP & Qty/Side */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingLeft: '12px' }}>
-                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                <span>₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
-                                {/* Optional: Add day change % here if available in prices store */}
-                              </div>
-                              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
-                                <span>Qty {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : (pos.qty > 0 ? '+' : (pos.qty < 0 ? '-' : ''))}{Math.abs(viewMode === 'CLOSED' ? pos.closed_quantity || 0 : pos.qty)}</span>
-                                {(pos.qty !== 0 || viewMode === 'CLOSED') && (
-                                  <span style={{ 
-                                    background: pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', 
-                                    color: pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'var(--color-green-light)' : 'var(--color-red-light)', 
-                                    padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '800' 
-                                  }}>
-                                    {pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'B' : 'S'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-            
-                            {/* Row 3: Invested, Current, P&L */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', paddingLeft: '12px' }}>
-                              <div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Invested Value</div>
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>₹{pos.invested.toFixed(2)}</div>
-                              </div>
-                              <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Current Value</div>
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>
-                                  {viewMode === 'CLOSED' ? '-' : `₹${currentValue.toFixed(2)}`}
-                                </div>
-                              </div>
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>
-                                  {viewMode === 'CLOSED' ? 'Realized P&L' : `P&L (${isDisplayProfit ? '▲' : '▼'} ${Math.abs(pnlPercent).toFixed(2)}%)`}
-                                </div>
-                                <div style={{ fontSize: '14px', fontWeight: '700', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                                  {isDisplayProfit ? '+' : ''}₹{displayPnl.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+            // For closed positions, use realized P&L as the main display
+            const displayPnl = viewMode === 'CLOSED' ? realizedPnl : pos.pnl;
+            const isDisplayProfit = displayPnl >= 0;
+
+            return (
+              <div 
+                key={idx} 
+                onClick={() => {
+                  if (viewMode === 'CLOSED') return;
+                  if (viewMode === 'OPEN') {
+                    if (pos.unencumberedQty === 0) {
+                      alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+                      return;
+                    }
+                    setPartialExitPos(pos);
+                    const ls = pos.lotSize || 1;
+                    setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+                    setPartialExitType('MARKET');
+                    setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                  } else if (viewMode === 'HOLDINGS') {
+                    useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL');
+                  }
+                }}
+                style={{ 
+                  background: 'var(--bg-panel)', 
+                  border: '1px solid rgba(255,255,255,0.05)', 
+                  borderRadius: '8px', 
+                  padding: '16px',
+                  cursor: viewMode === 'CLOSED' ? 'default' : 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transition: 'background 0.2s, border-color 0.2s',
+                  ':hover': {
+                    background: 'rgba(255,255,255,0.03)',
+                    borderColor: 'var(--color-blue-dark)'
+                  }
+                }}
+              >
+                {/* Left Accent Bar */}
+                <div style={{ position: 'absolute', left: 0, top: '16px', bottom: '16px', width: '3px', background: pos.qty > 0 ? 'var(--color-green-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-muted)'), borderRadius: '0 4px 4px 0' }} />
+
+                {/* Row 1: Symbol & Avg */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingLeft: '12px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', letterSpacing: '0.3px' }}>
+                    {pos.symbol.replace(/-(EQ|FUT|CE|PE)$/, '')}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                    Avg. ₹{pos.avg.toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Row 2: LTP & Qty/Side */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingLeft: '12px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
+                    <span>₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
+                    {/* Optional: Add day change % here if available in prices store */}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}>
+                    <span>Qty {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : (pos.qty > 0 ? '+' : (pos.qty < 0 ? '-' : ''))}{Math.abs(viewMode === 'CLOSED' ? pos.closed_quantity || 0 : pos.qty)}</span>
+                    {(pos.qty !== 0 || viewMode === 'CLOSED') && (
+                      <span style={{ 
+                        background: pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', 
+                        color: pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'var(--color-green-light)' : 'var(--color-red-light)', 
+                        padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: '800' 
+                      }}>
+                        {pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0) ? 'B' : 'S'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 3: Invested, Current, P&L */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', paddingLeft: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Invested Value</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>₹{pos.invested.toFixed(2)}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Current Value</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>
+                      {viewMode === 'CLOSED' ? '-' : `₹${currentValue.toFixed(2)}`}
                     </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>
+                      {viewMode === 'CLOSED' ? 'Realized P&L' : `P&L (${isDisplayProfit ? '▲' : '▼'} ${Math.abs(pnlPercent).toFixed(2)}%)`}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                      {isDisplayProfit ? '+' : ''}₹{displayPnl.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
           </div>
         </>
-
       )}
 
       {/* Global MTM Banner */}
