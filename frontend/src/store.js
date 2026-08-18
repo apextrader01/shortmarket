@@ -393,6 +393,24 @@ export const useStore = create(persist((set, get) => ({
       }, 15000);
     }
 
+    // Polling fallback: Force sync all subscribed symbols from REST API every 15s
+    // Ensures prices never get stuck if WebSocket drops ticks or misses the final closing price
+    if (!window._forceSyncInterval) {
+      window._forceSyncInterval = setInterval(() => {
+        const { stocks, positions, holdings } = get();
+        const allSymbols = new Set([
+          ...stocks.map(s => s.symbol),
+          ...(positions || []).map(p => p.symbol),
+          ...(holdings || []).map(h => h.symbol),
+          ...temporaryOptionSubscriptions
+        ]);
+        const arr = [...allSymbols].filter(Boolean);
+        if (arr.length > 0) {
+          get().fetchBatchPrices(arr, true);
+        }
+      }, 15000);
+    }
+
     let batchedPrices = {};
     let batchTimeout = null;
 
@@ -494,18 +512,16 @@ export const useStore = create(persist((set, get) => ({
     } catch (_) {}
   },
 
-  fetchBatchPrices: async (symbols) => {
+  fetchBatchPrices: async (symbols, force = false) => {
     try {
       const res = await fetch(`${API}/api/ltp-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ symbols }),
+        body: JSON.stringify({ symbols, force }),
       });
-      const snapshot = await res.json();
-      if (snapshot && Object.keys(snapshot).length > 0) {
-        set((state) => ({ prices: applySnapshot(snapshot, state) }));
-      }
+      if (!res.ok) return;
+      const data = await res.json();
+      set((state) => ({ prices: applySnapshot(data, state) }));
     } catch (_) {}
   },
 

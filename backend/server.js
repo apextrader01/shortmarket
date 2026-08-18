@@ -1741,7 +1741,7 @@ const _inFlightLtpRequests = new Map(); // key: sorted symbol list → Promise
 
 app.post('/api/ltp-batch', async (req, res) => {
   try {
-    const { symbols } = req.body;
+    const { symbols, force } = req.body;
     if (!symbols || !Array.isArray(symbols)) {
       return res.status(400).json({ error: 'Missing or invalid symbols array' });
     }
@@ -1752,11 +1752,11 @@ app.post('/api/ltp-batch', async (req, res) => {
     const result = {};
     const missingSymbols = [];
     
-    // 1. Serve everything we already have in the live priceCache instantly
+    // 1. Serve everything we already have in the live priceCache instantly (unless force=true)
     for (const item of symbols) {
       const sym = typeof item === 'string' ? item : item.symbol;
       if (!sym) continue;
-      if (priceCache[sym] && priceCache[sym].ltp > 0) {
+      if (!force && priceCache[sym] && priceCache[sym].ltp > 0) {
         result[sym] = priceCache[sym];
       } else {
         missingSymbols.push(sym);

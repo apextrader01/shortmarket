@@ -1,10 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Activity, X } from 'lucide-react';
 
 export default function PositionsView() {
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const { positions, holdings, prices } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices })));
   
   const mergedHoldingsMap = {};
@@ -204,8 +212,9 @@ export default function PositionsView() {
         </div>
       ) : (
         <>
-          <div className="desktop-view">
-            <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+          {!isMobile && (
+            <div className="desktop-view">
+              <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
@@ -291,12 +300,14 @@ export default function PositionsView() {
                     </tr>
                   );
                 })}
-              </tbody>
+                </tbody>
             </table>
           </div>
         </div>
           </div>
+            )}
           <div className="mobile-view">
+            {isMobile && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
           {flatPositions.map((pos, idx) => {
             const isProfit = pos.pnl >= 0;
@@ -400,6 +411,7 @@ export default function PositionsView() {
             );
           })}
         </div>
+        )}
           </div>
         </>
       )}

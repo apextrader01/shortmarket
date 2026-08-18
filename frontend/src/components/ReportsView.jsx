@@ -896,8 +896,99 @@ const ProfitAndLoss = () => {
 };
 
 const DownloadReports = () => {
-  const Card = ({ icon: Icon, title, desc }) => (
-    <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  const { positions, orders, holdings, token } = useStore(useShallow(state => ({ 
+    positions: state.positions, 
+    orders: state.orders, 
+    holdings: state.holdings,
+    token: state.token
+  })));
+
+  const handleDownloadTaxPnL = () => {
+    const data = (positions || []).map(p => ({
+      Symbol: p.symbol,
+      Product: p.product_type,
+      Realized_PnL: parseFloat(p.realized_pnl || 0).toFixed(2),
+      Status: p.quantity === 0 ? 'CLOSED' : 'OPEN'
+    }));
+    downloadCSV(data, 'tax_pnl_report.csv');
+  };
+
+  const handleDownloadPnLSummary = () => {
+    const data = (positions || []).map(p => {
+      const pnl = p.pnl || 0;
+      const realized = parseFloat(p.realized_pnl || 0);
+      return {
+        Symbol: p.symbol,
+        Buy_Avg: p.average_price,
+        Quantity: p.quantity,
+        Realized_PnL: realized.toFixed(2),
+        Unrealized_PnL: pnl.toFixed(2),
+        Total_PnL: (pnl + realized).toFixed(2)
+      };
+    });
+    downloadCSV(data, 'pnl_summary.csv');
+  };
+
+  const handleDownloadTrades = () => {
+    const executed = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+    const data = executed.map(o => ({
+      Date: new Date(o.created_at).toLocaleString(),
+      Symbol: o.symbol,
+      Type: o.side,
+      Quantity: o.quantity,
+      Price: o.average_price || o.price,
+      Charges: (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)).toFixed(2)
+    }));
+    downloadCSV(data, 'trades_and_charges.csv');
+  };
+
+  const handleDownloadLedger = async () => {
+    try {
+      const res = await fetch(`${API}/api/ledger`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const ledger = await res.json();
+      if (!ledger || ledger.length === 0) return alert('No ledger data found');
+      const data = ledger.map(l => ({
+        Date: new Date(l.created_at).toLocaleString(),
+        Description: l.description,
+        Amount: l.amount,
+        Type: l.type,
+        Balance: l.balance
+      }));
+      downloadCSV(data, 'ledger_statement.csv');
+    } catch(e) {
+      alert('Failed to download ledger');
+    }
+  };
+
+  const handleDownloadContractNote = () => {
+    const executed = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+    const data = executed.map(o => ({
+      Trade_Date: new Date(o.created_at).toLocaleDateString(),
+      Trade_Time: new Date(o.created_at).toLocaleTimeString(),
+      Symbol: o.symbol,
+      Action: o.side,
+      Quantity: o.quantity,
+      Execution_Price: o.average_price || o.price,
+      Order_ID: o.id,
+      Product: o.product_type
+    }));
+    downloadCSV(data, 'contract_note.csv');
+  };
+
+  const handleDownloadHoldings = () => {
+    const data = (holdings || []).map(h => ({
+      Symbol: h.symbol,
+      Quantity: h.quantity,
+      Average_Price: h.average_price,
+      Invested_Value: (h.quantity * h.average_price).toFixed(2)
+    }));
+    downloadCSV(data, 'dp_holdings.csv');
+  };
+
+  const Card = ({ icon: Icon, title, desc, onClick }) => (
+    <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
         <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '50%' }}>
           <Icon size={24} color="var(--color-blue-light)" />
@@ -914,13 +1005,13 @@ const DownloadReports = () => {
   return (
     <div>
       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '24px' }}>Stocks, SGBs, Bonds and FnO</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
-        <Card icon={FileDown} title="Tax P&L" desc="Scripwise Taxable P&L" />
-        <Card icon={FileText} title="P & L Summary" desc="Entire P&L (taxable and non-taxable)" />
-        <Card icon={FileText} title="Trades and Charges" desc="Tradewise charges and details" />
-        <Card icon={FileText} title="Ledger" desc="Daywise Debits, Credits and Net Balances" />
-        <Card icon={FileText} title="Contract Note" desc="Trade details of the day" />
-        <Card icon={FileText} title="DP Transaction and Holding Statement" desc="Scripwise list of transactions" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '24px' }}>
+        <Card icon={FileDown} title="Tax P&L" desc="Scripwise Taxable P&L" onClick={handleDownloadTaxPnL} />
+        <Card icon={FileText} title="P & L Summary" desc="Entire P&L (taxable and non-taxable)" onClick={handleDownloadPnLSummary} />
+        <Card icon={FileText} title="Trades and Charges" desc="Tradewise charges and details" onClick={handleDownloadTrades} />
+        <Card icon={FileText} title="Ledger" desc="Daywise Debits, Credits and Net Balances" onClick={handleDownloadLedger} />
+        <Card icon={FileText} title="Contract Note" desc="Trade details of the day" onClick={handleDownloadContractNote} />
+        <Card icon={FileText} title="DP Transaction and Holding Statement" desc="Scripwise list of transactions" onClick={handleDownloadHoldings} />
       </div>
     </div>
   );
