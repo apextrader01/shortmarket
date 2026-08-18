@@ -1102,18 +1102,18 @@ input:checked + .slider:before {
 
 /* Glassmorphism Panel */
 .glass-panel {
-  background: rgba(10, 15, 25, 0.65);
+  background: var(--bg-panel);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .glass-header {
-  background: rgba(5, 11, 20, 0.75);
+  background: var(--bg-panel);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* Typography Enhancements */
@@ -1244,7 +1244,7 @@ input:checked + .slider:before {
 /* Option Chain Polishes */
 .option-chain-table th {
   padding: 12px 16px;
-  background: rgba(11, 17, 33, 0.95);
+  background: var(--bg-secondary);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -1265,10 +1265,10 @@ input:checked + .slider:before {
 
 /* Glassmorphism Watchlist enhancements */
 .sidebar {
-  background: rgba(11, 17, 33, 0.65) !important;
+  background: var(--bg-secondary) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-right: 1px solid var(--border-color) !important;
 }
 .premium-btn-mini {
   background: rgba(255, 255, 255, 0.05);
@@ -1310,15 +1310,16 @@ body.font-small .glass-panel,
 body.font-large .glass-panel {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: #0f1624 !important; /* solid opaque dark background to replace blur */
+  background: var(--bg-secondary) !important; /* solid opaque dark background to replace blur */
 }
 body.font-small .glass-header,
 body.font-large .glass-header {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  background: #0b1121 !important;
+  background: var(--bg-primary) !important;
 }
 
 
 @media (max-width: 768px) { .desktop-view { display: none !important; } }
 @media (min-width: 769px) { .mobile-view { display: none !important; } }
+
