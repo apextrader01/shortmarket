@@ -4,7 +4,7 @@ import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
-import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -63,7 +63,7 @@ const SymbolDropdown = ({ value, options, onChange }) => {
   );
 };
 
-const OptionChainView = () => {
+const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState([]);
   const [expiry, setExpiry] = useState('');
@@ -752,6 +752,34 @@ const OptionChainView = () => {
       </div>
     </div>
   );
+};
+
+const OPTIONS_ENABLED = false;
+
+const ComingSoonScreen = () => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4 bg-[#0b0e14]">
+    <div className="bg-[#111620] p-8 rounded-2xl border border-slate-800 shadow-xl max-w-md w-full">
+      <div className="flex justify-center mb-6">
+        <div className="p-4 bg-blue-500/10 rounded-full">
+          <Clock className="w-12 h-12 text-blue-400" />
+        </div>
+      </div>
+      <h2 className="text-2xl font-bold text-white mb-3">Options Trading</h2>
+      <p className="text-slate-400 text-lg mb-6">
+        This feature is currently under development and will be coming soon.
+      </p>
+      <div className="text-sm text-slate-500">
+        We're working hard to bring you a seamless options trading experience.
+      </div>
+    </div>
+  </div>
+);
+
+const OptionChainView = (props) => {
+  if (!OPTIONS_ENABLED) {
+    return <ComingSoonScreen />;
+  }
+  return <OptionChainViewInternal {...props} />;
 };
 
 export default OptionChainView;
