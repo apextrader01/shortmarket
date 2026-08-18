@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../firebase';
 
 export default function LoginView() {
   const { login, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
@@ -13,6 +15,8 @@ export default function LoginView() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [otp,      setOtp]      = useState('');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState(null);
   const [loading,  setLoading]  = useState(false);
   const [message,  setMessage]  = useState('');
 
@@ -26,7 +30,28 @@ export default function LoginView() {
       await login(email, password);
     } 
     else if (view === 'register') {
-      await register(username, email, phone, password);
+      try {
+        if (!window.recaptchaVerifier) {
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible'
+          });
+        }
+        const formattedPhone = '+91' + phone;
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+        setConfirmationResult(confirmation);
+        setView('register_otp');
+        setMessage('OTP sent to your phone.');
+      } catch (error) {
+        useStore.setState({ authError: error.message });
+      }
+    }
+    else if (view === 'register_otp') {
+      try {
+        await confirmationResult.confirm(phoneOtp);
+        await register(username, email, phone, password);
+      } catch (error) {
+        useStore.setState({ authError: 'Invalid OTP code.' });
+      }
     }
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
@@ -118,6 +143,7 @@ export default function LoginView() {
             {view === 'register' && 'Create your account'}
             {view === 'forgot' && 'Reset password'}
             {view === 'otp' && 'Verify identity'}
+            {view === 'register_otp' && 'Verify your phone'}
             {view === 'reset' && 'Secure your account'}
           </h2>
           <div style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
@@ -125,6 +151,7 @@ export default function LoginView() {
             {view === 'register' && 'Join the edge in professional trading.'}
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
+            {view === 'register_otp' && 'Enter the 6-digit code sent to your phone via SMS.'}
             {view === 'reset' && 'Choose a strong, unique password.'}
           </div>
         </div>
@@ -197,6 +224,13 @@ export default function LoginView() {
             </div>
           )}
 
+          {view === 'register_otp' && (
+            <div>
+              <label style={labelStyle}>6-Digit Phone OTP</label>
+              <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
+            </div>
+          )}
+
           {(view === 'login' || view === 'register' || view === 'reset') && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -209,10 +243,12 @@ export default function LoginView() {
             </div>
           )}
 
+          <div id="recaptcha-container"></div>
           <button type="submit" disabled={loading} className="premium-btn" style={{ marginTop: '12px' }}>
             {loading ? 'PROCESSING...' : 
               (view === 'login' ? 'LOG IN' : 
                view === 'register' ? 'CREATE ACCOUNT' : 
+               view === 'register_otp' ? 'VERIFY OTP' : 
                view === 'forgot' ? 'SEND RESET LINK' : 
                view === 'otp' ? 'VERIFY CODE' : 'RESET PASSWORD')}
           </button>
@@ -220,16 +256,16 @@ export default function LoginView() {
 
         {/* Toggle */}
         <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
+          {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
           <span
             onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
             style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
           >
-            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
+            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
           </span>
-          {(view === 'forgot' || view === 'otp' || view === 'reset') && (
+          {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') && (
             <div style={{ marginTop: '16px' }}>
-              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
+              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>? Back to login</span>
             </div>
           )}
         </div>
@@ -237,3 +273,4 @@ export default function LoginView() {
     </div>
   );
 }
+
