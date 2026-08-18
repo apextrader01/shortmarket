@@ -56,51 +56,12 @@ export default function EditOrderModal() {
   const isBuy = order.side === 'BUY';
 
   const handleUpdateOrder = async () => {
-    // If we're updating a pending trigger and isMarket is selected, we need a special payload
-    let success = false;
-    
-    if (isPendingTrigger && isMarket) {
-      // Execute at market
-      const token = localStorage.getItem('token');
-      try {
-        const res = await fetch(`https://shortmarket.onrender.com/api/order/${order.id}`, { // Using API URL if configured, fallback to standard fetch if store uses fetch internally. Wait, useStore has updateOrder!
-          // We can just add isMarket to the updateOrder arguments, but updateOrder signature in store is (id, qty, price, sl, tgt)
-          // Let's modify the store action in store.js or just fetch directly here for safety.
-        });
-      } catch (e) {}
-    }
-    
-    // We will update the store.js to accept an options object or isMarket flag.
-    // For now, we will fetch directly here since it's a specialized action.
-    try {
-      const token = localStorage.getItem('token');
-      const payload = {
-          quantity,
-          price: isPendingTrigger && isMarket ? 0 : parseFloat(price),
-          sl_price: slPrice ? parseFloat(slPrice) : null,
-          tgt_price: tgtPrice ? parseFloat(tgtPrice) : null,
-          isMarket: isPendingTrigger ? isMarket : false
-      };
-      
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/order/${order.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(payload)
-      });
-      
-      if (res.ok) {
-        success = true;
-        // Optionally refresh orders in store
-        const getOrdersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/orders`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (getOrdersRes.ok) {
-          useStore.getState().setOrders(await getOrdersRes.json());
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    const finalPrice = isPendingTrigger && isMarket ? 0 : parseFloat(price);
+    const sl = slPrice ? parseFloat(slPrice) : null;
+    const tgt = tgtPrice ? parseFloat(tgtPrice) : null;
+    const marketFlag = isPendingTrigger ? isMarket : false;
+
+    const success = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag);
 
     if (success) {
       closeEditOrderModal();
