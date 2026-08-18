@@ -301,6 +301,21 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+app.post('/api/auth/pre-login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!user.phone) return res.status(400).json({ error: 'No phone number registered for this account. Please contact support.' });
+    res.json({ success: true, phone: user.phone });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
@@ -2713,4 +2728,5 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 

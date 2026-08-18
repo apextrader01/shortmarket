@@ -53,6 +53,24 @@ export const useStore = create(persist((set, get) => ({
   
   authError: null,
 
+    preLogin: async (email, password) => {
+    try {
+      set({ authError: null });
+      const res = await fetch($API/api/auth/pre-login, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (data.success) return { success: true, phone: data.phone };
+      set({ authError: data.error });
+      return { success: false };
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false };
+    }
+  },
+
   login: async (email, password) => {
     try {
       set({ authError: null });
@@ -1136,3 +1154,4 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+

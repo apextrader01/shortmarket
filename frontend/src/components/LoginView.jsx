@@ -5,7 +5,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function LoginView() {
-  const { login, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
+  const { login, preLogin, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, preLogin: state.preLogin, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset'
   const [view, setView] = useState('login');
@@ -27,8 +27,32 @@ export default function LoginView() {
     setMessage('');
 
     if (view === 'login') {
-      await login(email, password);
+      const res = await preLogin(email, password);
+      if (res.success) {
+        try {
+          if (!window.recaptchaVerifier) {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+              size: 'invisible'
+            });
+          }
+          const formattedPhone = res.phone.startsWith('+') ? res.phone : '+91' + res.phone;
+          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+          setConfirmationResult(confirmation);
+          setView('login_otp');
+          setMessage('OTP sent to your registered phone number.');
+        } catch (error) {
+          useStore.setState({ authError: error.message });
+        }
+      }
     } 
+    else if (view === 'login_otp') {
+      try {
+        await confirmationResult.confirm(phoneOtp);
+        await login(email, password);
+      } catch (error) {
+        useStore.setState({ authError: 'Invalid OTP code.' });
+      }
+    }
     else if (view === 'register') {
       try {
         if (!window.recaptchaVerifier) {
@@ -143,6 +167,7 @@ export default function LoginView() {
             {view === 'register' && 'Create your account'}
             {view === 'forgot' && 'Reset password'}
             {view === 'otp' && 'Verify identity'}
+            {view === 'login_otp' && 'Two-Factor Authentication'}
             {view === 'register_otp' && 'Verify your phone'}
             {view === 'reset' && 'Secure your account'}
           </h2>
@@ -151,6 +176,7 @@ export default function LoginView() {
             {view === 'register' && 'Join the edge in professional trading.'}
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
+            {view === 'login_otp' && 'Enter the 6-digit code sent to your registered phone number.'}
             {view === 'register_otp' && 'Enter the 6-digit code sent to your phone via SMS.'}
             {view === 'reset' && 'Choose a strong, unique password.'}
           </div>
@@ -224,7 +250,7 @@ export default function LoginView() {
             </div>
           )}
 
-          {view === 'register_otp' && (
+          {(view === 'register_otp' || view === 'login_otp') && (
             <div>
               <label style={labelStyle}>6-Digit Phone OTP</label>
               <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
@@ -247,6 +273,7 @@ export default function LoginView() {
           <button type="submit" disabled={loading} className="premium-btn" style={{ marginTop: '12px' }}>
             {loading ? 'PROCESSING...' : 
               (view === 'login' ? 'LOG IN' : 
+               view === 'login_otp' ? 'VERIFY OTP' :
                view === 'register' ? 'CREATE ACCOUNT' : 
                view === 'register_otp' ? 'VERIFY OTP' : 
                view === 'forgot' ? 'SEND RESET LINK' : 
@@ -256,16 +283,16 @@ export default function LoginView() {
 
         {/* Toggle */}
         <div style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-          {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
+          {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? "Don't have an account? " : 'Already have an account? '}
           <span
             onClick={() => switchMode(view === 'register' ? 'login' : 'register')}
             style={{ color: '#fff', cursor: 'pointer', fontWeight: '700' }}
           >
-            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
+            {(view === 'login' || view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') ? 'Sign up for free' : 'Log in'}
           </span>
-          {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'reset') && (
+          {(view === 'forgot' || view === 'otp' || view === 'register_otp' || view === 'login_otp' || view === 'reset') && (
             <div style={{ marginTop: '16px' }}>
-              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>? Back to login</span>
+              <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
             </div>
           )}
         </div>
