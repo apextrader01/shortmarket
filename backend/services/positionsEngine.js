@@ -219,16 +219,47 @@ class PositionsEngine {
                     .orWhereIn('symbol', expiringUniqueSymbols);
             });
             
+            // Cancel ALL pending open orders for expiring symbols globally (even if user has no position)
+            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).where(function() {
+                this.where('symbol', 'like', `%${expiryToken1}%`)
+                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
+                    .orWhereIn('symbol', expiringUniqueSymbols);
+            });
+            
             if (isCommodity) {
                 posQuery = posQuery.where('symbol', 'like', '%MCX%');
                 holdQuery = holdQuery.where('symbol', 'like', '%MCX%');
+                orderQuery = orderQuery.where('symbol', 'like', '%MCX%');
             } else {
                 posQuery = posQuery.whereNot('symbol', 'like', '%MCX%');
                 holdQuery = holdQuery.whereNot('symbol', 'like', '%MCX%');
+                orderQuery = orderQuery.whereNot('symbol', 'like', '%MCX%');
             }
 
             const expiringPositions = await posQuery;
             const expiringHoldings = await holdQuery;
+            const expiringOrders = await orderQuery;
+
+            // Globally cancel all open orders for expiring contracts
+            for (const stale of expiringOrders) {
+                await db.transaction(async (trx) => {
+                    if (stale.margin > 0) {
+                        const user = await trx('users').where({ id: stale.user_id }).first();
+                        await trx('users').where({ id: stale.user_id }).update({
+                            balance: Number(user.balance) + Number(stale.margin)
+                        });
+                        await trx('ledger').insert({
+                            user_id: stale.user_id,
+                            amount: Number(stale.margin),
+                            type: 'MARGIN_RELEASE',
+                            description: `Margin refunded: expiry settlement cancelled open order for ${stale.symbol}`
+                        });
+                    }
+                    await trx('orders').where({ id: stale.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                    triggerEngine.removeOrderFromMemory(stale.id, stale.symbol);
+                    console.log(`[EXPIRY SETTLE] Cancelled pending order ${stale.id} globally for expiring ${stale.symbol}`);
+                });
+            }
 
             const { getPriceFromCache } = require('./fyers');
             const priceCache = getPriceFromCache();
@@ -239,33 +270,6 @@ class PositionsEngine {
                 const side = item.quantity > 0 ? 'SELL' : 'BUY';
                 const orderQty = Math.abs(item.quantity);
                 const prodType = isHolding ? 'DEL' : item.product_type;
-
-                // BUG FIX 3: Cancel all open pending/trigger orders for this symbol BEFORE settling.
-                // Without this, a stale SL/Target order can fire after settlement and create
-                // a phantom reverse position or corrupt the ledger.
-                const staleOrders = await db('orders')
-                    .where({ user_id: item.user_id, symbol: item.symbol })
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-
-                for (const stale of staleOrders) {
-                    await db.transaction(async (trx) => {
-                        if (stale.margin > 0) {
-                            const user = await trx('users').where({ id: stale.user_id }).first();
-                            await trx('users').where({ id: stale.user_id }).update({
-                                balance: Number(user.balance) + Number(stale.margin)
-                            });
-                            await trx('ledger').insert({
-                                user_id: stale.user_id,
-                                amount: Number(stale.margin),
-                                type: 'MARGIN_RELEASE',
-                                description: `Margin refunded: expiry settlement cancelled order for ${stale.symbol}`
-                            });
-                        }
-                        await trx('orders').where({ id: stale.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                        triggerEngine.removeOrderFromMemory(stale.id, stale.symbol);
-                        console.log(`[EXPIRY SETTLE] Cancelled stale order ${stale.id} for expiring ${stale.symbol}`);
-                    });
-                }
 
                 // BUG FIX 5: Store actual LTP in price field (not 0) so order history shows correct price
                 const [orderId] = await db('orders').insert({
