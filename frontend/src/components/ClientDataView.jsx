@@ -201,17 +201,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             </div>
           </div>
 
-        {/* Pledging & Pay Later */}
+        {/* Coming Features */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Pledging & Pay Later</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Coming Features</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Card title="Pledge Holdings for Extra Margin" desc="Increase your trading balance" color="#EAB308" />
             <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.041% interest per day" color="#A855F7" />
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.2)' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: '#22C55E' }}>Transfer Stocks</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Transferring stocks to any Demat account quickly and securely</div>
-              </div>
+            <div onClick={() => setActiveTab('Options')} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" />
             </div>
           </div>
         </div>

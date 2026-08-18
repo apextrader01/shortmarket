@@ -368,7 +368,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Options', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds', 'Pricing',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds', 'Pricing',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -514,7 +514,6 @@ function App() {
         <div className="mobile-menu-content">
           {[
             { label: 'Markets', icon: TrendingUp },
-            { label: 'Options', icon: LineChart },
             { label: 'Positions', icon: Briefcase },
             { label: 'Orders', icon: List },
             { label: 'Portfolio', icon: Briefcase },
