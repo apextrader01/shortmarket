@@ -9,6 +9,7 @@ export default function LoginView() {
   const [view, setView] = useState('login');
   
   const [username, setUsername] = useState('');
+  const [phone,    setPhone]    = useState('');
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [otp,      setOtp]      = useState('');
@@ -25,7 +26,7 @@ export default function LoginView() {
       await login(email, password);
     } 
     else if (view === 'register') {
-      await register(username, email, password);
+      await register(username, email, phone, password);
     }
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
@@ -170,14 +171,21 @@ export default function LoginView() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {view === 'register' && (
             <div>
-              <label style={labelStyle}>Username</label>
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="premium-input" placeholder="johndoe" />
+              <label style={labelStyle}>Full Name</label>
+              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="premium-input" placeholder="John Doe" />
+            </div>
+          )}
+
+          {view === 'register' && (
+            <div>
+              <label style={labelStyle}>Phone Number</label>
+              <input type="tel" pattern="[0-9]{10}" maxLength="10" required value={phone} onChange={(e) => setPhone(e.target.value)} className="premium-input" placeholder="1234567890" />
             </div>
           )}
 
           {(view === 'login' || view === 'register' || view === 'forgot') && (
             <div>
-              <label style={labelStyle}>Email Address</label>
+              <label style={labelStyle}>Email ID</label>
               <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" placeholder="john@example.com" />
             </div>
           )}

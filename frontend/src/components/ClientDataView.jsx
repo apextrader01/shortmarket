@@ -158,7 +158,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-          <Star size={14} /> Member since 2021
+          <Star size={14} /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
         </div>
       </div>
 

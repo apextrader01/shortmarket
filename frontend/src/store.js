@@ -77,11 +77,11 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  register: async (username, email, password) => {
+  register: async (username, email, phone, password) => {
     try {
       set({ authError: null });
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, phone, password }),
       });
       const data = await res.json();
       if (data.success) {

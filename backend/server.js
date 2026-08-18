@@ -267,14 +267,14 @@ const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
 
 app.post('/api/auth/register', async (req, res) => {
-  const { username, email, password } = req.body;
-  if (!username || !email || !password) return res.status(400).json({ error: 'Missing fields' });
+  const { username, email, phone, password } = req.body;
+  if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
   try {
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
     const [id] = await db('users').insert({ 
-      username, email, password_hash, watchlists: defaultWatchlist 
+      username, email, phone, password_hash, watchlists: defaultWatchlist 
     }).returning('id');
     
     // Some db engines return an object from returning(), handle both
