@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Star, Shield, Zap, ChevronLeft } from 'lucide-react';
+import { Check, Star, Shield, Zap, ChevronLeft, ArrowLeft } from 'lucide-react';
 
 export default function PricingView({ setActiveTab }) {
   const { user } = useStore(useShallow(state => ({ user: state.user })));
@@ -102,7 +102,15 @@ export default function PricingView({ setActiveTab }) {
 
   return (
     <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto', color: 'var(--text-primary)' }}>
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+          <div 
+            onClick={() => setActiveTab('ClientData')} 
+            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <ArrowLeft size={16} />
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '12px' }}>Choose Your Plan</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>Unlock the full potential of your trading with PRO.</p>
       </div>
@@ -220,3 +228,4 @@ export default function PricingView({ setActiveTab }) {
     </div>
   );
 }
+

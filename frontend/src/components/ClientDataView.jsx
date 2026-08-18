@@ -321,7 +321,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>Keyboard & Shortcut</span>
             </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('AboutUs')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>About Us</span>
             </div>
@@ -383,3 +383,4 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
   );
 }
+

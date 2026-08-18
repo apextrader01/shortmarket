@@ -27,6 +27,7 @@
 
   /* Dark surfaces */
   --bg-dark: #060D1A;
+  --bg-hover: rgba(255, 255, 255, 0.08);
 
   /* Utilities */
   --radius-sm: 6px;
@@ -44,6 +45,7 @@
   --border-color: rgba(0, 0, 0, 0.1);
   --border-highlight: rgba(0, 0, 0, 0.2);
   --bg-dark: #F1F5F9;
+  --bg-hover: rgba(0, 0, 0, 0.05);
 }
 
 @media (prefers-color-scheme: light) {
@@ -56,6 +58,7 @@
     --border-color: rgba(0, 0, 0, 0.1);
     --border-highlight: rgba(0, 0, 0, 0.2);
     --bg-dark: #F1F5F9;
+  --bg-hover: rgba(0, 0, 0, 0.05);
   }
 }
 
@@ -287,8 +290,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .hoverable:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  transform: translateY(-1px);
+  background: var(--bg-hover) !important;
+  
 }
 
 .hoverable-row:hover {
@@ -296,7 +299,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-buy:hover {
   background: var(--color-green-light);
-  transform: translateY(-1px);
+  
   box-shadow: 0 4px 12px rgba(17, 140, 79, 0.3);
 }
 
@@ -307,7 +310,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-sell:hover {
   background: var(--color-red-light);
-  transform: translateY(-1px);
+  
   box-shadow: 0 4px 12px rgba(225, 42, 31, 0.3);
 }
 
@@ -1280,9 +1283,9 @@ input:checked + .slider:before {
   transition: all 0.2s ease;
 }
 .premium-btn-mini.buy { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3); color: #4ade80; }
-.premium-btn-mini.buy:hover { background: rgba(34, 197, 94, 0.3); transform: translateY(-1px); }
+.premium-btn-mini.buy:hover { background: rgba(34, 197, 94, 0.3);  }
 .premium-btn-mini.sell { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
-.premium-btn-mini.sell:hover { background: rgba(239, 68, 68, 0.3); transform: translateY(-1px); }
+.premium-btn-mini.sell:hover { background: rgba(239, 68, 68, 0.3);  }
 
 html {
   background-color: var(--bg-primary);
@@ -1322,4 +1325,6 @@ body.font-large .glass-header {
 
 @media (max-width: 768px) { .desktop-view { display: none !important; } }
 @media (min-width: 769px) { .mobile-view { display: none !important; } }
+
+
 

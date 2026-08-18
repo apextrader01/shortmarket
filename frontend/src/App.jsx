@@ -466,6 +466,11 @@ function App() {
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
             </div>
           )}
+          {activeTab === 'AboutUs' && (
+            <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
+              <AboutUsView setActiveTab={setActiveTab} />
+            </div>
+          )}
           {activeTab === 'Reports' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
               <ReportsView onBack={() => setActiveTab('ClientData')} />
