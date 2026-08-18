@@ -1491,12 +1491,11 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     }
   }
 
-  // BUG FIX 4: Block new BUY orders for F&O/FUT contracts on their expiry day after trading closes.
-  // Without this, users can queue orders on contracts that have already expired and they remain
-  // as stale PENDING orders that fire incorrectly later.
-  // SELL orders are still allowed so users can exit existing positions/holdings.
+  // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
+  // Equities auto-square-off at 03:25 PM. MCX auto-square-off at 07:00 PM.
+  // After these times, no manual intervention is allowed as the system forces settlement.
   const isDerivativeSymbol = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
-  if (isDerivativeSymbol && side === 'BUY') {
+  if (isDerivativeSymbol) {
     const now = new Date();
     const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
     const dayStr = String(istNow.getUTCDate()).padStart(2, '0');
@@ -1510,12 +1509,12 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       const h = istNow.getUTCHours();
       const min = istNow.getUTCMinutes();
       const isMCXSymbol = symbol.endsWith('-MCX');
-      // Equity/NFO/BFO: block after 3:15 PM; MCX: block after 7:00 PM
-      const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 15));
-      const mcxExpiryClosed   =  isMCXSymbol && h >= 19;
+      // Equity/NFO/BFO: block after 03:25 PM; MCX: block after 07:00 PM
+      const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 25));
+      const mcxExpiryClosed   =  isMCXSymbol && (h >= 19);
       if (equityExpiryClosed || mcxExpiryClosed) {
         return res.status(400).json({
-          error: `Cannot place new BUY orders on ${symbol.split('-')[0]}. This contract expires today and new positions are no longer allowed.`
+          error: `Cannot place orders on ${symbol.split('-')[0]}. This contract expires today and the Auto-Square-Off cutoff time has passed.`
         });
       }
     }
@@ -1866,6 +1865,33 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
         if (isBeforeOpen || isAfterClose) {
           return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
+        }
+      }
+    }
+
+    // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
+    const isDerivativeSymbol = item.symbol.includes('CE') || item.symbol.includes('PE') || item.symbol.includes('FUT');
+    if (isDerivativeSymbol) {
+      const now = new Date();
+      const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+      const dayStr = String(istNow.getUTCDate()).padStart(2, '0');
+      const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const monthStr = monthNames[istNow.getUTCMonth()];
+      const yearStr = String(istNow.getUTCFullYear()).slice(-2);
+      const todayExpiryToken = `${dayStr}${monthStr}${yearStr}`;
+      
+      const isExpiringToday = item.symbol.includes(todayExpiryToken);
+      if (isExpiringToday) {
+        const h = istNow.getUTCHours();
+        const min = istNow.getUTCMinutes();
+        const isMCXSymbol = item.symbol.endsWith('-MCX');
+        // Equity/NFO/BFO: block after 03:25 PM; MCX: block after 07:00 PM
+        const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 25));
+        const mcxExpiryClosed   =  isMCXSymbol && (h >= 19);
+        if (equityExpiryClosed || mcxExpiryClosed) {
+          return res.status(400).json({
+            error: `Cannot place orders on ${item.symbol.split('-')[0]}. This contract expires today and the Auto-Square-Off cutoff time has passed.`
+          });
         }
       }
     }
