@@ -25,33 +25,16 @@ export default function MarketDepthModal() {
 
   if (!marketDepthModal.isOpen || !symbol) return null;
 
-  // Use real data from store, fallback to fake data if market is closed (empty arrays)
-  let bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  let asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  // Use real data from the price_snapshot (basicData) which includes market depth
+  let bids = basicData.bids || [];
+  let asks = basicData.asks || [];
 
-  if (bids.length === 0 && asks.length === 0) {
-    const ltp = basicData?.ltp || 100;
-    bids = [
-      { orders: 3, qty: 150, price: (ltp - 0.5).toFixed(2) },
-      { orders: 1, qty: 50, price: (ltp - 1.0).toFixed(2) },
-      { orders: 5, qty: 300, price: (ltp - 1.5).toFixed(2) },
-      { orders: 2, qty: 100, price: (ltp - 2.0).toFixed(2) },
-      { orders: 8, qty: 850, price: (ltp - 2.5).toFixed(2) }
-    ];
-    asks = [
-      { orders: 2, qty: 200, price: (ltp + 0.5).toFixed(2) },
-      { orders: 4, qty: 120, price: (ltp + 1.0).toFixed(2) },
-      { orders: 1, qty: 10, price: (ltp + 1.5).toFixed(2) },
-      { orders: 7, qty: 500, price: (ltp + 2.0).toFixed(2) },
-      { orders: 3, qty: 150, price: (ltp + 2.5).toFixed(2) }
-    ];
-  }
+  // Do not divide by lotSize, Fyers provides exact share quantity for bids/asks
+  const displayBids = bids.map(b => ({ ...b, qty: Math.round(b.qty) }));
+  const displayAsks = asks.map(a => ({ ...a, qty: Math.round(a.qty) }));
 
-  const displayBids = bids.map(b => ({ ...b, qty: Math.round(b.qty / lotSize) }));
-  const displayAsks = asks.map(a => ({ ...a, qty: Math.round(a.qty / lotSize) }));
-
-  const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? Math.round(marketDepthData.totBuyQuan / lotSize) : displayBids.reduce((sum, b) => sum + (b.qty || 0), 0);
-  const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? Math.round(marketDepthData.totSellQuan / lotSize) : displayAsks.reduce((sum, a) => sum + (a.qty || 0), 0);
+  const totalBidQty = basicData.totBuyQuan ? Math.round(basicData.totBuyQuan) : displayBids.reduce((sum, b) => sum + (b.qty || 0), 0);
+  const totalAskQty = basicData.totSellQuan ? Math.round(basicData.totSellQuan) : displayAsks.reduce((sum, a) => sum + (a.qty || 0), 0);
   
   // Calculate width ratio for progress bars
   const totalVol = totalBidQty + totalAskQty;

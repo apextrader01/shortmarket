@@ -300,7 +300,9 @@ function startLiveWebSocket() {
                         change: change,
                         pct: pct,
                         bids: bids.length > 0 ? bids : (oldPriceObj.bids || []),
-                        asks: asks.length > 0 ? asks : (oldPriceObj.asks || [])
+                        asks: asks.length > 0 ? asks : (oldPriceObj.asks || []),
+                        totBuyQuan: tick.tot_buy_qty !== undefined ? tick.tot_buy_qty : (oldPriceObj.totBuyQuan || 0),
+                        totSellQuan: tick.tot_sell_qty !== undefined ? tick.tot_sell_qty : (oldPriceObj.totSellQuan || 0)
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
