@@ -122,7 +122,10 @@ function searchInstruments(query) {
     const queryParts = query.toLowerCase().split(/\s+/).filter(Boolean);
     
     // Simple filter: every part of the query must be included in the search_string
+    const nowMs = Date.now();
     const results = allInstruments.filter(item => {
+        if (item.expiryTimestamp && item.expiryTimestamp < nowMs) return false;
+        if (item.expiry_timestamp && item.expiry_timestamp * 1000 < nowMs) return false;
         for (const part of queryParts) {
             if (!item.search_string.includes(part)) return false;
         }
