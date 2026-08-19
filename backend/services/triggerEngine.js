@@ -192,7 +192,8 @@ class TriggerEngine {
             await trx('orders').where({ id: order.id }).update({ 
                 status: 'EXECUTED',
                 price: execPrice,
-                taxes: totalTaxes
+                taxes: totalTaxes,
+                updated_at: new Date()
             });
 
             // 2. Position Logic
