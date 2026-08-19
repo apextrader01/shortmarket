@@ -362,10 +362,11 @@ function addSubscriptionBatch(symbols) {
     symbols.forEach(item => {
         let s = typeof item === 'string' ? item : item?.symbol;
         if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
+        const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
         if (fSym) {
-            if (!subQueue.includes(fSym)) {
+            if (!alreadySubscribed && !subQueue.includes(fSym)) {
                 subQueue.push(fSym);
             }
             if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
