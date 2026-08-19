@@ -1291,6 +1291,8 @@ input:checked + .slider:before {
 
 html {
   background-color: var(--bg-primary);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
 }
 
 /* Font Size Settings via zoom (with width compensation for Chrome gap bug) */
