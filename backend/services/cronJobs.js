@@ -121,6 +121,43 @@ function initCronJobs(priceCache, triggerEngine) {
     // DISABLED: Handled exclusively in positionsEngine.js to avoid race conditions.
     // cron.schedule('25 15 * * *', () => expirySquareOff(false), TZ);
     // cron.schedule('0 19 * * *', () => expirySquareOff(true), TZ);
+
+    // --- 1:00 AM Expired Watchlist Cleanup ---
+    cron.schedule('0 1 * * *', async () => {
+        console.log('[CRON] 1:00 AM: Cleaning expired symbols from all user watchlists...');
+        try {
+            const db = require('../database/db');
+            const now = new Date().getTime();
+            const expiredInstruments = await db('instruments').whereNotNull('expiry_timestamp').where('expiry_timestamp', '<', now).select('unique_symbol');
+            if (expiredInstruments.length === 0) return;
+            const expiredSet = new Set(expiredInstruments.map(i => i.unique_symbol));
+            let usersUpdated = 0;
+            const users = await db('users').whereNotNull('watchlists');
+            
+            for (const user of users) {
+                let changed = false;
+                let watchlists = user.watchlists;
+                if (typeof watchlists === 'string') { try { watchlists = JSON.parse(watchlists); } catch(e) { continue; } }
+                
+                if (Array.isArray(watchlists)) {
+                    watchlists.forEach(wl => {
+                        if (Array.isArray(wl.symbols)) {
+                            const originalLen = wl.symbols.length;
+                            wl.symbols = wl.symbols.filter(sym => !expiredSet.has(sym));
+                            if (wl.symbols.length !== originalLen) changed = true;
+                        }
+                    });
+                }
+                if (changed) {
+                    await db('users').where({ id: user.id }).update({ watchlists: typeof user.watchlists === 'string' ? JSON.stringify(watchlists) : watchlists });
+                    usersUpdated++;
+                }
+            }
+            console.log(`[CRON] Watchlist cleanup complete. Removed expired symbols for ${usersUpdated} users.`);
+        } catch (err) {
+            console.error('[CRON] Watchlist cleanup error:', err);
+        }
+    }, TZ);
 }
 
 module.exports = { initCronJobs, isIntradayBlocked: () => isIntradayBlocked };

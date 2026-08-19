@@ -309,7 +309,7 @@ class PositionsEngine {
             await db.transaction(async (trx) => {
                 // 1. Fetch all Delivery positions with Qty > 0
                 let query = trx('positions')
-                    .where('product_type', 'DEL')
+                    .whereIn('product_type', ['DEL', 'CNC'])
                     .where('quantity', '>', 0);
                     
                 if (onlyBeforeToday) {

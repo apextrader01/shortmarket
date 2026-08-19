@@ -180,6 +180,7 @@ async function initFyers(io, pc, isMaster = true) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
+    if (wsInstance) { try { if (wsInstance.close) wsInstance.close(); if (wsInstance.disconnect) wsInstance.disconnect(); } catch(e) {} }
     // With fyers-api-v3, we MUST use getInstance() instead of new DataSocket
     // to prevent 'Only one instance of DataSocket is allowed' errors during reconnects.
     // If wsInstance exists, we just let it be, but we will call connect() later.
