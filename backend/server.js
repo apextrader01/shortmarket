@@ -2484,18 +2484,15 @@ io.on('connection', (socket) => {
     socket.leave(symbol);
   });
 
-  socket.on('subscribe_depth', (symbol) => {
-    if (!symbol) return;
-    socket.join(`${symbol}_depth`);
-    const { subscribeToDepth } = require('./services/fyers');
-    if (subscribeToDepth) subscribeToDepth(symbol);
+    socket.on('subscribe_depth', (symbol) => {
+    // [DISABLED for bandwidth/traffic optimization]
+    // Keeping this route as a dummy so it can easily be re-enabled for VIP/Yearly customers later.
+    return;
   });
 
   socket.on('unsubscribe_depth', (symbol) => {
-    if (!symbol) return;
-    socket.leave(`${symbol}_depth`);
-    const { unsubscribeFromDepth } = require('./services/fyers');
-    if (unsubscribeFromDepth) unsubscribeFromDepth(symbol);
+    // [DISABLED for bandwidth/traffic optimization]
+    return;
   });
 
   socket.on('disconnect', () => {
