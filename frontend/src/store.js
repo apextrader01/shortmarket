@@ -32,14 +32,27 @@ export const socket = io(API, {
 const temporaryOptionSubscriptions = new Set();
 
 /** Merge a price snapshot object into the current prices map, tagging each tick direction */
-function applySnapshot(snapshot, state) {
+function applySnapshot(snapshot, state, isFromWebSocket = false) {
   const newPrices = { ...state.prices };
+  const now = Date.now();
   for (const [symbol, data] of Object.entries(snapshot)) {
     const old = newPrices[symbol];
+    
+    // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 20 seconds.
+    // This prevents the 15-second REST API fallback polling from fighting the live WebSocket.
+    if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 20000)) {
+        continue;
+    }
+    
     const tick = old
       ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
       : 'flat';
-    newPrices[symbol] = { ...data, tick };
+    
+    newPrices[symbol] = { ...old, ...data, tick };
+    
+    if (isFromWebSocket) {
+        newPrices[symbol].lastWsUpdate = now;
+    }
   }
   return newPrices;
 }
@@ -401,7 +414,7 @@ export const useStore = create(persist((set, get) => ({
   initSocket: () => {
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
-      set((state) => ({ prices: applySnapshot(snapshot, state) }));
+      set((state) => ({ prices: applySnapshot(snapshot, state, true) }));
     });
     
     // Keep TOP_INDICES alive in the backend so they don't freeze after 30s
