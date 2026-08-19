@@ -94,7 +94,6 @@ const OptionChainRow = React.memo(({
                 <button onClick={() => setAlertModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
                 <button onClick={() => setChartModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
                 <button onClick={() => openMarketDepthModal(callKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(callKey, parseInt(call.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
               </>
             )}
           </div>
@@ -133,7 +132,6 @@ const OptionChainRow = React.memo(({
                 <button onClick={() => setAlertModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
                 <button onClick={() => setChartModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
                 <button onClick={() => openMarketDepthModal(putKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(putKey, parseInt(put.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
               </>
             )}
           </div>
