@@ -1643,6 +1643,8 @@ app.post('/api/order', authenticateToken, async (req, res) => {
       if (realLtp > 0) {
         try {
           await triggerEngine.evaluateTick(ord.symbol, realLtp);
+          // Wait briefly for background DB transaction to commit so frontend sees EXECUTED status instantly
+          await new Promise(r => setTimeout(r, 250));
         } catch (err) {
           console.error('Immediate evaluation error:', err);
         }
