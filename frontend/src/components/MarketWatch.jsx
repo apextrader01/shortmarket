@@ -237,12 +237,17 @@ export default function MarketWatch({ className = '' }) {
                 <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.name}</div>
               </div>
 
-              {/* Action Buttons (visible on hover) */}
-              {isHovered && (
+              {/* Action Buttons (visible on hover or always in search mode) */}
+              {(isHovered || isSearchMode) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '8px' }}>
                   {isSearchMode ? (
                     isInWatchlist ? (
-                      <Check size={14} color="var(--color-green-light)" />
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
+                        style={{ padding: '3px', background: 'var(--color-red)', borderRadius: '4px', display: 'flex' }}
+                      >
+                        <Minus size={12} color="#fff" />
+                      </div>
                     ) : (
                       <div 
                         onClick={(e) => { e.stopPropagation(); addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
@@ -291,8 +296,8 @@ export default function MarketWatch({ className = '' }) {
                 </div>
               )}
 
-              {/* Prices (hidden when hovered to make room for actions) */}
-              {data && !isHovered ? (
+              {/* Prices (hidden when actions are visible) */}
+              {data && !(isHovered || isSearchMode) ? (
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div 
                     key={data.last_update_time || data.ltp}
@@ -324,7 +329,7 @@ export default function MarketWatch({ className = '' }) {
                       : '—'}
                   </div>
                 </div>
-              ) : !data && !isHovered ? (
+              ) : !data && !(isHovered || isSearchMode) ? (
                 <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</div>
               ) : null}
             </div>
