@@ -1768,13 +1768,18 @@ app.post('/api/ltp-batch', async (req, res) => {
     
     const result = {};
     const missingSymbols = [];
+    const now = Date.now();
     
     // 1. Serve everything we already have in the live priceCache instantly (unless force=true)
     for (const item of symbols) {
       const sym = typeof item === 'string' ? item : item.symbol;
       if (!sym) continue;
-      if (!force && priceCache[sym] && priceCache[sym].ltp > 0) {
-        result[sym] = priceCache[sym];
+      
+      const cached = priceCache[sym];
+      const isStale = cached && cached.timestamp ? (now - cached.timestamp > 15000) : false;
+      
+      if (!force && cached && cached.ltp > 0 && !isStale) {
+        result[sym] = cached;
       } else {
         missingSymbols.push(sym);
       }

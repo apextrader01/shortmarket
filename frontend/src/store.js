@@ -437,7 +437,7 @@ export const useStore = create(persist((set, get) => ({
         ]);
         const arr = [...allSymbols].filter(Boolean);
         if (arr.length > 0) {
-          get().fetchBatchPrices(arr, true);
+          get().fetchBatchPrices(arr, false);
         }
       }, 15000);
     }

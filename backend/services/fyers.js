@@ -291,6 +291,7 @@ function startLiveWebSocket() {
                     
                     const priceObj = {
                         symbol: uniqueSymbol,
+                        timestamp: Date.now(),
                         ltp: ltp,
                         open: tick.open_price !== undefined ? tick.open_price : (oldPriceObj.open || null),
                         high: tick.high_price !== undefined ? tick.high_price : (oldPriceObj.high || null),
@@ -525,6 +526,7 @@ async function fetchBatchLTPs(symbols) {
                                     syms.forEach(uniqueSymbol => {
                                         const priceObj = {
                                             symbol: uniqueSymbol,
+                                            timestamp: Date.now(),
                                             ltp: Number(item.v.lp) || Number(item.v.prev_close_price) || Number(item.v.close_price) || 0,
                                             open: Number(item.v.open_price) || null,
                                             high: Number(item.v.high_price) || null,
