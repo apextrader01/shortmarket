@@ -311,7 +311,7 @@ export const useStore = create(persist((set, get) => ({
 
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 },
 
-  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0) => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType, isExit, defaultQty } }),
+  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0) => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType, isExit, totalExitQty } }),
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
   closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 } }),
 
@@ -1167,6 +1167,7 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+
 
 
 
