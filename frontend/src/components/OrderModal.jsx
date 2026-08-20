@@ -366,6 +366,7 @@ export default function OrderModal() {
                 <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
+                  step={orderModal.lotsize || 1}
                   value={quantity} 
                   onChange={e => setQuantity(Math.max(1, Number(e.target.value)))} 
                   style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 

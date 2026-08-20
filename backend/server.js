@@ -1453,6 +1453,16 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Validate Quantity is a multiple of Lot Size for Options/Futures
+  if (symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT')) {
+    const { getLotSizes } = require('./services/instrumentsCache');
+    const lotSizes = getLotSizes([symbol]);
+    const lotsize = lotSizes[symbol] || 1;
+    if (Number(quantity) % lotsize !== 0) {
+      return res.status(400).json({ error: `Quantity must be a multiple of lot size (${lotsize}).` });
+    }
+  }
+
   // Validate Bracket Order (BO) and Cover Order (CO) formats
   if (product_type === 'BO' || product_type === 'CO') {
     const entryPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
