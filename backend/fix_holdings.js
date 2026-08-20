@@ -34,9 +34,14 @@ async function fixHoldings() {
                     .first();
 
                 if (existingHolding) {
-                    const newTotalQty = existingHolding.quantity + pos.quantity;
-                    const totalCost = (existingHolding.quantity * existingHolding.average_price) + (pos.quantity * pos.average_price);
-                    const newAvgPrice = totalCost / newTotalQty;
+                    const existingQty = Number(existingHolding.quantity);
+                    const posQty = Number(pos.quantity);
+                    const existingAvgPrice = Number(existingHolding.average_price);
+                    const posAvgPrice = Number(pos.average_price);
+                    
+                    const newTotalQty = existingQty + posQty;
+                    const totalCost = (existingQty * existingAvgPrice) + (posQty * posAvgPrice);
+                    const newAvgPrice = newTotalQty === 0 ? 0 : totalCost / newTotalQty;
 
                     await trx('holdings')
                         .where({ id: existingHolding.id })

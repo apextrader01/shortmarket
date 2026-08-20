@@ -226,6 +226,14 @@ async function initSchema() {
         console.log('Added margin to orders table');
       }
       
+      const hasAssetClass = await db.schema.hasColumn('holdings', 'asset_class');
+      if (!hasAssetClass) {
+        await db.schema.alterTable('holdings', table => {
+          table.string('asset_class').notNullable().defaultTo('STOCK');
+        });
+        console.log('Added asset_class to holdings table');
+      }
+      
       const hasTriggerPrice = await db.schema.hasColumn('orders', 'trigger_price');
       if (!hasTriggerPrice) {
         await db.schema.alterTable('orders', table => {

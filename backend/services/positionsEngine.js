@@ -342,7 +342,7 @@ class PositionsEngine {
 
                         const newTotalQty = existingQty + posQty;
                         const totalCost = (existingQty * existingAvgPrice) + (posQty * posAvgPrice);
-                        const newAvgPrice = totalCost / newTotalQty;
+                        const newAvgPrice = newTotalQty === 0 ? 0 : totalCost / newTotalQty;
 
                         await trx('holdings')
                             .where({ id: existingHolding.id })
@@ -360,17 +360,20 @@ class PositionsEngine {
                 }
 
                 // 2. Wipe the positions table to clear UI history
-                if (onlyBeforeToday) {
-                    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const parts = formatter.formatToParts(new Date());
-                    const year = parts.find(p => p.type === 'year').value;
-                    const month = parts.find(p => p.type === 'month').value;
-                    const day = parts.find(p => p.type === 'day').value;
-                    const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-                    await trx('positions').where('created_at', '<', startOfToday).del();
-                } else {
-                    await trx('positions').del();
+                // Wipe the DEL positions we successfully migrated
+                const migratedIds = deliveryPositions.map(p => p.id);
+                if (migratedIds.length > 0) {
+                    await trx('positions').whereIn('id', migratedIds).del();
                 }
+                
+                // Wipe ANY remaining closed/intraday positions from yesterday to clear UI
+                const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+                const parts = formatter.formatToParts(new Date());
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+                await trx('positions').where('created_at', '<', startOfToday).del();
                 
                 console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions and wiped old history.`);
             });
