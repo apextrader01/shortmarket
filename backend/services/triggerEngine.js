@@ -220,6 +220,7 @@ class TriggerEngine {
                         
                         // Create a CLOSED position record for today
                         const realizedPnl = (execPrice - holding.average_price) * offsetQty;
+                        const principalAmount = holding.average_price * offsetQty;
                         await trx('positions').insert({
                             user_id: order.user_id,
                             symbol: order.symbol,
@@ -232,22 +233,23 @@ class TriggerEngine {
                             updated_at: new Date()
                         });
                         
-                        // Update Balance and Ledger with Realized P&L and RMS Penalty
+                        // Update Balance and Ledger with Principal, Realized P&L and RMS Penalty
                         const rmsPenalty = order.is_rms ? 59 : 0;
-                        if (realizedPnl !== 0 || rmsPenalty !== 0) {
-                            const user = await trx('users').where({ id: order.user_id }).first();
-                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + realizedPnl - rmsPenalty });
-                            
-                            if (realizedPnl !== 0) {
-                                await trx('ledger').insert({
-                                    user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
-                                });
-                            }
-                            if (rmsPenalty > 0) {
-                                await trx('ledger').insert({
-                                    user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `Auto-Square-Off RMS Penalty for holding ${order.symbol}`
-                                });
-                            }
+                        const user = await trx('users').where({ id: order.user_id }).first();
+                        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + principalAmount + realizedPnl - rmsPenalty });
+                        
+                        await trx('ledger').insert({
+                            user_id: order.user_id, amount: principalAmount, type: 'HOLDING_RELEASE', description: `Holding value released for ${offsetQty} ${order.symbol}`
+                        });
+                        if (realizedPnl !== 0) {
+                            await trx('ledger').insert({
+                                user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
+                            });
+                        }
+                        if (rmsPenalty > 0) {
+                            await trx('ledger').insert({
+                                user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `Auto-Square-Off RMS Penalty for holding ${order.symbol}`
+                            });
                         }
                         
                         remainingQty += offsetQty; // e.g. -15 + 10 = -5
