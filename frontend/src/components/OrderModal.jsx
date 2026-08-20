@@ -142,7 +142,7 @@ export default function OrderModal() {
     baseMargin = baseMargin * marginRate;
   }
 
-  const requiredMargin = baseMargin * leverageMultiplier;
+  const requiredMargin = isExit ? 0 : baseMargin * leverageMultiplier;
   const isInsufficient = balanceNum < requiredMargin;
 
   let leverageText = '';
