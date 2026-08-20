@@ -604,8 +604,8 @@ export const useStore = create(persist((set, get) => ({
         watchlists: (user && !user.error && user.watchlists) ? user.watchlists : get().watchlists
       });
       
-      const posSymbols = (positions || []).map(p => p.symbol);
-      const holdSymbols = (holdData.holdings || []).map(h => h.symbol);
+      const posSymbols = get().positions.map(p => p.symbol);
+      const holdSymbols = get().holdings.map(h => h.symbol);
       const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
       if (allSymbolsToSubscribe.length > 0) {
         get().fetchBatchPrices(allSymbolsToSubscribe);
@@ -1167,6 +1167,7 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+
 
 
 
