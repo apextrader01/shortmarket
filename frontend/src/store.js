@@ -597,7 +597,7 @@ export const useStore = create(persist((set, get) => ({
       if (!get().user) return;
       set({
         positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
-        holdings: holdData.success ? holdData.holdings : get().holdings,
+        holdings: Array.isArray(holdData) ? holdData : (holdData.error ? [] : get().holdings),
         sips: sipsData.success ? sipsData.sips : get().sips,
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
         user: (user && !user.error) ? user : get().user,
