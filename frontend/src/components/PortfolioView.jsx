@@ -273,7 +273,7 @@ export default function PortfolioView() {
                         </td>
                         <td style={{ padding: '16px', textAlign: 'center' }}>
                           <button
-                            onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', 1, 'DEL')}
+                            onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
                             style={{
                               background: 'transparent',
                               color: 'var(--color-red-light)',

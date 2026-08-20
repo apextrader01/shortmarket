@@ -35,6 +35,12 @@ export default function OrderModal() {
   useEffect(() => {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
+      setProductType(orderModal.productType || 'INT');
+      if (orderModal.totalExitQty) {
+          setQuantity(Math.max(1, orderModal.totalExitQty / (orderModal.lotsize || 1)));
+      } else {
+          setQuantity(1);
+      }
       
       // Fetch initial price imperatively to avoid re-running on every live tick
       const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
@@ -46,7 +52,11 @@ export default function OrderModal() {
           .then(r => r.json())
           .then(data => {
             if (data[orderModal.symbol] && data[orderModal.symbol] > 1) {
-              useStore.getState().setOrderModalLotsize(data[orderModal.symbol]);
+              const ls = data[orderModal.symbol];
+              useStore.getState().setOrderModalLotsize(ls);
+              if (orderModal.totalExitQty) {
+                  setQuantity(Math.max(1, orderModal.totalExitQty / ls));
+              }
             }
           }).catch(console.error);
       }
@@ -308,6 +318,7 @@ export default function OrderModal() {
         </div>
 
         {/* Intraday / Overnight Tabs */}
+        {!orderModal.isExit && (
         <div style={{ padding: '20px 20px 10px 20px' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden', width: 'fit-content' }}>
             <div 
@@ -338,6 +349,7 @@ export default function OrderModal() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Form Body */}
         <div style={{ padding: '10px 20px 20px 20px' }}>

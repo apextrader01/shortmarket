@@ -309,11 +309,11 @@ export const useStore = create(persist((set, get) => ({
     } catch (_) { return false; }
   },
 
-  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' },
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 },
 
-  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT') => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType } }),
+  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0) => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType, isExit, defaultQty } }),
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
-  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' } }),
+  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
@@ -1167,4 +1167,9 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+
+
+
+
+
 
