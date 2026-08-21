@@ -362,6 +362,11 @@ export const useStore = create(persist((set, get) => ({
       positions.forEach(p => symbols.add(p.symbol));
     }
     
+    const holdings = get().holdings;
+    if (holdings && holdings.length > 0) {
+      holdings.forEach(h => symbols.add(h.symbol));
+    }
+    
     // Add temporary options
     temporaryOptionSubscriptions.forEach(s => symbols.add(s));
     
