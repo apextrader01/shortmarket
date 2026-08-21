@@ -691,6 +691,37 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
   }
 });
 
+// 🗑️ Delete User Account (Admin only)
+app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const targetUserId = req.params.id;
+
+    // Prevent admin from deleting themselves
+    if (String(targetUserId) === String(req.user.id)) {
+      return res.status(400).json({ error: 'Cannot delete your own admin account.' });
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('orders').where({ user_id: targetUserId }).del();
+      await trx('positions').where({ user_id: targetUserId }).del();
+      await trx('ledger').where({ user_id: targetUserId }).del();
+      await trx('holdings').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('alerts').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('sips').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('deposit_requests').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('users').where({ id: targetUserId }).del();
+    });
+
+    res.json({ success: true, message: 'User account permanently deleted.' });
+  } catch (err) {
+    console.error('Delete User Error:', err);
+    res.status(500).json({ error: 'Failed to delete user account.' });
+  }
+});
+
 app.post('/api/admin/user/:id/subscription', authenticateToken, async (req, res) => {
   try {
     const admin = await db('users').where({ id: req.user.id }).first();

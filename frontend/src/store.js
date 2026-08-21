@@ -1044,6 +1044,16 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  adminDeleteUser: async (userId) => {
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}`, { credentials: 'include', method: 'DELETE' });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: 'Network error' };
+    }
+  },
+
   updateUserBalance: async (userId, balance) => {
     try {
       const res = await fetch(`${API}/api/admin/user/${userId}/balance`, { credentials: 'include', method: 'POST',

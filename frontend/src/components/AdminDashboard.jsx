@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, updateUserDetails } = useStore(useShallow(state => ({ fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, updateUserDetails: state.updateUserDetails })));
+  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails } = useStore(useShallow(state => ({ fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails })));
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
@@ -141,6 +141,27 @@ export default function AdminDashboard() {
       }
       setUpdating(false);
     }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    const confirmation = window.prompt(
+      `⚠️ PERMANENT DELETE ⚠️\n\nThis will PERMANENTLY delete ${selectedUser.username}'s account and ALL their data (orders, positions, holdings, ledger, deposits).\n\nThis CANNOT be undone!\n\nType the username "${selectedUser.username}" to confirm:`
+    );
+    if (confirmation !== selectedUser.username) {
+      if (confirmation !== null) alert('Username did not match. Deletion cancelled.');
+      return;
+    }
+    setUpdating(true);
+    const res = await adminDeleteUser(selectedUser.id);
+    if (res.success) {
+      alert(`✅ ${selectedUser.username}'s account has been permanently deleted.`);
+      loadData();
+      setSelectedUser(null);
+    } else {
+      alert(res.error || 'Failed to delete user account');
+    }
+    setUpdating(false);
   };
 
   const handleProcessDeposit = async (id, action) => {
@@ -664,16 +685,28 @@ export default function AdminDashboard() {
               {/* Danger Zone */}
               <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginTop: '8px' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-red-light)' }}>Danger Zone</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                     Wipe all trades, positions, ledger, and reset balance to ₹10,00,000.
                   </div>
                   <button 
                     onClick={handleResetUser}
                     disabled={updating}
-                    style={{ background: 'var(--color-red)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    style={{ background: 'var(--color-red)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
                   >
-                    {updating ? 'RESETTING...' : 'RESET ACCOUNT'}
+                    {updating ? 'WORKING...' : 'RESET ACCOUNT'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span style={{ color: '#ff4444', fontWeight: '700' }}>PERMANENT:</span> Delete this account and all associated data. This cannot be undone.
+                  </div>
+                  <button
+                    onClick={handleDeleteUser}
+                    disabled={updating}
+                    style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
+                  >
+                    {updating ? 'WORKING...' : '🗑️ DELETE ACCOUNT'}
                   </button>
                 </div>
               </div>
