@@ -103,7 +103,7 @@ async function verifyFyersAuth(auth_code) {
             try {
                 const { pubClient } = require('./redisClient');
                 if (pubClient) {
-                    pubClient.publish('fyers_token_updated', 'updated');
+                    pubClient.publish('fyers_token_updated', 'updated').catch(e => {});
                 }
             } catch (err) {}
             
@@ -174,7 +174,7 @@ async function initFyers(io, pc, isMaster = true) {
                     try {
                         const { pubClient } = require('./redisClient');
                         if (pubClient) {
-                            pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate));
+                            pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate)).catch(e => {});
                         }
                     } catch(e) {}
                 }

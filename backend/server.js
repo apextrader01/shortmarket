@@ -1666,7 +1666,7 @@ app.post('/api/order', authenticateToken, async (req, res) => {
     setTimeout(() => {
         try {
             const { pubClient } = require('./services/redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1');
+            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
         } catch(e) {}
     }, 500);
     
@@ -1753,7 +1753,7 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
       });
       try {
           const { pubClient } = require('./services/redisClient');
-          if (pubClient) pubClient.publish('reload_triggers', '1');
+          if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
       } catch(e) {}
 
       try {
@@ -2054,7 +2054,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     setTimeout(() => {
         try {
             const { pubClient } = require('./services/redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1');
+            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
         } catch(e) {}
     }, 500);
 
@@ -2148,7 +2148,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
     triggerEngine.removeOrderFromMemory(req.params.id, cancelledOrder.symbol);
     try {
         const { pubClient } = require('./services/redisClient');
-        if (pubClient) pubClient.publish('reload_triggers', '1');
+        if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
     } catch(e) {}
     
     res.json({ success: true });
@@ -2315,7 +2315,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       triggerEngine.addOrderToMemory({ ...order, ...updateObj });
       try {
           const { pubClient } = require('./services/redisClient');
-          if (pubClient) pubClient.publish('reload_triggers', '1');
+          if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
       } catch(e) {}
       
       res.json({ success: true });
@@ -2479,7 +2479,7 @@ io.on('connection', (socket) => {
         } else {
             try {
                 const { pubClient } = require('./services/redisClient');
-                pubClient.publish('fyers_subscribe', JSON.stringify(data));
+                pubClient.publish('fyers_subscribe', JSON.stringify(data)).catch(e=>{});
             } catch (err) {}
         }
     } else {
@@ -2491,7 +2491,7 @@ io.on('connection', (socket) => {
         } else {
             try {
                 const { pubClient } = require('./services/redisClient');
-                pubClient.publish('fyers_subscribe', JSON.stringify([symbol]));
+                pubClient.publish('fyers_subscribe', JSON.stringify([symbol])).catch(e=>{});
             } catch (err) {
                 console.error('Redis Publish Error for subscribe:', err.message);
             }
@@ -2514,7 +2514,7 @@ io.on('connection', (socket) => {
     } else {
       try {
         const { pubClient } = require('./services/redisClient');
-        pubClient.publish('fyers_ping', JSON.stringify(symbolsArray));
+        pubClient.publish('fyers_ping', JSON.stringify(symbolsArray)).catch(e=>{});
       } catch (err) {
         console.error('Redis Publish Error for fyers_ping:', err.message);
       }

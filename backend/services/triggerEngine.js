@@ -395,7 +395,7 @@ class TriggerEngine {
         // Broadcast to other PM2 workers to sync their trigger memory (AFTER transaction commits)
         try {
             const { pubClient } = require('./redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1');
+            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
         } catch (e) {}
     }
 
