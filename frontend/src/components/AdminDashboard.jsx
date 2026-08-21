@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser } = useStore(useShallow(state => ({ fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser })));
+  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, updateUserDetails } = useStore(useShallow(state => ({ fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, updateUserDetails: state.updateUserDetails })));
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
@@ -22,6 +22,9 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [newBalance, setNewBalance] = useState('');
   const [newSubTier, setNewSubTier] = useState('BASIC');
+  const [newUsername, setNewUsername] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [updating, setUpdating] = useState(false);
 
   const loadData = async () => {
@@ -101,6 +104,25 @@ export default function AdminDashboard() {
       loadData();
     } else {
       alert(`Error updating balance: ${res.error}`);
+    }
+    setUpdating(false);
+  };
+
+  const handleUpdateDetails = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setUpdating(true);
+    const res = await updateUserDetails(selectedUser.id, {
+      username: newUsername,
+      email: newEmail,
+      phone: newPhone
+    });
+    if (res.success) {
+      alert('Client details updated successfully!');
+      setSelectedUser(null);
+      loadData();
+    } else {
+      alert(`Error updating details: ${res.error}`);
     }
     setUpdating(false);
   };
@@ -449,7 +471,14 @@ export default function AdminDashboard() {
                         <button 
                           className="btn btn-primary" 
                           style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => { setSelectedUser(u); setNewBalance(u.balance); setNewSubTier(u.subscription_tier || 'BASIC'); }}
+                          onClick={() => { 
+                            setSelectedUser(u); 
+                            setNewBalance(u.balance); 
+                            setNewSubTier(u.subscription_tier || 'BASIC');
+                            setNewUsername(u.username || '');
+                            setNewEmail(u.email || '');
+                            setNewPhone(u.phone || '');
+                          }}
                         >
                           Manage Client
                         </button>
@@ -523,14 +552,38 @@ export default function AdminDashboard() {
         }}>
           <div style={{
             background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
-            borderRadius: '16px', width: '500px', maxWidth: '90vw', overflow: 'hidden'
+            borderRadius: '16px', width: '500px', maxWidth: '90vw', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border-color)' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Manage {selectedUser.username}</h3>
               <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setSelectedUser(null)} />
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', overflowY: 'auto' }}>
+              {/* Client Details Editor */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Edit size={14} style={{ color: 'var(--color-blue)' }} /> Client Details
+                </h4>
+                <form onSubmit={handleUpdateDetails} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="input-group">
+                    <User size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                    <input type="text" className="input-field" placeholder="Username" value={newUsername} onChange={e => setNewUsername(e.target.value)} style={{ paddingLeft: '36px' }} required />
+                  </div>
+                  <div className="input-group">
+                    <Mail size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                    <input type="email" className="input-field" placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={{ paddingLeft: '36px' }} required />
+                  </div>
+                  <div className="input-group">
+                    <Phone size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                    <input type="text" className="input-field" placeholder="Phone (optional)" value={newPhone} onChange={e => setNewPhone(e.target.value)} style={{ paddingLeft: '36px' }} />
+                  </div>
+                  <button type="submit" className="btn btn-primary" disabled={updating}>
+                    {updating ? 'Saving...' : 'Update Details'}
+                  </button>
+                </form>
+              </div>
+
               {/* Balance Editor */}
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>

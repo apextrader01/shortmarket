@@ -1040,8 +1040,6 @@ export const useStore = create(persist((set, get) => ({
   },
 
   updateUserBalance: async (userId, balance) => {
-    
-    
     try {
       const res = await fetch(`${API}/api/admin/user/${userId}/balance`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json', },
@@ -1049,6 +1047,24 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  updateUserDetails: async (userId, details) => {
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}`, { 
+        credentials: 'include', 
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(details)
+      });
+      if (res.ok) {
+        return { success: true };
+      }
+      const data = await res.json();
+      return { success: false, error: data.error };
     } catch (err) {
       return { success: false, error: err.message };
     }

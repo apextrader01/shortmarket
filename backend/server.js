@@ -647,6 +647,29 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const targetUserId = req.params.id;
+    const { username, email, phone } = req.body;
+    
+    const updates = {};
+    if (username !== undefined) updates.username = username;
+    if (email !== undefined) updates.email = email;
+    if (phone !== undefined) updates.phone = phone;
+
+    if (Object.keys(updates).length > 0) {
+      await db('users').where({ id: targetUserId }).update(updates);
+    }
+    
+    res.json({ message: 'User updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
