@@ -164,6 +164,7 @@ export const useStore = create(persist((set, get) => ({
   // ── Watchlists ──────────────────────────────────────────────────────────────
   watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
   activeWatchlistId: 1,
+  lastWatchlistEdit: 0, // Timestamp to prevent background fetchUserData from overwriting optimistic UI
 
   createWatchlist: (name) => {
     if (get().watchlists.some(w => w.name.toLowerCase() === name.toLowerCase())) {
@@ -171,7 +172,7 @@ export const useStore = create(persist((set, get) => ({
       return;
     }
     const newWatchlists = [...get().watchlists, { id: Date.now(), name, symbols: [] }];
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
   },
 
@@ -181,7 +182,7 @@ export const useStore = create(persist((set, get) => ({
       return;
     }
     const newWatchlists = get().watchlists.map(w => String(w.id) === String(id) ? { ...w, name: newName } : w);
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
   },
 
@@ -191,6 +192,7 @@ export const useStore = create(persist((set, get) => ({
     set({
       watchlists:        newWatchlists,
       activeWatchlistId: String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId,
+      lastWatchlistEdit: Date.now()
     });
     get().syncWatchlists(newWatchlists);
   },
@@ -207,7 +209,7 @@ export const useStore = create(persist((set, get) => ({
       }
       return w;
     });
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
     get().pingSubscriptions();
   },
@@ -217,7 +219,7 @@ export const useStore = create(persist((set, get) => ({
       if (w.id === watchlistId) return { ...w, symbols: w.symbols.filter(s => s !== uniqueSymbol) };
       return w;
     });
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
     get().pingSubscriptions();
   },
@@ -621,13 +623,17 @@ export const useStore = create(persist((set, get) => ({
       }
       
       if (!get().user) return;
+      
+      const now = Date.now();
+      const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
+      
       set({
         positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
         holdings: Array.isArray(holdData) ? holdData : (holdData.error ? [] : get().holdings),
         sips: sipsData.success ? sipsData.sips : get().sips,
         orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
         user: (user && !user.error) ? user : get().user,
-        watchlists: (user && !user.error && user.watchlists) ? user.watchlists : get().watchlists
+        watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
       });
       
       const posSymbols = get().positions.map(p => p.symbol);
