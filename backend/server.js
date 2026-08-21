@@ -90,14 +90,17 @@ if (!isMaster) {
   const triggerEngine = require('./services/triggerEngine');
   
   const setupCacheSync = () => {
-    cacheSubClient.subscribe('price_cache_sync', (message) => {
+    cacheSubClient.subscribe('price_cache_batch_sync', (message) => {
       try {
-        const data = JSON.parse(message);
-        if (data.symbol && data.priceObj) {
-          priceCache[data.symbol] = data.priceObj;
-          // Trigger evaluation on worker nodes
-          triggerEngine.evaluateTick(data.symbol, data.priceObj.ltp).catch(err => console.error(err));
-        }
+        const batchUpdate = JSON.parse(message);
+        Object.keys(batchUpdate).forEach(symbol => {
+          const priceObj = batchUpdate[symbol];
+          if (symbol && priceObj) {
+            priceCache[symbol] = priceObj;
+            // Trigger evaluation on worker nodes
+            triggerEngine.evaluateTick(symbol, priceObj.ltp).catch(err => console.error(err));
+          }
+        });
       } catch(e){}
     }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
     

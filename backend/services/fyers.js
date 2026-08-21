@@ -169,6 +169,14 @@ async function initFyers(io, pc, isMaster = true) {
                 if (Object.keys(batchUpdate).length > 0) {
                     // Single broadcast to ALL connected clients — they filter by their own watchlist
                     global_io.emit('price_snapshot', batchUpdate);
+
+                    // Also batch-sync this updated cache to Worker nodes via Redis
+                    try {
+                        const { pubClient } = require('./redisClient');
+                        if (pubClient) {
+                            pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate));
+                        }
+                    } catch(e) {}
                 }
             }
         }, 100); // 100ms — 3x faster than before, safe because it's now 1 message not N
@@ -310,16 +318,9 @@ function startLiveWebSocket() {
                     sharedPriceCache[uniqueSymbol] = priceObj;
                     dirtySymbols.add(uniqueSymbol); // Mark as dirty for the debounce interval
                     
-                    // Publish to Redis for PM2 Workers
-                    try {
-                        const { pubClient } = require('./redisClient');
-                        if (pubClient) {
-                            pubClient.publish('price_cache_sync', JSON.stringify({ symbol: uniqueSymbol, priceObj }));
-                        }
-                        
-                        // Evaluate triggers on the master node
-                        const triggerEngine = require('./triggerEngine');
-                        triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(err => console.error('Master trigger evaluation error:', err));
+                    // Evaluate triggers on the master node
+                    const triggerEngine = require('./triggerEngine');
+                    triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(err => console.error('Master trigger evaluation error:', err));
                     } catch(e) {}
                 });
             }
