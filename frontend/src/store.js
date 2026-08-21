@@ -430,19 +430,21 @@ export const useStore = create(persist((set, get) => ({
     }
 
     // Polling fallback: Force sync all subscribed symbols from REST API every 15s
-    // Ensures prices never get stuck if WebSocket drops ticks or misses the final closing price
+    // ONLY if the WebSocket is disconnected, to prevent flickering between REST and WS prices
     if (!window._forceSyncInterval) {
       window._forceSyncInterval = setInterval(() => {
-        const { stocks, positions, holdings } = get();
-        const allSymbols = new Set([
-          ...stocks.map(s => s.symbol),
-          ...(positions || []).map(p => p.symbol),
-          ...(holdings || []).map(h => h.symbol),
-          ...temporaryOptionSubscriptions
-        ]);
-        const arr = [...allSymbols].filter(Boolean);
-        if (arr.length > 0) {
-          get().fetchBatchPrices(arr, false);
+        if (!get().isConnected) {
+          const { stocks, positions, holdings } = get();
+          const allSymbols = new Set([
+            ...stocks.map(s => s.symbol),
+            ...(positions || []).map(p => p.symbol),
+            ...(holdings || []).map(h => h.symbol),
+            ...temporaryOptionSubscriptions
+          ]);
+          const arr = [...allSymbols].filter(Boolean);
+          if (arr.length > 0) {
+            get().fetchBatchPrices(arr, false);
+          }
         }
       }, 15000);
     }
@@ -538,6 +540,9 @@ export const useStore = create(persist((set, get) => ({
     const now = Date.now();
     // Throttle: skip if last fetch was < 2s ago (unless forced by socket reconnect)
     if (!force && (now - get()._lastPriceFetchTime) < 2000) return;
+
+    // Do NOT fetch REST prices if the live WebSocket is connected, to prevent price flickering
+    if (!force && get().isConnected) return;
 
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
