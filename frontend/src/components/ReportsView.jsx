@@ -47,7 +47,7 @@ const LedgerStatement = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  const { token } = useStore(useShallow(state => ({ token: state.token })));
+  const { token, user } = useStore(useShallow(state => ({ token: state.token, user: state.user })));
 
   useEffect(() => {
     const fetchLedger = async () => {
@@ -68,9 +68,20 @@ const LedgerStatement = () => {
     };
     fetchLedger();
   }, [token]);
+  // Calculate running balances using user's current balance
+  const ledgerWithBalance = React.useMemo(() => {
+    if (!user || !ledger.length) return ledger;
+    let currentBalance = parseFloat(user.balance || 0);
+    // Ledger is sorted by created_at DESC (newest first)
+    return ledger.map(entry => {
+       const balanceAfter = currentBalance;
+       currentBalance -= Number(entry.amount);
+       return { ...entry, running_balance: balanceAfter };
+    });
+  }, [ledger, user]);
 
   // Apply filters
-  const filteredLedger = ledger.filter(entry => {
+  const filteredLedger = ledgerWithBalance.filter(entry => {
     // Transaction type filter
     if (filterType === 'Credits' && entry.amount <= 0) return false;
     if (filterType === 'Debits' && entry.amount >= 0) return false;
@@ -109,7 +120,8 @@ const LedgerStatement = () => {
       Description: entry.description || entry.type,
       Credit: entry.amount > 0 ? entry.amount : 0,
       Debit: entry.amount < 0 ? Math.abs(entry.amount) : 0,
-      Net: entry.amount
+      Net: entry.amount,
+      'Available Balance': entry.running_balance
     }));
     downloadCSV(formattedData, 'Ledger_Statement.csv');
   };
@@ -174,8 +186,8 @@ const LedgerStatement = () => {
       </div>
 
       <div style={{ fontSize: '14px', fontWeight: '600' }}>
-        Combined Ledger Balance <span style={{ color: 'var(--color-green-light)' }}>₹{activeSubTab === 'MTF' ? '0.00' : (filteredLedger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span> 
-        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400', marginLeft: '8px' }}>(This includes both broking ledger balance of ₹{(filteredLedger.reduce((acc, curr) => acc + Number(curr.amount), 0)).toLocaleString('en-IN', {minimumFractionDigits: 2})} and MTF ledger balance of ₹0.00)</span>
+        Combined Ledger Balance <span style={{ color: 'var(--color-green-light)' }}>₹{activeSubTab === 'MTF' ? '0.00' : Number(user?.balance || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</span> 
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400', marginLeft: '8px' }}>(This includes both broking ledger balance of ₹{Number(user?.balance || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})} and MTF ledger balance of ₹0.00)</span>
       </div>
 
       {/* Table */}
@@ -189,14 +201,15 @@ const LedgerStatement = () => {
               <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Credit</th>
               <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Debit</th>
               <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Net</th>
+              <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Available Balance</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
+              <tr><td colSpan="7" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
             ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
               <tr>
-                <td colSpan="6" style={{ padding: '64px', textAlign: 'center' }}>
+                <td colSpan="7" style={{ padding: '64px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
                       <FileText size={48} color="var(--text-secondary)" />
@@ -224,6 +237,9 @@ const LedgerStatement = () => {
                   </td>
                   <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>
                     ₹{Number(entry.amount).toFixed(2)}
+                  </td>
+                  <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+                    ₹{Number(entry.running_balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}
                   </td>
                 </tr>
               ))
