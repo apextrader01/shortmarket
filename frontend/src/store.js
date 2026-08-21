@@ -69,7 +69,7 @@ export const useStore = create(persist((set, get) => ({
     preLogin: async (email, password) => {
     try {
       set({ authError: null });
-      const res = await fetch($API/api/auth/pre-login, {
+      const res = await fetch(`${API}/api/auth/pre-login`, {
         credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
