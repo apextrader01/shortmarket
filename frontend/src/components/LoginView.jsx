@@ -27,23 +27,7 @@ export default function LoginView() {
     setMessage('');
 
     if (view === 'login') {
-      const res = await preLogin(email, password);
-      if (res.success) {
-        try {
-          if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-              size: 'invisible'
-            });
-          }
-          const formattedPhone = res.phone.startsWith('+') ? res.phone : '+91' + res.phone;
-          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
-          setConfirmationResult(confirmation);
-          setView('login_otp');
-          setMessage('OTP sent to your registered phone number.');
-        } catch (error) {
-          useStore.setState({ authError: error.message });
-        }
-      }
+      await login(email, password);
     } 
     else if (view === 'login_otp') {
       try {
