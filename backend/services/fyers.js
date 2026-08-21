@@ -368,9 +368,16 @@ function addSubscriptionBatch(symbols) {
     if (Array.isArray(symbols)) symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
     if (!Array.isArray(symbols) || symbols.length === 0) return;
     
+    const now = Date.now();
     symbols.forEach(item => {
         let s = typeof item === 'string' ? item : item?.symbol;
         if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
+        
+        // FIX: Update symbolLastSeen so GC doesn't kill manually subscribed symbols.
+        // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
+        // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
+        symbolLastSeen.set(s, now);
+        
         const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
         const fSym = toFyersSymbol(s);
@@ -385,6 +392,11 @@ function addSubscriptionBatch(symbols) {
     
     if (wsInstance && isFyersConnected && subQueue.length > 0) {
         processSubQueue();
+    }
+    
+    // Start GC if not already running
+    if (!gcInterval) {
+        gcInterval = setInterval(garbageCollectSubscriptions, 10000);
     }
 }
 

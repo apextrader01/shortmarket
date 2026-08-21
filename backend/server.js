@@ -2484,9 +2484,11 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
 io.on('connection', (socket) => {
   // NOTE: Do NOT log every connect/disconnect — at 50k users this would spam logs
 
-  // Send full price snapshot immediately on connect (if available)
+  // FIX: Send initial cache as 'price_init' (not 'price_snapshot') so the frontend
+  // treats it as stale cache data and doesn't block REST fallback for 20s.
+  // Live 100ms-interval batches continue to use 'price_snapshot'.
   if (Object.keys(priceCache).length > 0) {
-    socket.emit('price_snapshot', priceCache);
+    socket.emit('price_init', priceCache);
   }
 
   socket.on('register_user', (userId) => {

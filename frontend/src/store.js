@@ -38,9 +38,10 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
   for (const [symbol, data] of Object.entries(snapshot)) {
     const old = newPrices[symbol];
     
-    // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 20 seconds.
-    // This prevents the 15-second REST API fallback polling from fighting the live WebSocket.
-    if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 20000)) {
+    // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 4 seconds.
+    // 4s is enough to block REST flickering while still allowing REST to recover if WS stalls.
+    // (Previously 20s — too long; stale initial snapshots were blocking REST recovery for 20s)
+    if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 4000)) {
         continue;
     }
     
@@ -370,12 +371,12 @@ export const useStore = create(persist((set, get) => ({
     // Add temporary options
     temporaryOptionSubscriptions.forEach(s => symbols.add(s));
     
-    // Add indices which are always needed for the header
-    symbols.add('NIFTY-NSE');
-    symbols.add('BANKNIFTY-NSE');
-    symbols.add('SENSEX-BSE');
+    // Add indices — MUST use exact Fyers-format symbols (not the old aliases)
+    symbols.add('NSE:NIFTY50-INDEX');
+    symbols.add('NSE:NIFTYBANK-INDEX');
+    symbols.add('BSE:SENSEX-INDEX');
     
-    const symbolsArray = Array.from(symbols);
+    const symbolsArray = Array.from(symbols).filter(Boolean);
     
     if (symbolsArray.length > 0) {
         socket.emit('ping_subscriptions', symbolsArray);
@@ -417,8 +418,18 @@ export const useStore = create(persist((set, get) => ({
   _lastPriceFetchTime: 0,
 
   initSocket: () => {
+    // FIX: Use separate event for initial snapshot vs live ticks.
+    // The initial snapshot on connect is OLD CACHE DATA — it must NOT block REST fallback.
+    // Only real live ticks from the 100ms batch interval tag symbols as "fresh WebSocket".
+    socket.off('price_init');
+    socket.on('price_init', (snapshot) => {
+      // isFromWebSocket = false so REST can still override stale cache values
+      set((state) => ({ prices: applySnapshot(snapshot, state, false) }));
+    });
+
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
+      // isFromWebSocket = true — these are real live ticks, block REST for 4s
       set((state) => ({ prices: applySnapshot(snapshot, state, true) }));
     });
     
@@ -484,7 +495,6 @@ export const useStore = create(persist((set, get) => ({
     });
 
     const onConnect = () => {
-      console.log('Socket connected, refreshing and resubscribing...');
       set({ isConnected: true });
       const currentUser = get().user;
       if (currentUser?.id) {
@@ -493,8 +503,14 @@ export const useStore = create(persist((set, get) => ({
       // Force a fresh REST price fetch on every socket connect/reconnect
       get().refreshPrices(true);
       
-      // Send the active subscriptions to the backend
+      // FIX: Ping immediately to re-join rooms for already-loaded symbols
       get().pingSubscriptions();
+      
+      // FIX: Also ping again after 2s and 5s to catch positions/holdings that may
+      // still be loading from the server when the socket first reconnects.
+      // Without this, positions/holdings symbols miss the first ping window and get GC'd in 30s.
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 2000);
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 5000);
       
       // Start a 10-second heartbeat to keep subscriptions alive and garbage collect old ones
       if (!get().subscriptionPingInterval) {
