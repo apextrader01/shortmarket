@@ -91,56 +91,99 @@ async function executeOrder(order, executionPrice) {
                 }
             }
 
-            
-            // Note: Since we already deduct margin when the order is placed for both BUY and SELL (in server.js), 
-            // we don't need to deduct the balance AGAIN here when the order executes.
-            // If it's a SELL order, it means they are closing a long position or shorting.
-            // For a complete paper trading system, we would calculate realized PnL when closing positions.
-            // For now, we just update the positions table.
-            
-            if (order.side === 'BUY') {
-                const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
-                if (position) {
-                    const newQuantity = position.quantity + order.quantity;
-                    let newAvgPrice;
-                    if (position.quantity === 0) {
-                        newAvgPrice = executionPrice;
-                    } else {
-                        newAvgPrice = ((position.quantity * parseFloat(position.average_price)) + totalCost) / newQuantity;
-                    }
-                    await trx('positions').where({ id: position.id }).update({ quantity: newQuantity, average_price: newAvgPrice });
-                } else {
-                    await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL', quantity: order.quantity, average_price: executionPrice });
-                }
-            } else if (order.side === 'SELL') {
-                const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
-                if (position) {
-                    if (position.quantity === 0) {
-                        // Opening short position from a closed state
-                        await trx('positions').where({ id: position.id }).update({ quantity: -order.quantity, average_price: executionPrice });
-                    } else {
-                        const newQuantity = position.quantity - order.quantity;
-                        const currentRealizedPnl = parseFloat(position.realized_pnl || 0);
-                        
-                        // Add profit/loss back to balance when position is closed (simple PnL)
-                        const entryCost = parseFloat(position.average_price) * order.quantity;
-                        const exitValue = executionPrice * order.quantity;
-                        const pnl = exitValue - entryCost;
+            let orderRealizedPnl = 0;
 
-                        await trx('positions').where({ id: position.id }).update({ quantity: newQuantity, realized_pnl: currentRealizedPnl + pnl });
+            const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
+            
+            if (position) {
+                let pnl = 0;
+                let marginToReturn = 0;
+                let newQuantity = position.quantity;
+                let newAvgPrice = position.average_price;
+                const leverageMultiplier = position.product_type === 'INT' ? 0.25 : 1.0;
+                const user = await trx('users').where({ id: order.user_id }).first();
+
+                if (order.side === 'BUY') {
+                    if (position.quantity < 0) {
+                        // Closing a short position (fully or partially)
+                        const closeQty = Math.min(Math.abs(position.quantity), order.quantity);
+                        const entryCost = parseFloat(position.average_price) * closeQty;
+                        const exitValue = executionPrice * closeQty;
+                        pnl = entryCost - exitValue; // Profit if exit < entry
                         
-                        // Add the freed up margin + profit back to balance
-                        // Intraday (INT) only consumes 25% margin initially
-                        const leverageMultiplier = position.product_type === 'INT' ? 0.25 : 1.0;
-                        const user = await trx('users').where({ id: order.user_id }).first();
-                        const marginToReturn = (order.quantity * parseFloat(position.average_price) * leverageMultiplier) + pnl;
-                        await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + marginToReturn });
+                        marginToReturn = (closeQty * parseFloat(position.average_price) * leverageMultiplier) + pnl;
+                        
+                        newQuantity = position.quantity + order.quantity;
+                        if (newQuantity > 0) {
+                            // Flipped to long
+                            newAvgPrice = executionPrice;
+                        } else if (newQuantity === 0) {
+                            newAvgPrice = executionPrice; // Doesn't matter
+                        } // else remains same avg price
+                    } else {
+                        // Adding to long position
+                        newQuantity = position.quantity + order.quantity;
+                        const totalCost = (position.quantity * parseFloat(position.average_price)) + (order.quantity * executionPrice);
+                        newAvgPrice = newQuantity === 0 ? executionPrice : totalCost / newQuantity;
                     }
-                } else {
-                    // Short selling mock: insert negative position
-                    await trx('positions').insert({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL', quantity: -order.quantity, average_price: executionPrice });
+                } else if (order.side === 'SELL') {
+                    if (position.quantity > 0) {
+                        // Closing a long position (fully or partially)
+                        const closeQty = Math.min(position.quantity, order.quantity);
+                        const entryCost = parseFloat(position.average_price) * closeQty;
+                        const exitValue = executionPrice * closeQty;
+                        pnl = exitValue - entryCost; // Profit if exit > entry
+                        
+                        marginToReturn = (closeQty * parseFloat(position.average_price) * leverageMultiplier) + pnl;
+                        
+                        newQuantity = position.quantity - order.quantity;
+                        if (newQuantity < 0) {
+                            // Flipped to short
+                            newAvgPrice = executionPrice;
+                        } else if (newQuantity === 0) {
+                            newAvgPrice = executionPrice; // Doesn't matter
+                        } // else remains same avg price
+                    } else {
+                        // Adding to short position
+                        newQuantity = position.quantity - order.quantity;
+                        const totalCost = (Math.abs(position.quantity) * parseFloat(position.average_price)) + (order.quantity * executionPrice);
+                        newAvgPrice = newQuantity === 0 ? executionPrice : totalCost / Math.abs(newQuantity);
+                    }
                 }
+                
+                orderRealizedPnl = pnl;
+                const currentRealizedPnl = parseFloat(position.realized_pnl || 0);
+                
+                await trx('positions').where({ id: position.id }).update({ 
+                    quantity: newQuantity, 
+                    average_price: newAvgPrice,
+                    realized_pnl: currentRealizedPnl + pnl
+                });
+
+                if (marginToReturn !== 0) {
+                    await trx('users').where({ id: order.user_id }).update({ balance: parseFloat(user.balance) + marginToReturn });
+                }
+                if (pnl !== 0) {
+                    await trx('ledger').insert({ user_id: order.user_id, amount: pnl, type: 'REALIZED_PNL', description: `Realized P&L for ${order.symbol}` });
+                }
+            } else {
+                // No existing position, create new one
+                const qty = order.side === 'BUY' ? order.quantity : -order.quantity;
+                await trx('positions').insert({ 
+                    user_id: order.user_id, 
+                    symbol: order.symbol, 
+                    product_type: order.product_type || 'DEL', 
+                    quantity: qty, 
+                    average_price: executionPrice 
+                });
             }
+
+            // Update order status with realized PnL
+            await trx('orders').where({ id: order.id }).update({ 
+                status: 'EXECUTED', 
+                price: executionPrice,
+                realized_pnl: orderRealizedPnl 
+            });
             
             // OCO Logic: Cancel sibling orders linked by parent_order_id
             if (order.parent_order_id) {

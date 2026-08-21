@@ -514,7 +514,9 @@ const TradesAndCharges = () => {
 const PnLCalendarHeatmap = ({ positions, orders }) => {
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null });
 
-  if (!positions || positions.length === 0) {
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  
+  if (!executedOrders || executedOrders.length === 0) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '32px 0', opacity: 0.3 }}>
         <div style={{ textAlign: 'center' }}>
@@ -528,18 +530,16 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
 
   const dailyData = {};
   
-  (orders || []).forEach(o => {
+  executedOrders.forEach(o => {
     const dt = new Date(o.created_at);
     const dStr = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
     if (!dailyData[dStr]) dailyData[dStr] = { charges: 0, pnl: 0 };
     dailyData[dStr].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
-  });
-
-  (positions || []).forEach(p => {
-    const dt = new Date(p.updated_at || p.created_at);
-    const dStr = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-    if (!dailyData[dStr]) dailyData[dStr] = { charges: 0, pnl: 0 };
-    dailyData[dStr].pnl += (Number(p.realized_pnl) || 0);
+    
+    // Only aggregate realized_pnl if it exists and is not zero
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
+      dailyData[dStr].pnl += (Number(o.realized_pnl) || 0);
+    }
   });
 
   const getColor = (netPnl) => {
@@ -1025,7 +1025,10 @@ const TradingInsights = () => {
     orders: state.orders 
   })));
 
-  // Aggregate metrics from positions
+  // Daily orders (for Day Trades list)
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+
+  // Aggregate metrics from historical orders instead of positions (since positions are wiped at EOD)
   let grossPnl = 0;
   let profitableTrades = 0;
   let lossTrades = 0;
@@ -1033,25 +1036,25 @@ const TradingInsights = () => {
   let totalGrossProfit = 0;
   let totalGrossLoss = 0;
 
-  (positions || []).forEach(p => {
-    const pnl = parseFloat(p.realized_pnl || 0);
-    grossPnl += pnl;
-    totalTrades++;
-    if (pnl > 0) {
-      profitableTrades++;
-      totalGrossProfit += pnl;
-    } else if (pnl < 0) {
-      lossTrades++;
-      totalGrossLoss += Math.abs(pnl);
+  executedOrders.forEach(o => {
+    // Only count orders that generated a realized PnL
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
+      const pnl = parseFloat(o.realized_pnl);
+      grossPnl += pnl;
+      totalTrades++;
+      if (pnl > 0) {
+        profitableTrades++;
+        totalGrossProfit += pnl;
+      } else if (pnl < 0) {
+        lossTrades++;
+        totalGrossLoss += Math.abs(pnl);
+      }
     }
   });
 
   const profitableTradePercent = totalTrades > 0 ? ((profitableTrades / totalTrades) * 100).toFixed(1) : '-';
   const profitFactor = totalGrossLoss > 0 ? (totalGrossProfit / totalGrossLoss).toFixed(2) : (totalGrossProfit > 0 ? 'MAX' : '-');
 
-  // Daily orders (for Day Trades list)
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
-  
   const StatCard = ({ title, value, sub, icon: Icon, colorClass }) => (
     <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px', flex: 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1134,8 +1137,8 @@ const TradingInsights = () => {
               <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</td></tr>
             ) : (
               executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
-                const pos = (positions || []).find(p => p.symbol === o.symbol);
-                const pnl = pos ? parseFloat(pos.realized_pnl || 0).toFixed(2) : '--';
+                const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
+                const pnl = isPnLAvailable ? parseFloat(o.realized_pnl).toFixed(2) : '--';
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>

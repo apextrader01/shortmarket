@@ -1,1 +1,4 @@
-const fs = require('fs'); let content = fs.readFileSync('backend/server.js', 'utf8'); content = content.replace(/          console\.error\('Immediate evaluation error:', err\);\s*\n*\s*\/\/ Fetch the final status after evaluation to send back to frontend/, '          console.error(\'Immediate evaluation error:\', err);\n        }\n      }\n    }\n\n    // Fetch the final status after evaluation to send back to frontend'); fs.writeFileSync('backend/server.js', content);
+const fs=require('fs');
+let code=fs.readFileSync('backend/services/triggerEngine.js','utf8');
+code = code.replace(/pubClient\.publish\('reload_triggers', '1'\)/g, "pubClient.publish('reload_triggers', '1').catch(e=>{})");
+fs.writeFileSync('backend/services/triggerEngine.js', code);

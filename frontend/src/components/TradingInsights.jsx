@@ -1,4 +1,4 @@
-﻿const TradingInsights = () => {
+const TradingInsights = () => {
   const [filterPeriod, setFilterPeriod] = useState('Month');
   
   const { positions, orders } = useStore(useShallow(state => ({ 
@@ -6,7 +6,10 @@
     orders: state.orders 
   })));
 
-  // Aggregate metrics from positions
+  // Daily orders (for Day Trades list)
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+
+  // Aggregate metrics from historical orders instead of positions (since positions are wiped at EOD)
   let grossPnl = 0;
   let profitableTrades = 0;
   let lossTrades = 0;
@@ -14,16 +17,19 @@
   let totalGrossProfit = 0;
   let totalGrossLoss = 0;
 
-  (positions || []).forEach(p => {
-    const pnl = parseFloat(p.realized_pnl || 0);
-    grossPnl += pnl;
-    totalTrades++;
-    if (pnl > 0) {
-      profitableTrades++;
-      totalGrossProfit += pnl;
-    } else if (pnl < 0) {
-      lossTrades++;
-      totalGrossLoss += Math.abs(pnl);
+  executedOrders.forEach(o => {
+    // Only count orders that generated a realized PnL
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
+      const pnl = parseFloat(o.realized_pnl);
+      grossPnl += pnl;
+      totalTrades++;
+      if (pnl > 0) {
+        profitableTrades++;
+        totalGrossProfit += pnl;
+      } else if (pnl < 0) {
+        lossTrades++;
+        totalGrossLoss += Math.abs(pnl);
+      }
     }
   });
 
@@ -115,8 +121,8 @@
               <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</td></tr>
             ) : (
               executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
-                const pos = (positions || []).find(p => p.symbol === o.symbol);
-                const pnl = pos ? parseFloat(pos.realized_pnl || 0).toFixed(2) : '--';
+                const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
+                const pnl = isPnLAvailable ? parseFloat(o.realized_pnl).toFixed(2) : '--';
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>
@@ -128,7 +134,7 @@
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>{o.quantity}</td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: pnl > 0 ? 'var(--color-green-light)' : (pnl < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
-                       {pnl > 0 ? '+' : ''}{pnl !== '--' ? \₹\\ : pnl}
+                       {pnl > 0 ? '+' : ''}{pnl !== '--' ? `₹${pnl}` : pnl}
                     </td>
                   </tr>
                 )
