@@ -422,10 +422,10 @@ export const useStore = create(persist((set, get) => ({
       set((state) => ({ prices: applySnapshot(snapshot, state, true) }));
     });
     
-    // Keep TOP_INDICES alive in the backend so they don't freeze after 30s
+    // Keep TOP_INDICES alive in the backend so they don't freeze after 30s GC
     if (!window._topIndicesPingInterval) {
       window._topIndicesPingInterval = setInterval(() => {
-        socket.emit('ping_symbols', ['NIFTY-NSE', 'BANKNIFTY-NSE', 'SENSEX-BSE']);
+        socket.emit('ping_subscriptions', ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
       }, 15000);
     }
 

@@ -49,6 +49,15 @@ try {
     console.error("Error loading fyers_map.json:", e);
 }
 
+// ── O(1) reverse lookup: fyersSymbol → our platform symbol (built once at boot) ──
+// The fromFyersSymbol() function was doing O(n) for-loop over nameToFyers on EVERY tick.
+// For 200 subscribed symbols × 10 ticks/sec = 200,000 iterations/sec. This Map makes it O(1).
+const fyersToNameMap = new Map(Object.entries(nameToFyers).map(([k, v]) => [v, k]));
+
+// ── Pre-require triggerEngine at module level so it's not re-required in every tick ──
+let triggerEngine = null;
+try { triggerEngine = require('./triggerEngine'); } catch(e) {}
+
 
 // Convert our platform's unique symbols to Fyers Symbols
 function toFyersSymbol(symbol) {
@@ -66,14 +75,12 @@ function toFyersSymbol(symbol) {
     return symbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 
-// Convert Fyers Symbols back to our platform's unique symbols
+// Convert Fyers Symbols back to our platform's unique symbols — O(1) Map lookup
 function fromFyersSymbol(fyersSymbol) {
     if (!fyersSymbol) return null;
-    
-    for (const [key, val] of Object.entries(nameToFyers)) {
-        if (val === fyersSymbol) return key;
-    }
-    
+    // Use O(1) Map lookup instead of O(n) for-loop
+    const mapped = fyersToNameMap.get(fyersSymbol);
+    if (mapped) return mapped;
     return fyersSymbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
 }
 
@@ -318,9 +325,10 @@ function startLiveWebSocket() {
                     sharedPriceCache[uniqueSymbol] = priceObj;
                     dirtySymbols.add(uniqueSymbol); // Mark as dirty for the debounce interval
                     
-                    // Evaluate triggers on the master node
-                    const triggerEngine = require('./triggerEngine');
-                    triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(err => console.error('Master trigger evaluation error:', err));
+                    // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
+                    if (triggerEngine) {
+                        triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
+                    }
                 });
             }
         });
@@ -487,13 +495,7 @@ async function fetchBatchLTPs(symbols) {
         return null;
     }).filter(Boolean);
     
-    console.log(`📡 fetchBatchLTPs called: ${validSymbols.length} symbols, ${fyersSymbols.length} mapped to Fyers, token=${activeAccessToken ? 'SET' : 'NONE'}`);
-    if (fyersSymbols.length > 0 && fyersSymbols.length <= 5) {
-        console.log(`   Fyers symbols: ${fyersSymbols.join(', ')}`);
-    }
-    
     if (!activeAccessToken || fyersSymbols.length === 0) {
-        console.log(`⚠️ fetchBatchLTPs: skipping API call (token=${!!activeAccessToken}, fyersSymbols=${fyersSymbols.length})`);
         return validSymbols.reduce((acc, sym) => {
             if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
             return acc;
@@ -510,7 +512,6 @@ async function fetchBatchLTPs(symbols) {
             
             try {
                 const response = await fyers.getQuotes(chunk);
-                console.log(`📡 Fyers getQuotes response: s=${response?.s}, d_count=${response?.d?.length || 0}, code=${response?.code || 'none'}, msg=${response?.message || 'none'}`);
                 
                 const processQuotesResponse = (res) => {
                     if (res && res.s === 'ok' && res.d) {
@@ -569,7 +570,6 @@ async function fetchBatchLTPs(symbols) {
             }
         }
         
-        console.log(`📡 fetchBatchLTPs returning ${Object.keys(results).length} prices`);
         return results;
     } catch(e) {
         console.error("Fyers fetchBatchLTPs error:", e);

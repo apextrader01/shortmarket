@@ -87,26 +87,24 @@ if (isMaster) {
 }
 if (!isMaster) {
   const { subClient: cacheSubClient } = require('./services/redisClient');
-  const triggerEngine = require('./services/triggerEngine');
   
   const setupCacheSync = () => {
     cacheSubClient.subscribe('price_cache_batch_sync', (message) => {
       try {
         const batchUpdate = JSON.parse(message);
+        // Workers only update their local priceCache — trigger evaluation ONLY runs on master
         Object.keys(batchUpdate).forEach(symbol => {
           const priceObj = batchUpdate[symbol];
           if (symbol && priceObj) {
             priceCache[symbol] = priceObj;
-            // Trigger evaluation on worker nodes
-            triggerEngine.evaluateTick(symbol, priceObj.ltp).catch(err => console.error(err));
           }
         });
       } catch(e){}
     }).catch(err => { console.error('Redis cache sync subscribe error:', err); });
     
     // Subscribe to trigger reloads
-    cacheSubClient.subscribe('reload_triggers', (message) => {
-        console.log('[Worker] Reloading triggers from DB');
+    cacheSubClient.subscribe('reload_triggers', () => {
+        const triggerEngine = require('./services/triggerEngine');
         triggerEngine.loadPendingOrders();
     }).catch(err => console.error(err));
   };
@@ -2484,7 +2482,7 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
 
 // ─── Socket.IO ────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  // NOTE: Do NOT log every connect/disconnect — at 50k users this would spam logs
 
   // Send full price snapshot immediately on connect (if available)
   if (Object.keys(priceCache).length > 0) {
@@ -2494,7 +2492,6 @@ io.on('connection', (socket) => {
   socket.on('register_user', (userId) => {
     if (userId) {
       socket.join(userId.toString());
-      console.log(`Socket ${socket.id} registered user: ${userId}`);
     }
   });
 
@@ -2523,9 +2520,7 @@ io.on('connection', (socket) => {
             try {
                 const { pubClient } = require('./services/redisClient');
                 pubClient.publish('fyers_subscribe', JSON.stringify([symbol])).catch(e=>{});
-            } catch (err) {
-                console.error('Redis Publish Error for subscribe:', err.message);
-            }
+            } catch (err) {}
         }
     }
   });
@@ -2534,7 +2529,6 @@ io.on('connection', (socket) => {
     if (!Array.isArray(symbolsArray)) return;
     
     // Join socket.io rooms for each symbol so targeted price_snapshot broadcasts reach this client.
-    // fyers.js emits price_snapshot via global_io.to(sym).emit() — clients MUST be in the room to receive it.
     symbolsArray.forEach(sym => {
       if (sym && typeof sym === 'string') socket.join(sym);
     });
@@ -2546,9 +2540,7 @@ io.on('connection', (socket) => {
       try {
         const { pubClient } = require('./services/redisClient');
         pubClient.publish('fyers_ping', JSON.stringify(symbolsArray)).catch(e=>{});
-      } catch (err) {
-        console.error('Redis Publish Error for fyers_ping:', err.message);
-      }
+      } catch (err) {}
     }
   });
 
@@ -2570,7 +2562,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    // NOTE: No log here intentionally — at scale this would spam the logger
   });
 });
 
