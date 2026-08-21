@@ -726,36 +726,38 @@ const ProfitAndLoss = () => {
   });
 
   const totalCharges = filteredOrders.reduce((acc, o) => acc + (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25)), 0);
-  const realizedPnl = filteredPositions.reduce((acc, p) => acc + (Number(p.realized_pnl) || 0), 0);
+  
+  const realizedPnl = filteredOrders.reduce((acc, o) => {
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
+      return acc + parseFloat(o.realized_pnl);
+    }
+    return acc;
+  }, 0);
+  
   const netRealizedPnl = realizedPnl - totalCharges;
 
   // Aggregation Logic
   const monthWiseMap = {};
   const scripWiseMap = {};
 
-  filteredPositions.forEach(p => {
-    const dt = new Date(p.updated_at || p.created_at);
-    const mStr = dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-    const sym = p.symbol || 'UNKNOWN';
-
-    if (!monthWiseMap[mStr]) monthWiseMap[mStr] = { name: mStr, rawDate: dt, pnl: 0, charges: 0 };
-    monthWiseMap[mStr].pnl += (Number(p.realized_pnl) || 0);
-
-    if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, pnl: 0, charges: 0 };
-    scripWiseMap[sym].pnl += (Number(p.realized_pnl) || 0);
-  });
-
   filteredOrders.forEach(o => {
     const dt = new Date(o.created_at);
     const mStr = dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
     const sym = o.symbol || 'UNKNOWN';
     const c = (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
+    let pnl = 0;
+
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
+      pnl = parseFloat(o.realized_pnl);
+    }
 
     if (!monthWiseMap[mStr]) monthWiseMap[mStr] = { name: mStr, rawDate: dt, pnl: 0, charges: 0 };
     monthWiseMap[mStr].charges += c;
+    monthWiseMap[mStr].pnl += pnl;
 
     if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, pnl: 0, charges: 0 };
     scripWiseMap[sym].charges += c;
+    scripWiseMap[sym].pnl += pnl;
   });
 
   const monthWiseData = Object.values(monthWiseMap).sort((a, b) => b.rawDate - a.rawDate);
@@ -795,7 +797,15 @@ const ProfitAndLoss = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Search size={14} color="var(--text-secondary)" /></div>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Filter size={14} color="var(--text-secondary)" /></div>
-          <button onClick={() => downloadCSV(filteredPositions.length ? filteredPositions : [{Message: 'No PnL'}], 'PnL_Statement.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={() => {
+            const exportData = scripWiseData.length > 0 ? scripWiseData.map(s => ({
+              Scrip: s.symbol,
+              'Gross P&L': s.pnl.toFixed(2),
+              'Total Charges': s.charges.toFixed(2),
+              'Net Realized P&L': (s.pnl - s.charges).toFixed(2)
+            })) : [{Message: 'No PnL'}];
+            downloadCSV(exportData, 'PnL_Statement.csv');
+          }} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
             DOWNLOAD P/L STATEMENT
           </button>
         </div>
