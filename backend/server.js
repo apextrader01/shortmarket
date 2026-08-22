@@ -709,13 +709,13 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
 
-    let query = db('users');
+    let query = db('users').leftJoin('user_profiles', 'users.id', 'user_profiles.user_id');
     let countQuery = db('users');
 
     if (search) {
-      query = query.where('username', 'ilike', `%${search}%`)
-                   .orWhere('email', 'ilike', `%${search}%`)
-                   .orWhere('client_id', 'ilike', `%${search}%`);
+      query = query.where('users.username', 'ilike', `%${search}%`)
+                   .orWhere('users.email', 'ilike', `%${search}%`)
+                   .orWhere('users.client_id', 'ilike', `%${search}%`);
                    
       countQuery = countQuery.where('username', 'ilike', `%${search}%`)
                              .orWhere('email', 'ilike', `%${search}%`)
@@ -726,8 +726,8 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const total = countResult ? parseInt(countResult.total) : 0;
 
     const users = await query
-      .select('id', 'client_id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at', 'dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style')
-      .orderBy('created_at', 'desc')
+      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
+      .orderBy('users.created_at', 'desc')
       .limit(limit)
       .offset(offset);
 
