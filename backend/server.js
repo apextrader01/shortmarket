@@ -302,6 +302,19 @@ app.post('/api/auth/register', async (req, res) => {
   const { username, email, phone, password } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
   try {
+    // Check for existing duplicates
+    const existingUser = await db('users')
+      .where('email', email)
+      .orWhere('phone', phone)
+      .orWhere('username', username)
+      .first();
+
+    if (existingUser) {
+      if (existingUser.email === email) return res.status(400).json({ error: 'An account with this email already exists.' });
+      if (existingUser.phone === phone) return res.status(400).json({ error: 'An account with this phone number already exists.' });
+      if (existingUser.username === username) return res.status(400).json({ error: 'Username is already taken.' });
+    }
+
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
