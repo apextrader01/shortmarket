@@ -324,6 +324,11 @@ app.post('/api/auth/register', async (req, res) => {
     
     // Some db engines return an object from returning(), handle both
     const userId = typeof id === 'object' ? id.id : id;
+    
+    // Generate Professional Client ID: SE + Base36(userId) padded to 6 chars
+    const clientId = 'SE' + Number(userId).toString(36).toUpperCase().padStart(6, '0');
+    await db('users').where({ id: userId }).update({ client_id: clientId });
+
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
@@ -332,7 +337,7 @@ app.post('/api/auth/register', async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
+    res.json({ success: true, token, user: { id: userId, client_id: clientId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });

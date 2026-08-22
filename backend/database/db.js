@@ -420,6 +420,7 @@ async function initSchema() {
 async function ensureCriticalColumns() {
   try {
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(10)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
@@ -442,6 +443,14 @@ async function ensureCriticalColumns() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Retroactively assign professional client IDs to existing users who don't have one
+    const usersWithoutClientId = await db('users').whereNull('client_id');
+    for (const u of usersWithoutClientId) {
+      const clientId = 'SE' + Number(u.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: u.id }).update({ client_id: clientId });
+    }
+
     console.log('✅ Critical columns verified on positions, users, and orders tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);

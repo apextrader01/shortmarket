@@ -148,7 +148,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               {user?.username || 'Hari Krishnan I Vijayan'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-              Client ID: {user?.id}
+              Client ID: {user?.client_id || user?.id}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
               Available Margin: ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
