@@ -451,7 +451,16 @@ async function ensureCriticalColumns() {
       await db('users').where({ id: u.id }).update({ client_id: clientId });
     }
 
-    console.log('✅ Critical columns verified on positions, users, and orders tables');
+    // Performance: Add critical indexes to prevent full table scans at scale
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_user_id ON sips(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
+    
+    console.log('✅ Critical columns and indexes verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }

@@ -266,6 +266,20 @@ app.get('/api/stocks', async (req, res) => {
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
+const rateLimit = require('express-rate-limit');
+
+// Rate Limiting Config
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 auth requests per windowMs
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+
+const orderLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 120, // limit each IP to 120 orders per minute
+  message: { error: 'Order rate limit exceeded (max 120/min)' }
+});
 
 app.post('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
@@ -298,7 +312,7 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { username, email, phone, password } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -366,7 +380,7 @@ app.post('/api/auth/pre-login', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
@@ -690,8 +704,20 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
-    const users = await db('users').select('id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at').orderBy('created_at', 'desc');
-    res.json(users);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    const [countResult] = await db('users').count('id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+
+    const users = await db('users')
+      .select('id', 'client_id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at')
+      .orderBy('created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    res.json({ users, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1550,7 +1576,7 @@ const { spawnBracketOrders } = require('./services/orderExecutor');
 
 let lastOrderError = null;
 
-app.post('/api/order', authenticateToken, async (req, res) => {
+app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   lastOrderError = null;
   const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
   if (!symbol || !type || !side || !quantity) {
