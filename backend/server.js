@@ -748,7 +748,7 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'User account permanently deleted.' });
   } catch (err) {
     console.error('Delete User Error:', err);
-    res.status(500).json({ error: 'Failed to delete user account.' });
+    res.status(500).json({ error: 'Failed to delete user account: ' + (err.message || String(err)) });
   }
 });
 
