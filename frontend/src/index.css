@@ -1333,3 +1333,13 @@ body.font-large .glass-header {
 
 
 
+
+select {
+  color: white;
+  background-color: var(--bg-secondary);
+}
+select option {
+  background-color: var(--bg-secondary);
+  color: white;
+}
+

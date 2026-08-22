@@ -425,13 +425,11 @@ function App() {
                     <User size={14} color="var(--text-secondary)" />
                   )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '600' }}>{user.username}</span>
-                  <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '15px' }}>{user.username}</div>
                 </div>
               </div>
               <div
-                onClick={() => setActiveTab('Settings')}
                   onClick={() => setActiveTab('Settings')}
                   style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}
                 >
@@ -522,7 +520,6 @@ function App() {
                   <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 'bold' }}>PRO</span>
                 )}
               </div>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Client ID: {user.id}</span>
             </div>
           </div>
           <div onClick={() => setShowMobileMenu(false)} style={{ cursor: 'pointer', padding: '8px' }}>
