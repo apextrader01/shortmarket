@@ -707,11 +707,25 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
+    const search = req.query.search || '';
 
-    const [countResult] = await db('users').count('id as total');
+    let query = db('users');
+    let countQuery = db('users');
+
+    if (search) {
+      query = query.where('username', 'ilike', `%${search}%`)
+                   .orWhere('email', 'ilike', `%${search}%`)
+                   .orWhere('client_id', 'ilike', `%${search}%`);
+                   
+      countQuery = countQuery.where('username', 'ilike', `%${search}%`)
+                             .orWhere('email', 'ilike', `%${search}%`)
+                             .orWhere('client_id', 'ilike', `%${search}%`);
+    }
+
+    const [countResult] = await countQuery.count('id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
 
-    const users = await db('users')
+    const users = await query
       .select('id', 'client_id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at')
       .orderBy('created_at', 'desc')
       .limit(limit)

@@ -8,6 +8,8 @@ export default function AdminDashboard() {
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [deposits, setDeposits] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   
@@ -17,7 +19,17 @@ export default function AdminDashboard() {
   
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // reset to page 1 on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
   const [newBalance, setNewBalance] = useState('');
@@ -31,8 +43,11 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const res = await fetchAdminUsers?.();
-        if (res?.success) setUsers(res.users || []);
+        const res = await fetchAdminUsers?.(page, 50, debouncedSearch);
+        if (res?.success) {
+          setUsers(res.users || []);
+          setTotalPages(res.totalPages || 1);
+        }
       } else if (activeTab === 'deposits') {
         const res = await fetchDepositRequests?.();
         if (res?.success) setDeposits(res.deposits || []);
@@ -58,7 +73,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
-  }, [activeTab]);
+  }, [activeTab, page, debouncedSearch]);
 
   const handleUpdateSubscription = async (e) => {
     e.preventDefault();
@@ -184,11 +199,6 @@ export default function AdminDashboard() {
       alert(`Error: ${res.error}`);
     }
   };
-
-  const filteredUsers = users.filter(u => 
-    (u.username?.toLowerCase() || '').includes(search.toLowerCase()) || 
-    (u.email?.toLowerCase() || '').includes(search.toLowerCase())
-  );
 
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
@@ -443,14 +453,14 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.length === 0 ? (
+              {users.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     No users found
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map(u => {
+                users.map(u => {
                   const hasKyc = Boolean(u.kyc_pan_url && u.kyc_aadhar_url);
                   const hasPartialKyc = Boolean(u.kyc_pan_url || u.kyc_aadhar_url);
                   
@@ -463,7 +473,7 @@ export default function AdminDashboard() {
                           </div>
                           <div>
                             <div style={{ fontWeight: '600' }}>{u.username || 'Unknown User'} {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {u.id}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.client_id || u.id}</div>
                           </div>
                         </div>
                       </td>
@@ -511,6 +521,29 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Page {page} of {totalPages}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setPage(p => Math.max(1, p - 1))} 
+                disabled={page === 1}
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+              >
+                Previous
+              </button>
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                disabled={page >= totalPages}
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>

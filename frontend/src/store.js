@@ -1056,19 +1056,18 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Admin ───────────────────────────────────────────────────────────────────
-  fetchAdminUsers: async () => {
-    
-    
+  fetchAdminUsers: async (page = 1, limit = 50, search = '') => {
     try {
-      const res = await fetch(`${API}/api/admin/users`, { credentials: 'include'
+      const res = await fetch(`${API}/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include'
       });
       if (res.ok) {
-        const users = await res.json();
-        return { success: true, users };
+        const data = await res.json();
+        return { success: true, ...data }; // returns { success, users, total, page, totalPages }
       }
-      return { success: false, error: 'Unauthorized' };
+      return { success: false };
     } catch (err) {
-      return { success: false, error: err.message };
+      console.error(err);
+      return { success: false };
     }
   },
 
