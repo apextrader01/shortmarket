@@ -741,6 +741,7 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
       await trx('alerts').where({ user_id: targetUserId }).del().catch(() => {});
       await trx('sips').where({ user_id: targetUserId }).del().catch(() => {});
       await trx('deposit_requests').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('user_profiles').where({ user_id: targetUserId }).del().catch(() => {});
       await trx('users').where({ id: targetUserId }).del();
     });
 
