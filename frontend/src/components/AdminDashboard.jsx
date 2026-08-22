@@ -74,8 +74,9 @@ export default function AdminDashboard() {
     
     setUpdating(true);
     try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API}/api/admin/user/${selectedUser.id}/subscription`, {
+      const res = await fetch(`${API_URL}/api/admin/user/${selectedUser.id}/subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ tier: newSubTier, expires })
