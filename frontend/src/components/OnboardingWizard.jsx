@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { User, Briefcase, TrendingUp, CheckCircle, ChevronRight, ChevronLeft, Upload } from 'lucide-react';
+import indianStatesData from '../data/indianStates.json';
 
 export default function OnboardingWizard() {
   const { saveProfile } = useStore(useShallow(state => ({ saveProfile: state.saveProfile })));
@@ -26,8 +27,19 @@ export default function OnboardingWizard() {
   });
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: value,
+      ...(name === 'state' ? { city: '' } : {}) 
+    }));
   };
+
+  const availableDistricts = useMemo(() => {
+    if (!formData.state) return [];
+    const stateObj = indianStatesData.states.find(s => s.state === formData.state);
+    return stateObj ? stateObj.districts : [];
+  }, [formData.state]);
 
   const handleNext = () => {
     if (step === 1) {
@@ -124,7 +136,15 @@ export default function OnboardingWizard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Date of Birth</label>
-              <input type="date" name="dob" value={formData.dob} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }} />
+              <input 
+                type="date" 
+                name="dob" 
+                value={formData.dob} 
+                onChange={handleChange} 
+                min="1900-01-01"
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }} 
+              />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Gender</label>
@@ -138,11 +158,21 @@ export default function OnboardingWizard() {
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>State</label>
-                <input type="text" name="state" value={formData.state} onChange={handleChange} placeholder="e.g. Maharashtra" style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }} />
+                <select name="state" value={formData.state} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+                  <option value="" disabled>Select</option>
+                  {indianStatesData.states.map(s => (
+                    <option key={s.state} value={s.state}>{s.state.toUpperCase()}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>City</label>
-                <input type="text" name="city" value={formData.city} onChange={handleChange} placeholder="e.g. Mumbai" style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }} />
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>District</label>
+                <select name="city" value={formData.city} onChange={handleChange} disabled={!formData.state} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', opacity: !formData.state ? 0.5 : 1 }}>
+                  <option value="" disabled>Select</option>
+                  {availableDistricts.map(d => (
+                    <option key={d} value={d}>{d.toUpperCase()}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
