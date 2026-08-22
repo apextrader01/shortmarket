@@ -689,6 +689,25 @@ export default function AdminDashboard() {
                 </form>
               </div>
 
+              {/* User Profile Details */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={14} style={{ color: 'var(--color-blue)' }} /> Client Profile (Onboarding Data)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.state || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.city || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: 'white' }}>{selectedUser.occupation || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: 'white' }}>{selectedUser.annual_income || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: 'white' }}>{selectedUser.financial_goal || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: 'white' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: 'white' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: 'white' }}>{selectedUser.trading_style || 'N/A'}</span></div>
+                </div>
+              </div>
+
               {/* KYC Documents */}
               <div>
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>

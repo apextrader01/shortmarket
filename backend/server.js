@@ -726,7 +726,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const total = countResult ? parseInt(countResult.total) : 0;
 
     const users = await query
-      .select('id', 'client_id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at')
+      .select('id', 'client_id', 'username', 'email', 'balance', 'phone', 'pan_card', 'aadhar_number', 'kyc_pan_url', 'kyc_aadhar_url', 'is_admin', 'created_at', 'dob', 'gender', 'state', 'city', 'occupation', 'annual_income', 'financial_goal', 'trading_experience', 'preferred_segment', 'trading_style')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
