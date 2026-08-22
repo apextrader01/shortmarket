@@ -22,6 +22,7 @@ import AlertModal from './components/AlertModal';
 import ChartModal from './components/ChartModal';
 import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
+import OnboardingWizard from './components/OnboardingWizard';
 import PricingView from './components/PricingView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
@@ -302,6 +303,9 @@ function App() {
   // ── Guard: show login screen when not authenticated ──────────────────────────
   if (!user) {
     return <LoginView />;
+  }
+  if (user && !user.is_onboarded && !user.is_admin) {
+    return <OnboardingWizard />;
   }
 
   // ── Authenticated layout ─────────────────────────────────────────────────────

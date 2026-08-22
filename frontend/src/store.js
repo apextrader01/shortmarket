@@ -816,6 +816,25 @@ export const useStore = create(persist((set, get) => ({
     } catch (err) { return { success: false, error: err.message }; }
   },
 
+  saveProfile: async (profileData) => {
+    try {
+      const res = await fetch(`${API}/api/auth/profile`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
+      });
+      const data = await res.json();
+      if (data.success) { 
+        get().fetchUserData(); 
+        return { success: true }; 
+      }
+      return { success: false, error: data.error };
+    } catch (err) { 
+      return { success: false, error: err.message }; 
+    }
+  },
+
   updateUserDetails: async (details) => {
     
     

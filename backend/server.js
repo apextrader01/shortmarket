@@ -267,6 +267,37 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
 
+app.post('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const data = req.body;
+    
+    // Insert profile data
+    await db('user_profiles').insert({
+      user_id: req.user.id,
+      dob: data.dob,
+      gender: data.gender,
+      state: data.state,
+      city: data.city,
+      occupation: data.occupation,
+      annual_income: data.annual_income,
+      financial_goal: data.financial_goal,
+      trading_experience: data.trading_experience,
+      preferred_segment: data.preferred_segment,
+      trading_style: data.trading_style,
+      primary_strategy: data.primary_strategy,
+      hear_about_us: data.hear_about_us
+    });
+
+    // Update users table to set is_onboarded
+    await db('users').where({ id: req.user.id }).update({ is_onboarded: true });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving profile:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/register', async (req, res) => {
   const { username, email, phone, password } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
@@ -288,7 +319,7 @@ app.post('/api/auth/register', async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
+    res.json({ success: true, token, user: { id: userId, username, balance: 1000000.0, is_onboarded: false, watchlists: JSON.parse(defaultWatchlist), subscription_tier: 'BASIC', subscription_expires: null } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('unique')) return res.status(400).json({ error: 'Username or email already exists' });
@@ -336,7 +367,7 @@ app.post('/api/auth/login', async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, is_onboarded: Boolean(user.is_onboarded), watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {

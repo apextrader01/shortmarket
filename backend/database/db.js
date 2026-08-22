@@ -377,6 +377,37 @@ async function initSchema() {
       });
       console.log('Created instruments table');
     }
+    // 9. User Profiles Table for KYC/Onboarding
+    const hasUserProfiles = await db.schema.hasTable('user_profiles');
+    if (!hasUserProfiles) {
+      await db.schema.createTable('user_profiles', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('dob');
+        table.string('gender');
+        table.string('state');
+        table.string('city');
+        table.string('occupation');
+        table.string('annual_income');
+        table.string('financial_goal');
+        table.string('trading_experience');
+        table.string('preferred_segment');
+        table.string('trading_style');
+        table.string('primary_strategy');
+        table.string('hear_about_us');
+        table.timestamps(true, true);
+      });
+      console.log('Created user_profiles table');
+    }
+
+    // Add is_onboarded to users
+    const hasIsOnboarded = await db.schema.hasColumn('users', 'is_onboarded');
+    if (!hasIsOnboarded) {
+      await db.schema.alterTable('users', table => {
+        table.boolean('is_onboarded').defaultTo(false);
+      });
+      console.log('Added is_onboarded to users table');
+    }
 
     // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
@@ -392,6 +423,7 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE`);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
     
