@@ -165,11 +165,11 @@ export default function OnboardingWizard() {
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Annual Income</label>
               <select name="annual_income" value={formData.annual_income} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Income Range</option>
-                <option value="Below 1L">Below ?1 Lakh</option>
-                <option value="1L - 5L">?1 Lakh - ?5 Lakh</option>
-                <option value="5L - 10L">?5 Lakh - ?10 Lakh</option>
-                <option value="10L - 25L">?10 Lakh - ?25 Lakh</option>
-                <option value="25L+">Above ?25 Lakh</option>
+                <option value="Below 1L">Below ₹1 Lakh</option>
+                <option value="1L - 5L">₹1 Lakh - ₹5 Lakh</option>
+                <option value="5L - 10L">₹5 Lakh - ₹10 Lakh</option>
+                <option value="10L - 25L">₹10 Lakh - ₹25 Lakh</option>
+                <option value="25L+">Above ₹25 Lakh</option>
               </select>
             </div>
             <div>
