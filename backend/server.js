@@ -733,13 +733,8 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
     res.json({ users, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
-    console.error("ADMIN USERS ERROR:", err);
-    res.json({ 
-      users: [{ id: 99999, username: "DB_ERROR", email: err.message, client_id: "ERR", balance: 0 }], 
-      total: 1, 
-      page: 1, 
-      totalPages: 1 
-    });
+    console.error("Admin Users Error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
