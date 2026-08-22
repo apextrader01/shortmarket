@@ -13,7 +13,7 @@ mkdir -p "$BACKUP_DIR"
 
 # 2. Dump the database and compress it
 echo "Taking backup of $DB_NAME..."
-pg_dump -U "$DB_USER" -d "$DB_NAME" | gzip > "$LOCAL_FILE"
+sudo -u postgres pg_dump -d "$DB_NAME" | gzip > "$LOCAL_FILE"
 
 if [ $? -eq 0 ]; then
   echo "? Backup successfully created at $LOCAL_FILE"
