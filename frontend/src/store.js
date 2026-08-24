@@ -432,6 +432,7 @@ export const useStore = create(persist((set, get) => ({
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
       // isFromWebSocket = true — these are real live ticks, block REST for 4s
+      window._lastWsTick = Date.now();
       set((state) => ({ prices: applySnapshot(snapshot, state, true) }));
     });
     
@@ -559,8 +560,10 @@ export const useStore = create(persist((set, get) => ({
     // Throttle: skip if last fetch was < 2s ago (unless forced by socket reconnect)
     if (!force && (now - get()._lastPriceFetchTime) < 2000) return;
 
-    // Always fetch REST prices as a safety net - applySnapshot has a 4s WebSocket priority
-    // guard that prevents REST from flickering/overriding live WS ticks.
+    // To prevent flicker, if WebSocket has ticked recently (within 5s), do NOT fetch REST.
+    // Only fetch REST as a true fallback when WebSocket is totally dead or not ticking.
+    if (!force && window._lastWsTick && (now - window._lastWsTick < 5000)) return;
+
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
       const snapshot = await res.json();
