@@ -218,12 +218,10 @@ function startLiveWebSocket() {
         wsInstance.mode(wsInstance.FullMode);
     }
     
-    // Check if listeners are already attached to this singleton instance
-    if (wsInstance.hasListenersAttached) {
-        // Just attempt to connect if it's not connected
-        try { wsInstance.connect(); } catch(e) {}
-        return;
-    }
+    // Always remove old listeners and re-attach fresh ones.
+    // The singleton pattern means we get the same object back, but after a token change
+    // or pm2 restart we MUST re-register handlers so the new code takes effect.
+    try { if (wsInstance.removeAllListeners) wsInstance.removeAllListeners(); } catch(e) {}
     wsInstance.hasListenersAttached = true;
     
     wsInstance.on('connect', () => {
