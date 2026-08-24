@@ -559,9 +559,8 @@ export const useStore = create(persist((set, get) => ({
     // Throttle: skip if last fetch was < 2s ago (unless forced by socket reconnect)
     if (!force && (now - get()._lastPriceFetchTime) < 2000) return;
 
-    // Do NOT fetch REST prices if the live WebSocket is connected, to prevent price flickering
-    if (!force && get().isConnected) return;
-
+    // Always fetch REST prices as a safety net - applySnapshot has a 4s WebSocket priority
+    // guard that prevents REST from flickering/overriding live WS ticks.
     try {
       const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
       const snapshot = await res.json();
