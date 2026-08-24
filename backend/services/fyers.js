@@ -281,9 +281,11 @@ function startLiveWebSocket() {
             
             // Fyers WebSocket v3 sends tick data as an object
             // ltp, ch, chp, vol, bid, ask, etc.
+            // Tick types: 'dp'=Depth, 'if'=IndexFull, 'sf'=SymFull(Lite), 'of'=SymFull(Full)
+            // We accept ALL types that have an ltp - do not whitelist by type string
+            // because Fyers may send 'of' or other types depending on mode/symbol.
             
-            if (tick.type === 'dp' || tick.type === 'if' || tick.type === 'sf') {
-                // dp = Depth, if = Index, sf = Symbol Update (Lite)
+            if (tick.ltp !== undefined) {
                 const ltp = tick.ltp;
                 if (ltp === undefined) return;
                 
