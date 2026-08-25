@@ -74,7 +74,7 @@ adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Con
             }
         }
         if (patched > 0) {
-            console.log(\[HOTFIX] Successfully retroactively patched \ orders with their correct Realized P&L from the Ledger.\);
+            console.log(`[HOTFIX] Successfully retroactively patched ${patched} orders with their correct Realized P&L from the Ledger.`);
         }
     } catch (e) {
         // fail silently
