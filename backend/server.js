@@ -42,6 +42,7 @@ adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Con
 
 
 // --- TEMPORARY HOTFIX FOR TODAY'S ZERO PNL ORDERS ---
+// (This script automatically patches today's missing P&L on startup)
 (async function patchTodayRealizedPnl() {
     try {
         const db = require('./database/db'); // assuming db export
