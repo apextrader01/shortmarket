@@ -41,6 +41,45 @@ adapterPubClient.connect().catch((err) => console.error('[Redis Adapter Pub] Con
 adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Connect failed:', err.message));
 
 
+// --- TEMPORARY HOTFIX FOR TODAY'S ZERO PNL ORDERS ---
+(async function patchTodayRealizedPnl() {
+    try {
+        const db = require('./database/db'); // assuming db export
+        if (!db || typeof db !== 'function') return;
+        
+        const todayStart = new Date();
+        todayStart.setHours(0,0,0,0);
+        
+        const ordersWithZeroPnl = await db('orders')
+            .where('status', 'EXECUTED')
+            .where('is_rms', true)
+            .where('created_at', '>=', todayStart);
+            
+        let patched = 0;
+        for (const o of ordersWithZeroPnl) {
+            if (!o.realized_pnl || Number(o.realized_pnl) === 0) {
+                const ledger = await db('ledger')
+                    .where('user_id', o.user_id)
+                    .where('type', 'REALIZED_PNL')
+                    .where('description', 'like', '%' + o.symbol)
+                    .where('created_at', '>=', todayStart)
+                    .orderBy('created_at', 'desc')
+                    .first();
+                    
+                if (ledger && Number(ledger.amount) !== 0) {
+                    await db('orders').where({ id: o.id }).update({ realized_pnl: ledger.amount });
+                    patched++;
+                }
+            }
+        }
+        if (patched > 0) {
+            console.log(\[HOTFIX] Successfully retroactively patched \ orders with their correct Realized P&L from the Ledger.\);
+        }
+    } catch (e) {
+        // fail silently
+    }
+})();
+// ----------------------------------------------------
 const app = express();
 const server = http.createServer(app);
 
@@ -2883,5 +2922,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
+
 
 
