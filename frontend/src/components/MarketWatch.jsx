@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { useStore, API } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell } from 'lucide-react';
 
-export default function MarketWatch({ className = '' }) {
+export default function MarketWatch({ className = '', onStockSelect }) {
   const { prices, stocks, selectedSymbol, setSelectedSymbol, fetchBatchPrices, watchlists, activeWatchlistId, setActiveWatchlist, addStockToWatchlist, removeStockFromWatchlist, createWatchlist, deleteWatchlist, renameWatchlist, openOrderModal, openMarketDepthModal, openDomLadderModal, setAlertModalSymbol } = useStore(useShallow(state => ({ prices: state.prices, stocks: state.stocks, selectedSymbol: state.selectedSymbol, setSelectedSymbol: state.setSelectedSymbol, fetchBatchPrices: state.fetchBatchPrices, watchlists: state.watchlists, activeWatchlistId: state.activeWatchlistId, setActiveWatchlist: state.setActiveWatchlist, addStockToWatchlist: state.addStockToWatchlist, removeStockFromWatchlist: state.removeStockFromWatchlist, createWatchlist: state.createWatchlist, deleteWatchlist: state.deleteWatchlist, renameWatchlist: state.renameWatchlist, openOrderModal: state.openOrderModal, openMarketDepthModal: state.openMarketDepthModal, openDomLadderModal: state.openDomLadderModal, setAlertModalSymbol: state.setAlertModalSymbol })));
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -212,7 +212,10 @@ export default function MarketWatch({ className = '' }) {
           return (
             <div
               key={stock.uniqueSymbol}
-              onClick={() => setSelectedSymbol(stock.uniqueSymbol)}
+              onClick={() => {
+                setSelectedSymbol(stock.uniqueSymbol);
+                if (onStockSelect) onStockSelect();
+              }}
               onMouseEnter={() => setHoveredStock(stock.uniqueSymbol)}
               onMouseLeave={() => setHoveredStock(null)}
               className={`watchlist-item ${isSelected ? 'selected hover-glow' : 'hover-glow'}`}

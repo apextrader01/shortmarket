@@ -440,10 +440,13 @@ function App() {
         </header>
 
       <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-        <MarketWatch className={activeTab !== 'Markets' ? 'mobile-hidden' : ''} />
-        <div className={`main-content ${activeTab === 'Markets' ? '' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        <MarketWatch 
+          className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
+          onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
+        />
+        <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-          {activeTab === 'Markets' && (
+          {(activeTab === 'Markets' || activeTab === 'Chart') && (
             <div className="dashboard-grid" style={{ width: '100%', minWidth: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
                 <ChartWidget />
@@ -551,21 +554,21 @@ function App() {
       
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">
-        <div className={`mobile-nav-item ${activeTab === 'Markets' ? 'active' : ''}`} onClick={() => setActiveTab('Markets')}>
+        <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
+          <List size={20} />
+          <span>Watchlist</span>
+        </div>
+        <div className={`mobile-nav-item ${activeTab === 'Chart' ? 'active' : ''}`} onClick={() => setActiveTab('Chart')}>
           <TrendingUp size={20} />
-          <span>Markets</span>
+          <span>Chart</span>
         </div>
         <div className={`mobile-nav-item ${activeTab === 'Orders' ? 'active' : ''}`} onClick={() => setActiveTab('Orders')}>
           <List size={20} />
           <span>Orders</span>
         </div>
-        <div className={`mobile-nav-item ${activeTab === 'Portfolio' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
+        <div className={`mobile-nav-item ${activeTab === 'Portfolio' || activeTab === 'Positions' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
           <Briefcase size={20} />
           <span>Portfolio</span>
-        </div>
-        <div className="mobile-nav-item" onClick={() => setShowDepositModal(true)}>
-          <CircleDollarSign size={20} />
-          <span>Funds</span>
         </div>
         <div className={`mobile-nav-item ${activeTab === 'ClientData' ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
           <User size={20} />
