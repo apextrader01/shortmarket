@@ -448,6 +448,25 @@ function garbageCollectSubscriptions() {
     const now = Date.now();
     const staleFyersSymbols = [];
     
+    // --- ANTI-GC FOR PENDING ORDERS ---
+    try {
+        const db = require('../database/db');
+        db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).distinct('symbol')
+            .then(rows => {
+                rows.forEach(row => {
+                    symbolLastSeen.set(row.symbol, now); // Prevent GC
+                    if (!clientSubscriptions.has(row.symbol)) {
+                        clientSubscriptions.add(row.symbol);
+                        const fSym = toFyersSymbol(row.symbol);
+                        if (fSym && !subQueue.includes(fSym)) {
+                            subQueue.push(fSym);
+                        }
+                    }
+                });
+            }).catch(e => {});
+    } catch(e) {}
+    // ----------------------------------
+
     for (const [symbol, lastSeen] of symbolLastSeen.entries()) {
         // If a symbol hasn't been pinged in 30 seconds by ANY user, unsubscribe it
         if (now - lastSeen > 30000) {

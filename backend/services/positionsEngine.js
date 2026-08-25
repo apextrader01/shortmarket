@@ -4,6 +4,29 @@ const triggerEngine = require('./triggerEngine');
 
 const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'];
 
+const ensureLivePrices = async (symbols) => {
+    const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
+    const priceCache = getPriceFromCache();
+    const missing = [...new Set(symbols)].filter(sym => !priceCache[sym]?.ltp);
+    
+    if (missing.length > 0) {
+        console.log(`[EOD] Fetching live prices for ${missing.length} offline symbols via REST...`);
+        try {
+            const fetchedQuotes = await fetchBatchLTPs(missing);
+            if (fetchedQuotes && typeof fetchedQuotes === 'object') {
+                for (const [sym, data] of Object.entries(fetchedQuotes)) {
+                    if (data && data.ltp) {
+                        priceCache[sym] = { ltp: data.ltp };
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[EOD] Failed to fetch REST fallback prices:', e);
+        }
+    }
+    return priceCache;
+};
+
 class PositionsEngine {
     constructor() {
         console.log('PositionsEngine Initialized (EOD Automation)');
@@ -114,25 +137,23 @@ class PositionsEngine {
     async forceSquareOff(market) {
         console.log(`[EOD SQUARE-OFF] Starting Phase 3 Square-Off for ${market}...`);
         try {
-            // BUG FIX 1: Load real LTP from price cache.
-            // Previously called evaluateTick(symbol, 0) which caused ALL pending
-            // buy limit orders to trigger (ZRANGEBYSCORE >= 0 matches everything).
-            // Now we directly call executeOrder() with the actual price.
-            const { getPriceFromCache } = require('./fyers');
-            const priceCache = getPriceFromCache();
-
             // 1. Force Market Exit for Open Positions
             const positions = await db('positions')
                 .whereNot('quantity', 0)
                 .whereIn('product_type', ['INT', 'BO', 'CO']);
-
-            for (const pos of positions) {
+                
+            const positionsToExit = positions.filter(pos => {
                 const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
-                if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
-                    const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-                    const exitQty = Math.abs(pos.quantity);
-                    // Use real LTP; fall back to average price if no live price available
-                    const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                return (market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity);
+            });
+            
+            const priceCache = await ensureLivePrices(positionsToExit.map(p => p.symbol));
+
+            for (const pos of positionsToExit) {
+                const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+                const exitQty = Math.abs(pos.quantity);
+                // Use real LTP; fall back to average price if no live price available
+                const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
 
                     try {
                         const [orderId] = await db('orders').insert({
@@ -160,7 +181,6 @@ class PositionsEngine {
                     } catch (execErr) {
                         console.error(`[EOD SQUARE-OFF] Failed to exit ${pos.symbol}:`, execErr.message);
                     }
-                }
             }
 
             // 2. Safety net: cancel any remaining PENDING_TRIGGER legs that executeOrder may have missed
@@ -261,8 +281,8 @@ class PositionsEngine {
                 });
             }
 
-            const { getPriceFromCache } = require('./fyers');
-            const priceCache = getPriceFromCache();
+            const allSymbols = [...expiringPositions.map(p => p.symbol), ...expiringHoldings.map(h => h.symbol)];
+            const priceCache = await ensureLivePrices(allSymbols);
             
             // Helper to submit settlement order
             const submitSettlementOrder = async (item, isHolding) => {
