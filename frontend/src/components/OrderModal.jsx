@@ -142,7 +142,8 @@ export default function OrderModal() {
     baseMargin = baseMargin * marginRate;
   }
 
-  const requiredMargin = orderModal.isExit ? 0 : baseMargin * leverageMultiplier;
+  const isTrueExit = orderModal.isExit && side === orderModal.side;
+  const requiredMargin = isTrueExit ? 0 : baseMargin * leverageMultiplier;
   const isInsufficient = balanceNum < requiredMargin;
 
   let leverageText = '';
@@ -318,7 +319,7 @@ export default function OrderModal() {
         </div>
 
         {/* Intraday / Overnight Tabs */}
-        {!orderModal.isExit && (
+        {!isTrueExit && (
         <div style={{ padding: '20px 20px 10px 20px' }}>
           <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden', width: 'fit-content' }}>
             <div 
@@ -632,3 +633,4 @@ export default function OrderModal() {
     </div>
   );
 }
+
