@@ -171,8 +171,8 @@ export default function OrdersView() {
                 </button>
               )}
             </div>
-            <div className="responsive-mobile-table" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className={`responsive-mobile-table orders-layout ${activeTab === 'Pending Triggers' ? 'triggers-table' : 'orders-table'}`} style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 {activeTab === 'Pending Triggers' ? (
                   <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>

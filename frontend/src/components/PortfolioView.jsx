@@ -220,7 +220,7 @@ export default function PortfolioView() {
           </div>
           
           <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="responsive-mobile-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table className="responsive-mobile-table portfolio-layout portfolio-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                   <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>

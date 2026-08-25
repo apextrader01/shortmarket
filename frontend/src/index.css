@@ -1343,15 +1343,71 @@ select option {
 }
 
 
-@media (max-width: 1200px) { .mobile-orders-table { display: none !important; } .mobile-orders-cards { display: block !important; } }
+
 
 @media (max-width: 1200px) {
-  .responsive-mobile-table table, table.responsive-mobile-table { min-width: 0 !important; }
-  .responsive-mobile-table thead, table.responsive-mobile-table thead { display: none; }
-  .responsive-mobile-table tbody, table.responsive-mobile-table tbody, .responsive-mobile-table tr, table.responsive-mobile-table tr, .responsive-mobile-table td, table.responsive-mobile-table td { display: block; width: 100%; }
-  .responsive-mobile-table tr, table.responsive-mobile-table tr { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .responsive-mobile-table td, table.responsive-mobile-table td { padding: 0 !important; width: auto !important; flex: 1 1 auto; text-align: left; }
-  .responsive-mobile-table td:nth-child(1), table.responsive-mobile-table td:nth-child(1) { width: 100% !important; text-align: right; color: var(--text-secondary); font-size: 11px; flex: 0 0 100%; }
-  .responsive-mobile-table td:nth-child(2), table.responsive-mobile-table td:nth-child(2) { width: 100% !important; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px !important; margin-bottom: 4px !important; flex: 0 0 100%; }
-  .responsive-mobile-table td:last-child, table.responsive-mobile-table td:last-child { width: 100% !important; display: flex; justify-content: flex-end; margin-top: 8px; flex: 0 0 100%; }
+  .mobile-orders-table { display: none !important; }
+  .mobile-orders-cards { display: block !important; }
+
+  /* Common Base for Mobile Tables */
+  table.responsive-mobile-table { min-width: 0 !important; }
+  table.responsive-mobile-table thead { display: none; }
+  table.responsive-mobile-table tbody, table.responsive-mobile-table tr, table.responsive-mobile-table td { display: block; width: 100%; }
+  table.responsive-mobile-table tr { background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-start; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  table.responsive-mobile-table td { padding: 0 !important; width: auto !important; flex: 1 1 auto; text-align: left; border: none !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; }
+  table.responsive-mobile-table td::before { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; margin-bottom: 4px; }
+
+  /* ORDERS LAYOUT (Time in col 1, Symbol in col 2) */
+  table.orders-layout td:nth-child(1) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-end !important; margin-bottom: -28px !important; text-align: right; font-size: 11px; color: var(--text-secondary); }
+  table.orders-layout td:nth-child(1)::before { display: none; }
+  table.orders-layout td:nth-child(2) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-start !important; font-size: 16px; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05) !important; padding-bottom: 12px !important; margin-bottom: 8px !important; white-space: normal !important; overflow: visible !important; max-width: none !important; }
+  table.orders-layout td:nth-child(2)::before { display: none; }
+  table.orders-layout td:last-child { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-end !important; margin-top: 12px !important; border-top: 1px solid rgba(255,255,255,0.05) !important; padding-top: 16px !important; gap: 8px; }
+  table.orders-layout td:last-child::before { display: none; }
+
+  /* Specific Labels for Triggers */
+  table.triggers-table td:nth-child(3) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(3)::before { content: "Side/Type"; }
+  table.triggers-table td:nth-child(4) { flex: 1 1 20% !important; } table.triggers-table td:nth-child(4)::before { content: "Qty"; }
+  table.triggers-table td:nth-child(5) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(5)::before { content: "Trg/Lmt"; }
+  table.triggers-table td:nth-child(6) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(6)::before { content: "Trail"; }
+  table.triggers-table td:nth-child(7) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(7)::before { content: "Order"; }
+  table.triggers-table td:nth-child(8) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(8)::before { content: "Status"; }
+
+  /* Specific Labels for Orders */
+  table.orders-table td:nth-child(3) { flex: 1 1 30% !important; } table.orders-table td:nth-child(3)::before { content: "Side/Type"; }
+  table.orders-table td:nth-child(4) { flex: 1 1 20% !important; } table.orders-table td:nth-child(4)::before { content: "Qty"; }
+  table.orders-table td:nth-child(5) { flex: 1 1 30% !important; } table.orders-table td:nth-child(5)::before { content: "Price"; }
+  table.orders-table td:nth-child(6) { flex: 1 1 30% !important; } table.orders-table td:nth-child(6)::before { content: "Order"; }
+  table.orders-table td:nth-child(7) { flex: 1 1 30% !important; } table.orders-table td:nth-child(7)::before { content: "Charges"; }
+  table.orders-table td:nth-child(8) { flex: 1 1 30% !important; } table.orders-table td:nth-child(8)::before { content: "P&L"; }
+  table.orders-table td:nth-child(9) { flex: 1 1 30% !important; } table.orders-table td:nth-child(9)::before { content: "Status"; }
+
+  /* POSITIONS LAYOUT (Symbol in col 1) */
+  table.positions-layout td:nth-child(1) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-start !important; font-size: 16px; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05) !important; padding-bottom: 12px !important; margin-bottom: 8px !important; white-space: normal !important; overflow: visible !important; max-width: none !important; }
+  table.positions-layout td:nth-child(1)::before { display: none; }
+  table.positions-layout td:last-child { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-end !important; margin-top: 12px !important; border-top: 1px solid rgba(255,255,255,0.05) !important; padding-top: 16px !important; gap: 8px; }
+  table.positions-layout td:last-child::before { display: none; }
+
+  /* Specific Labels for Positions */
+  table.positions-table td:nth-child(2) { flex: 1 1 30% !important; } table.positions-table td:nth-child(2)::before { content: "Side"; }
+  table.positions-table td:nth-child(3) { flex: 1 1 20% !important; } table.positions-table td:nth-child(3)::before { content: "Net Qty"; }
+  table.positions-table td:nth-child(4) { flex: 1 1 30% !important; } table.positions-table td:nth-child(4)::before { content: "Avg. Price"; }
+  table.positions-table td:nth-child(5) { flex: 1 1 30% !important; } table.positions-table td:nth-child(5)::before { content: "LTP"; }
+  table.positions-table td:nth-child(6) { flex: 1 1 45% !important; } table.positions-table td:nth-child(6)::before { content: "Unrealized P&L"; }
+  table.positions-table td:nth-child(7) { flex: 1 1 45% !important; } table.positions-table td:nth-child(7)::before { content: "Realized P&L"; }
+  table.positions-table td:nth-child(8) { flex: 1 1 30% !important; } table.positions-table td:nth-child(8)::before { content: "Segment"; }
+  table.positions-table td:nth-child(9) { flex: 1 1 30% !important; } table.positions-table td:nth-child(9)::before { content: "Exchange"; }
+
+  /* PORTFOLIO LAYOUT (Symbol in col 1) */
+  table.portfolio-layout td:nth-child(1) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-start !important; font-size: 16px; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05) !important; padding-bottom: 12px !important; margin-bottom: 8px !important; white-space: normal !important; overflow: visible !important; max-width: none !important; }
+  table.portfolio-layout td:nth-child(1)::before { display: none; }
+
+  table.portfolio-table td:nth-child(2) { flex: 1 1 20% !important; } table.portfolio-table td:nth-child(2)::before { content: "Qty"; }
+  table.portfolio-table td:nth-child(3) { flex: 1 1 35% !important; } table.portfolio-table td:nth-child(3)::before { content: "Avg. Price"; }
+  table.portfolio-table td:nth-child(4) { flex: 1 1 35% !important; } table.portfolio-table td:nth-child(4)::before { content: "LTP"; }
+  table.portfolio-table td:nth-child(5) { flex: 1 1 30% !important; } table.portfolio-table td:nth-child(5)::before { content: "Inv. Amount"; }
+  table.portfolio-table td:nth-child(6) { flex: 1 1 30% !important; } table.portfolio-table td:nth-child(6)::before { content: "Current Value"; }
+  table.portfolio-table td:nth-child(7) { flex: 1 1 30% !important; } table.portfolio-table td:nth-child(7)::before { content: "P&L"; }
+  table.portfolio-table td:nth-child(8) { flex: 1 1 30% !important; } table.portfolio-table td:nth-child(8)::before { content: "P&L %"; }
 }
+

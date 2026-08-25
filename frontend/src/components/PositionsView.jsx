@@ -216,7 +216,7 @@ export default function PositionsView() {
             <div className="desktop-view">
               <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="responsive-mobile-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <table className="responsive-mobile-table positions-layout positions-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <th style={{ padding: '16px 20px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Symbol</th>
