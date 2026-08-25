@@ -241,6 +241,7 @@ class TriggerEngine {
                         await trx('ledger').insert({
                             user_id: order.user_id, amount: principalAmount, type: 'HOLDING_RELEASE', description: `Holding value released for ${offsetQty} ${order.symbol}`
                         });
+                        await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
                         if (realizedPnl !== 0) {
                             await trx('ledger').insert({
                                 user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for exiting holding ${offsetQty} ${order.symbol}`
