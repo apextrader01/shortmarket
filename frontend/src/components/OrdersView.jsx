@@ -149,7 +149,7 @@ export default function OrdersView() {
             </button>
           </div>
         ) : (
-          <div style={{ padding: '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: window.innerWidth <= 1200 ? '12px' : '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '700' }}>{activeTab}</h2>
               {activeTab === 'Open Orders' && displayOrders.length > 0 && (
@@ -171,7 +171,7 @@ export default function OrdersView() {
                 </button>
               )}
             </div>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <div className="responsive-mobile-table" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 {activeTab === 'Pending Triggers' ? (

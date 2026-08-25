@@ -1342,3 +1342,16 @@ select option {
   color: white;
 }
 
+
+@media (max-width: 1200px) { .mobile-orders-table { display: none !important; } .mobile-orders-cards { display: block !important; } }
+
+@media (max-width: 1200px) {
+  .responsive-mobile-table table, table.responsive-mobile-table { min-width: 0 !important; }
+  .responsive-mobile-table thead, table.responsive-mobile-table thead { display: none; }
+  .responsive-mobile-table tbody, table.responsive-mobile-table tbody, .responsive-mobile-table tr, table.responsive-mobile-table tr, .responsive-mobile-table td, table.responsive-mobile-table td { display: block; width: 100%; }
+  .responsive-mobile-table tr, table.responsive-mobile-table tr { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .responsive-mobile-table td, table.responsive-mobile-table td { padding: 0 !important; width: auto !important; flex: 1 1 auto; text-align: left; }
+  .responsive-mobile-table td:nth-child(1), table.responsive-mobile-table td:nth-child(1) { width: 100% !important; text-align: right; color: var(--text-secondary); font-size: 11px; flex: 0 0 100%; }
+  .responsive-mobile-table td:nth-child(2), table.responsive-mobile-table td:nth-child(2) { width: 100% !important; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px !important; margin-bottom: 4px !important; flex: 0 0 100%; }
+  .responsive-mobile-table td:last-child, table.responsive-mobile-table td:last-child { width: 100% !important; display: flex; justify-content: flex-end; margin-top: 8px; flex: 0 0 100%; }
+}

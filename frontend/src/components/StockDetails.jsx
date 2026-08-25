@@ -266,7 +266,7 @@ export default function StockDetails({ symbol, price, candles }) {
           <div style={{ marginTop: '16px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Similar Stocks</h4>
             <div className="glass-panel" style={{ overflowX: 'auto', padding: '0' }}>
-              <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'right' }}>
+              <table className="responsive-mobile-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'right' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#94A3B8', fontSize: '12px' }}>
                     <th style={{ padding: '16px', textAlign: 'left', fontWeight: '400' }}>Stock</th>
