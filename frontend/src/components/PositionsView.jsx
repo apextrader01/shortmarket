@@ -250,7 +250,7 @@ export default function PositionsView() {
                         {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)}
                       </td>
                       <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
-                      <td data-label="LTP" style={{ fontWeight: '500' }}>`n                        {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
+                      <td data-label="LTP" style={{ fontWeight: '500' }}>{viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
                       </td>
                       <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                         {viewMode === 'CLOSED' ? '-' : `${pos.pnl > 0 ? '+ ' : ''}₹${Math.abs(pos.pnl).toFixed(2)}`}
@@ -537,6 +537,7 @@ export default function PositionsView() {
     </div>
   );
 }
+
 
 
 

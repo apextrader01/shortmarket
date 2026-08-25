@@ -200,7 +200,7 @@ export default function PortfolioView() {
               </div>
             </div>
             
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'linear-gradient(145deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.6) 100%)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backdropFilter: 'blur(8px)' }}>
               <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[2] }} />
                 Mutual Funds
@@ -301,6 +301,8 @@ export default function PortfolioView() {
     </div>
   );
 }
+
+
 
 
 
