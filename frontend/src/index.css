@@ -1371,7 +1371,7 @@ select option {
     display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; 
     font-size: 14px !important; font-weight: 600 !important; color: #f1f5f9;
   }
-  table.responsive-mobile-table td::before { 
+  table.responsive-mobile-table td::before { content: attr(data-label); 
     font-size: 9.5px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 6px; 
   }
 
@@ -1392,12 +1392,12 @@ select option {
   .portfolio-layout td:nth-child(1)::before { display: none; }
   
   .orders-layout td:last-child,
-  .positions-layout td:last-child { 
+  .positions-layout td:last-child, .portfolio-layout td:last-child { 
     flex: 0 0 100% !important; flex-direction: row !important; justify-content: space-between !important; 
     margin-top: 12px !important; border-top: 1px dashed rgba(255,255,255,0.1) !important; padding-top: 16px !important; gap: 12px; 
   }
   .orders-layout td:last-child::before,
-  .positions-layout td:last-child::before { display: none; }
+  .positions-layout td:last-child::before, .portfolio-layout td:last-child::before { display: none; }
 
   /* Premium Buttons inside Actions */
   .orders-layout td:last-child button {
@@ -1410,39 +1410,4 @@ select option {
     font-weight: 700 !important;
   }
 
-  /* Specific Labels for Triggers */
-  table.triggers-table td:nth-child(3) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(3)::before { content: "Side/Type"; }
-  table.triggers-table td:nth-child(4) { flex: 1 1 20% !important; } table.triggers-table td:nth-child(4)::before { content: "Qty"; }
-  table.triggers-table td:nth-child(5) { flex: 1 1 35% !important; } table.triggers-table td:nth-child(5)::before { content: "Trg/Lmt"; }
-  table.triggers-table td:nth-child(6) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(6)::before { content: "Trail"; }
-  table.triggers-table td:nth-child(7) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(7)::before { content: "Order"; }
-  table.triggers-table td:nth-child(8) { flex: 1 1 30% !important; } table.triggers-table td:nth-child(8)::before { content: "Status"; }
-
-  /* Specific Labels for Orders */
-  table.orders-table td:nth-child(3) { flex: 1 1 30% !important; } table.orders-table td:nth-child(3)::before { content: "Side/Type"; }
-  table.orders-table td:nth-child(4) { flex: 1 1 20% !important; } table.orders-table td:nth-child(4)::before { content: "Qty"; }
-  table.orders-table td:nth-child(5) { flex: 1 1 35% !important; } table.orders-table td:nth-child(5)::before { content: "Price"; }
-  table.orders-table td:nth-child(6) { flex: 1 1 30% !important; } table.orders-table td:nth-child(6)::before { content: "Order"; }
-  table.orders-table td:nth-child(7) { flex: 1 1 30% !important; } table.orders-table td:nth-child(7)::before { content: "Charges"; }
-  table.orders-table td:nth-child(8) { flex: 1 1 30% !important; } table.orders-table td:nth-child(8)::before { content: "P&L"; }
-  table.orders-table td:nth-child(9) { flex: 1 1 30% !important; } table.orders-table td:nth-child(9)::before { content: "Status"; }
-
-  /* Specific Labels for Positions */
-  table.positions-table td:nth-child(2) { flex: 1 1 30% !important; } table.positions-table td:nth-child(2)::before { content: "Side"; }
-  table.positions-table td:nth-child(3) { flex: 1 1 20% !important; } table.positions-table td:nth-child(3)::before { content: "Net Qty"; }
-  table.positions-table td:nth-child(4) { flex: 1 1 35% !important; } table.positions-table td:nth-child(4)::before { content: "Avg. Price"; }
-  table.positions-table td:nth-child(5) { flex: 1 1 30% !important; } table.positions-table td:nth-child(5)::before { content: "LTP"; }
-  table.positions-table td:nth-child(6) { flex: 1 1 45% !important; } table.positions-table td:nth-child(6)::before { content: "Unrealized"; }
-  table.positions-table td:nth-child(7) { flex: 1 1 45% !important; } table.positions-table td:nth-child(7)::before { content: "Realized"; }
-  table.positions-table td:nth-child(8) { flex: 1 1 30% !important; } table.positions-table td:nth-child(8)::before { content: "Segment"; }
-  table.positions-table td:nth-child(9) { flex: 1 1 30% !important; } table.positions-table td:nth-child(9)::before { content: "Exchange"; }
-
-  /* Specific Labels for Portfolio */
-  table.portfolio-table td:nth-child(2) { flex: 1 1 20% !important; } table.portfolio-table td:nth-child(2)::before { content: "Qty"; }
-  table.portfolio-table td:nth-child(3) { flex: 1 1 35% !important; } table.portfolio-table td:nth-child(3)::before { content: "Avg. Price"; }
-  table.portfolio-table td:nth-child(4) { flex: 1 1 35% !important; } table.portfolio-table td:nth-child(4)::before { content: "LTP"; }
-  table.portfolio-table td:nth-child(5) { flex: 1 1 45% !important; } table.portfolio-table td:nth-child(5)::before { content: "Inv. Amount"; }
-  table.portfolio-table td:nth-child(6) { flex: 1 1 45% !important; } table.portfolio-table td:nth-child(6)::before { content: "Current Value"; }
-  table.portfolio-table td:nth-child(7) { flex: 1 1 45% !important; } table.portfolio-table td:nth-child(7)::before { content: "Total P&L"; }
-  table.portfolio-table td:nth-child(8) { flex: 1 1 45% !important; } table.portfolio-table td:nth-child(8)::before { content: "P&L %"; }
-}
+  }

@@ -240,34 +240,28 @@ export default function PositionsView() {
                   
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
-                      <td style={{ padding: '16px 20px' }}>
-                        <span style={{ 
-                          background: 'var(--color-blue)', color: '#fff', 
-                          padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' 
-                        }}>
-                          {pos.symbol.replace(/-(EQ|FUT|CE|PE)$/, '')}
-                        </span>
+                      <td data-label="Symbol" style={{ padding: '16px 20px' }}>
+                        {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
                       </td>
-                      <td style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
+                      <td data-label="Side" style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
                         {sideText}
                       </td>
-                      <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                      <td data-label="Net Qty" style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
                         {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)}
                       </td>
                       <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
-                      <td style={{ fontWeight: '500' }}>
-                        {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
+                      <td data-label="LTP" style={{ fontWeight: '500' }}>`n                        {viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
                       </td>
-                      <td style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                         {viewMode === 'CLOSED' ? '-' : `${pos.pnl > 0 ? '+ ' : ''}₹${Math.abs(pos.pnl).toFixed(2)}`}
                       </td>
-                      <td style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
+                      <td data-label="Realized P&L" style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
                         {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+ ' : ''}₹${Math.abs(realizedPnl).toFixed(2)}` : '0'}
                       </td>
-                      <td style={{ fontWeight: '500' }}>{pos.segment}</td>
-                      <td style={{ fontWeight: '500' }}>{pos.exchange}</td>
-                      <td style={{ fontWeight: '500' }}>{pos.productLabel}</td>
-                      <td style={{ textAlign: 'center', paddingRight: '20px' }}>
+                      <td data-label="Segment" style={{ fontWeight: '500' }}>{pos.segment}</td>
+                      <td data-label="Exchange" style={{ fontWeight: '500' }}>{pos.exchange}</td>
+                      <td data-label="Product" style={{ fontWeight: '500' }}>{pos.productLabel}</td>
+                      <td data-label="Actions" style={{ textAlign: 'center', paddingRight: '20px' }}>
                         {viewMode === 'OPEN' && (
                           <X 
                             size={18} 
@@ -543,4 +537,10 @@ export default function PositionsView() {
     </div>
   );
 }
+
+
+
+
+
+
 

@@ -158,7 +158,7 @@ export default function PortfolioView() {
                     innerRadius={60}
                     outerRadius={80}
                     paddingAngle={5}
-                    dataKey="value"
+                    dataKey="value" isAnimationActive={false}
                     stroke="none"
                   >
                     {chartData.map((entry, index) => (
@@ -253,17 +253,17 @@ export default function PortfolioView() {
                     
                     return (
                       <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '16px', fontWeight: '600' }}>
-                          {safeSymbol.split('-')[0]}
+                        <td data-label="Symbol" style={{ padding: '16px', fontWeight: '600' }}>
+                          {safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}
                           <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>
-                            {safeSymbol.split('-')[1] || 'NSE'}
+                            {safeSymbol.split(':')[0] || 'NSE'}
                           </span>
                         </td>
-                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>{qty}</td>
-                        <td style={{ padding: '16px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{parseFloat(pos.average_price).toFixed(2)}</td>
-                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{ltp.toFixed(2)}</td>
-                        <td style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{current.toFixed(2)}</td>
-                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <td data-label="Qty" style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>{qty}</td>
+                        <td data-label="Avg Price" style={{ padding: '16px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{parseFloat(pos.average_price).toFixed(2)}</td>
+                        <td data-label="Value" style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{ltp.toFixed(2)}</td>
+                        <td data-label="Value" style={{ padding: '16px', textAlign: 'right', fontWeight: '500' }}>₹{current.toFixed(2)}</td>
+                        <td data-label="Total P&L" style={{ padding: '16px', textAlign: 'right' }}>
                           <div style={{ color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                             {isProfit ? '+' : ''}₹{pnl.toFixed(2)}
                           </div>
@@ -271,7 +271,7 @@ export default function PortfolioView() {
                             {isProfit ? '+' : ''}{pnlPct.toFixed(2)}%
                           </div>
                         </td>
-                        <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <td data-label="Actions" style={{ padding: '16px', textAlign: 'center' }}>
                           <button
                             onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
                             style={{
@@ -301,3 +301,8 @@ export default function PortfolioView() {
     </div>
   );
 }
+
+
+
+
+
