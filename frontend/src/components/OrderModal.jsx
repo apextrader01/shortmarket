@@ -142,9 +142,11 @@ export default function OrderModal() {
     baseMargin = baseMargin * marginRate;
   }
 
-  const isTrueExit = orderModal.isExit && side === orderModal.side;
+  // FIX: isTrueExit must compare against orderModal.type (not orderModal.side which doesn't exist)
+  // When true, the sell is an exit of an existing holding — no margin required
+  const isTrueExit = orderModal.isExit && side === orderModal.type;
   const requiredMargin = isTrueExit ? 0 : baseMargin * leverageMultiplier;
-  const isInsufficient = balanceNum < requiredMargin;
+  const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
 
   let leverageText = '';
   if (isOption) {
