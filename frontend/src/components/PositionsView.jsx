@@ -411,27 +411,30 @@ export default function PositionsView() {
       )}
 
       {/* Global MTM Banner */}
-      <div style={{
-        position: 'fixed', bottom: '0', left: '0', right: '0', 
-        background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-        backdropFilter: 'blur(10px)', borderTop: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-        padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        zIndex: 50, transition: 'all 0.3s ease'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
-          <div>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Live updates based on market ticks</div>
+        <div style={{
+          position: 'fixed', bottom: '24px', right: '24px', 
+          background: 'var(--bg-panel)',
+          backdropFilter: 'blur(16px)', 
+          border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          boxShadow: `0 12px 40px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+          borderRadius: '16px',
+          padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '32px',
+          zIndex: 50, transition: 'all 0.3s ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Live market ticks</div>
+            </div>
+          </div>
+          <div style={{ 
+            fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px',
+            color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
+          }}>
+            {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
-        <div style={{ 
-          fontSize: '32px', fontWeight: '900', letterSpacing: '-0.5px',
-          color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
-        }}>
-          {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
-      </div>
 
       {/* Partial Exit Modal */}
       {partialExitPos && (
