@@ -1,19 +1,41 @@
-import React, { useEffect, useState } from 'react';
-import { X, TrendingUp, Info, CheckCircle, XCircle, ChevronRight, Activity, PieChart, Shield, Calculator } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { X, TrendingUp, CheckCircle, XCircle, ChevronRight, Activity, PieChart, Shield, Calculator, Wallet, ArrowDownRight, ArrowUpRight, Check } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundDetailsModal({ fund, onClose }) {
-    const { fetchFundDetails, fetchFundHistory, placeOrder, setupSip } = useStore(useShallow(state => ({ fetchFundDetails: state.fetchFundDetails, fetchFundHistory: state.fetchFundHistory, placeOrder: state.placeOrder, setupSip: state.setupSip })));
+    const { fetchFundDetails, placeOrder, setupSip, holdings, user } = useStore(useShallow(state => ({ 
+        fetchFundDetails: state.fetchFundDetails, 
+        placeOrder: state.placeOrder, 
+        setupSip: state.setupSip,
+        holdings: state.holdings,
+        user: state.user
+    })));
+    
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isInvesting, setIsInvesting] = useState(false);
+    const [orderStatus, setOrderStatus] = useState(null); // null, 'success', 'error'
+    const [statusMsg, setStatusMsg] = useState('');
+
+    // Right Column States
+    const [actionMode, setActionMode] = useState('INVEST'); // 'INVEST' | 'REDEEM'
+    const [investType, setInvestType] = useState('SIP'); // 'SIP' | 'LUMPSUM'
     
-    // Calculator state
-    const [calcType, setCalcType] = useState('SIP');
-    const [investmentAmount, setInvestmentAmount] = useState(5000);
+    // Inputs
+    const [amount, setAmount] = useState('5000');
+    const [redeemType, setRedeemType] = useState('ALL'); // 'ALL' | 'CUSTOM'
+    
+    // Calculator
     const [investmentYears, setInvestmentYears] = useState(5);
+
+    // Identify Fund Symbol (support legacy symbol format and new format)
+    const legacySymbol = `${fund.amc?.substring(0,4).toUpperCase()}-MF`;
+    const fundSymbol = `${fund.id || fund.schemeCode}-MF`;
+    
+    const userHolding = holdings.find(h => h.symbol === legacySymbol || h.symbol === fundSymbol);
+    const actualSymbolToUse = userHolding ? userHolding.symbol : fundSymbol; // Use legacy if they already own it
 
     useEffect(() => {
         let mounted = true;
@@ -38,126 +60,211 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
     const cagr = details?.return_stats?.find(r => r.year === 3)?.fund_return || fund.return3y || 12;
 
-    const calculateReturns = () => {
+    const calcResult = useMemo(() => {
         const rate = cagr / 100;
         const months = investmentYears * 12;
+        const amt = Number(amount) || 0;
         let invested = 0;
         let wealth = 0;
 
-        if (calcType === 'SIP') {
-            invested = investmentAmount * months;
+        if (investType === 'SIP') {
+            invested = amt * months;
             const monthlyRate = rate / 12;
-            wealth = investmentAmount * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+            wealth = amt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
         } else {
-            invested = investmentAmount;
-            wealth = investmentAmount * Math.pow(1 + rate, investmentYears);
+            invested = amt;
+            wealth = amt * Math.pow(1 + rate, investmentYears);
         }
         return { invested, wealth: Math.round(wealth), gain: Math.round(wealth - invested) };
+    }, [cagr, investmentYears, amount, investType]);
+
+    const handleAction = async () => {
+        if (isInvesting) return;
+        setIsInvesting(true);
+        setOrderStatus(null);
+
+        const currentNav = details?.nav || fund.nav || 1;
+        const numAmount = Number(amount) || 0;
+        let res;
+
+        try {
+            if (actionMode === 'INVEST') {
+                if (numAmount < 100) throw new Error("Minimum investment is ₹100");
+                
+                const qty = numAmount / currentNav;
+                
+                if (investType === 'SIP') {
+                    res = await setupSip({
+                        symbol: actualSymbolToUse,
+                        amount: numAmount,
+                        frequency: 'MONTHLY',
+                        price: currentNav
+                    });
+                } else {
+                    res = await placeOrder({
+                        symbol: actualSymbolToUse,
+                        type: 'MARKET',
+                        side: 'BUY',
+                        quantity: parseFloat(qty.toFixed(4)),
+                        price: currentNav,
+                        margin: numAmount,
+                        product_type: 'DEL'
+                    });
+                }
+            } else if (actionMode === 'REDEEM') {
+                if (!userHolding) throw new Error("No holdings to redeem.");
+                
+                let qtyToSell = userHolding.quantity;
+                if (redeemType === 'CUSTOM') {
+                    qtyToSell = numAmount / currentNav;
+                    if (qtyToSell > userHolding.quantity) throw new Error("Insufficient units to redeem.");
+                }
+
+                res = await placeOrder({
+                    symbol: actualSymbolToUse,
+                    type: 'MARKET',
+                    side: 'SELL',
+                    quantity: parseFloat(qtyToSell.toFixed(4)),
+                    price: currentNav,
+                    product_type: 'CNC' // Mutual fund delivery sell
+                });
+            }
+
+            if (res && res.success) {
+                setOrderStatus('success');
+                setStatusMsg(`Successfully ${actionMode === 'INVEST' ? (investType === 'SIP' ? 'set up SIP' : 'invested') : 'redeemed'}!`);
+                setTimeout(() => onClose(), 2000);
+            } else {
+                setOrderStatus('error');
+                setStatusMsg(res?.error || "Transaction failed. Please try again.");
+                setTimeout(() => setOrderStatus(null), 3000);
+            }
+        } catch (err) {
+            setOrderStatus('error');
+            setStatusMsg(err.message);
+            setTimeout(() => setOrderStatus(null), 3000);
+        } finally {
+            setIsInvesting(false);
+        }
     };
 
-    const calcResult = calculateReturns();
+    const holdingCurrentValue = userHolding ? (userHolding.quantity * (details?.nav || fund.nav || userHolding.ltp)) : 0;
+    const holdingInvested = userHolding ? userHolding.invested : 0;
+    const holdingPnL = holdingCurrentValue - holdingInvested;
+    const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
 
     return (
-        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-            <div style={{ width: '95%', maxWidth: '1200px', height: '90vh', maxHeight: '85vh', background: 'var(--bg-dark)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                
+        <div className="modal-backdrop" style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+            <div style={{
+                width: '1100px', maxWidth: '95vw', height: '85vh',
+                background: 'var(--bg-dark)', borderRadius: '16px',
+                border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            }}>
                 {/* Header */}
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'var(--bg-panel)' }}>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                            {details?.logo_url ? (
-                                <img src={details.logo_url} alt="AMC" style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#fff' }} />
-                            ) : (
-                                <div style={{ width: '24px', height: '24px', borderRadius: '4px', background: 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Activity size={14} color="#fff" />
-                                </div>
-                            )}
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</span>
-                            <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px' }}>{fund.category}</span>
-                            {details?.groww_rating && (
-                                <span style={{ fontSize: '12px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    ★ {details.groww_rating}
-                                </span>
-                            )}
-                        </div>
-                        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)' }}>{fund.name}</h2>
-                        <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-                            <div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>NAV ({details?.nav_date || 'Latest'})</div>
-                                <div style={{ fontSize: '16px', fontWeight: '600' }}>₹{details?.nav || fund.nav}</div>
+                <div style={{ padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
+                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                        {details?.logo_url ? (
+                            <img src={details.logo_url} alt="AMC" style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fff', padding: '4px' }} />
+                        ) : (
+                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                                <TrendingUp size={24} />
                             </div>
-                            <div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Fund Size (AUM)</div>
-                                <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(details?.aum)}</div>
+                        )}
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</div>
+                                <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
+                                {details?.groww_rating && (
+                                    <span style={{ fontSize: '12px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        ★ {details.groww_rating}
+                                    </span>
+                                )}
                             </div>
-                            <div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Expense Ratio</div>
-                                <div style={{ fontSize: '16px', fontWeight: '600' }}>{details?.expense_ratio ? `${details.expense_ratio}%` : 'N/A'}</div>
-                            </div>
+                            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>{fund.name}</h2>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}>
-                        <X size={20} />
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>
+                        <X size={24} />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="mf-details-content" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'row' }}>
+                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     
-                    {/* Left Column (Main Info) */}
-                    <div style={{ flex: '1', padding: '24px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                        
-                        {/* Chart */}
-                        <div>
-                            <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Performance Chart</h3>
-                            <div style={{ height: '300px', background: 'var(--bg-panel)', borderRadius: '8px', overflow: 'hidden' }}>
-                                <MutualFundChart schemeCode={fund.id} color="#3b82f6" />
+                    {/* Left Column (Details & Chart) */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+                        {/* NAV & Key Metrics */}
+                        <div style={{ display: 'flex', gap: '48px', marginBottom: '32px' }}>
+                            <div>
+                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Current NAV</div>
+                                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    ₹{details?.nav || fund.nav}
+                                    {fund.dayChange !== undefined && (
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: fund.dayChange >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center' }}>
+                                            {fund.dayChange >= 0 ? <TrendingUp size={16} style={{marginRight: '4px'}}/> : <TrendingUp size={16} style={{marginRight: '4px', transform: 'rotate(180deg)'}}/>}
+                                            {fund.dayChange >= 0 ? '+' : ''}{fund.dayChange}%
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Min SIP Amount</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600' }}>₹{details?.min_sip_investment || 500}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Fund Size (AUM)</div>
+                                <div style={{ fontSize: '18px', fontWeight: '600' }}>{formatCurrency(details?.aum)}</div>
                             </div>
                         </div>
 
+                        {/* Chart */}
+                        <div style={{ height: '300px', marginBottom: '32px' }}>
+                            <MutualFundChart schemeCode={fund.id || fund.schemeCode} />
+                        </div>
+
+                        {/* Details Grid */}
                         {loading ? (
-                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading deep insights...</div>
+                            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <Activity size={24} className="spin" style={{ marginBottom: '12px' }} />
+                                <div>Loading fund details...</div>
+                            </div>
                         ) : details ? (
-                            <>
-                                {/* Returns & Rankings */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                
+                                {/* Returns Table */}
                                 <div>
-                                    <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Returns & Category Rankings</h3>
-                                    <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', overflow: 'hidden' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                                    <h3 style={{ fontSize: '18px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Historical Returns</h3>
+                                    <div style={{ background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                             <thead>
-                                                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)' }}>
-                                                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Period</th>
-                                                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Fund Return</th>
-                                                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Category Avg</th>
-                                                    <th style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontWeight: '500' }}>Rank</th>
+                                                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
+                                                    <th style={{ textAlign: 'left', padding: '16px', color: 'var(--text-secondary)', fontWeight: '600' }}>Time Period</th>
+                                                    <th style={{ textAlign: 'right', padding: '16px', color: 'var(--text-secondary)', fontWeight: '600' }}>Fund Return</th>
+                                                    <th style={{ textAlign: 'right', padding: '16px', color: 'var(--text-secondary)', fontWeight: '600' }}>Category Avg</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {details.return_stats && details.return_stats.length > 0 && [
-                                                    { label: '1 Year', fKey: 'return1y', cKey: 'cat_return1y', rKey: 'rank1yr' },
-                                                    { label: '3 Year', fKey: 'return3y', cKey: 'cat_return3y', rKey: 'rank3yr' },
-                                                    { label: '5 Year', fKey: 'return5y', cKey: 'cat_return5y', rKey: 'rank5yr' },
-                                                    { label: '7 Year', fKey: 'return7y', cKey: 'cat_return7y', rKey: 'rank7yr' },
-                                                    { label: '10 Year', fKey: 'return10y', cKey: 'cat_return10y', rKey: 'rank10yr' },
-                                                    { label: 'All Time', fKey: 'return_since_created', cKey: 'cat_return_since_launch', rKey: null },
+                                                    { label: '1 Year', fKey: 'return1y', cKey: 'cat_return1y' },
+                                                    { label: '3 Year', fKey: 'return3y', cKey: 'cat_return3y' },
+                                                    { label: '5 Year', fKey: 'return5y', cKey: 'cat_return5y' },
+                                                    { label: 'All Time', fKey: 'return_since_created', cKey: 'cat_return_since_launch' },
                                                 ].map(period => {
                                                     const stat = details.return_stats[0];
                                                     const fundReturn = stat[period.fKey];
                                                     const catReturn = stat[period.cKey];
-                                                    const rank = period.rKey ? stat[period.rKey] : null;
+                                                    if (!fundReturn) return null;
                                                     
-                                                    if (fundReturn == null) return null;
-
-                                                    const formatRet = (val) => val != null ? `${parseFloat(val).toFixed(2)}%` : '-';
-
                                                     return (
                                                         <tr key={period.label} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                            <td style={{ padding: '12px 16px' }}>{period.label}</td>
-                                                            <td style={{ padding: '12px 16px', color: fundReturn >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
-                                                                {fundReturn >= 0 && fundReturn !== 0 ? '+' : ''}{formatRet(fundReturn)}
-                                                            </td>
-                                                            <td style={{ padding: '12px 16px' }}>{formatRet(catReturn)}</td>
-                                                            <td style={{ padding: '12px 16px' }}>{rank ? `#${rank}` : '-'}</td>
+                                                            <td style={{ padding: '16px', color: 'var(--text-primary)', fontWeight: '500' }}>{period.label}</td>
+                                                            <td style={{ textAlign: 'right', padding: '16px', color: 'var(--color-green-light)', fontWeight: '600' }}>{fundReturn.toFixed(1)}%</td>
+                                                            <td style={{ textAlign: 'right', padding: '16px', color: 'var(--text-secondary)' }}>{catReturn ? catReturn.toFixed(1) + '%' : '-'}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -166,179 +273,211 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                     </div>
                                 </div>
 
-                                {/* Pros & Cons */}
-                                {details.analysis && (
-                                    <div>
-                                        <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Pros & Cons</h3>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                            <div style={{ background: 'rgba(34, 197, 94, 0.05)', border: '1px solid rgba(34, 197, 94, 0.1)', borderRadius: '8px', padding: '16px' }}>
-                                                <h4 style={{ margin: '0 0 12px 0', color: 'var(--color-green-light)', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={16} /> Pros</h4>
-                                                <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {details.analysis.filter(a => a.analysis_type === 'PROS').map((p, i) => <li key={i}>{p.analysis_desc}</li>)}
-                                                </ul>
-                                            </div>
-                                            <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: '8px', padding: '16px' }}>
-                                                <h4 style={{ margin: '0 0 12px 0', color: 'var(--color-red-light)', display: 'flex', alignItems: 'center', gap: '8px' }}><XCircle size={16} /> Cons</h4>
-                                                <ul style={{ margin: 0, paddingLeft: '20px', color: 'var(--text-secondary)', fontSize: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                    {details.analysis.filter(a => a.analysis_type === 'CONS').map((c, i) => <li key={i}>{c.analysis_desc}</li>)}
-                                                </ul>
-                                            </div>
+                                {/* About / Grid */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                    <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                        <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={16} /> Fund Information</h4>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Expense Ratio</span><span>{details.expense_ratio ? `${details.expense_ratio}%` : 'N/A'}</span></div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Exit Load</span><span style={{ textAlign: 'right', maxWidth: '200px' }}>{details.exit_load || 'N/A'}</span></div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Lock-in Period</span><span>{details.lock_in ? `${details.lock_in} Years` : 'No Lock-in'}</span></div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Fund Manager</span><span style={{ textAlign: 'right' }}>{details.fund_manager || 'N/A'}</span></div>
                                         </div>
                                     </div>
-                                )}
 
-                                {/* Portfolio Holdings */}
-                                {details.holdings && details.holdings.length > 0 && (
-                                    <div>
-                                        <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Top 10 Holdings</h3>
-                                        <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', padding: '16px' }}>
-                                            {details.holdings.slice(0, 10).map((h, i) => (
-                                                <div key={i} style={{ marginBottom: '12px' }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                                                        <span style={{ color: 'var(--text-primary)' }}>{h.company_name}</span>
-                                                        <span style={{ color: 'var(--text-secondary)' }}>{h.corpus_per}%</span>
+                                    {details.holdings && details.holdings.length > 0 && (
+                                        <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                            <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}><PieChart size={16} /> Top Holdings</h4>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+                                                {details.holdings.slice(0, 4).map((h, i) => (
+                                                    <div key={i}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                                            <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{h.company_name}</span>
+                                                            <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{h.corpus_per.toFixed(1)}%</span>
+                                                        </div>
+                                                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                            <div style={{ width: `${h.corpus_per}%`, height: '100%', background: 'var(--color-blue)', borderRadius: '2px' }} />
+                                                        </div>
                                                     </div>
-                                                    <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                                                        <div style={{ width: `${h.corpus_per}%`, height: '100%', background: 'var(--color-blue)', borderRadius: '2px' }} />
-                                                    </div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{h.sector_name}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Fund Management & Objective */}
-                                <div>
-                                    <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Fund Details</h3>
-                                    <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', padding: '16px', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                                        <div style={{ marginBottom: '16px' }}>
-                                            <strong style={{ color: 'var(--text-primary)' }}>Investment Objective:</strong><br />
-                                            {details.description || 'N/A'}
-                                        </div>
-                                        <div>
-                                            <strong style={{ color: 'var(--text-primary)' }}>Fund Managers:</strong><br />
-                                            {details.fund_manager || 'N/A'}
-                                        </div>
-                                        <div style={{ marginTop: '16px', display: 'flex', gap: '24px' }}>
-                                            <div>
-                                                <strong style={{ color: 'var(--text-primary)' }}>Exit Load:</strong><br />
-                                                {details.exit_load || 'N/A'}
-                                            </div>
-                                            <div>
-                                                <strong style={{ color: 'var(--text-primary)' }}>Lock-in:</strong><br />
-                                                {details.lock_in ? `${details.lock_in} Years` : 'No Lock-in'}
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                            </>
+                            </div>
                         ) : null}
                     </div>
 
-                    {/* Right Column (Calculator & Invest) */}
-                    <div style={{ width: '380px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'var(--bg-panel)' }}>
+                    {/* Right Column (Action Panel) */}
+                    <div style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
                         
-                        <div style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '20px' }}>
-                            <h3 style={{ fontSize: '16px', margin: '0 0 16px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Calculator size={18} /> Returns Calculator
-                            </h3>
-                            
-                            <div style={{ display: 'flex', background: 'var(--bg-panel)', padding: '4px', borderRadius: '6px', marginBottom: '16px' }}>
-                                {['SIP', 'Lumpsum'].map(t => (
-                                    <button 
-                                        key={t}
-                                        onClick={() => setCalcType(t)}
-                                        style={{ flex: 1, padding: '8px', background: calcType === t ? 'var(--color-blue)' : 'transparent', color: calcType === t ? '#fff' : 'var(--text-secondary)', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
-                                    >
-                                        {t}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div style={{ marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                    <span>{calcType === 'SIP' ? 'Monthly Investment' : 'Total Investment'}</span>
-                                    <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>₹{investmentAmount.toLocaleString()}</span>
-                                </div>
-                                <input 
-                                    type="range" 
-                                    min="500" max="100000" step="500"
-                                    value={investmentAmount} 
-                                    onChange={(e) => setInvestmentAmount(Number(e.target.value))}
-                                    style={{ width: '100%', accentColor: 'var(--color-blue)' }}
-                                />
-                            </div>
-
-                            <div style={{ marginBottom: '24px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                    <span>Time Period</span>
-                                    <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{investmentYears} Years</span>
-                                </div>
-                                <input 
-                                    type="range" 
-                                    min="1" max="30" step="1"
-                                    value={investmentYears} 
-                                    onChange={(e) => setInvestmentYears(Number(e.target.value))}
-                                    style={{ width: '100%', accentColor: 'var(--color-blue)' }}
-                                />
-                            </div>
-
-                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Total Invested</span>
-                                    <span style={{ color: 'var(--text-primary)' }}>₹{calcResult.invested.toLocaleString()}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Est. Returns ({cagr.toFixed(1)}% p.a)</span>
-                                    <span style={{ color: 'var(--color-green-light)' }}>+₹{calcResult.gain.toLocaleString()}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', fontSize: '16px', fontWeight: '600' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Total Value</span>
-                                    <span style={{ color: 'var(--text-primary)' }}>₹{calcResult.wealth.toLocaleString()}</span>
+                        {/* Portfolio Status */}
+                        {userHolding && (
+                            <div style={{ padding: '24px 24px 0 24px' }}>
+                                <div style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px' }}>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Wallet size={14}/> Your Investment</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                        <div>
+                                            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>₹{holdingCurrentValue.toLocaleString(undefined, {maximumFractionDigits:2})}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{userHolding.quantity.toFixed(2)} Units</div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontSize: '15px', fontWeight: '600', color: holdingPnL >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                                                {holdingPnL >= 0 ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>}
+                                                ₹{Math.abs(holdingPnL).toLocaleString(undefined, {maximumFractionDigits:2})}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{holdingPnLPct.toFixed(2)}% Return</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
-                        <div style={{ marginTop: 'auto' }}>
-                            <button 
-                                disabled={isInvesting}
-                                onClick={async () => {
-                                    setIsInvesting(true);
-                                    const qty = investmentAmount / (details?.nav || fund.nav || 1);
-                                    
-                                    let res;
-                                    if (calcType === 'SIP') {
-                                        res = await setupSip({
-                                            symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
-                                            amount: investmentAmount,
-                                            frequency: 'MONTHLY',
-                                            price: details?.nav || fund.nav
-                                        });
-                                    } else {
-                                        res = await placeOrder({
-                                            symbol: `${fund.amc.substring(0,4).toUpperCase()}-MF`,
-                                            type: 'MARKET',
-                                            side: 'BUY',
-                                            quantity: parseFloat(qty.toFixed(4)),
-                                            price: details?.nav || fund.nav,
-                                            margin: investmentAmount,
-                                            product_type: 'DEL'
-                                        });
-                                    }
-                                    
-                                    setIsInvesting(false);
-                                    if (res && res.success) {
-                                        alert(`Successfully ${calcType === 'SIP' ? 'set up SIP for' : 'invested'} ₹${investmentAmount} in ${fund.name}!`);
-                                        onClose();
-                                    } else {
-                                        alert(`Failed to invest: ${res?.error || "Please check your margin balance."}`);
-                                    }
-                                }}
-                                style={{ width: '100%', padding: '14px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: isInvesting ? 'not-allowed' : 'pointer', opacity: isInvesting ? 0.7 : 1 }}
-                            >
-                                {isInvesting ? 'Processing...' : 'Start Investing'}
-                            </button>
+                        <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            {/* Action Tabs */}
+                            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '8px', marginBottom: '24px', border: '1px solid var(--border-color)' }}>
+                                <button onClick={() => setActionMode('INVEST')} style={{ flex: 1, padding: '10px', background: actionMode === 'INVEST' ? 'var(--color-blue)' : 'transparent', color: actionMode === 'INVEST' ? '#fff' : 'var(--text-secondary)', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}>Invest</button>
+                                <button onClick={() => setActionMode('REDEEM')} style={{ flex: 1, padding: '10px', background: actionMode === 'REDEEM' ? 'var(--color-red)' : 'transparent', color: actionMode === 'REDEEM' ? '#fff' : 'var(--text-secondary)', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}>Redeem</button>
+                            </div>
+
+                            {actionMode === 'INVEST' ? (
+                                <>
+                                    {/* Sub Tabs */}
+                                    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                            <input type="radio" checked={investType === 'SIP'} onChange={() => setInvestType('SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Monthly SIP
+                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'LUMPSUM' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                            <input type="radio" checked={investType === 'LUMPSUM'} onChange={() => setInvestType('LUMPSUM')} style={{ accentColor: 'var(--color-blue)' }} /> One-time
+                                        </label>
+                                    </div>
+
+                                    {/* Input Amount */}
+                                    <div style={{ marginBottom: '32px' }}>
+                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>{investType === 'SIP' ? 'Installment Amount' : 'Investment Amount'}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', transition: 'border-color 0.2s' }}>
+                                            <span style={{ fontSize: '24px', color: 'var(--text-secondary)', marginRight: '8px' }}>₹</span>
+                                            <input 
+                                                type="number" 
+                                                value={amount}
+                                                onChange={(e) => setAmount(e.target.value)}
+                                                style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '28px', fontWeight: '700', width: '100%', outline: 'none' }}
+                                                placeholder="5000"
+                                            />
+                                        </div>
+                                        {user && (Number(amount) > user.balance) && (
+                                            <div style={{ color: 'var(--color-red-light)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <XCircle size={12}/> Insufficient Balance (Available: ₹{user.balance?.toLocaleString()})
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Quick Calculator */}
+                                    <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '16px', borderRadius: '12px', marginBottom: 'auto' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}><Calculator size={14}/> Returns Estimator</div>
+                                            <select value={investmentYears} onChange={(e) => setInvestmentYears(Number(e.target.value))} style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', outline: 'none' }}>
+                                                <option value={1}>1 Year</option>
+                                                <option value={3}>3 Years</option>
+                                                <option value={5}>5 Years</option>
+                                                <option value={10}>10 Years</option>
+                                            </select>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                                            <span style={{ color: 'var(--text-secondary)' }}>Invested Amount</span>
+                                            <span style={{ color: 'var(--text-primary)' }}>₹{calcResult.invested.toLocaleString()}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '600' }}>
+                                            <span style={{ color: 'var(--text-primary)' }}>Expected Value</span>
+                                            <span style={{ color: 'var(--color-green-light)' }}>₹{calcResult.wealth.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {!userHolding ? (
+                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                            <div style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                                                <Shield size={32} />
+                                            </div>
+                                            <div style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '8px' }}>No Active Investments</div>
+                                            <div style={{ fontSize: '14px', lineHeight: '1.5', maxWidth: '250px' }}>You don't have any units of this mutual fund to redeem.</div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: redeemType === 'ALL' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                                    <input type="radio" checked={redeemType === 'ALL'} onChange={() => { setRedeemType('ALL'); setAmount(holdingCurrentValue.toFixed(0)); }} style={{ accentColor: 'var(--color-red)' }} /> Redeem All
+                                                </label>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: redeemType === 'CUSTOM' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                                    <input type="radio" checked={redeemType === 'CUSTOM'} onChange={() => setRedeemType('CUSTOM')} style={{ accentColor: 'var(--color-red)' }} /> Custom Amount
+                                                </label>
+                                            </div>
+
+                                            <div style={{ marginBottom: '32px' }}>
+                                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>Amount to Redeem</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', transition: 'border-color 0.2s', opacity: redeemType === 'ALL' ? 0.6 : 1 }}>
+                                                    <span style={{ fontSize: '24px', color: 'var(--text-secondary)', marginRight: '8px' }}>₹</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={redeemType === 'ALL' ? holdingCurrentValue.toFixed(0) : amount}
+                                                        onChange={(e) => setAmount(e.target.value)}
+                                                        disabled={redeemType === 'ALL'}
+                                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '28px', fontWeight: '700', width: '100%', outline: 'none' }}
+                                                    />
+                                                </div>
+                                                {redeemType === 'CUSTOM' && (Number(amount) > holdingCurrentValue) && (
+                                                    <div style={{ color: 'var(--color-red-light)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <XCircle size={12}/> Exceeds total invested value
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px dashed var(--border-color)', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                                    <span>Applicable NAV Date</span>
+                                                    <span style={{ color: 'var(--text-primary)' }}>Today (EOD)</span>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <span>Est. Exit Load</span>
+                                                    <span style={{ color: 'var(--text-primary)' }}>{details?.exit_load ? 'May apply' : 'Nil'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Action Button */}
+                            {(actionMode === 'INVEST' || (actionMode === 'REDEEM' && userHolding)) && (
+                                <div style={{ marginTop: '24px' }}>
+                                    {orderStatus === 'success' ? (
+                                        <div style={{ width: '100%', padding: '16px', background: 'var(--color-green)', color: '#fff', borderRadius: '12px', fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                            <Check size={20} /> {statusMsg}
+                                        </div>
+                                    ) : orderStatus === 'error' ? (
+                                        <div style={{ width: '100%', padding: '16px', background: 'var(--color-red)', color: '#fff', borderRadius: '12px', fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textAlign: 'center' }}>
+                                            <XCircle size={20} style={{ flexShrink: 0 }} /> <span>{statusMsg}</span>
+                                        </div>
+                                    ) : (
+                                        <button 
+                                            disabled={isInvesting || (actionMode === 'INVEST' && Number(amount) < 100) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue)}
+                                            onClick={handleAction}
+                                            style={{ 
+                                                width: '100%', padding: '16px', 
+                                                background: actionMode === 'INVEST' ? 'var(--color-blue)' : 'var(--color-red)', 
+                                                color: '#fff', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', 
+                                                cursor: (isInvesting || (actionMode === 'INVEST' && Number(amount) < 100)) ? 'not-allowed' : 'pointer', 
+                                                opacity: (isInvesting || (actionMode === 'INVEST' && Number(amount) < 100)) ? 0.7 : 1,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                            }}
+                                        >
+                                            {isInvesting ? <Activity size={20} className="spin" /> : null}
+                                            {isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType === 'SIP' ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem'}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -346,5 +485,3 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         </div>
     );
 }
-
-
