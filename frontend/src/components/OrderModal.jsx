@@ -369,15 +369,25 @@ export default function OrderModal() {
                 <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
-                  step={orderModal.lotsize || 1}
+                  step={1}
+                  min={1}
                   value={quantity} 
-                  onChange={e => setQuantity(Math.max(1, Number(e.target.value)))} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') { setQuantity(''); return; }
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num)) setQuantity(Math.max(1, num));
+                  }}
+                  onBlur={e => {
+                    const num = parseInt(e.target.value, 10);
+                    setQuantity(Math.max(1, isNaN(num) ? 1 : num));
+                  }}
                   style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
                 />
               </fieldset>
               {orderModal.lotsize > 1 && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Total Qty: {quantity * orderModal.lotsize}
+                  Total Qty: {(parseInt(quantity) || 0) * orderModal.lotsize}
                 </div>
               )}
             </div>
