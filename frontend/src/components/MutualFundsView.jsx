@@ -1,32 +1,43 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Search, Filter, ArrowUpRight, TrendingUp, Loader2 } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const mobileStyles = `
     @media (max-width: 768px) {
-      .hide-mobile { display: none !important; }
       .mobile-scroll { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 8px !important; }
-      .mobile-padding { padding: 12px !important; }
-      .mobile-card { width: 100% !important; min-width: auto !important; }
+      .mobile-scroll::-webkit-scrollbar { display: none; }
+      .mf-card { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; }
+      .mf-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .mf-card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .mf-card-subtitle { font-size: 12px; color: var(--text-secondary); }
+      .mf-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; margin-top: 4px; }
+      .mf-stat-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+      .mf-stat-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
     }
   `;
-  const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
+  const [mainTab, setMainTab] = useState('Explore');
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
   const [selectedFund, setSelectedFund] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
-  const searchIdRef = useRef(0); // Track latest search to prevent race conditions
+  const searchIdRef = useRef(0);
 
   const ITEMS_PER_PAGE = 50;
 
-  // Debounced auto-search
   useEffect(() => {
       setIsSearching(true);
       setPage(1);
@@ -36,12 +47,11 @@ export default function MutualFundsView() {
           try {
               await searchMutualFunds(search);
           } finally {
-              // Only clear loading if this is still the latest search
               if (currentSearchId === searchIdRef.current) {
                   setIsSearching(false);
               }
           }
-      }, search && search.length >= 2 ? 500 : 0); // No debounce on initial load or empty search
+      }, search && search.length >= 2 ? 500 : 0);
 
       return () => clearTimeout(timer);
   }, [search, searchMutualFunds]);
@@ -86,7 +96,6 @@ export default function MutualFundsView() {
   const enrichFundsBatch = useStore(state => state.enrichFundsBatch);
 
   useEffect(() => {
-      // Whenever the page changes or new funds arrive, enrich any visible funds that don't have return data yet
       if (paginatedFunds.length === 0) return;
       const idsToEnrich = paginatedFunds.filter(f => !f.enriched).map(f => f.id);
       if (idsToEnrich.length > 0) {
@@ -116,49 +125,49 @@ export default function MutualFundsView() {
       <style>{mobileStyles}</style>
 
       {/* Main Navigation (Explore, Dashboard, etc) */}
-      <div style={{ padding: '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '24px', gap: '16px' }}>
-            <div className="mobile-scroll" style={{ display: 'flex', gap: '32px' }}>
+      <div style={{ padding: isMobile ? '16px' : '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '16px', gap: '16px' }}>
+            <div className="mobile-scroll" style={{ display: 'flex', gap: '32px', width: isMobile ? '100%' : 'auto' }}>
                 {mainTabs.map(tab => (
                   <div
                     key={tab}
                     onClick={() => setMainTab(tab)}
                     style={{
                       padding: '0 4px 16px 4px',
-                      fontSize: '18px',
+                      fontSize: isMobile ? '16px' : '18px',
                       fontWeight: mainTab === tab ? '700' : '600',
                       color: mainTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
                       borderBottom: mainTab === tab ? '3px solid #E2E8F0' : '3px solid transparent',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       position: 'relative',
-                      top: '1px' // Cover the border bottom
+                      top: '1px',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     {tab}
                   </div>
                 ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 12px' }}>
-                    <Search size={14} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : 'auto', marginBottom: isMobile ? '12px' : 0 }}>
+                <form onSubmit={handleSearch} style={{ width: '100%', display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 12px' }}>
+                    <Search size={16} color="var(--text-secondary)" style={{ marginRight: '8px' }} />
                     <input 
                         type="text" 
                         placeholder="Search HDFC, SBI, Quant..." 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        autoFocus
-                        style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', outline: 'none', width: '220px' }}
+                        style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', outline: 'none', width: '100%' }}
                     />
-                    {isSearching && <Loader2 size={14} color="var(--color-blue)" className="spin" />}
+                    {isSearching && <Loader2 size={16} color="var(--color-blue)" className="spin" />}
                 </form>
             </div>
         </div>
 
         {mainTab === 'Explore' ? (
           <>
-            {/* Sub Navigation for Explore (All, Equity, Debt, Hybrid) */}
-            <div className="mobile-scroll" style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+            {/* Sub Navigation */}
+            <div className="mobile-scroll" style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
               {tabs.map(tab => (
                 <div
                   key={tab}
@@ -167,12 +176,13 @@ export default function MutualFundsView() {
                     padding: '8px 16px',
                     fontSize: '13px',
                     fontWeight: '600',
-                    background: activeTab === tab ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                    background: activeTab === tab ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-panel)',
                     color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
                     border: activeTab === tab ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
                     borderRadius: '20px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   {tab}
@@ -180,180 +190,234 @@ export default function MutualFundsView() {
               ))}
             </div>
 
-        {/* Results count */}
-        {sortedFunds.length > 0 && (
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, sortedFunds.length)} of {sortedFunds.length} funds
-                {activeTab !== 'All' && ` (${activeTab})`}
-            </div>
-        )}
+            {sortedFunds.length > 0 && (
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, sortedFunds.length)} of {sortedFunds.length} funds
+                    {activeTab !== 'All' && ` (${activeTab})`}
+                </div>
+            )}
 
-        <div className="glass-panel" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                        <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Fund Name</th>
-                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
-                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>NAV</th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return1y')}>
-                            1Y Return {sortConfig.key === 'return1y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                        </th>
-                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return3y')}>
-                            3Y Return {sortConfig.key === 'return3y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                        </th>
-                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
-                            5Y Return {sortConfig.key === 'return5y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                        </th>
-                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('returnAllTime')}>
-                            All Time {sortConfig.key === 'returnAllTime' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                        </th>
-                        <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
+            {isMobile ? (
+                // MOBILE VIEW: Sleek vertical cards
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {isSearching ? (
-                        <tr>
-                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                    <Loader2 size={28} color="var(--color-blue)" className="spin" />
-                                    <span>Searching & calculating returns for "{search}"...</span>
-                                </div>
-                            </td>
-                        </tr>
+                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            <Loader2 size={24} color="var(--color-blue)" className="spin" style={{ margin: '0 auto 12px' }} />
+                            Searching...
+                        </div>
                     ) : paginatedFunds.length > 0 ? (
-                        paginatedFunds.map((fund, idx) => (
-                        <tr key={fund.id} style={{ borderBottom: idx < paginatedFunds.length - 1 ? '1px solid var(--border-color)' : 'none', transition: 'background 0.2s' }}>
-                            <td style={{ padding: '16px', fontWeight: '600' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', flexShrink: 0 }}>
-                                        <TrendingUp size={16} />
+                        paginatedFunds.map((fund) => (
+                            <div key={fund.id} className="mf-card" onClick={() => setSelectedFund(fund)}>
+                                <div className="mf-card-header">
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                                            <TrendingUp size={16} color="var(--text-secondary)" />
+                                        </div>
+                                        <div>
+                                            <div className="mf-card-title">{fund.name}</div>
+                                            <div className="mf-card-subtitle">{fund.category} • {fund.risk}</div>
+                                        </div>
                                     </div>
-                                    <div style={{ minWidth: 0 }}>
-                                        <div style={{ color: 'var(--text-primary)', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }} title={fund.name}>{fund.name}</div>
-                                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{fund.amc} Mutual Fund</div>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund.id); }}
+                                        style={{ background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
+                                    >
+                                        {mfWatchlist.includes(fund.id) ? '★' : '☆'}
+                                    </button>
+                                </div>
+                                <div className="mf-card-stats">
+                                    <div>
+                                        <div className="mf-stat-label">Current NAV</div>
+                                        <div className="mf-stat-value">₹{fund.nav.toFixed(2)}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div className="mf-stat-label">1Y Return</div>
+                                        <div className="mf-stat-value" style={{ color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                                            {fund.return1y >= 0 ? '+' : ''}{fund.return1y}%
+                                        </div>
                                     </div>
                                 </div>
-                            </td>
-                            <td className="hide-mobile" style={{ padding: '16px', color: 'var(--text-secondary)' }}>{fund.category}</td>
-                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'center' }}>
-                                <span style={{ 
-                                    background: fund.risk.includes('High') ? 'rgba(239, 68, 68, 0.1)' : (fund.risk === 'Moderate' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(34, 197, 94, 0.1)'),
-                                    color: fund.risk.includes('High') ? 'var(--color-red-light)' : (fund.risk === 'Moderate' ? 'var(--color-yellow)' : 'var(--color-green-light)'),
-                                    padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600'
-                                }}>
-                                    {fund.risk}
-                                </span>
-                            </td>
-                            <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{fund.nav.toFixed(2)}</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
-                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
-                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
-                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.returnAllTime >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.returnAllTime ? `${fund.returnAllTime >= 0 ? '+' : ''}${fund.returnAllTime}%` : '-'}</td>
-                            <td style={{ padding: '16px', textAlign: 'center' }}>
-                                <button 
-                                    onClick={() => setSelectedFund(fund)}
-                                    style={{ 
-                                        background: 'transparent', color: 'var(--color-blue)', border: '1px solid var(--color-blue)', 
-                                        padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                                        display: 'inline-flex', alignItems: 'center', gap: '4px'
-                                    }}
-                                >
-                                    Invest <ArrowUpRight size={14} />
-                                </button>
-                                <button
-                                    onClick={() => toggleMfWatchlist(fund.id)}
-                                    style={{
-                                        background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none',
-                                        padding: '6px', cursor: 'pointer', fontSize: '18px', marginLeft: '4px'
-                                    }}
-                                    title={mfWatchlist.includes(fund.id) ? "Remove from Watchlist" : "Add to Watchlist"}
-                                >
-                                    {mfWatchlist.includes(fund.id) ? '★' : '☆'}
-                                </button>
-                            </td>
-                        </tr>
-                    ))
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                    <div style={{ color: 'var(--color-blue)', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        Invest <ArrowUpRight size={14} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))
                     ) : search.length >= 2 ? (
-                        <tr>
-                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                No mutual funds found for "{search}". Try "HDFC", "SBI", "Axis", or "Quant".
-                            </td>
-                        </tr>
-                    ) : (
-                        <tr>
-                            <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                    <Search size={32} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
-                                    <span>Failed to load default funds. Please try searching.</span>
-                                </div>
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-        
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px' }}>
-                <button 
-                    disabled={page === 1}
-                    onClick={() => setPage(p => p - 1)}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
-                >
-                    Previous
-                </button>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
-                <button 
-                    disabled={page === totalPages}
-                    onClick={() => setPage(p => p + 1)}
-                    style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}
-                >
-                    Next
-                </button>
-            </div>
-        )}
-        </>
+                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No funds found.</div>
+                    ) : null}
+                </div>
+            ) : (
+                // DESKTOP VIEW: Traditional Table
+                <div className="glass-panel" style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Fund Name</th>
+                                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
+                                <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>NAV</th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return1y')}>
+                                    1Y Return {sortConfig.key === 'return1y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                                </th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return3y')}>
+                                    3Y Return {sortConfig.key === 'return3y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                                </th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
+                                    5Y Return {sortConfig.key === 'return5y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                                </th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('returnAllTime')}>
+                                    All Time {sortConfig.key === 'returnAllTime' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
+                                </th>
+                                <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isSearching ? (
+                                <tr>
+                                    <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                            <Loader2 size={28} color="var(--color-blue)" className="spin" />
+                                            <span>Searching & calculating returns for "{search}"...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : paginatedFunds.length > 0 ? (
+                                paginatedFunds.map((fund, idx) => (
+                                <tr key={fund.id} style={{ borderBottom: idx < paginatedFunds.length - 1 ? '1px solid var(--border-color)' : 'none', transition: 'background 0.2s' }}>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                                                <TrendingUp size={16} />
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ color: 'var(--text-primary)', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '300px' }} title={fund.name}>{fund.name}</div>
+                                                <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '2px' }}>{fund.amc} Mutual Fund</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{fund.category}</td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <span style={{ 
+                                            background: fund.risk.includes('High') ? 'rgba(239, 68, 68, 0.1)' : (fund.risk === 'Moderate' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(34, 197, 94, 0.1)'),
+                                            color: fund.risk.includes('High') ? 'var(--color-red-light)' : (fund.risk === 'Moderate' ? 'var(--color-yellow)' : 'var(--color-green-light)'),
+                                            padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600'
+                                        }}>
+                                            {fund.risk}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{fund.nav.toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.returnAllTime >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.returnAllTime ? `${fund.returnAllTime >= 0 ? '+' : ''}${fund.returnAllTime}%` : '-'}</td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <button 
+                                            onClick={() => setSelectedFund(fund)}
+                                            style={{ 
+                                                background: 'transparent', color: 'var(--color-blue)', border: '1px solid var(--color-blue)', 
+                                                padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                                                display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                            }}
+                                        >
+                                            Invest <ArrowUpRight size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => toggleMfWatchlist(fund.id)}
+                                            style={{
+                                                background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none',
+                                                padding: '6px', cursor: 'pointer', fontSize: '18px', marginLeft: '4px'
+                                            }}
+                                            title={mfWatchlist.includes(fund.id) ? "Remove from Watchlist" : "Add to Watchlist"}
+                                        >
+                                            {mfWatchlist.includes(fund.id) ? '★' : '☆'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                            ) : search.length >= 2 ? (
+                                <tr>
+                                    <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        No mutual funds found for "{search}". Try "HDFC", "SBI", "Axis", or "Quant".
+                                    </td>
+                                </tr>
+                            ) : (
+                                <tr>
+                                    <td colSpan="9" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                            <Search size={32} color="var(--text-secondary)" style={{ opacity: 0.4 }} />
+                                            <span>Failed to load default funds. Please try searching.</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '24px', paddingBottom: '24px' }}>
+                    <button 
+                        disabled={page === 1}
+                        onClick={() => setPage(p => p - 1)}
+                        style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+                    >
+                        Previous
+                    </button>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Page {page} of {totalPages}</span>
+                    <button 
+                        disabled={page === totalPages}
+                        onClick={() => setPage(p => p + 1)}
+                        style={{ padding: '8px 16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.5 : 1 }}
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+          </>
         ) : mainTab === 'SIPs' ? (
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Active SIPs</h3>
-            {/* SIPS Table will be injected here */}
             {sips?.length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                            <th style={{ padding: '16px', textAlign: 'left' }}>Symbol</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Amount</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Frequency</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Next Execution</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Status</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sips.map(sip => (
-                            <tr key={sip.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <td style={{ padding: '16px', fontWeight: '600' }}>{sip.symbol}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>
-                                    <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                                        {new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>
-                                    <span style={{ padding: '4px 8px', borderRadius: '12px', background: sip.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: sip.status === 'ACTIVE' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '11px', fontWeight: '600' }}>
-                                        {sip.status}
-                                    </span>
-                                </td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>
-                                    <button onClick={() => cancelSip(sip.id)} style={{ padding: '6px 12px', background: 'var(--color-red)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
-                                </td>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                <th style={{ padding: '16px', textAlign: 'left' }}>Symbol</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Amount</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Frequency</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Next Execution</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Status</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {sips.map(sip => (
+                                <tr key={sip.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>{sip.symbol}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                            {new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <span style={{ padding: '4px 8px', borderRadius: '12px', background: sip.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: sip.status === 'ACTIVE' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '11px', fontWeight: '600' }}>
+                                            {sip.status}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <button onClick={() => cancelSip(sip.id)} style={{ padding: '6px 12px', background: 'var(--color-red)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             ) : (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no active SIPs.</div>
             )}
@@ -362,59 +426,104 @@ export default function MutualFundsView() {
           <div className="glass-panel" style={{ padding: '24px' }}>
             <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>
             {finalInvestments.length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                            <th style={{ padding: '16px', textAlign: 'left' }}>Fund Symbol</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Units</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Avg NAV</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>Invested Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {finalInvestments.map(h => (
-                            <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <td style={{ padding: '16px', fontWeight: '600' }}>{h.symbol.replace('-MF', '')}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity.toFixed(4)}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '400px' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                <th style={{ padding: '16px', textAlign: 'left' }}>Fund Symbol</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Units</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Avg NAV</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>Invested Amount</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {finalInvestments.map(h => (
+                                <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>{h.symbol.replace('-MF', '')}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity.toFixed(4)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             ) : (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no mutual fund investments yet.</div>
             )}
           </div>
         ) : mainTab === 'Watchlist' ? (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Watchlist</h3>
+          <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
+            {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Watchlist</h3>}
             {mutualFunds.filter(f => mfWatchlist.includes(f.id)).length > 0 ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                            <th style={{ padding: '16px', textAlign: 'left' }}>Fund Name</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Category</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>NAV</th>
-                            <th style={{ padding: '16px', textAlign: 'right' }}>3Y Return</th>
-                            <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
                         {mutualFunds.filter(f => mfWatchlist.includes(f.id)).map(fund => (
-                            <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
-                                <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category}</td>
-                                <td style={{ padding: '16px', textAlign: 'right' }}>₹{fund.nav.toFixed(2)}</td>
-                                <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
-                                <td style={{ padding: '16px', textAlign: 'center' }}>
-                                    <button onClick={() => setSelectedFund(fund)} style={{ padding: '6px 12px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>Invest</button>
-                                    <button onClick={() => toggleMfWatchlist(fund.id)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
-                                </td>
-                            </tr>
+                            <div key={fund.id} className="mf-card" onClick={() => setSelectedFund(fund)}>
+                                <div className="mf-card-header">
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                                            <TrendingUp size={16} color="var(--text-secondary)" />
+                                        </div>
+                                        <div>
+                                            <div className="mf-card-title">{fund.name}</div>
+                                            <div className="mf-card-subtitle">{fund.category} • {fund.risk}</div>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund.id); }}
+                                        style={{ background: 'transparent', color: 'var(--color-yellow)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
+                                    >
+                                        ★
+                                    </button>
+                                </div>
+                                <div className="mf-card-stats">
+                                    <div>
+                                        <div className="mf-stat-label">Current NAV</div>
+                                        <div className="mf-stat-value">₹{fund.nav.toFixed(2)}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div className="mf-stat-label">3Y Return</div>
+                                        <div className="mf-stat-value" style={{ color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                                            {fund.return3y >= 0 ? '+' : ''}{fund.return3y}%
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                                    <div style={{ color: 'var(--color-blue)', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        Invest <ArrowUpRight size={14} />
+                                    </div>
+                                </div>
+                            </div>
                         ))}
-                    </tbody>
-                </table>
+                    </div>
+                ) : (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                <th style={{ padding: '16px', textAlign: 'left' }}>Fund Name</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Category</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>NAV</th>
+                                <th style={{ padding: '16px', textAlign: 'right' }}>3Y Return</th>
+                                <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mutualFunds.filter(f => mfWatchlist.includes(f.id)).map(fund => (
+                                <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
+                                    <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{fund.nav.toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <button onClick={() => setSelectedFund(fund)} style={{ padding: '6px 12px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>Invest</button>
+                                        <button onClick={() => toggleMfWatchlist(fund.id)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )
             ) : (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Your watchlist is empty. Add funds from the Explore tab!</div>
             )}
@@ -424,14 +533,9 @@ export default function MutualFundsView() {
             This section is currently under development. Wait for updates!
           </div>
         )}
-
       </div>
       
       {selectedFund && <MutualFundDetailsModal fund={selectedFund} onClose={() => setSelectedFund(null)} />}
     </div>
   );
 }
-
-
-
-
