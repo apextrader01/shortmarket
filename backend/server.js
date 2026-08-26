@@ -1328,6 +1328,23 @@ function determineRisk(return1y) {
 
 const mfCache = {};
 
+app.post('/api/mf/names', async (req, res) => {
+    try {
+        const { ids } = req.body;
+        const mapping = {};
+        if (Array.isArray(ids)) {
+            ids.forEach(id => {
+                const cleanId = String(id).replace('-MF', '');
+                const fund = allMutualFunds.find(f => String(f.schemeCode) === cleanId);
+                if (fund) mapping[id] = fund.schemeName;
+            });
+        }
+        res.json(mapping);
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 2. FAST Search Endpoint — returns ALL matching funds instantly from memory (no mfapi calls)
 app.get('/api/mf/search', async (req, res) => {
     try {
@@ -1349,7 +1366,7 @@ app.get('/api/mf/search', async (req, res) => {
             });
         } else {
             // Instantly filter from the 37,000+ in-memory list
-            matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query));
+            matches = allMutualFunds.filter(f => f.schemeName.toLowerCase().includes(query) || String(f.schemeCode) === query || String(f.schemeCode) === query.replace('-MF', ''));
         }
         
         // Sort: Direct+Growth first, then Regular+Growth, then others
@@ -1820,7 +1837,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const ord = req.orderToProcess;
     
     // BUG FIX: Use effectiveProductType (not raw product_type from req.body which may be undefined)
-    triggerEngine.addOrderToMemory(ord);
+    await triggerEngine.addOrderToMemory(ord);
     
     setTimeout(() => {
         try {
@@ -1906,7 +1923,7 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
       const orderId = typeof id === 'object' ? id.id : id;
 
       const triggerEngine = require('./services/triggerEngine');
-      triggerEngine.addOrderToMemory({
+      await triggerEngine.addOrderToMemory({
         id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
         status: 'PENDING', product_type: 'DEL', margin: finalMargin
       });
@@ -2190,7 +2207,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     const finalResponseOrders = [];
     
     for (const ord of req.basketOrdersToProcess) {
-       triggerEngine.addOrderToMemory({
+       await triggerEngine.addOrderToMemory({
           id: ord.id, user_id: req.user.id, symbol: ord.symbol, type: ord.type, side: ord.side, quantity: ord.quantity, price: ord.execPrice || null,
           status: ord.status, sl_price: ord.sl_price || null, tgt_price: ord.tgt_price || null, trigger_price: null, trail_amount: null, product_type: ord.product_type, margin: ord.margin
        });
@@ -2471,7 +2488,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       }
       
       const triggerEngine = require('./services/triggerEngine');
-      triggerEngine.addOrderToMemory({ ...order, ...updateObj });
+      await triggerEngine.addOrderToMemory({ ...order, ...updateObj });
       try {
           const { pubClient } = require('./services/redisClient');
           if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});

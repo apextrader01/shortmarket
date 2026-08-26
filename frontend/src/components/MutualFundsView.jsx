@@ -52,7 +52,10 @@ export default function MutualFundsView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: unique })
       })
-      .then(r => r.json())
+      .then(r => {
+          if (!r.ok) throw new Error('Backend failed');
+          return r.json();
+      })
       .then(data => {
           setMfNames(prev => ({ ...prev, ...data }));
           
@@ -70,7 +73,20 @@ export default function MutualFundsView() {
              }
           });
       })
-      .catch(console.error);
+      .catch(err => {
+          console.error("Backend fetch failed, falling back to mfapi:", err);
+          // Complete fallback if backend endpoint completely fails
+          unique.forEach(symbol => {
+             const cleanId = String(symbol).replace('-MF', '');
+             fetch(`https://api.mfapi.in/mf/${cleanId}`)
+               .then(r => r.json())
+               .then(mfData => {
+                   if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                       setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+                   }
+               }).catch(() => {});
+          });
+      });
     }
   }, [sips, holdings, positions]);
 
