@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API } from '../store';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
@@ -402,19 +402,47 @@ export default function MutualFundsView() {
             )}
           </>
         ) : mainTab === 'SIPs' ? (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Active SIPs</h3>
-            {sips?.length > 0 ? (
+          <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
+            {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Active SIPs</h3>}
+            {sips.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active SIPs found.</div>
+            ) : isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {sips.map(sip => (
+                        <div key={sip.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div style={{ fontWeight: '600', fontSize: '16px', flex: 1, paddingRight: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                    {mfNames[sip.symbol] || sip.symbol}
+                                </div>
+                                <span style={{ color: 'var(--color-green)', fontWeight: '600', fontSize: '12px', background: 'rgba(34,197,94,0.1)', padding: '4px 8px', borderRadius: '6px' }}>{sip.status}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Amount</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{sip.amount}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Frequency</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{sip.frequency}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Next Exec</span>
+                                <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                            </div>
+                            <button onClick={() => cancelSip(sip.id)} style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Cancel SIP</button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-primary)' }}>
                         <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                                <th style={{ padding: '16px', textAlign: 'left' }}>Symbol</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Amount</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Frequency</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Next Execution</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Status</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'left' }}>
+                                <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Frequency</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Next Execution</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Status</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -429,34 +457,54 @@ export default function MutualFundsView() {
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                                        <span style={{ padding: '4px 8px', borderRadius: '12px', background: sip.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: sip.status === 'ACTIVE' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '11px', fontWeight: '600' }}>
-                                            {sip.status}
-                                        </span>
+                                        <span style={{ color: 'var(--color-green)', fontWeight: '600', fontSize: '12px' }}>{sip.status}</span>
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                                        <button onClick={() => cancelSip(sip.id)} style={{ padding: '6px 12px', background: 'var(--color-red)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                                        <button onClick={() => cancelSip(sip.id)} className="btn-cancel" style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no active SIPs.</div>
             )}
           </div>
         ) : mainTab === 'Dashboard' ? (
-          <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>
-            {finalInvestments.length > 0 ? (
+          <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
+            {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>}
+            {finalInvestments.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no mutual fund investments.</div>
+            ) : isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {finalInvestments.map(h => (
+                        <div key={h.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                {mfNames[h.symbol] || h.symbol.replace('-MF', '')}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Units</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{h.quantity.toFixed(4)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{h.average_price.toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(h.quantity * h.average_price).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
                 <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '400px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-primary)' }}>
                         <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                                <th style={{ padding: '16px', textAlign: 'left' }}>Fund Symbol</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Units</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Avg NAV</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>Invested Amount</th>
+                            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'left' }}>
+                                <th style={{ padding: '16px', fontWeight: '500' }}>Fund Symbol</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Units</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg NAV</th>
+                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Invested Amount</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -471,8 +519,6 @@ export default function MutualFundsView() {
                         </tbody>
                     </table>
                 </div>
-            ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no mutual fund investments yet.</div>
             )}
           </div>
         ) : mainTab === 'Watchlist' ? (
