@@ -53,7 +53,23 @@ export default function MutualFundsView() {
         body: JSON.stringify({ ids: unique })
       })
       .then(r => r.json())
-      .then(data => setMfNames(data))
+      .then(data => {
+          setMfNames(prev => ({ ...prev, ...data }));
+          
+          // For any missing names, fallback to direct mfapi fetch
+          unique.forEach(symbol => {
+             if (!data[symbol]) {
+                 const cleanId = String(symbol).replace('-MF', '');
+                 fetch(`https://api.mfapi.in/mf/${cleanId}`)
+                   .then(r => r.json())
+                   .then(mfData => {
+                       if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                           setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+                       }
+                   }).catch(() => {});
+             }
+          });
+      })
       .catch(console.error);
     }
   }, [sips, holdings, positions]);
