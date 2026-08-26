@@ -5,6 +5,12 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
 
 export default function AnalyticsView() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const { user } = useStore(useShallow(state => ({ user: state.user })));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +95,7 @@ export default function AnalyticsView() {
       </div>
 
       {/* Equity Curve Chart */}
-      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', height: '400px' }}>
+      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', height: isMobile ? '300px' : '400px' }}>
         <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Cumulative Equity Curve</h3>
         {equityCurve && equityCurve.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -100,7 +106,7 @@ export default function AnalyticsView() {
                   <stop offset="95%" stopColor="var(--color-blue)" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
               <XAxis dataKey="date" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `₹${val}`} />
               <Tooltip content={<CustomTooltip />} />
@@ -120,9 +126,32 @@ export default function AnalyticsView() {
           Trade Log (Last 50 Closed Trades)
         </div>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {recentTrades && recentTrades.length > 0 ? recentTrades.map((trade, i) => (
+                <div key={i} style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 'bold' }}>{trade.symbol}</div>
+                    <div style={{ fontWeight: 'bold', color: parseFloat(trade.realized_pnl) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                      ₹{parseFloat(trade.realized_pnl).toFixed(2)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
+                    <div style={{ color: 'var(--text-secondary)' }}>{new Date(trade.created_at).toLocaleString()}</div>
+                    <div>
+                      <span style={{ color: trade.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: 'bold' }}>{trade.side}</span> {trade.quantity}
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No closed trades found.</div>
+              )}
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+              <tr style={{ background: 'var(--bg-panel)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                 <th style={{ padding: '12px 20px', fontWeight: '500' }}>Date</th>
                 <th style={{ padding: '12px 20px', fontWeight: '500' }}>Symbol</th>
                 <th style={{ padding: '12px 20px', fontWeight: '500' }}>Type</th>
@@ -131,7 +160,7 @@ export default function AnalyticsView() {
             </thead>
             <tbody>
               {recentTrades && recentTrades.length > 0 ? recentTrades.map((trade, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td style={{ padding: '12px 20px' }}>{new Date(trade.created_at).toLocaleString()}</td>
                   <td style={{ padding: '12px 20px', fontWeight: 'bold' }}>{trade.symbol}</td>
                   <td style={{ padding: '12px 20px' }}>
@@ -148,6 +177,8 @@ export default function AnalyticsView() {
               )}
             </tbody>
           </table>
+          )}
+  
         </div>
       </div>
 

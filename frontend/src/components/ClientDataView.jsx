@@ -91,7 +91,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
       {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
       <div>
-        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: '#E2E8F0' }}>{title}</div>
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
         {desc && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>}
       </div>
     </div>
@@ -123,14 +123,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             title="Upload Profile Picture"
           >
             {isUploading ? (
-              <Loader2 size={24} className="animate-spin" color="#FFF" />
+              <Loader2 size={24} className="animate-spin" color="var(--text-primary)" />
             ) : !user?.profile_picture_url ? (
               user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
             ) : null}
             
             {!isUploading && (
               <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '30%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <Upload size={12} color="#FFF" />
+                <Upload size={12} color="var(--text-primary)" />
               </div>
             )}
           </div>
@@ -144,7 +144,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           />
 
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
               {user?.username || 'Hari Krishnan I Vijayan'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
@@ -175,7 +175,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: 'var(--text-primary)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
             DEPOSIT
           </button>
           <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
@@ -190,7 +190,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         
         {/* Reports */}
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Reports</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Reports</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
@@ -217,8 +217,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
         {/* Coming Features */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Coming Features</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Coming Features</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.041% interest per day" color="#A855F7" />
             <div onClick={() => setActiveTab('Options')} style={{ textDecoration: 'none', color: 'inherit' }}>
               <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" />
@@ -228,8 +228,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
         {/* Subscription Plan */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Subscription Plan</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Market & get rewarded ₹500" color="#34D399" />
             <div onClick={() => setActiveTab('Pricing')} style={{ textDecoration: 'none', color: 'inherit' }}>
               <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" />
@@ -240,10 +240,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         {/* Quick Settings */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#E2E8F0' }}>Quick Settings</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>Quick Settings</h3>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Font Size</div>
@@ -307,8 +307,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
         {/* Account Settings */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Account Settings & Other Info</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Account Settings & Other Info</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>Subscription Plans</span>
@@ -336,14 +336,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
           </div>
-          <button style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '10px 20px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
             KNOW MORE
           </button>
         </div>
       </div>
       
       {/* Floating Ask Angel / Support Button */}
-      <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: '#FFF', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
+      <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
         <HelpCircle size={18} />
         <span style={{ fontSize: '14px', fontWeight: '700' }}>Ask Support</span>
       </div>
@@ -369,11 +369,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
                 <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Buy (Market)</span>
-                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
                 <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Sell (Market)</span>
-                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
               </div>
             </div>
           </div>
