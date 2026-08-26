@@ -4,6 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
 
@@ -35,6 +37,27 @@ export default function MutualFundsView() {
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
   const searchIdRef = useRef(0);
+
+  const [mfNames, setMfNames] = useState({});
+  useEffect(() => {
+    const symbols = [
+      ...(sips || []).map(s => s.symbol),
+      ...(holdings || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol),
+      ...(positions || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol)
+    ];
+    const unique = [...new Set(symbols)];
+    if (unique.length > 0) {
+      fetch(`${API}/api/mf/names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: unique })
+      })
+      .then(r => r.json())
+      .then(data => setMfNames(data))
+      .catch(console.error);
+    }
+  }, [sips, holdings, positions]);
+
 
   const ITEMS_PER_PAGE = 50;
 
@@ -397,7 +420,7 @@ export default function MutualFundsView() {
                         <tbody>
                             {sips.map(sip => (
                                 <tr key={sip.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '16px', fontWeight: '600' }}>{sip.symbol}</td>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[sip.symbol] || sip.symbol}</td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
@@ -439,7 +462,7 @@ export default function MutualFundsView() {
                         <tbody>
                             {finalInvestments.map(h => (
                                 <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '16px', fontWeight: '600' }}>{h.symbol.replace('-MF', '')}</td>
+                                    <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[h.symbol] || h.symbol.replace('-MF', '')}</td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity.toFixed(4)}</td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
                                     <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
