@@ -1901,14 +1901,14 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
 
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-        status: 'PENDING', product_type: 'SIP', margin: finalMargin
+        status: 'PENDING', product_type: 'DEL', margin: finalMargin
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
 
       const triggerEngine = require('./services/triggerEngine');
       triggerEngine.addOrderToMemory({
         id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-        status: 'PENDING', product_type: 'SIP', margin: finalMargin
+        status: 'PENDING', product_type: 'DEL', margin: finalMargin
       });
       try {
           const { pubClient } = require('./services/redisClient');
