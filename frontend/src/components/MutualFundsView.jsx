@@ -6,6 +6,15 @@ import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 export default function MutualFundsView() {
   const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
+
+  const mobileStyles = `
+    @media (max-width: 768px) {
+      .hide-mobile { display: none !important; }
+      .mobile-scroll { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 8px !important; }
+      .mobile-padding { padding: 12px !important; }
+      .mobile-card { width: 100% !important; min-width: auto !important; }
+    }
+  `;
   const [mainTab, setMainTab] = useState('Explore'); // New top-level tabs
   const [activeTab, setActiveTab] = useState('All');
   const [search, setSearch] = useState('');
@@ -104,11 +113,12 @@ export default function MutualFundsView() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
+      <style>{mobileStyles}</style>
 
       {/* Main Navigation (Explore, Dashboard, etc) */}
       <div style={{ padding: '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '24px', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '32px' }}>
+            <div className="mobile-scroll" style={{ display: 'flex', gap: '32px' }}>
                 {mainTabs.map(tab => (
                   <div
                     key={tab}
@@ -148,7 +158,7 @@ export default function MutualFundsView() {
         {mainTab === 'Explore' ? (
           <>
             {/* Sub Navigation for Explore (All, Equity, Debt, Hybrid) */}
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+            <div className="mobile-scroll" style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
               {tabs.map(tab => (
                 <div
                   key={tab}
@@ -183,19 +193,19 @@ export default function MutualFundsView() {
                 <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
                         <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Fund Name</th>
-                        <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
-                        <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
+                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
+                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
                         <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>NAV</th>
                         <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return1y')}>
                             1Y Return {sortConfig.key === 'return1y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                         </th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return3y')}>
+                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return3y')}>
                             3Y Return {sortConfig.key === 'return3y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                         </th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
+                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return5y')}>
                             5Y Return {sortConfig.key === 'return5y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                         </th>
-                        <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('returnAllTime')}>
+                        <th className="hide-mobile" style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('returnAllTime')}>
                             All Time {sortConfig.key === 'returnAllTime' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                         </th>
                         <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Action</th>
@@ -225,8 +235,8 @@ export default function MutualFundsView() {
                                     </div>
                                 </div>
                             </td>
-                            <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{fund.category}</td>
-                            <td style={{ padding: '16px', textAlign: 'center' }}>
+                            <td className="hide-mobile" style={{ padding: '16px', color: 'var(--text-secondary)' }}>{fund.category}</td>
+                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'center' }}>
                                 <span style={{ 
                                     background: fund.risk.includes('High') ? 'rgba(239, 68, 68, 0.1)' : (fund.risk === 'Moderate' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(34, 197, 94, 0.1)'),
                                     color: fund.risk.includes('High') ? 'var(--color-red-light)' : (fund.risk === 'Moderate' ? 'var(--color-yellow)' : 'var(--color-green-light)'),
@@ -237,9 +247,9 @@ export default function MutualFundsView() {
                             </td>
                             <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>₹{fund.nav.toFixed(2)}</td>
                             <td style={{ padding: '16px', textAlign: 'right', color: fund.return1y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return1y >= 0 ? '+' : ''}{fund.return1y}%</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
-                            <td style={{ padding: '16px', textAlign: 'right', color: fund.returnAllTime >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.returnAllTime ? `${fund.returnAllTime >= 0 ? '+' : ''}${fund.returnAllTime}%` : '-'}</td>
+                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
+                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.return5y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.return5y ? `${fund.return5y >= 0 ? '+' : ''}${fund.return5y}%` : '-'}</td>
+                            <td className="hide-mobile" style={{ padding: '16px', textAlign: 'right', color: fund.returnAllTime >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{fund.enriched || fund.returnAllTime ? `${fund.returnAllTime >= 0 ? '+' : ''}${fund.returnAllTime}%` : '-'}</td>
                             <td style={{ padding: '16px', textAlign: 'center' }}>
                                 <button 
                                     onClick={() => setSelectedFund(fund)}

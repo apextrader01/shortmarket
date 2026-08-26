@@ -154,19 +154,59 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
 
     return (
+        
+    <style>{`
+        @media (max-width: 768px) {
+            .mf-modal-container {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+                border-radius: 0 !important;
+            }
+            .mf-modal-content {
+                flex-direction: column !important;
+                overflow-y: auto !important;
+            }
+            .mf-modal-left {
+                width: 100% !important;
+                padding: 16px !important;
+                flex: none !important;
+            }
+            .mf-modal-right {
+                width: 100% !important;
+                border-left: none !important;
+                border-top: 1px solid var(--border-color) !important;
+            }
+            .mf-metrics-grid {
+                flex-direction: column !important;
+                gap: 16px !important;
+            }
+            .mf-info-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .mf-nav-big {
+                font-size: 24px !important;
+            }
+            .mf-header {
+                padding: 16px !important;
+            }
+        }
+    `}</style>
+
         <div className="modal-backdrop" style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-            <div style={{
+            <div className="mf-modal-container" style={{
                 width: '1100px', maxWidth: '95vw', height: '85vh',
                 background: 'var(--bg-dark)', borderRadius: '16px',
                 border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
                 display: 'flex', flexDirection: 'column', overflow: 'hidden'
             }}>
                 {/* Header */}
-                <div style={{ padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
+                <div className="mf-header" style={{ padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
                     <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                         {details?.logo_url ? (
                             <img src={details.logo_url} alt="AMC" style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fff', padding: '4px' }} />
@@ -194,15 +234,15 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 </div>
 
                 {/* Content */}
-                <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <div className="mf-modal-content" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     
                     {/* Left Column (Details & Chart) */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+                    <div className="mf-modal-left" style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
                         {/* NAV & Key Metrics */}
-                        <div style={{ display: 'flex', gap: '48px', marginBottom: '32px' }}>
+                        <div className="mf-metrics-grid" style={{ display: 'flex', gap: '48px', marginBottom: '32px' }}>
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Current NAV</div>
-                                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div className="mf-nav-big" style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     ₹{details?.nav || fund.nav}
                                     {fund.dayChange !== undefined && (
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: fund.dayChange >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center' }}>
@@ -274,7 +314,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                 </div>
 
                                 {/* About / Grid */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div className="mf-info-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                                     <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                                         <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={16} /> Fund Information</h4>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
@@ -309,7 +349,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                     </div>
 
                     {/* Right Column (Action Panel) */}
-                    <div style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
+                    <div className="mf-modal-right" style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
                         
                         {/* Portfolio Status */}
                         {userHolding && (
