@@ -154,7 +154,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
 
     return (
-        
+        <>
     <style>{`
         @media (max-width: 768px) {
             .mf-modal-container {
@@ -523,5 +523,6 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 </div>
             </div>
         </div>
+        </>
     );
 }
