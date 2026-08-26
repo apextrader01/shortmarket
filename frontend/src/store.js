@@ -44,6 +44,12 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 4000)) {
         continue;
     }
+
+    // Block stale data: Never overwrite a newer price with an older price based on backend timestamp.
+    // This fixes the "PM2 Cluster Flickering" bug where a worker node sends stale REST data.
+    if (old && old.timestamp && data.timestamp && data.timestamp < old.timestamp) {
+        continue;
+    }
     
     const tick = old
       ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
