@@ -237,7 +237,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
                     {stock.exchange}
                   </span>
                 </div>
-                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.name}</div>
+                <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.description || stock.name}</div>
               </div>
 
               {/* Action Buttons (visible on hover or always in search mode) */}
