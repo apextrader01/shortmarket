@@ -44,7 +44,7 @@ function initializeCache() {
     const symbolMap = new Map();
     
     rawInstruments.forEach(item => {
-        item.search_string = `${item.symbol} ${item.name} ${item.exchange}`.toLowerCase();
+        item.search_string = `${item.symbol} ${item.name || ''} ${item.description || ''} ${item.exchange || ''}`.toLowerCase();
         if (!item.unique_symbol) item.unique_symbol = item.symbol;
         
         // Filter out weird debt/bond segments (usually ends with -N0 to -N9, -NO, -F, etc)
