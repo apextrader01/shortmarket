@@ -22,7 +22,7 @@ export default function OrdersView() {
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
     if (activeTab === 'Open Orders') return order.status === 'PENDING' && !order.parent_order_id;
-    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && isToday(order.updated_at || order.created_at);
+    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER';
     return false;
   });
   
@@ -209,7 +209,7 @@ export default function OrdersView() {
                         {(() => {
                           if (!trigger.createdAt) return '—';
                           const d = new Date(trigger.createdAt);
-                          return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                          return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
                         })()}
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={trigger.symbol || ''}>
@@ -277,7 +277,7 @@ export default function OrdersView() {
                         const dateStr = activeTab === 'Order History' ? (order.updated_at || order.created_at) : order.created_at;
                         if (!dateStr) return '—';
                         const d = new Date(dateStr);
-                        return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
                       })()}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>{(order.symbol || '').split('-')[0] || '—'}</td>
@@ -428,3 +428,4 @@ export default function OrdersView() {
     </div>
   );
 }
+
