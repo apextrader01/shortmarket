@@ -457,22 +457,49 @@ function garbageCollectSubscriptions() {
     const now = Date.now();
     const staleFyersSymbols = [];
     
-    // --- ANTI-GC FOR PENDING ORDERS ---
+    // --- ANTI-GC FOR ESSENTIAL SYMBOLS ---
+    // Prevent garbage collection for open orders, positions, and active watchlists
+    // even if frontend clients disconnect or fail to ping.
     try {
         const db = require('../database/db');
+        const protectSymbol = (sym) => {
+            if (sym && !sym.endsWith('-MF')) {
+                symbolLastSeen.set(sym, now); // Prevent GC
+                if (!clientSubscriptions.has(sym)) {
+                    clientSubscriptions.add(sym);
+                    const fSym = toFyersSymbol(sym);
+                    if (fSym && !subQueue.includes(fSym)) subQueue.push(fSym);
+                }
+            }
+        };
+        
+        // 1. Protect Indices
+        ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'].forEach(protectSymbol);
+        
+        // 2. Protect Pending Orders
         db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).distinct('symbol')
+            .then(rows => rows.forEach(r => protectSymbol(r.symbol))).catch(()=>{});
+            
+        // 3. Protect Open Positions
+        db('positions').where('qty', '!=', 0).distinct('symbol')
+            .then(rows => rows.forEach(r => protectSymbol(r.symbol))).catch(()=>{});
+            
+        // 4. Protect ALL Watchlists (they are small enough to always keep alive)
+        db('watchlists').select('symbols')
             .then(rows => {
                 rows.forEach(row => {
-                    symbolLastSeen.set(row.symbol, now); // Prevent GC
-                    if (!clientSubscriptions.has(row.symbol)) {
-                        clientSubscriptions.add(row.symbol);
-                        const fSym = toFyersSymbol(row.symbol);
-                        if (fSym && !subQueue.includes(fSym)) {
-                            subQueue.push(fSym);
-                        }
-                    }
+                    try {
+                        const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
+                        syms.forEach(s => { const sym = typeof s === 'string' ? s : s?.symbol; protectSymbol(sym); });
+                    } catch(e) {}
                 });
-            }).catch(e => {});
+            }).catch(()=>{})
+            .finally(() => {
+                if (wsInstance && isFyersConnected && subQueue.length > 0) {
+                    processSubQueue();
+                }
+            });
+            
     } catch(e) {}
     // ----------------------------------
 
