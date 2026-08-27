@@ -229,6 +229,10 @@ function startLiveWebSocket() {
         lastTickTime = Date.now();
         isFyersConnected = true;
         
+        // CRITICAL: Always enable autoreconnect unconditionally so Fyers can
+        // recover from hourly session drops even when no clients are connected at boot.
+        if (wsInstance) wsInstance.autoreconnect();
+        
         // Re-subscribe to all existing client subscriptions
         if (clientSubscriptions.size > 0) {
             const fyersSymbols = Array.from(clientSubscriptions)
@@ -243,7 +247,6 @@ function startLiveWebSocket() {
                           wsInstance.subscribe(chunk);
                           await new Promise(r => setTimeout(r, 300));
                       }
-                      if (wsInstance) wsInstance.autoreconnect();
                   })();
         }
         
