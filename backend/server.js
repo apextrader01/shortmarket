@@ -2932,7 +2932,18 @@ server.listen(PORT, async () => {
     schedule.scheduleJob(loginRule, async () => {
       console.log('⏰ Daily 2:00 AM Cron: Refreshing Fyers Token...');
       await initFyers(io, priceCache, true);
-    });
+      });
+
+      const optionsRule = new schedule.RecurrenceRule();
+      optionsRule.dayOfWeek = [new schedule.Range(1, 5)];
+      optionsRule.hour = 8;
+      optionsRule.minute = 15;
+      optionsRule.tz = 'Asia/Kolkata';
+      schedule.scheduleJob(optionsRule, async () => {
+        console.log('Daily 8:15 AM Cron: Updating Options & Futures Master...');
+        await updateOptionsMaster().catch(e => console.error(e));
+      });
+
 
     // Initialize TriggerEngine
     triggerEngine.setSocketIo(io);
@@ -2971,6 +2982,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 
 
 
