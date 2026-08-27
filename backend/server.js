@@ -439,7 +439,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: user.is_admin, is_onboarded: Boolean(user.is_onboarded), watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
+    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: Boolean(user.is_admin), is_onboarded: Boolean(user.is_onboarded), watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
@@ -547,6 +547,8 @@ app.get('/api/user', authenticateToken, async (req, res) => {
     delete user.password_hash;
     if (typeof user.watchlists === 'string') user.watchlists = JSON.parse(user.watchlists);
     user.balance = parseFloat(user.balance || 0);
+    user.is_admin = Boolean(user.is_admin);
+    user.is_onboarded = Boolean(user.is_onboarded);
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });

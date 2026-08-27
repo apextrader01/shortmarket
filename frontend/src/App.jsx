@@ -304,7 +304,7 @@ function App() {
   if (!user) {
     return <LoginView />;
   }
-  if (user && !user.is_onboarded && !user.is_admin) {
+  if (user && !user.is_onboarded && !user.is_admin && window.location.pathname !== '/adminpanel') {
     return <OnboardingWizard />;
   }
 
