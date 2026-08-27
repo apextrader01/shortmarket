@@ -486,7 +486,11 @@ async function garbageCollectSubscriptions() {
                 if (!clientSubscriptions.has(sym)) {
                     clientSubscriptions.add(sym);
                     const fSym = toFyersSymbol(sym);
-                    if (fSym && !subQueue.includes(fSym)) subQueue.push(fSym);
+                    if (fSym) {
+                        if (!subQueue.includes(fSym)) subQueue.push(fSym);
+                        if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+                        if (!globalFyersToRequested[fSym].includes(sym)) globalFyersToRequested[fSym].push(sym);
+                    }
                 }
             }
         };
