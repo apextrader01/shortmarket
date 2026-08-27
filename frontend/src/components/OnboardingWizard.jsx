@@ -5,7 +5,7 @@ import { User, Briefcase, TrendingUp, CheckCircle, ChevronRight, ChevronLeft, Up
 import indianStatesData from '../data/indianStates.json';
 
 export default function OnboardingWizard() {
-  const { saveProfile } = useStore(useShallow(state => ({ saveProfile: state.saveProfile })));
+  const { saveProfile, skipOnboarding } = useStore(useShallow(state => ({ saveProfile: state.saveProfile, skipOnboarding: state.skipOnboarding })));
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -278,7 +278,11 @@ export default function OnboardingWizard() {
             <button onClick={handlePrev} style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
               <ChevronLeft size={16} /> Back
             </button>
-          ) : <div />}
+          ) : (
+            <button onClick={skipOnboarding} style={{ padding: '12px 24px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
+              Skip for now
+            </button>
+          )}
           
           {step < 3 ? (
             <button onClick={handleNext} style={{ padding: '12px 32px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '700' }}>

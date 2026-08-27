@@ -70,6 +70,8 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
+  hasSkippedOnboarding: false,
+  skipOnboarding: () => set({ hasSkippedOnboarding: true }),
   
   authError: null,
 
