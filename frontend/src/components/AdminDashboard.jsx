@@ -3,6 +3,97 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User } from 'lucide-react';
 
+
+function SystemStatusTab() {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/fyers/status`);
+        const data = await res.json();
+        setStatus(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) return <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>Loading system status...</div>;
+  if (!status) return <div style={{ padding: '24px', color: 'var(--color-red)' }}>Failed to fetch system status. Is the backend running?</div>;
+
+  const isHealthy = status.isFyersConnected && status.hasAccessToken && status.secondsSinceLastTick < 15;
+
+  return (
+    <div style={{ padding: '24px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: `1px solid ${isHealthy ? 'var(--color-green)' : 'var(--color-red)'}` }}>
+        <Activity size={32} color={isHealthy ? 'var(--color-green)' : 'var(--color-red)'} />
+        <div>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker Connection Status</h3>
+          <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold' }}>
+            {isHealthy ? 'System is Healthy & Receiving Live Data' : 'System is Disconnected or Stalled'}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Fyers Access Token</div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.hasAccessToken ? 'var(--color-green)' : 'var(--color-red)' }}>
+            {status.hasAccessToken ? 'Valid & Loaded' : 'Missing'}
+          </div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>WebSocket Connection</div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.isFyersConnected ? 'var(--color-green)' : 'var(--color-red)' }}>
+            {status.isFyersConnected ? 'Connected' : 'Disconnected'}
+          </div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Time Since Last Tick</div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.secondsSinceLastTick < 10 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
+            {status.secondsSinceLastTick.toFixed(1)} seconds ago
+          </div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Active Subscriptions</div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+            {status.subscriptions?.length || 0} symbols
+          </div>
+        </div>
+      </div>
+
+      {status.lastDataSocketError && (
+        <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--color-red)', padding: '16px', borderRadius: '8px' }}>
+          <h4 style={{ margin: '0 0 8px 0', color: 'var(--color-red)' }}>Recent WebSocket Error</h4>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '12px', color: 'var(--color-red-light)' }}>
+            {status.lastDataSocketError}
+          </pre>
+        </div>
+      )}
+
+      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <h4 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)' }}>Currently Subscribed Symbols (Live Data)</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {status.subscriptions && status.subscriptions.length > 0 ? status.subscriptions.map(sym => (
+            <span key={sym} style={{ background: 'var(--bg-panel)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>
+              {sym}
+            </span>
+          )) : (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No active subscriptions</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails } = useStore(useShallow(state => ({ fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails })));
   
@@ -211,7 +302,13 @@ export default function AdminDashboard() {
           </h2>
           <div style={{ display: 'flex', gap: '16px', marginTop: '16px', overflowX: 'auto' }} className="scrollbar-hide">
             <button 
-              onClick={() => setActiveTab('analytics')} 
+                onClick={() => setActiveTab('system')} 
+                style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                System Status
+              </button>
+              <button 
+                onClick={() => setActiveTab('analytics')}
               style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Analytics & Insights
@@ -298,6 +395,8 @@ export default function AdminDashboard() {
       <div style={{ background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
+        ) : activeTab === 'system' ? (
+          <SystemStatusTab />
         ) : activeTab === 'analytics' ? (
           <div style={{ padding: '24px' }}>
             {analytics ? (
