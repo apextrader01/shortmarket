@@ -2880,6 +2880,35 @@ server.listen(PORT, async () => {
       if (cacheSubClient.isReady) setupMasterSubscriptions();
       else cacheSubClient.on('ready', setupMasterSubscriptions);
 
+      // --- BOOT SELF-SUBSCRIPTION ---
+      const bootSubscribeFromDB = async () => {
+        try {
+          const db = require('./database/db');
+          const { addSubscriptionBatch } = require('./services/fyers');
+          if (!addSubscriptionBatch) return;
+          const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
+          const wlRows = await db('watchlists').select('symbols').catch(() => []);
+          wlRows.forEach(row => {
+            try {
+              const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
+              syms.forEach(s => { const sym = typeof s === 'string' ? s : s && s.symbol; if (sym && !sym.endsWith('-MF')) allSymbols.add(sym); });
+            } catch(e) {}
+          });
+          const posRows = await db('positions').where('qty', '!=', 0).select('symbol').catch(() => []);
+          posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
+          const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
+          ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
+          const list = Array.from(allSymbols);
+          console.log('Boot self-subscription: ' + list.length + ' symbols from DB');
+          addSubscriptionBatch(list);
+        } catch(e) { console.error('Boot self-sub error:', e.message); }
+      };
+      setTimeout(bootSubscribeFromDB, 5000);
+      setTimeout(bootSubscribeFromDB, 15000);
+      setTimeout(bootSubscribeFromDB, 30000);
+      setInterval(bootSubscribeFromDB, 5 * 60 * 1000);
+      // ---------------------------------
+
       // Update options master in background
       updateOptionsMaster().catch(e => console.error(e));
     
