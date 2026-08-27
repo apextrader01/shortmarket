@@ -102,7 +102,7 @@ export default function OrdersView() {
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{
                 background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
-                padding: '6px 12px', borderRadius: '4px', color: '#fff', fontSize: '13px',
+                padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
                 outline: 'none', cursor: 'pointer'
               }}
             >
@@ -119,7 +119,7 @@ export default function OrdersView() {
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
-              padding: '6px 12px', borderRadius: '4px', color: '#fff', fontSize: '13px',
+              padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
               width: '200px', outline: 'none'
             }}
           />
@@ -428,4 +428,6 @@ export default function OrdersView() {
     </div>
   );
 }
+
+
 

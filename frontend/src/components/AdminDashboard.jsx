@@ -529,7 +529,7 @@ export default function AdminDashboard() {
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
                     <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
                     <td style={{ padding: '16px' }}>
-                      <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
+                      <span style={{ background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.description}</td>
                     <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
@@ -594,7 +594,7 @@ export default function AdminDashboard() {
                             <Clock size={12} /> Pending
                           </div>
                         ) : (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
                             Missing
                           </div>
                         )}
@@ -871,3 +871,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+

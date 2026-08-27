@@ -56,7 +56,7 @@ const TradingInsights = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Instrument: <span style={{ color: 'var(--color-blue-light)' }}>F/O Trading Insights</span></div>
-           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
              {['Week', '15 Days', 'Month', '3 Months', 'Custom'].map(f => (
                <div key={f} onClick={() => setFilterPeriod(f)} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: filterPeriod === f ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: filterPeriod === f ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
                  {f}
@@ -128,7 +128,7 @@ const TradingInsights = () => {
                     <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>
                     <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
                     <td style={{ padding: '12px' }}>
-                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'var(--bg-hover)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
                           {o.side}
                        </span>
                     </td>
@@ -146,3 +146,5 @@ const TradingInsights = () => {
     </div>
   );
 };
+
+

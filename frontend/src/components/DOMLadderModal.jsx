@@ -134,7 +134,7 @@ export default function DOMLadderModal() {
                return (
                  <div key={i} style={{ 
                    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', 
-                   background: isLTP ? 'rgba(255,255,255,0.1)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
+                   background: isLTP ? 'var(--border-color)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
                    fontSize: '13px', fontWeight: isLTP ? 'bold' : '500', height: '32px'
                  }}>
                    
@@ -206,3 +206,5 @@ export default function DOMLadderModal() {
     </div>
   );
 }
+
+

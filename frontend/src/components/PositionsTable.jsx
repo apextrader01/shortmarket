@@ -30,14 +30,14 @@ export default function PositionsTable() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Positions</h3>
-            <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', padding: '2px' }}>
+            <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '4px', padding: '2px' }}>
               <button
                 onClick={() => setViewMode('OPEN')}
-                style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
+                style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
               >OPEN</button>
               <button
                 onClick={() => setViewMode('CLOSED')}
-                style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
+                style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '2px 8px', borderRadius: '3px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' }}
               >CLOSED</button>
             </div>
           </div>
@@ -149,3 +149,6 @@ export default function PositionsTable() {
     </div>
   );
 }
+
+
+

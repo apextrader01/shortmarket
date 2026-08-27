@@ -152,7 +152,7 @@ export default function AboutUsView({ setActiveTab }) {
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-secondary)' }}>Exchange and Regulators</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {regulators.map(reg => (
-              <div key={reg} style={{ background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+              <div key={reg} style={{ background: 'var(--bg-hover)', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
                 {reg}
               </div>
             ))}
@@ -162,3 +162,5 @@ export default function AboutUsView({ setActiveTab }) {
     </div>
   );
 }
+
+

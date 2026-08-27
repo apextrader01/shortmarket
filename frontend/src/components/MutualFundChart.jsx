@@ -27,13 +27,13 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
                 // Create chart
                 chart = createChart(chartContainerRef.current, {
                     layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9ca3af' },
-                    grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } },
+                    grid: { vertLines: { color: 'var(--bg-hover)' }, horzLines: { color: 'var(--bg-hover)' } },
                     timeScale: { 
-                        borderColor: 'rgba(255,255,255,0.1)', 
+                        borderColor: 'var(--border-color)', 
                         timeVisible: true,
                         rightOffset: 12
                     },
-                    rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+                    rightPriceScale: { borderColor: 'var(--border-color)' },
                     crosshair: {
                         mode: 1,
                         vertLine: { color: 'rgba(255,255,255,0.4)', width: 1, style: 1 },
@@ -100,3 +100,5 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
         </div>
     );
 }
+
+

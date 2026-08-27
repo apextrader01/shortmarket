@@ -145,7 +145,7 @@ const LedgerStatement = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Period:</span>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
               <span 
                 key={p} 
@@ -164,15 +164,15 @@ const LedgerStatement = () => {
           </span>
           {filterPeriod === 'Custom' && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
             </div>
           )}
           <select 
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+            style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
           >
             <option value="All" style={{ color: '#000' }}>Transaction Type</option>
             <option value="Credits" style={{ color: '#000' }}>Credits</option>
@@ -211,7 +211,7 @@ const LedgerStatement = () => {
               <tr>
                 <td colSpan="7" style={{ padding: '64px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '24px', borderRadius: '12px' }}>
+                    <div style={{ background: 'var(--bg-hover)', padding: '24px', borderRadius: '12px' }}>
                       <FileText size={48} color="var(--text-secondary)" />
                     </div>
                     <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No Results Found.</div>
@@ -283,7 +283,7 @@ const CalendarHeatmap = ({ orders }) => {
   }
 
   const getColor = (count) => {
-    if (count === 0) return 'rgba(255,255,255,0.05)';
+    if (count === 0) return 'var(--bg-hover)';
     if (count < 3) return 'rgba(59, 130, 246, 0.3)';
     if (count < 10) return 'rgba(59, 130, 246, 0.6)';
     return 'rgba(59, 130, 246, 1)';
@@ -387,7 +387,7 @@ const TradesAndCharges = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
               <span 
                 key={p} 
@@ -406,9 +406,9 @@ const TradesAndCharges = () => {
           </span>
           {filterPeriod === 'Custom' && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
             </div>
           )}
         </div>
@@ -425,7 +425,7 @@ const TradesAndCharges = () => {
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <FileText size={18} color="var(--color-purple)" />
              </div>
              <div>
@@ -434,7 +434,7 @@ const TradesAndCharges = () => {
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <FileText size={18} color="var(--color-purple)" />
              </div>
              <div>
@@ -443,7 +443,7 @@ const TradesAndCharges = () => {
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <FileText size={18} color="var(--color-purple)" />
              </div>
              <div>
@@ -459,7 +459,7 @@ const TradesAndCharges = () => {
       <div className="glass-panel" style={{ padding: '24px' }}>
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing Trades and Charges Summary for current period</div>
-           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
               <span 
                 onClick={() => setViewMode('Date-Wise View')}
                 style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Date-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Date-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
@@ -559,7 +559,7 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
   });
 
   const getColor = (netPnl) => {
-    if (netPnl === 0) return 'rgba(255,255,255,0.05)';
+    if (netPnl === 0) return 'var(--bg-hover)';
     if (netPnl > 0) return 'rgba(16, 185, 129, 0.8)';
     return 'rgba(239, 68, 68, 0.8)';
   };
@@ -768,7 +768,7 @@ const ProfitAndLoss = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months', 'Year'].map(p => (
               <span 
                 key={p} 
@@ -787,9 +787,9 @@ const ProfitAndLoss = () => {
           </span>
           {filterPeriod === 'Custom' && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
             </div>
           )}
         </div>
@@ -814,7 +814,7 @@ const ProfitAndLoss = () => {
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <PieChart size={18} color="var(--color-green-light)" />
              </div>
              <div>
@@ -825,7 +825,7 @@ const ProfitAndLoss = () => {
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <FileText size={18} color="var(--color-red-light)" />
              </div>
              <div>
@@ -834,7 +834,7 @@ const ProfitAndLoss = () => {
              </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <PieChart size={18} color="var(--color-green-light)" />
              </div>
              <div>
@@ -851,7 +851,7 @@ const ProfitAndLoss = () => {
       <div className="glass-panel" style={{ padding: '24px' }}>
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing P&L Summary for current period</div>
-           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
               <span 
                 onClick={() => setViewMode('Month-Wise View')}
                 style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: viewMode === 'Month-Wise View' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: viewMode === 'Month-Wise View' ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
@@ -1016,7 +1016,7 @@ const DownloadReports = () => {
   const Card = ({ icon: Icon, title, desc, onClick }) => (
     <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '50%' }}>
+        <div style={{ background: 'var(--bg-hover)', padding: '12px', borderRadius: '50%' }}>
           <Icon size={24} color="var(--color-blue-light)" />
         </div>
         <div>
@@ -1098,7 +1098,7 @@ const TradingInsights = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Instrument: <span style={{ color: 'var(--color-blue-light)' }}>F/O Trading Insights</span></div>
-           <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
              {['Week', '15 Days', 'Month', '3 Months', 'Custom'].map(f => (
                <div key={f} onClick={() => setFilterPeriod(f)} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: filterPeriod === f ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: filterPeriod === f ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
                  {f}
@@ -1170,7 +1170,7 @@ const TradingInsights = () => {
                     <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>
                     <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
                     <td style={{ padding: '12px' }}>
-                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'var(--bg-hover)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
                           {o.side}
                        </span>
                     </td>
@@ -1208,7 +1208,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
         <div 
           onClick={onBack} 
-          style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
           <ArrowLeft size={16} />
         </div>
@@ -1251,3 +1251,6 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
     </div>
   );
 }
+
+
+

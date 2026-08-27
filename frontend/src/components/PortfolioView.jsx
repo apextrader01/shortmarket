@@ -94,7 +94,7 @@ export default function PortfolioView() {
   // If no investments yet, show placeholder
   if (chartData.length === 0) {
     chartData.push({ name: 'Uninvested Cash', value: 100 });
-    COLORS[0] = 'rgba(255,255,255,0.1)';
+    COLORS[0] = 'var(--border-color)';
   }
 
   return (
@@ -131,7 +131,7 @@ export default function PortfolioView() {
           ].map((stat, i) => (
             <div key={i} style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--bg-hover)' }} />
                 {stat.label}
               </div>
               <div style={{ fontSize: '20px', fontWeight: '700', color: stat.color }}>
@@ -255,7 +255,7 @@ export default function PortfolioView() {
                       <tr key={pos.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td data-label="Symbol" style={{ padding: '16px', fontWeight: '600' }}>
                           {safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}
-                          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>
                             {safeSymbol.split(':')[0] || 'NSE'}
                           </span>
                         </td>
@@ -301,6 +301,8 @@ export default function PortfolioView() {
     </div>
   );
 }
+
+
 
 
 

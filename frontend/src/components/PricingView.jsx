@@ -105,7 +105,7 @@ export default function PricingView({ setActiveTab }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
           <div 
             onClick={() => setActiveTab('ClientData')} 
-            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
           >
             <ArrowLeft size={16} />
           </div>
@@ -228,4 +228,6 @@ export default function PricingView({ setActiveTab }) {
     </div>
   );
 }
+
+
 

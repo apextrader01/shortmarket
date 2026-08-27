@@ -143,12 +143,12 @@ export default function OnboardingWizard() {
                 onChange={handleChange} 
                 min="1900-01-01"
                 max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }} 
+                style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', colorScheme: 'dark' }} 
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Gender</label>
-              <select name="gender" value={formData.gender} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="gender" value={formData.gender} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -158,7 +158,7 @@ export default function OnboardingWizard() {
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>State</label>
-                <select name="state" value={formData.state} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+                <select name="state" value={formData.state} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                   <option value="" disabled>Select</option>
                   {indianStatesData.states.map(s => (
                     <option key={s.state} value={s.state}>{s.state.toUpperCase()}</option>
@@ -167,7 +167,7 @@ export default function OnboardingWizard() {
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>District</label>
-                <select name="city" value={formData.city} onChange={handleChange} disabled={!formData.state} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', opacity: !formData.state ? 0.5 : 1 }}>
+                <select name="city" value={formData.city} onChange={handleChange} disabled={!formData.state} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white', opacity: !formData.state ? 0.5 : 1 }}>
                   <option value="" disabled>Select</option>
                   {availableDistricts.map(d => (
                     <option key={d} value={d}>{d.toUpperCase()}</option>
@@ -183,7 +183,7 @@ export default function OnboardingWizard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Occupation</label>
-              <select name="occupation" value={formData.occupation} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="occupation" value={formData.occupation} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Occupation</option>
                 <option value="Salaried">Salaried</option>
                 <option value="Business">Business / Self-Employed</option>
@@ -193,7 +193,7 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Annual Income</label>
-              <select name="annual_income" value={formData.annual_income} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="annual_income" value={formData.annual_income} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Income Range</option>
                 <option value="Below 1L">Below ₹1 Lakh</option>
                 <option value="1L - 5L">₹1 Lakh - ₹5 Lakh</option>
@@ -204,7 +204,7 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Primary Financial Goal</label>
-              <select name="financial_goal" value={formData.financial_goal} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="financial_goal" value={formData.financial_goal} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select your goal</option>
                 <option value="Learn to trade">Learn to trade</option>
                 <option value="Secondary Income">Generate Secondary Income</option>
@@ -220,7 +220,7 @@ export default function OnboardingWizard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Trading Experience</label>
-              <select name="trading_experience" value={formData.trading_experience} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="trading_experience" value={formData.trading_experience} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Experience Level</option>
                 <option value="Fresher">Fresher (New to markets)</option>
                 <option value="Intermediate">Intermediate (1-3 years)</option>
@@ -230,7 +230,7 @@ export default function OnboardingWizard() {
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Preferred Segment</label>
-                <select name="preferred_segment" value={formData.preferred_segment} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+                <select name="preferred_segment" value={formData.preferred_segment} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                   <option value="" disabled>Select Segment</option>
                   <option value="Equity">Equity / Cash</option>
                   <option value="F&O">Options & Futures (F&O)</option>
@@ -240,7 +240,7 @@ export default function OnboardingWizard() {
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Trading Style</label>
-                <select name="trading_style" value={formData.trading_style} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+                <select name="trading_style" value={formData.trading_style} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                   <option value="" disabled>Select Style</option>
                   <option value="Scalper">Scalper (Minutes)</option>
                   <option value="Intraday">Intraday (Hours)</option>
@@ -251,7 +251,7 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Primary Strategy</label>
-              <select name="primary_strategy" value={formData.primary_strategy} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="primary_strategy" value={formData.primary_strategy} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Strategy</option>
                 <option value="Price Action">Pure Price Action</option>
                 <option value="Indicators">Indicator Based (RSI, MACD etc)</option>
@@ -261,7 +261,7 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>How did you hear about us?</label>
-              <select name="hear_about_us" value={formData.hear_about_us} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
+              <select name="hear_about_us" value={formData.hear_about_us} onChange={handleChange} style={{ width: '100%', padding: '12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'white' }}>
                 <option value="" disabled>Select Source</option>
                 <option value="YouTube">YouTube</option>
                 <option value="Telegram">Telegram Group</option>
@@ -275,7 +275,7 @@ export default function OnboardingWizard() {
         {/* Footer Buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px' }}>
           {step > 1 ? (
-            <button onClick={handlePrev} style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
+            <button onClick={handlePrev} style={{ padding: '12px 24px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
               <ChevronLeft size={16} /> Back
             </button>
           ) : (
@@ -299,3 +299,5 @@ export default function OnboardingWizard() {
     </div>
   );
 }
+
+

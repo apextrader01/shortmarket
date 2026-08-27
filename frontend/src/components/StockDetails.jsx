@@ -105,7 +105,7 @@ export default function StockDetails({ symbol, price, candles }) {
               <span>{l ? l.toFixed(2) : '-'}</span>
               <span>{h ? h.toFixed(2) : '-'}</span>
             </div>
-            <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+            <div style={{ position: 'relative', height: '4px', background: 'var(--border-color)', borderRadius: '2px' }}>
               {livePrice > 0 && h > l && (
                 <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - l) / (h - l)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
                   <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
@@ -124,7 +124,7 @@ export default function StockDetails({ symbol, price, candles }) {
               <span>{low52 ? low52.toFixed(2) : '-'}</span>
               <span>{high52 ? high52.toFixed(2) : '-'}</span>
             </div>
-            <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+            <div style={{ position: 'relative', height: '4px', background: 'var(--border-color)', borderRadius: '2px' }}>
               {livePrice > 0 && high52 > low52 && (
                 <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - low52) / (high52 - low52)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
                   <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
@@ -208,7 +208,7 @@ export default function StockDetails({ symbol, price, candles }) {
                     <span>{h.key}</span>
                     <span style={{ fontWeight: '700' }}>{(h.value).toFixed(2)}%</span>
                   </div>
-                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
+                  <div style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '3px' }}>
                     <div style={{ width: `${h.value}%`, height: '100%', background: '#60A5FA', borderRadius: '3px' }} />
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export default function StockDetails({ symbol, price, candles }) {
                         <td style={{ padding: '16px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                             <span style={{ fontSize: '10px', color: '#94A3B8' }}>L</span>
-                            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', position: 'relative' }}>
+                            <div style={{ flex: 1, height: '4px', background: 'var(--border-color)', borderRadius: '2px', position: 'relative' }}>
                                 {peer.livePriceData?.ltp && peer.nseYearHigh > peer.nseYearLow && (
                                     <div style={{ 
                                       position: 'absolute', 
@@ -353,7 +353,7 @@ export default function StockDetails({ symbol, price, candles }) {
           <span style={{ fontWeight: '700', fontSize: '13px' }}>{val}</span>
           <span style={{ 
             fontSize: '11px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px',
-            background: verdict === 'BULLISH' ? 'rgba(34,197,94,0.15)' : (verdict === 'BEARISH' ? 'rgba(239,83,80,0.15)' : 'rgba(255,255,255,0.1)'),
+            background: verdict === 'BULLISH' ? 'rgba(34,197,94,0.15)' : (verdict === 'BEARISH' ? 'rgba(239,83,80,0.15)' : 'var(--border-color)'),
             color: verdict === 'BULLISH' ? '#22C55E' : (verdict === 'BEARISH' ? '#EF5350' : '#94A3B8')
           }}>{verdict}</span>
         </div>
@@ -423,3 +423,5 @@ export default function StockDetails({ symbol, price, candles }) {
     </div>
   );
 }
+
+

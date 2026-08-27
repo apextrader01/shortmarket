@@ -311,8 +311,12 @@ function App() {
   // ── Authenticated layout ─────────────────────────────────────────────────────
   const price = prices[selectedSymbol];
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
-    <div className="app-container" data-theme={theme} style={{ flexDirection: 'column' }}>
+    <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
       <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

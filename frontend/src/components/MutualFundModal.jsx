@@ -44,7 +44,7 @@ export default function MutualFundModal({ fund, onClose }) {
                     <TrendingUp size={12} />
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</div>
-                <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
+                <div style={{ fontSize: '11px', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)' }}>{fund.name}</h2>
             <div style={{ display: 'flex', gap: '24px', fontSize: '13px' }}>
@@ -52,7 +52,7 @@ export default function MutualFundModal({ fund, onClose }) {
                 <div>3Y Return: <span style={{ color: 'var(--color-green-light)', fontWeight: '700', fontSize: '15px' }}>+{fund.return3y}%</span></div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s' }}><X size={18} /></button>
         </div>
 
         {/* Layout Split */}
@@ -91,7 +91,7 @@ export default function MutualFundModal({ fund, onClose }) {
               />
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   {['1000', '5000', '10000'].map(val => (
-                      <button key={val} onClick={() => setAmount(val)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>+₹{val}</button>
+                      <button key={val} onClick={() => setAmount(val)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>+₹{val}</button>
                   ))}
               </div>
             </div>
@@ -153,3 +153,5 @@ export default function MutualFundModal({ fund, onClose }) {
     </div>
   );
 }
+
+

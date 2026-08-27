@@ -159,22 +159,22 @@ export default function PositionsView() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Positions</h2>
-          <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', padding: '4px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '4px' }}>
             <button
               onClick={() => setViewMode('OPEN')}
-              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
             >
               OPEN
             </button>
             <button
               onClick={() => setViewMode('HOLDINGS')}
-              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
             >
               HOLDINGS
             </button>
             <button
               onClick={() => setViewMode('CLOSED')}
-              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
             >
               CLOSED
             </button>
@@ -184,7 +184,7 @@ export default function PositionsView() {
           <button
             onClick={exitAllPositions}
             style={{
-              background: 'var(--color-red-light)', color: '#fff', border: 'none',
+              background: 'var(--color-red-light)', color: 'var(--text-primary)', border: 'none',
               padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
               boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
             }}
@@ -241,7 +241,7 @@ export default function PositionsView() {
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
                       <td data-label="Symbol" style={{ padding: '16px 20px' }}>
-                        {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'rgba(255,255,255,0.05)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
+                        {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
                       </td>
                       <td data-label="Side" style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
                         {sideText}
@@ -352,7 +352,7 @@ export default function PositionsView() {
 
                 {/* Row 1: Symbol & Avg */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', paddingLeft: '12px' }}>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', letterSpacing: '0.3px' }}>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '0.3px' }}>
                     {pos.symbol.replace(/-(EQ|FUT|CE|PE)$/, '')}
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500' }}>
@@ -384,11 +384,11 @@ export default function PositionsView() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', paddingLeft: '12px' }}>
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Invested Value</div>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>₹{pos.invested.toFixed(2)}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>₹{pos.invested.toFixed(2)}</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '500' }}>Current Value</div>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#fff' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
                       {viewMode === 'CLOSED' ? '-' : `₹${currentValue.toFixed(2)}`}
                     </div>
                   </div>
@@ -469,7 +469,7 @@ export default function PositionsView() {
                     max={Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)}
                     min="1"
                     step="1"
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -477,7 +477,7 @@ export default function PositionsView() {
                   <select
                     value={partialExitType}
                     onChange={(e) => setPartialExitType(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   >
                     <option value="MARKET" style={{color:'#000'}}>Market</option>
                     <option value="LIMIT" style={{color:'#000'}}>Limit</option>
@@ -492,7 +492,7 @@ export default function PositionsView() {
                     type="number"
                     value={partialExitPrice}
                     onChange={(e) => setPartialExitPrice(e.target.value)}
-                    style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
               )}
@@ -527,7 +527,7 @@ export default function PositionsView() {
                 }}
                 style={{
                   width: '100%', background: partialExitPos.qty > 0 ? 'var(--color-red)' : 'var(--color-blue)',
-                  color: '#fff', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
+                  color: 'var(--text-primary)', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
                   fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
                 }}
               >
@@ -540,6 +540,9 @@ export default function PositionsView() {
     </div>
   );
 }
+
+
+
 
 
 

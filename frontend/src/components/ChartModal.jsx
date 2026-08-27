@@ -62,3 +62,5 @@ function ChartWidgetWrapper({ symbol }) {
 
   return <ChartWidget />;
 }
+
+

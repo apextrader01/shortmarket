@@ -275,21 +275,21 @@ export default function MarketWatch({ className = '', onStockSelect }) {
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); setAlertModalSymbol(stock.uniqueSymbol); }}
-                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }}
+                        style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }}
                         title="Set Price Alert"
                       >
                         <Bell size={12} color="var(--color-yellow)" />
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }}
-                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
+                        style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
                         title="Remove"
                       >
                         <Trash2 size={12} color="var(--color-red-light)" />
                       </div>
                       <div 
                         onClick={(e) => { e.stopPropagation(); openMarketDepthModal(stock.uniqueSymbol, stock.lotsize || searchLotsizes.current[stock.uniqueSymbol] || prices[stock.uniqueSymbol]?.lotsize || 1); }}
-                        style={{ padding: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
+                        style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px' }}
                         title="Market Depth"
                       >
                         <AlignRight size={12} color="var(--color-blue)" />
@@ -347,3 +347,5 @@ export default function MarketWatch({ className = '', onStockSelect }) {
     </div>
   );
 }
+
+

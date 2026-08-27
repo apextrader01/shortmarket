@@ -83,7 +83,7 @@ export default function DepositModal({ onClose }) {
                   key={amt}
                   type="button"
                   onClick={() => setAmount(amt.toString())}
-                  style={{ flex: 1, padding: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '6px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '4px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
                 >
                   +{amt/1000}k
                 </button>
@@ -107,3 +107,5 @@ export default function DepositModal({ onClose }) {
     </div>
   );
 }
+
+

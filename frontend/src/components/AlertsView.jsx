@@ -54,7 +54,7 @@ export default function AlertsView() {
             key={f}
             onClick={() => setFilter(f)}
             style={{
-              background: filter === f ? 'var(--color-blue)' : 'rgba(255,255,255,0.05)',
+              background: filter === f ? 'var(--color-blue)' : 'var(--bg-hover)',
               color: filter === f ? '#fff' : 'var(--text-secondary)',
               border: 'none', padding: '8px 16px', borderRadius: '6px',
               fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'
@@ -124,3 +124,5 @@ export default function AlertsView() {
     </div>
   );
 }
+
+

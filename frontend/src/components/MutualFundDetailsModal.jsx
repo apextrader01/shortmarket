@@ -218,7 +218,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</div>
-                                <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
+                                <div style={{ fontSize: '11px', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
                                 {details?.groww_rating && (
                                     <span style={{ fontSize: '12px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         ★ {details.groww_rating}
@@ -335,7 +335,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                             <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{h.company_name}</span>
                                                             <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{h.corpus_per.toFixed(1)}%</span>
                                                         </div>
-                                                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                        <div style={{ width: '100%', height: '4px', background: 'var(--bg-hover)', borderRadius: '2px', overflow: 'hidden' }}>
                                                             <div style={{ width: `${h.corpus_per}%`, height: '100%', background: 'var(--color-blue)', borderRadius: '2px' }} />
                                                         </div>
                                                     </div>
@@ -437,7 +437,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                 <>
                                     {!userHolding ? (
                                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                            <div style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                                            <div style={{ width: '64px', height: '64px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                                                 <Shield size={32} />
                                             </div>
                                             <div style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '8px' }}>No Active Investments</div>
@@ -526,3 +526,5 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         </>
     );
 }
+
+

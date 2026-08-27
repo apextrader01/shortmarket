@@ -323,7 +323,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
           <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--border-color)' }}>
+                <tr style={{ background: 'var(--bg-hover)', borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '500' }}>Side</th>
                   <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '500' }}>Strike</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '500' }}>Qty</th>
@@ -352,7 +352,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                         type="number" 
                         value={leg.quantity}
                         onChange={(e) => onUpdateLeg(i, { ...leg, quantity: parseInt(e.target.value) || 1 })}
-                        style={{ width: '60px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#fff', padding: '4px 8px', borderRadius: '4px', textAlign: 'center' }}
+                        style={{ width: '60px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: '#fff', padding: '4px 8px', borderRadius: '4px', textAlign: 'center' }}
                       />
                     </td>
                     <td style={{ padding: '10px 12px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{leg.price.toFixed(1)}</td>
@@ -450,3 +450,5 @@ function MetricCard({ title, value, color }) {
     </div>
   );
 }
+
+

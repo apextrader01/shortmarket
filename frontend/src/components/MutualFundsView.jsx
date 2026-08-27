@@ -484,7 +484,7 @@ export default function MutualFundsView() {
                                     <td style={{ padding: '16px', textAlign: 'right' }}>₹{sip.amount}</td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>{sip.frequency}</td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                                        <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                        <span style={{ padding: '4px 8px', background: 'var(--bg-hover)', borderRadius: '4px' }}>
                                             {new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </span>
                                     </td>
@@ -640,3 +640,5 @@ export default function MutualFundsView() {
     </div>
   );
 }
+
+

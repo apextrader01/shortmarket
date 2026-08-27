@@ -287,7 +287,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-buy {
   background: var(--color-green);
-  color: white;
+  color: #fff;
 }
 
 .hoverable:hover {
@@ -306,7 +306,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-sell {
   background: var(--color-red);
-  color: white;
+  color: #fff;
 }
 
 .btn-sell:hover {
@@ -488,7 +488,7 @@ tbody tr:hover {
   border: 1px solid var(--border-color);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: white;
+  color: var(--text-primary);
   font-family: inherit;
   transition: var(--transition);
 }
@@ -668,7 +668,7 @@ tbody tr:hover {
   width: 14px;
   left: 2px;
   bottom: 2px;
-  background-color: white;
+  background-color: var(--text-primary);
   transition: .4s;
 }
 input:checked + .slider {
@@ -760,7 +760,7 @@ input:checked + .slider:before {
 }
 .custom-dropdown-item:hover {
   background: #3b82f6; /* Bright blue hover like native select */
-  color: #ffffff;
+  color: var(--text-primary);
 }
 .custom-dropdown-item.text-muted {
   color: #94a3b8;
@@ -816,7 +816,7 @@ input:checked + .slider:before {
 
 .option-chain-table th.header-call {
   background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: white;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -826,7 +826,7 @@ input:checked + .slider:before {
 
 .option-chain-table th.header-put {
   background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: white;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   text-align: center;
@@ -908,7 +908,7 @@ input:checked + .slider:before {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
   border: none;
   cursor: pointer;
 }
@@ -1052,7 +1052,7 @@ input:checked + .slider:before {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 14px 16px;
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 15px;
   outline: none;
   transition: all 0.2s ease;
@@ -1091,7 +1091,7 @@ input:checked + .slider:before {
   font-size: 32px;
   font-weight: 900;
   letter-spacing: -1px;
-  color: #fff;
+  color: var(--text-primary);
 }
 .logo-text-premium span {
   background: linear-gradient(to right, #38bdf8, #34d399);
@@ -1149,12 +1149,12 @@ input:checked + .slider:before {
 }
 
 .nav-pill:hover {
-  color: #fff;
+  color: var(--text-primary);
   text-shadow: 0 0 8px rgba(255,255,255,0.3);
 }
 
 .nav-pill.active {
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .nav-pill.active::after {
@@ -1215,12 +1215,12 @@ input:checked + .slider:before {
 }
 .chart-tool-pill:hover {
   background: rgba(255,255,255,0.08);
-  color: #fff;
+  color: var(--text-primary);
 }
 .chart-tool-pill.active {
   background: rgba(59, 130, 246, 0.15);
   border-color: rgba(59, 130, 246, 0.4);
-  color: #fff;
+  color: var(--text-primary);
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
 }
 
@@ -1334,12 +1334,12 @@ body.font-large .glass-header {
 
 
 select {
-  color: white;
+  color: var(--text-primary);
   background-color: var(--bg-secondary);
 }
 select option {
   background-color: var(--bg-secondary);
-  color: white;
+  color: var(--text-primary);
 }
 
 
@@ -1369,22 +1369,22 @@ select option {
   table.responsive-mobile-table td { 
     padding: 0 !important; width: auto !important; flex: 1 1 auto; text-align: left; border: none !important; 
     display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; 
-    font-size: 14px !important; font-weight: 600 !important; color: #f1f5f9;
+    font-size: 14px !important; font-weight: 600 !important; color: var(--text-primary);
   }
   table.responsive-mobile-table td::before { content: attr(data-label); 
-    font-size: 9.5px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 6px; 
+    font-size: 9.5px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 6px; 
   }
 
   /* Shared Layout Overrides */
-  .orders-layout td:nth-child(1) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-end !important; margin-bottom: -32px !important; text-align: right; font-size: 11px !important; font-weight: 500 !important; color: #94a3b8 !important; }
+  .orders-layout td:nth-child(1) { flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-end !important; margin-bottom: -32px !important; text-align: right; font-size: 11px !important; font-weight: 500 !important; color: var(--text-secondary) !important; }
   .orders-layout td:nth-child(1)::before { display: none; }
   
   .orders-layout td:nth-child(2),
   .positions-layout td:nth-child(1),
   .portfolio-layout td:nth-child(1) { 
     flex: 0 0 100% !important; flex-direction: row !important; justify-content: flex-start !important; 
-    font-size: 18px !important; font-weight: 800 !important; letter-spacing: -0.3px !important; color: #fff !important; 
-    border-bottom: 1px dashed rgba(255,255,255,0.1) !important; padding-bottom: 14px !important; margin-bottom: 8px !important; 
+    font-size: 18px !important; font-weight: 800 !important; letter-spacing: -0.3px !important; color: var(--text-primary) !important; 
+    border-bottom: 1px dashed var(--border-color) !important; padding-bottom: 14px !important; margin-bottom: 8px !important; 
     white-space: normal !important; overflow: visible !important; max-width: none !important; 
   }
   .orders-layout td:nth-child(2)::before,
@@ -1411,3 +1411,4 @@ select option {
   }
 
   }
+
