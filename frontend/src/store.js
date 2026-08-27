@@ -515,11 +515,14 @@ export const useStore = create(persist((set, get) => ({
       // FIX: Ping immediately to re-join rooms for already-loaded symbols
       get().pingSubscriptions();
       
-      // FIX: Also ping again after 2s and 5s to catch positions/holdings that may
-      // still be loading from the server when the socket first reconnects.
-      // Without this, positions/holdings symbols miss the first ping window and get GC'd in 30s.
+      // FIX: Also ping again at multiple intervals after reconnect (e.g., after PM2 restart from 
+      // token refresh) to ensure subscriptions are re-established before the 60s GC fires.
+      // Without these, a slow frontend reconnect means GC silently kills all subscriptions.
       setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 2000);
       setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 5000);
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 10000);
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 20000);
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 30000);
       
       // Start a 10-second heartbeat to keep subscriptions alive and garbage collect old ones
       if (!get().subscriptionPingInterval) {

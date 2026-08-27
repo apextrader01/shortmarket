@@ -247,16 +247,25 @@ function startLiveWebSocket() {
                   })();
         }
         
-        // Watchdog
+        // Watchdog — only trigger if we've been running for more than 2 minutes.
+        // This prevents false restarts during PM2 boot when no clients have connected yet.
+        const bootGracePeriodMs = 120000; // 2 minutes
         if (watchdogInterval) clearInterval(watchdogInterval);
         watchdogInterval = setInterval(() => {
             const staleSec = (Date.now() - lastTickTime) / 1000;
+            const uptimeSec = process.uptime();
             // MCX is open until 23:30/23:55, so we need to run watchdog until hour 23
             const d = new Date();
             const h = d.getHours();
             const day = d.getDay();
             const isWeekend = (day === 0 || day === 6);
-            if (!isWeekend && staleSec > 45 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0) {
+            // Only restart if:
+            // 1. Not a weekend
+            // 2. Within market hours
+            // 3. No tick in 60 seconds (not 45)
+            // 4. There ARE active subscriptions (means clients are watching)
+            // 5. Server has been up for at least 90 seconds (avoid restart loops on boot)
+            if (!isWeekend && staleSec > 60 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0 && uptimeSec > 90) {
                 console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck. Forcing PM2 restart...`);
                 process.exit(0);
             }
@@ -468,8 +477,8 @@ function garbageCollectSubscriptions() {
     // ----------------------------------
 
     for (const [symbol, lastSeen] of symbolLastSeen.entries()) {
-        // If a symbol hasn't been pinged in 30 seconds by ANY user, unsubscribe it
-        if (now - lastSeen > 30000) {
+        // If a symbol hasn't been pinged in 60 seconds by ANY user, unsubscribe it
+        if (now - lastSeen > 60000) {
             clientSubscriptions.delete(symbol);
             symbolLastSeen.delete(symbol);
             
