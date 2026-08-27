@@ -174,10 +174,13 @@ async function initFyers(io, pc, isMaster = true) {
                 dirtySymbols.clear();
 
                 if (Object.keys(batchUpdate).length > 0) {
-                    // Single broadcast to ALL connected clients — they filter by their own watchlist
-                    global_io.emit('price_snapshot', batchUpdate);
+                    // Send targeted updates to specific symbol rooms to prevent DDOSing the frontend
+                    // with ticks they aren't subscribed to, which causes severe UI lag.
+                    for (const sym of Object.keys(batchUpdate)) {
+                        global_io.to(sym).emit('price_snapshot', { [sym]: batchUpdate[sym] });
+                    }
 
-                    // Also batch-sync this updated cache to Worker nodes via Redis
+                    // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)
                     try {
                         const { pubClient } = require('./redisClient');
                         if (pubClient) {
@@ -186,7 +189,7 @@ async function initFyers(io, pc, isMaster = true) {
                     } catch(e) {}
                 }
             }
-        }, 100); // 100ms — 3x faster than before, safe because it's now 1 message not N
+        }, 250); // 250ms (4 updates per sec) is the sweet spot to prevent frontend React lag
     }
 }
 
