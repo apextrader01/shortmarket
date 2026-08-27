@@ -37,16 +37,26 @@ function parseExpiryDate(symbol) {
     const expiryStr = map[symbol];
     if (!expiryStr) return null;
     
-    // expiryStr is like "28JUL2026"
-    const match = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
-    if (!match) return null;
+    // Fyers expiryStr format is "YYYY-MM-DD"
+    const match = expiryStr.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+    if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1; // 0-indexed month
+        const day = parseInt(match[3], 10);
+        return new Date(year, month, day);
+    }
+
+    // Fallback for legacy Angel One format "28JUL2026" (just in case)
+    const matchLegacy = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
+    if (matchLegacy) {
+        const day = parseInt(matchLegacy[1], 10);
+        const monthStr = matchLegacy[2].toUpperCase();
+        const year = parseInt(matchLegacy[3], 10); 
+        const month = MONTH_MAP[monthStr];
+        return new Date(year, month, day);
+    }
     
-    const day = parseInt(match[1], 10);
-    const monthStr = match[2].toUpperCase();
-    const year = parseInt(match[3], 10); 
-    
-    const month = MONTH_MAP[monthStr];
-    return new Date(year, month, day);
+    return null;
 }
 
 function formatDate(date) {
