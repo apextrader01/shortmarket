@@ -234,7 +234,14 @@ async function runWatchlistCleanup() {
                 const originalLength = wl.symbols.length;
                 wl.symbols = wl.symbols.filter(symbol => {
                     const expiryDateObj = parseExpiryDate(symbol);
-                    if (!expiryDateObj) return true; // Keep non-expiring assets
+                    if (!expiryDateObj) {
+                        // If it's not in the master file, but it looks like a derivative (CE/PE/FUT), 
+                        // it's an orphaned/dead contract (e.g. holiday shifted expiry). Delete it.
+                        if (symbol.endsWith('CE') || symbol.endsWith('PE') || symbol.endsWith('FUT')) {
+                            return false; 
+                        }
+                        return true; // Keep true non-expiring assets like EQUITY/INDEX
+                    }
 
                     // If the expiry date is strictly before today's midnight, it is expired
                     // E.g., if it expired yesterday, its midnight is < today's midnight
