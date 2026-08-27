@@ -451,7 +451,7 @@ function handlePingSubscriptions(symbols) {
     }
 }
 
-function garbageCollectSubscriptions() {
+async function garbageCollectSubscriptions() {
     if (!wsInstance || !isFyersConnected) return;
     
     const now = Date.now();
@@ -477,29 +477,25 @@ function garbageCollectSubscriptions() {
         ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'].forEach(protectSymbol);
         
         // 2. Protect Pending Orders
-        db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).distinct('symbol')
-            .then(rows => rows.forEach(r => protectSymbol(r.symbol))).catch(()=>{});
+        const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).distinct('symbol').catch(()=>[]);
+        ordRows.forEach(r => protectSymbol(r.symbol));
             
         // 3. Protect Open Positions
-        db('positions').where('qty', '!=', 0).distinct('symbol')
-            .then(rows => rows.forEach(r => protectSymbol(r.symbol))).catch(()=>{});
+        const posRows = await db('positions').where('qty', '!=', 0).distinct('symbol').catch(()=>[]);
+        posRows.forEach(r => protectSymbol(r.symbol));
             
         // 4. Protect ALL Watchlists (they are small enough to always keep alive)
-        db('watchlists').select('symbols')
-            .then(rows => {
-                rows.forEach(row => {
-                    try {
-                        const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
-                        syms.forEach(s => { const sym = typeof s === 'string' ? s : s?.symbol; protectSymbol(sym); });
-                    } catch(e) {}
-                });
-            }).catch(()=>{})
-            .finally(() => {
-                if (wsInstance && isFyersConnected && subQueue.length > 0) {
-                    processSubQueue();
-                }
-            });
-            
+        const wlRows = await db('watchlists').select('symbols').catch(()=>[]);
+        wlRows.forEach(row => {
+            try {
+                const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
+                syms.forEach(s => { const sym = typeof s === 'string' ? s : s?.symbol; protectSymbol(sym); });
+            } catch(e) {}
+        });
+
+        if (wsInstance && isFyersConnected && subQueue.length > 0) {
+            processSubQueue();
+        }
     } catch(e) {}
     // ----------------------------------
 
@@ -765,9 +761,10 @@ function getPriceFromCache() {
 }
 
 function getFyersStatus() {
+    const recentTick = (Date.now() - lastTickTime) < 15000;
     return {
         isMasterNode,
-        isFyersConnected,
+        isFyersConnected: isMasterNode ? isFyersConnected : recentTick,
         hasAccessToken: !!activeAccessToken,
         wsInstanceExists: !!wsInstance,
         lastDataSocketError: lastDataSocketError,
@@ -779,6 +776,7 @@ function getFyersStatus() {
 }
 
 module.exports = {
+    updateWorkerTickTime,
     getPriceFromCache,
     setPriceCache,
     registerTokens,
