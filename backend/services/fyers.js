@@ -775,6 +775,10 @@ function getFyersStatus() {
     };
 }
 
+function updateWorkerTickTime() {
+    lastTickTime = Date.now();
+}
+
 module.exports = {
     updateWorkerTickTime,
     getPriceFromCache,
