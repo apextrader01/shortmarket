@@ -351,7 +351,19 @@ function startLiveWebSocket() {
     });
     
     wsInstance.on('close', () => {
-        console.log("Fyers WS Closed.");
+        console.log("Fyers WS Closed — resetting state and scheduling reconnect.");
+        isFyersConnected = false;  // CRITICAL FIX: was never set to false, causing false "Connected" status
+        
+        // Safety-net manual reconnect after 5 seconds.
+        // autoreconnect() should handle this, but if the SDK silently fails
+        // (which happens when Fyers drops the connection due to token expiry),
+        // this ensures we always attempt a fresh connection.
+        setTimeout(() => {
+            if (!isFyersConnected && activeAccessToken) {
+                console.log("[WS] Manual reconnect triggered after close.");
+                startLiveWebSocket();
+            }
+        }, 5000);
     });
     
     wsInstance.connect();
@@ -765,9 +777,13 @@ function getPriceFromCache() {
 
 function getFyersStatus() {
     const recentTick = (Date.now() - lastTickTime) < 15000;
+    // For master: report truly healthy only when BOTH the flag is set AND ticks are recent.
+    // This prevents the admin panel from showing "Connected" when the WS is physically connected
+    // but Fyers has stopped sending data (expired token, rate limit, etc.)
+    const masterConnected = isFyersConnected && recentTick;
     return {
         isMasterNode,
-        isFyersConnected: isMasterNode ? isFyersConnected : recentTick,
+        isFyersConnected: isMasterNode ? masterConnected : recentTick,
         hasAccessToken: !!activeAccessToken,
         wsInstanceExists: !!wsInstance,
         lastDataSocketError: lastDataSocketError,
