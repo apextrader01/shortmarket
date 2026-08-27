@@ -62,7 +62,20 @@ class PositionsEngine {
             this.settleExpiries(false); // false = Not Commodity
         }, { timezone: 'Asia/Kolkata' });
 
+        // Phase 4: Final Cleanup (Equities) - 04:00 PM IST (16:00)
+        cron.schedule('0 16 * * *', () => {
+            console.log('[CRON] 04:00 PM Final Cleanup for Equities triggered.');
+            this.sweepPendingOrders('EQUITY');
+            this.forceSquareOff('EQUITY');
+            this.settleExpiries(false);
+        }, { timezone: 'Asia/Kolkata' });
+
         // COMMODITIES
+        // Condition 10: Expiry Day Settlement (Commodities) - 07:00 PM (19:00)
+        cron.schedule('0 19 * * *', () => {
+            this.settleExpiries(true); // true = Commodity
+        }, { timezone: 'Asia/Kolkata' });
+
         // Phase 2: The Order Sweep - 10:59 PM IST (22:59)
         cron.schedule('59 22 * * *', () => {
             this.sweepPendingOrders('COMMODITY');
@@ -73,9 +86,12 @@ class PositionsEngine {
             this.forceSquareOff('COMMODITY');
         }, { timezone: 'Asia/Kolkata' });
 
-        // Condition 10: Expiry Day Settlement (Commodities) - 07:00 PM (19:00)
-        cron.schedule('0 19 * * *', () => {
-            this.settleExpiries(true); // true = Commodity
+        // Phase 4: Final Cleanup (Commodities) - 12:05 AM IST (00:05)
+        cron.schedule('5 0 * * *', () => {
+            console.log('[CRON] 12:05 AM Final Cleanup for Commodities triggered.');
+            this.sweepPendingOrders('COMMODITY');
+            this.forceSquareOff('COMMODITY');
+            this.settleExpiries(true);
         }, { timezone: 'Asia/Kolkata' });
     }
 
