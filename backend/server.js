@@ -1854,17 +1854,26 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
     // Using the order's own price would cause LIMIT orders to self-trigger immediately.
     if (ord.isMarket) {
-      const isMutualFund = ord.symbol.endsWith('-MF');
-      const realLtp = isMutualFund ? ord.price : (priceCache[ord.symbol]?.ltp || 0);
-      if (realLtp > 0) {
-        try {
-          await triggerEngine.evaluateTick(ord.symbol, realLtp);
-          // Wait briefly for background DB transaction to commit so frontend sees EXECUTED status instantly
-          await new Promise(r => setTimeout(r, 250));
-        } catch (err) {
-          console.error('Immediate evaluation error:', err);
-        }
+      
+      const isMutualFund = ord.symbol.endsWith('-MF') || /^\d+$/.test(ord.symbol);
+      if (isMutualFund) {
+         try {
+             const triggerEngineLocal = require('./services/triggerEngine');
+             triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
+             triggerEngineLocal.executeOrder(ord, ord.price).catch(e => console.error(e));
+         } catch(e) {}
+      } else {
+         const realLtp = priceCache[ord.symbol]?.ltp || 0;
+         if (realLtp > 0) {
+            try {
+              await triggerEngine.evaluateTick(ord.symbol, realLtp);
+              await new Promise(r => setTimeout(r, 250));
+            } catch (err) {
+              console.error('Immediate evaluation error:', err);
+            }
+         }
       }
+
     }
 
     // Fetch the final status after evaluation to send back to frontend
@@ -2221,15 +2230,25 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
        });
        
        if (ord.isMarket) {
-          const isMutualFund = ord.symbol.endsWith('-MF');
-          const realLtp = isMutualFund ? ord.execPrice : (priceCache[ord.symbol]?.ltp || 0);
-          if (realLtp > 0) {
-            try {
-              await triggerEngine.evaluateTick(ord.symbol, realLtp);
-            } catch (err) {
-              console.error('Immediate evaluation error for basket item:', err);
-            }
+          
+          const isMutualFund = ord.symbol.endsWith('-MF') || /^\d+$/.test(ord.symbol);
+          if (isMutualFund) {
+             try {
+                 const triggerEngineLocal = require('./services/triggerEngine');
+                 triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
+                 triggerEngineLocal.executeOrder(ord, ord.execPrice).catch(e => console.error(e));
+             } catch(e) {}
+          } else {
+             const realLtp = priceCache[ord.symbol]?.ltp || 0;
+             if (realLtp > 0) {
+                try {
+                  await triggerEngine.evaluateTick(ord.symbol, realLtp);
+                } catch (err) {
+                  console.error('Immediate evaluation error for basket item:', err);
+                }
+             }
           }
+
        }
        
        finalResponseOrders.push({ id: ord.id, symbol: ord.symbol, status: ord.status });
