@@ -515,15 +515,15 @@ export default function MutualFundsView() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Units</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{h.quantity.toFixed(4)}</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{Number(h.quantity || 0).toFixed(4)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{h.average_price.toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{Number(h.average_price || 0).toFixed(2)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(h.quantity * h.average_price).toFixed(2)}</span>
+                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
@@ -543,9 +543,9 @@ export default function MutualFundsView() {
                             {finalInvestments.map(h => (
                                 <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                     <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[h.symbol] || h.symbol.replace('-MF', '')}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>{h.quantity.toFixed(4)}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{h.average_price.toFixed(2)}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{(h.quantity * h.average_price).toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>{Number(h.quantity || 0).toFixed(4)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(h.average_price || 0).toFixed(2)}</td>
+                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</td>
                                 </tr>
                             ))}
                         </tbody>

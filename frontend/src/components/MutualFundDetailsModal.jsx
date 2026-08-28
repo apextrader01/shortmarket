@@ -114,10 +114,10 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
             } else if (actionMode === 'REDEEM') {
                 if (!userHolding) throw new Error("No holdings to redeem.");
                 
-                let qtyToSell = userHolding.quantity;
+                let qtyToSell = Number(userHolding.quantity || 0);
                 if (redeemType === 'CUSTOM') {
                     qtyToSell = numAmount / currentNav;
-                    if (qtyToSell > userHolding.quantity) throw new Error("Insufficient units to redeem.");
+                    if (qtyToSell > Number(userHolding.quantity || 0)) throw new Error("Insufficient units to redeem.");
                 }
 
                 res = await placeOrder({
@@ -359,7 +359,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                                         <div>
                                             <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>₹{holdingCurrentValue.toLocaleString(undefined, {maximumFractionDigits:2})}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{userHolding.quantity.toFixed(2)} Units</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>{Number(userHolding.quantity || 0).toFixed(4)} Units</div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <div style={{ fontSize: '15px', fontWeight: '600', color: holdingPnL >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
