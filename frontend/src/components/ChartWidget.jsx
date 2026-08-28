@@ -301,7 +301,7 @@ export default function ChartWidget() {
   const tfLabel = TIMEFRAMES.find(t => t.value === chartInterval)?.label ?? chartInterval;
 
   return (
-    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
@@ -383,7 +383,7 @@ export default function ChartWidget() {
       )}
 
       {/* ── Chart area ── */}
-      <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: '300px' }}>
+      <div style={{ position: 'relative', width: '100%', flex: '1 1 50%', minHeight: '300px' }}>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
 
         {/* Quick Order Buttons Overlay */}
@@ -467,7 +467,9 @@ export default function ChartWidget() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       
       {selectedSymbol && price && (
-        <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
+        <div style={{ flex: '1 1 50%', minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+          <StockDetails symbol={selectedSymbol} price={price} candles={candles} />
+        </div>
       )}
     </div>
   );

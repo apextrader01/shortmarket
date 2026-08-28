@@ -408,14 +408,14 @@ export default function StockDetails({ symbol, price, candles }) {
   };
 
   return (
-    <div style={{ marginTop: '24px' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', overflowX: 'auto', paddingBottom: '4px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', overflowX: 'auto', paddingBottom: '4px', flexShrink: 0 }}>
         <div onClick={() => setActiveTab('Overview')} style={tabStyle('Overview')}>Overview</div>
         <div onClick={() => setActiveTab('Technicals')} style={tabStyle('Technicals')}>Technicals</div>
         <div onClick={() => setActiveTab('News')} style={tabStyle('News')}>News</div>
       </div>
       
-      <div style={{ padding: '16px', minWidth: 0, overflowX: 'hidden' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0', minWidth: 0, overflowX: 'hidden' }}>
         {activeTab === 'Overview' && renderOverview()}
         {activeTab === 'Technicals' && renderTechnicals()}
         {activeTab === 'News' && renderNews()}
