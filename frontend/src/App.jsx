@@ -451,8 +451,8 @@ function App() {
         <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           {(activeTab === 'Markets' || activeTab === 'Chart') && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
                 <ChartWidget />
               </div>
             </div>
