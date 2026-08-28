@@ -398,7 +398,8 @@ function addSubscriptionBatch(symbols) {
     const now = Date.now();
     symbols.forEach(item => {
         let s = typeof item === 'string' ? item : item?.symbol;
-        if (!s || typeof s !== 'string' || s.endsWith('-MF')) return; // Ignore mutual funds
+        if (!s || typeof s !== 'string') return;
+        if (s.endsWith('-MF')) { mfSubscriptions.add(s); return; }
         
         // FIX: Update symbolLastSeen so GC doesn't kill manually subscribed symbols.
         // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
@@ -554,10 +555,35 @@ async function garbageCollectSubscriptions() {
 
 // Helper for HTTP fallback
 async function fetchBatchLTPs(symbols) {
-    symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
-    const validSymbols = symbols.filter(s => s && !s.endsWith('-MF'));
-    if (validSymbols.length === 0) return {};
+    if (!Array.isArray(symbols) || symbols.length === 0) return {};
     
+    symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
+    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !s.endsWith('-MF'));
+    const mfSymbols = symbols.filter(s => typeof s === 'string' && s.endsWith('-MF'));
+    
+    const mfResults = {};
+    if (mfSymbols.length > 0) {
+        const axios = require('axios');
+        for (const sym of mfSymbols) {
+            try {
+                const mfCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+                const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
+                if (res.data && res.data.data && res.data.data.length > 0) {
+                    const nav = parseFloat(res.data.data[0].nav);
+                    if (!isNaN(nav)) {
+                        mfResults[sym] = { symbol: sym, ltp: nav, ch: 0, chp: 0, vol: 0, timestamp: Date.now() };
+                        if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
+                        sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...mfResults[sym] };
+                    }
+                }
+            } catch (e) {
+                console.error(`Failed to fetch MF data for ${sym}:`, e.message);
+            }
+        }
+    }
+    
+    if (validSymbols.length === 0) return mfResults;
+
     const fyersToRequested = {};
     const fyersSymbols = validSymbols.map(s => {
         const fSym = toFyersSymbol(s);
@@ -565,8 +591,6 @@ async function fetchBatchLTPs(symbols) {
             if (!fyersToRequested[fSym]) fyersToRequested[fSym] = [];
             if (!fyersToRequested[fSym].includes(s)) fyersToRequested[fSym].push(s);
             
-            // Self-heal: If the mapping was incorrect during initial boot (before CSVs loaded),
-            // ensure the correct Fyers symbol is now registered and subscribed.
             if (!globalFyersToRequested[fSym]) {
                 globalFyersToRequested[fSym] = [];
                 if (!subQueue.includes(fSym)) subQueue.push(fSym);
@@ -584,13 +608,12 @@ async function fetchBatchLTPs(symbols) {
         return validSymbols.reduce((acc, sym) => {
             if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
             return acc;
-        }, {});
+        }, mfResults);
     }
 
     try {
         const results = {};
         
-        // Fyers max batch size is 50. Use 50 to drastically reduce HTTP overhead and search delays
         const chunkSize = 50;
         for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
             const chunk = fyersSymbols.slice(i, i + chunkSize);
@@ -634,9 +657,6 @@ async function fetchBatchLTPs(symbols) {
                 if (response && response.s === 'ok') {
                     processQuotesResponse(response);
                 } else if (response && response.s === 'error') {
-                    console.error(`❌ Fyers getQuotes error for chunk: code=${response.code}, message=${response.message}. Retrying individually...`);
-                    // Retry individually to prevent one invalid symbol from ruining the batch
-                    // Fyers API limit is 10 req/sec. We process sequentially with 150ms delay
                     for (let j = 0; j < chunk.length; j++) {
                         const fSym = chunk[j];
                         try {
@@ -645,21 +665,17 @@ async function fetchBatchLTPs(symbols) {
                             if (indRes && indRes.s === 'ok') {
                                 processQuotesResponse(indRes);
                             }
-                        } catch(indErr) {
-                            console.error(`Fyers getQuotes individual error for ${fSym}:`, indErr.message || indErr);
-                        }
+                        } catch(indErr) {}
                     }
                 }
-            } catch(chunkErr) {
-                console.error("Fyers getQuotes chunk error:", chunkErr);
-            }
+            } catch(chunkErr) {}
         }
         
-        return results;
+        return { ...results, ...mfResults };
     } catch(e) {
         console.error("Fyers fetchBatchLTPs error:", e);
     }
-    return {};
+    return mfResults;
 }
 
 // Fyers interval mapping
@@ -825,3 +841,34 @@ module.exports = {
     toFyersSymbol,
     fromFyersSymbol
 };
+
+// Background task to poll mutual fund NAVs from mfapi.in
+setInterval(async () => {
+    if (typeof mfSubscriptions === 'undefined' || mfSubscriptions.size === 0) return;
+    const axios = require('axios');
+    const updates = {};
+    for (const sym of mfSubscriptions) {
+        try {
+            const mfCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+            const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
+            if (res.data && res.data.data && res.data.data.length > 0) {
+                const nav = parseFloat(res.data.data[0].nav);
+                if (!isNaN(nav)) {
+                    updates[sym] = { ltp: nav, ch: 0, chp: 0, vol: 0, ts: Date.now() };
+                    if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
+                    sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...updates[sym] };
+                }
+            }
+        } catch (e) {
+            console.error(`Failed to fetch MF data for ${sym}:`, e.message);
+        }
+    }
+    if (Object.keys(updates).length > 0 && typeof isMasterNode !== 'undefined' && isMasterNode && typeof global_io !== 'undefined' && global_io) {
+        global_io.emit('price_update', updates);
+    } else if (Object.keys(updates).length > 0 && typeof isMasterNode !== 'undefined' && !isMasterNode) {
+        try { 
+            const { pubClient } = require('./redisClient');
+            pubClient.publish('fyers_ws_tick', JSON.stringify(updates)); 
+        } catch (e) {}
+    }
+}, 300000); // Poll every 5 minutes
