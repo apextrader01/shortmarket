@@ -1262,19 +1262,33 @@ const myFetch = async (...args) => {
 let allMutualFunds = [];
 
 // Initialize by fetching all 10,000+ funds from mfapi.in
+
+let mfInitializationPromise = null;
+
 async function initMutualFundsList() {
-    try {
-        console.log('🔄 Fetching master list of all Mutual Funds from mfapi.in...');
-        const res = await myFetch('https://api.mfapi.in/mf');
-        const data = await res.json();
-        if (Array.isArray(data)) {
-            allMutualFunds = data;
-            console.log(`✅ Loaded ${allMutualFunds.length} mutual funds into memory.`);
+    if (allMutualFunds.length > 0) return; // already loaded
+    
+    // Prevent concurrent initialization attempts
+    if (mfInitializationPromise) return mfInitializationPromise;
+
+    mfInitializationPromise = (async () => {
+        try {
+            console.log('Fetching master list of all Mutual Funds from mfapi.in...');
+            const res = await myFetch('https://api.mfapi.in/mf');
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+                allMutualFunds = data;
+                console.log(`Loaded ${allMutualFunds.length} mutual funds into memory.`);
+            }
+        } catch (err) {
+            console.error('Failed to fetch mutual funds master list:', err.message);
+        } finally {
+            mfInitializationPromise = null;
         }
-    } catch (err) {
-        console.error('❌ Failed to fetch mutual funds master list:', err.message);
-    }
+    })();
+    return mfInitializationPromise;
 }
+
 initMutualFundsList();
 
 // Helper to calculate CAGR
@@ -1352,6 +1366,9 @@ app.post('/api/mf/names', async (req, res) => {
 // 2. FAST Search Endpoint — returns ALL matching funds instantly from memory (no mfapi calls)
 app.get('/api/mf/search', async (req, res) => {
     try {
+        if (allMutualFunds.length === 0) {
+            await initMutualFundsList();
+        }
         const query = (req.query.q || '').toLowerCase().trim();
         
         let matches = [];
