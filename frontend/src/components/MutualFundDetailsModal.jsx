@@ -157,7 +157,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     };
 
     const holdingCurrentValue = userHolding ? (userHolding.quantity * (details?.nav || fund.nav || userHolding.ltp)) : 0;
-    const holdingInvested = userHolding ? userHolding.invested : 0;
+    const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * Number(userHolding.quantity || 0) : 0;
     const holdingPnL = holdingCurrentValue - holdingInvested;
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
 
