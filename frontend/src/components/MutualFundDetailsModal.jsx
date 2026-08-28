@@ -357,7 +357,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                     </div>
 
                     {/* Right Column (Action Panel) */}
-                    <div className="mf-modal-right" style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
+                    <div className="mf-modal-right" style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflowY: 'auto', minHeight: 0 }}>
                         
                         {/* Portfolio Status */}
                         {userHolding && (
