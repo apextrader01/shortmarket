@@ -70,8 +70,8 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
-  hasSkippedOnboarding: false,
-  skipOnboarding: () => set({ hasSkippedOnboarding: true }),
+  hasSkippedOnboarding: localStorage.getItem("hasSkippedOnboarding") === "true",
+  skipOnboarding: () => { localStorage.setItem("hasSkippedOnboarding", "true"); set({ hasSkippedOnboarding: true }); },
   
   authError: null,
 
@@ -1172,6 +1172,8 @@ export const useStore = create(persist((set, get) => ({
   setUser:  (user)  => set({ user }),
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('hasSkippedOnboarding');
+    set({ hasSkippedOnboarding: false });
     set({ user: null, positions: [], orders: [] });
     fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{});
   },

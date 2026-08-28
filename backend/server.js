@@ -324,6 +324,9 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const data = req.body;
     
+    // Delete existing to avoid conflicts
+    await db('user_profiles').where({ user_id: req.user.id }).del();
+
     // Insert profile data
     await db('user_profiles').insert({
       user_id: req.user.id,
