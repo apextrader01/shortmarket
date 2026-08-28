@@ -301,6 +301,10 @@ function App() {
   }, [prices, pendingTriggers, updatePendingTrigger, placeOrder]);
 
   // ── Guard: show login screen when not authenticated ──────────────────────────
+  
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
   if (!user) {
     return <LoginView />;
   }
@@ -310,10 +314,6 @@ function App() {
 
   // ── Authenticated layout ─────────────────────────────────────────────────────
   const price = prices[selectedSymbol];
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
 
   return (
     <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
