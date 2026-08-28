@@ -1405,8 +1405,8 @@ app.get('/api/mf/search', async (req, res) => {
             return score(b) - score(a);
         });
 
-        // Return ALL matches with basic info (no API calls needed = instant)
-        const results = matches.map(fund => {
+        // Return TOP 100 matches to prevent overwhelming the frontend
+        const results = matches.slice(0, 100).map(fund => {
             const nameLower = fund.schemeName.toLowerCase();
             let category = 'Equity';
             if (nameLower.includes('debt') || nameLower.includes('liquid') || nameLower.includes('bond') || nameLower.includes('gilt') || nameLower.includes('money market') || nameLower.includes('overnight') || nameLower.includes('floating')) category = 'Debt';
