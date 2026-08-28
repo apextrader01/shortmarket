@@ -58,30 +58,7 @@ function initializeCache() {
     
     let filteredInstruments = Array.from(symbolMap.values());
     
-    // Handle NSE vs BSE duplicates for the same company (Keep NSE-EQ if both exist)
-    const nameMap = new Map();
-    filteredInstruments.forEach(item => {
-        if (!item.name) return;
-        const name = item.name.toUpperCase();
-        if (!nameMap.has(name)) nameMap.set(name, []);
-        nameMap.get(name).push(item);
-    });
-    
-    const toRemove = new Set();
-    nameMap.forEach(group => {
-        const nseEq = group.find(i => i.exchange === 'NSE' && i.symbol.endsWith('-EQ'));
-        if (nseEq) {
-            group.forEach(i => {
-                // If it's not the NSE-EQ, but it's a cash market symbol, remove it to prevent duplicates
-                if (i !== nseEq && (i.exchange === 'BSE' || i.exchange === 'NSE') && 
-                    !i.symbol.includes('FUT') && !i.symbol.includes('CE') && !i.symbol.includes('PE')) {
-                    toRemove.add(i.unique_symbol);
-                }
-            });
-        }
-    });
-    
-    allInstruments = filteredInstruments.filter(i => !toRemove.has(i.unique_symbol));
+    allInstruments = filteredInstruments;
     
     // Pre-calculate lot sizes map for O(1) lookup
     lotSizeMap = {};

@@ -240,7 +240,7 @@ app.get('/api/stocks', async (req, res) => {
     
     try {
       const { generalClient } = require('./services/redisClient');
-      const cacheKey = `api:search:v2:${qLower}`;
+      const cacheKey = `api:search:v3:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
