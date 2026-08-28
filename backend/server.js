@@ -1273,12 +1273,36 @@ async function initMutualFundsList() {
 
     mfInitializationPromise = (async () => {
         try {
-            console.log('Fetching master list of all Mutual Funds from mfapi.in...');
-            const res = await myFetch('https://api.mfapi.in/mf');
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-                allMutualFunds = data;
-                console.log(`Loaded ${allMutualFunds.length} mutual funds into memory.`);
+            console.log('Fetching master list from mfapi.in and active list from amfiindia.com...');
+            
+            const [mfapiRes, amfiRes] = await Promise.all([
+                myFetch('https://api.mfapi.in/mf'),
+                myFetch('https://www.amfiindia.com/spages/NAVAll.txt')
+            ]);
+            
+            const rawData = await mfapiRes.json();
+            const amfiText = await amfiRes.text();
+            
+            if (Array.isArray(rawData) && rawData.length > 0) {
+                const activeCodes = new Set();
+                const lines = amfiText.split('\n');
+                for (const line of lines) {
+                    if (line.includes(';')) {
+                        const parts = line.split(';');
+                        if (parts[0] && !isNaN(parts[0])) {
+                            activeCodes.add(String(parts[0]).trim());
+                        }
+                    }
+                }
+                
+                allMutualFunds = rawData.filter(f => activeCodes.has(String(f.schemeCode)));
+                
+                // Fallback in case AMFI file parsing failed
+                if (allMutualFunds.length === 0) {
+                    allMutualFunds = rawData;
+                }
+                
+                console.log(`Filtered down to ${allMutualFunds.length} active mutual funds (from ${rawData.length} total).`);
             }
         } catch (err) {
             console.error('Failed to fetch mutual funds master list:', err.message);
