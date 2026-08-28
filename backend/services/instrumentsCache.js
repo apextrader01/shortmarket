@@ -47,10 +47,15 @@ function initializeCache() {
         item.search_string = `${item.symbol} ${item.name || ''} ${item.description || ''} ${item.exchange || ''}`.toLowerCase();
         if (!item.unique_symbol) item.unique_symbol = item.symbol;
         
-        // Filter out weird debt/bond segments (usually ends with -N0 to -N9, -NO, -F, etc)
-        if (item.symbol.match(/-(N[0-9O]|F|G|H|I|J|K|L|M|S)$/i)) return; 
-        
-        // Deduplicate exact unique_symbols (prevents 2 identical symbols from stocks & spots)
+        // Filter out debt/bonds, debentures, government securities, etc.
+        if (item.exchange === 'NSE') {
+            // NSE Debt segments: N*, Y*, Z*, GS (Govt Sec), GB (Govt Bond), TB (Treasury Bill), SG (Sovereign Gold)
+            if (item.symbol.match(/-(N[A-Z0-9]|Y[A-Z0-9]|Z[A-Z0-9]|GS|GB|TB|SG)$/i)) return;
+        }
+        if (item.exchange === 'BSE') {
+            // BSE Debt segments: -F (Fixed Income/NCDs), -G (Govt Securities)
+            if (item.symbol.match(/-(F|G)$/i)) return;
+        }
         if (!symbolMap.has(item.unique_symbol)) {
             symbolMap.set(item.unique_symbol, item);
         }

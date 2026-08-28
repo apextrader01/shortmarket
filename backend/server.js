@@ -237,10 +237,9 @@ app.get('/api/stocks', async (req, res) => {
     if (!q || q.length < 2) return res.json([]);
     
     const qLower = q.toLowerCase();
-    
-    try {
-      const { generalClient } = require('./services/redisClient');
-      const cacheKey = `api:search:v3:${qLower}`;
+        try {
+        const { generalClient } = require('./services/redisClient');
+        const cacheKey = `api:search:v4:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
