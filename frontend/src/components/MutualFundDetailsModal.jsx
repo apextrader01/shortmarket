@@ -21,7 +21,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
     // Right Column States
     const [actionMode, setActionMode] = useState('INVEST'); // 'INVEST' | 'REDEEM'
-    const [investType, setInvestType] = useState('SIP'); // 'SIP' | 'LUMPSUM'
+    const [investType, setInvestType] = useState('MONTHLY_SIP'); // 'MONTHLY_SIP' | 'WEEKLY_SIP' | 'DAILY_SIP' | 'LUMPSUM'
     
     // Inputs
     const [amount, setAmount] = useState('5000');
@@ -67,7 +67,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         let invested = 0;
         let wealth = 0;
 
-        if (investType === 'SIP') {
+        if (investType === 'MONTHLY_SIP' || investType === 'WEEKLY_SIP' || investType === 'DAILY_SIP') {
             invested = amt * months;
             const monthlyRate = rate / 12;
             wealth = amt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
@@ -93,11 +93,11 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 
                 const qty = numAmount / currentNav;
                 
-                if (investType === 'SIP') {
+                if (investType === 'MONTHLY_SIP' || investType === 'WEEKLY_SIP' || investType === 'DAILY_SIP') {
                     res = await setupSip({
                         symbol: actualSymbolToUse,
                         amount: numAmount,
-                        frequency: 'MONTHLY',
+                        frequency: investType === 'DAILY_SIP' ? 'DAILY' : (investType === 'WEEKLY_SIP' ? 'WEEKLY' : 'MONTHLY'),
                         price: currentNav
                     });
                 } else {
@@ -132,7 +132,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
             if (res && res.success) {
                 setOrderStatus('success');
-                setStatusMsg(`Successfully ${actionMode === 'INVEST' ? (investType === 'SIP' ? 'set up SIP' : 'invested') : 'redeemed'}!`);
+                setStatusMsg(`Successfully ${actionMode === 'INVEST' ? (investType.includes('SIP') ? 'set up SIP' : 'invested') : 'redeemed'}!`);
                 setTimeout(() => onClose(), 2000);
             } else {
                 setOrderStatus('error');
@@ -384,9 +384,15 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                 <>
                                     {/* Sub Tabs */}
                                     <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                                            <input type="radio" checked={investType === 'SIP'} onChange={() => setInvestType('SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Monthly SIP
-                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'MONTHLY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                        <input type="radio" checked={investType === 'MONTHLY_SIP'} onChange={() => setInvestType('MONTHLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Monthly SIP
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'WEEKLY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                        <input type="radio" checked={investType === 'WEEKLY_SIP'} onChange={() => setInvestType('WEEKLY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Weekly SIP
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'DAILY_SIP' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                        <input type="radio" checked={investType === 'DAILY_SIP'} onChange={() => setInvestType('DAILY_SIP')} style={{ accentColor: 'var(--color-blue)' }} /> Daily SIP
+                                    </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: investType === 'LUMPSUM' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                                             <input type="radio" checked={investType === 'LUMPSUM'} onChange={() => setInvestType('LUMPSUM')} style={{ accentColor: 'var(--color-blue)' }} /> One-time
                                         </label>
@@ -394,7 +400,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
                                     {/* Input Amount */}
                                     <div style={{ marginBottom: '32px' }}>
-                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>{investType === 'SIP' ? 'Installment Amount' : 'Investment Amount'}</div>
+                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px' }}>{investType.includes('SIP') ? 'Installment Amount' : 'Investment Amount'}</div>
                                         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', transition: 'border-color 0.2s' }}>
                                             <span style={{ fontSize: '24px', color: 'var(--text-secondary)', marginRight: '8px' }}>₹</span>
                                             <input 
@@ -513,7 +519,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             }}
                                         >
                                             {isInvesting ? <Activity size={20} className="spin" /> : null}
-                                            {isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType === 'SIP' ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem'}
+                                            {isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem'}
                                         </button>
                                     )}
                                 </div>
