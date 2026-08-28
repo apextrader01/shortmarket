@@ -395,7 +395,7 @@ export default function StockDetails({ symbol, price, candles }) {
           <a key={i} href={item.link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
             <div className="glass-panel hoverable" style={{ padding: '16px', transition: 'all 0.2s', cursor: 'pointer' }}>
               <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px' }}>
-                {item.publisher} • {new Date(item.providerPublishTime * 1000).toLocaleDateString()}
+                {item.publisher} • {new Date(item.providerPublishTime * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </div>
               <h5 style={{ fontSize: '14px', fontWeight: '700', color: '#F8FAFC', marginBottom: '8px', lineHeight: '1.4' }}>
                 {item.title}

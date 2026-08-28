@@ -67,11 +67,19 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         let invested = 0;
         let wealth = 0;
 
+        
         if (investType === 'MONTHLY_SIP' || investType === 'WEEKLY_SIP' || investType === 'DAILY_SIP') {
-            invested = amt * months;
-            const monthlyRate = rate / 12;
-            wealth = amt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate) * (1 + monthlyRate);
+            let periodsPerYear = 12;
+            if (investType === 'WEEKLY_SIP') periodsPerYear = 52;
+            if (investType === 'DAILY_SIP') periodsPerYear = 250; // standard approx trading days
+
+            const n = investmentYears * periodsPerYear;
+            const i = rate / periodsPerYear;
+
+            invested = amt * n;
+            wealth = amt * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
         } else {
+
             invested = amt;
             wealth = amt * Math.pow(1 + rate, investmentYears);
         }
