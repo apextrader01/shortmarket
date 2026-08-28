@@ -69,12 +69,14 @@ async function updateOptionsMaster() {
                         token: exchToken,
                         symbol: symbol,
                         name: underlying,
+                        description: desc,
                         exchange: exchPrefix
                     };
                     stocks.push({
                         token: exchToken,
                         symbol: symbol,
                         name: underlying,
+                        description: desc,
                         exchange: exchPrefix,
                         lotsize: lotsize
                     });
