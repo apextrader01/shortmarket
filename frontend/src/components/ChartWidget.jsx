@@ -301,7 +301,7 @@ export default function ChartWidget() {
   const tfLabel = TIMEFRAMES.find(t => t.value === chartInterval)?.label ?? chartInterval;
 
   return (
-    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>

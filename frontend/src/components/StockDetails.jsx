@@ -415,7 +415,7 @@ export default function StockDetails({ symbol, price, candles }) {
         <div onClick={() => setActiveTab('News')} style={tabStyle('News')}>News</div>
       </div>
       
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', minWidth: 0, overflowX: 'hidden' }}>
+      <div style={{ padding: '16px', minWidth: 0, overflowX: 'hidden' }}>
         {activeTab === 'Overview' && renderOverview()}
         {activeTab === 'Technicals' && renderTechnicals()}
         {activeTab === 'News' && renderNews()}
