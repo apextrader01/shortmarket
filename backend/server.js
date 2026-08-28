@@ -1295,7 +1295,7 @@ async function initMutualFundsList() {
                     }
                 }
                 
-                allMutualFunds = rawData.filter(f => activeCodes.has(String(f.schemeCode)));
+                allMutualFunds = rawData.filter(f => activeCodes.has(String(f.schemeCode)) && f.schemeName.toLowerCase().includes('growth'));
                 
                 // Fallback in case AMFI file parsing failed
                 if (allMutualFunds.length === 0) {
