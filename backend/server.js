@@ -1905,8 +1905,21 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
           description: `SIP installment blocked for ${symbol}`
       });
 
-      const nextExecutionDate = new Date();
-      nextExecutionDate.setMonth(nextExecutionDate.getMonth() + 1);
+      
+      let nextExecutionDate = new Date();
+      if (frequency === 'DAILY') {
+        nextExecutionDate.setDate(nextExecutionDate.getDate() + 1);
+      } else if (frequency === 'WEEKLY') {
+        nextExecutionDate.setDate(nextExecutionDate.getDate() + 7);
+      } else {
+        nextExecutionDate.setMonth(nextExecutionDate.getMonth() + 1);
+      }
+      
+      // Ensure it's not Saturday/Sunday (skips to Monday)
+      while (nextExecutionDate.getDay() === 0 || nextExecutionDate.getDay() === 6) {
+          nextExecutionDate.setDate(nextExecutionDate.getDate() + 1);
+      }
+
 
       await trx('sips').insert({
         user_id: req.user.id,
@@ -1927,20 +1940,11 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
       const orderId = typeof id === 'object' ? id.id : id;
 
       const triggerEngine = require('./services/triggerEngine');
-      await triggerEngine.addOrderToMemory({
+      triggerEngine.executeOrder({
         id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
         status: 'PENDING', product_type: 'DEL', margin: finalMargin
-      });
-      try {
-          const { pubClient } = require('./services/redisClient');
-          if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
-      } catch(e) {}
+      }, execPrice).catch(e => console.error('Immediate execution error:', e));
 
-      try {
-        await triggerEngine.evaluateTick(symbol, execPrice);
-      } catch (err) {
-        console.error('Immediate evaluation error:', err);
-      }
     });
 
     res.json({ success: true, message: 'SIP created successfully' });
