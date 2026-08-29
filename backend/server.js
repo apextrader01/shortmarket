@@ -1798,7 +1798,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Validate Quantity is a multiple of Lot Size for Options/Futures
-  if (/(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(symbol)) {
+  if (symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT')) {
     const { getLotSizes } = require('./services/instrumentsCache');
     const lotSizes = getLotSizes([symbol]);
     const lotsize = lotSizes[symbol] || 1;
@@ -1863,7 +1863,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
   // Equities auto-square-off at 03:25 PM. MCX auto-square-off at 07:00 PM.
   // After these times, no manual intervention is allowed as the system forces settlement.
-  const isDerivativeSymbol = /(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(symbol);
+  const isDerivativeSymbol = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
   if (isDerivativeSymbol) {
     const now = new Date();
     const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
@@ -1900,7 +1900,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       let requiresMargin = true;
       const effectiveProductType = product_type || 'DEL';
       if (side === 'SELL') {
-          const isDerivative = /(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(symbol);
+          const isDerivative = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
           if (effectiveProductType === 'DEL' && !isDerivative) {
               // 1. Fetch available Holdings
               const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
@@ -2259,7 +2259,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     }
 
     // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
-    const isDerivativeSymbol = /(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(item.symbol);
+    const isDerivativeSymbol = item.symbol.includes('CE') || item.symbol.includes('PE') || item.symbol.includes('FUT');
     if (isDerivativeSymbol) {
       const now = new Date();
       const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
@@ -2299,7 +2299,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       // 1.5 Validate SELL DEL orders against holdings (No Naked Shorting for Equities)
       const sellDelQuantities = {};
       for (const item of items) {
-          const isDerivative = /(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(item.symbol);
+          const isDerivative = item.symbol.includes('CE') || item.symbol.includes('PE') || item.symbol.includes('FUT');
           if (item.side === 'SELL' && (item.product_type || 'DEL') === 'DEL' && !isDerivative) {
               sellDelQuantities[item.symbol] = (sellDelQuantities[item.symbol] || 0) + Number(item.quantity);
           }
@@ -2773,18 +2773,16 @@ async function fetchGoogleNews(symbol) {
 }
 
 app.get('/api/stocks/:symbol/details', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const symbol = req.params.symbol;
   let rawName = symbol.split('-')[0];
 
-  const cached = stockDetailsCache[rawName];
-  if (cached && (Date.now() - cached.timestamp < 3600000) && cached.data && Array.isArray(cached.data.fundamentals) && cached.data.fundamentals.length > 0) {
+  if (stockDetailsCache[rawName] && (Date.now() - stockDetailsCache[rawName].timestamp < 3600000)) {
     return res.json(stockDetailsCache[rawName].data);
   }
 
   // Derivatives (Options/Futures) won't be found on Groww stock search.
   // Return a mock payload so the frontend doesn't crash with 404.
-  const isDerivative = /(?:CE|PE|FUT)(?:\s+(?:NSE|BSE))?$/i.test(symbol);
+  const isDerivative = !symbol.endsWith('-EQ') && !symbol.endsWith('-INDEX');
   if (isDerivative) {
     return res.json({
       header: { companyName: rawName },

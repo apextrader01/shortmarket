@@ -10,16 +10,14 @@ export default function StockDetails({ symbol, price, candles }) {
   useEffect(() => {
     if (!symbol) return;
     setLoading(true);
-    setDetails(null); // Clear stale data immediately when symbol changes
-    const url = `${API}/api/stocks/${encodeURIComponent(symbol)}/details?_t=${Date.now()}`;
-    fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } })
+    fetch(`${API}/api/stocks/${encodeURIComponent(symbol)}/details`)
       .then(r => r.json())
       .then(data => {
         setDetails(data);
         setLoading(false);
       })
       .catch(e => {
-        console.error('StockDetails fetch error:', symbol, e);
+        console.error(e);
         setLoading(false);
       });
   }, [symbol]);
