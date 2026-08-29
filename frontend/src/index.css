@@ -79,7 +79,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  overflow: hidden;
+  /* removed overflow: hidden because it propagates to the viewport and clips CSS space before zoom */
   font-variant-numeric: tabular-nums; /* Prevents layout jitter for rapidly changing numbers */
 }
 
@@ -89,10 +89,16 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
 
-html, body, #root {
+html, body {
   height: 100%;
   width: 100%;
-  overflow-x: hidden;
+  /* removed overflow-x: hidden to prevent Chrome from clipping body in CSS space before zoom is applied */
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -1416,6 +1422,8 @@ select option {
   }
 
   }
+
+
 
 
 
