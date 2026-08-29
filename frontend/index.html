@@ -9,7 +9,27 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Short Edge | Trading Platform</title>
-  <!-- cache bust 20260829143719 --></head>
+  <!-- cache bust 20260829143719 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script>
+      // Aggressive cache breaking script
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      const lastVersion = localStorage.getItem('app_version');
+      const currentVersion = 'v1.0.2'; // increment this
+      if (lastVersion !== currentVersion) {
+        localStorage.setItem('app_version', currentVersion);
+        window.location.reload(true);
+      }
+    </script>
+</head>
   <body>
     <div id="root"></div>
     <!-- Remove any old service worker that causes blank screen on refresh -->
