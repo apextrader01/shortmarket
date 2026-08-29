@@ -103,9 +103,20 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         if (e.target) e.target.value = '';
       }
   };
-
-
-
+  if (showProfile) {
+    return (
+      <div style={{ padding: '24px', animation: 'fadeIn 0.3s ease-out', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setShowProfile(false)} 
+          style={{ marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+        >
+          &larr; Back to Dashboard
+        </button>
+        <SettingsView />
+      </div>
+    );
+  }
 
   return (
     <div style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'var(--bg-dark)' }}>
