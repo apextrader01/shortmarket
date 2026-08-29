@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Box } from 'lucide-react';
+import AlertsView from './AlertsView';
 
 export default function OrdersView() {
   const { orders, pendingTriggers, removePendingTrigger } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger })));
@@ -127,6 +128,9 @@ export default function OrdersView() {
       </div>
 
       {/* Content Area */}
+      {activeTab === 'Alerts' ? (
+        <AlertsView />
+      ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start', minHeight: 0, width: '100%' }}>
         {(activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? (
           <div style={{ textAlign: 'center' }}>
@@ -354,6 +358,7 @@ export default function OrdersView() {
         )}
       </div>
 
+      )}
       {/* Order Details Modal */}
       {selectedOrder && (
         <div style={{

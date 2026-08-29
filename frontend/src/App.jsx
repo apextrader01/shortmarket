@@ -11,7 +11,7 @@ import AboutUsView from './components/AboutUsView';
 import ReportsView from './components/ReportsView';
 import AdminDashboard from './components/AdminDashboard';
 import SettingsView from './components/SettingsView';
-import AlertsView from './components/AlertsView';
+
 import AnalyticsView from './components/AnalyticsView';
 import OrderModal from './components/OrderModal';
 import EditOrderModal from './components/EditOrderModal';
@@ -43,7 +43,7 @@ function App() {
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
-      'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
+      'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
@@ -82,7 +82,7 @@ function App() {
       }
       const tabsMap = {
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
-        'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Alerts',
+        'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
@@ -385,7 +385,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Alerts', 'Analytics', 'Mutual Funds',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Analytics', 'Mutual Funds',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -467,7 +467,7 @@ function App() {
           {activeTab === 'Portfolio' && <PortfolioView />}
           {activeTab === 'Orders' && <OrdersView />}
           {activeTab === 'Positions' && <PositionsView />}
-          {activeTab === 'Alerts' && <div style={{ flex: 1, padding: '12px' }}><AlertsView /></div>}
+
           {activeTab === 'Analytics' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}><AnalyticsView /></div>}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'ClientData' && (
@@ -539,7 +539,7 @@ function App() {
             { label: 'Positions', icon: Briefcase },
             { label: 'Orders', icon: List },
             { label: 'Portfolio', icon: Briefcase },
-            { label: 'Alerts', icon: TrendingUp },
+
             { label: 'Analytics', icon: LineChart },
             { label: 'Mutual Funds', icon: CircleDollarSign },
             ...(user?.is_admin ? [{ label: 'Admin Panel', icon: Settings }] : [])
