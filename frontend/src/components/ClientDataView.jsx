@@ -27,7 +27,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferralModal, setShowReferralModal] = useState(false);
-  const refLink = `/register?ref=${user?.id || 'unknown'}$;
+  const refLink = window.location.origin + '/register?ref=' + (user?.id || 'unknown');
 
   const handleResetAccount = async () => {
     if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to ₹10,00,000. This cannot be undone.')) {
@@ -403,4 +403,5 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         </div>
       )}
     </div>
+
 
