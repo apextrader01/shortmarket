@@ -3065,6 +3065,10 @@ app.get('/api/referrals', authenticateToken, async (req, res) => {
         totalCount: referrals.length
       }
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.use((req, res) => {
   // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
@@ -3083,11 +3087,7 @@ const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
 
-  } catch (error) {
-    console.error('Error fetching referrals:', error);
-    res.status(500).json({ error: 'Failed to fetch referrals' });
-  }
-});
+
 
 server.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
