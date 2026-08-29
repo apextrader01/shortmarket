@@ -41,7 +41,7 @@ export default function ReferralsView({ setActiveTab }) {
   };
 
   return (
-    <div style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'var(--bg-dark)' }}>
+    <div style={{ padding: '24px', background: 'var(--bg-dark)' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>

@@ -491,7 +491,11 @@ function App() {
               <SettingsView />
             </div>
           )}
-          {activeTab === 'Referrals' && <ReferralsView setActiveTab={setActiveTab} />}
+          {activeTab === 'Referrals' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+              <ReferralsView setActiveTab={setActiveTab} />
+            </div>
+          )}
             {activeTab === 'Pricing' && (
             <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
               <PricingView setActiveTab={setActiveTab} />
