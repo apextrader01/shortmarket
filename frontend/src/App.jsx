@@ -45,7 +45,7 @@ function App() {
     const tabsMap = {
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
-      'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
+      'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
         'aboutus': 'AboutUs'
@@ -84,7 +84,7 @@ function App() {
       const tabsMap = {
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
-        'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing',
+        'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
         'aboutus': 'AboutUs'
@@ -586,3 +586,4 @@ function App() {
 }
 
 export default App;
+

@@ -56,9 +56,9 @@ export default function ReferralsView({ setActiveTab }) {
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600' }}>Total Earned</div>
-            <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '8px', borderRadius: '8px' }}><span style={{color: "#34D399", fontSize: "20px", fontWeight: "bold"}}>?</span></div>
+            <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '8px', borderRadius: '8px' }}><span style={{color: "#34D399", fontSize: "20px", fontWeight: "bold"}}>₹</span></div>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: '800', color: '#34D399' }}>?{data.stats.totalEarned.toFixed(2)}</div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#34D399' }}>₹{data.stats.totalEarned.toFixed(2)}</div>
         </div>
 
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -135,7 +135,7 @@ export default function ReferralsView({ setActiveTab }) {
                       {new Date(ref.created_at).toLocaleDateString()}
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right', fontWeight: '700', color: ref.status === 'completed' ? '#34D399' : 'var(--text-secondary)' }}>
-                      ?{parseFloat(ref.reward_amount || 0).toFixed(2)}
+                      ₹{parseFloat(ref.reward_amount || 0).toFixed(2)}
                     </td>
                   </tr>
                 ))}
