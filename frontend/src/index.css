@@ -90,10 +90,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 html, body, #root {
-  height: calc(100vh / var(--app-scale, 1));
-  min-height: calc(100vh / var(--app-scale, 1));
-  width: calc(100vw / var(--app-scale, 1));
+  height: 100%;
+  width: 100%;
   overflow-x: hidden;
+}
+
+body {
+  width: calc(100% / var(--app-scale, 1));
+  height: calc(100% / var(--app-scale, 1));
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -118,7 +122,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Layout */
 .app-container {
   display: flex;
-  height: calc(100vh / var(--app-scale, 1));
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -1411,5 +1416,7 @@ select option {
   }
 
   }
+
+
 
 
