@@ -87,8 +87,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
 
 
-  const Card = ({ title, desc, icon: Icon, color }) => (
-    <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
+  const Card = ({ title, desc, icon: Icon, color, onClick }) => (
+    <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
       {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
       <div>
         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
@@ -231,9 +231,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
             <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Market & get rewarded ₹500" color="#34D399" />
-            <div onClick={() => setActiveTab('Pricing')} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" />
-            </div>
+            <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
           </div>
         </div>
 
@@ -296,7 +294,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Account Settings & Other Info</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('Pricing')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '13px', fontWeight: '600' }}>Subscription Plans</span>
             </div>
@@ -370,6 +368,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
   );
 }
+
+
 
 
 
