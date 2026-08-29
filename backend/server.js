@@ -355,7 +355,7 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { username, email, phone, password } = req.body;
+  const { username, email, phone, password, referral_code } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
   try {
     // Check for existing duplicates
@@ -384,6 +384,23 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // Generate Professional Client ID: SE + Base36(userId) padded to 6 chars
     const clientId = 'SE' + Number(userId).toString(36).toUpperCase().padStart(6, '0');
     await db('users').where({ id: userId }).update({ client_id: clientId });
+    // Handle Referral Logic
+    if (referral_code) {
+      try {
+        const referrer = await db('users').where({ id: referral_code }).first();
+        if (referrer && referrer.id !== userId) {
+          await db('referrals').insert({
+            referrer_id: referrer.id,
+            referred_user_id: userId,
+            status: 'pending',
+            reward_amount: 0
+          });
+        }
+      } catch (e) {
+        console.error('Failed to process referral code', e);
+      }
+    }
+
 
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
@@ -672,9 +689,33 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
       await db('users').where({ id: req.user.id }).update({
         subscription_tier: 'PRO',
         subscription_expires: expires
-      });
-      
-      res.json({ success: true, message: 'Upgraded to PRO successfully!' });
+        });
+
+        // --- Referral Reward Logic ---
+        try {
+          const pendingRef = await db('referrals')
+            .where({ referred_user_id: req.user.id, status: 'pending' })
+            .first();
+
+          if (pendingRef) {
+            const rewardAmount = plan === 'monthly' ? 9.9 : 49.9;
+            
+            // Mark as completed
+            await db('referrals')
+              .where({ id: pendingRef.id })
+              .update({ status: 'completed', reward_amount: rewardAmount });
+            
+            // Credit referrer
+            await db('users')
+              .where({ id: pendingRef.referrer_id })
+              .increment('balance', rewardAmount);
+          }
+        } catch (e) {
+          console.error('Failed to process referral reward', e);
+        }
+        // -----------------------------
+
+        res.json({ success: true, message: 'Upgraded to PRO successfully!' });
     } else {
       res.status(400).json({ error: 'Invalid Payment Signature' });
     }
@@ -3018,6 +3059,35 @@ setPriceCache(priceCache);
 const { updateOptionsMaster } = require('./database/updateOptionsMaster');
 
 const PORT = process.env.PORT || 5000;
+
+app.get('/api/referrals', authenticateToken, async (req, res) => {
+  try {
+    const referrals = await db('referrals')
+      .join('users', 'referrals.referred_user_id', 'users.id')
+      .where('referrals.referrer_id', req.user.id)
+      .select('referrals.*', 'users.username', 'users.email')
+      .orderBy('referrals.created_at', 'desc');
+
+    const totalEarned = referrals.filter(r => r.status === 'completed').reduce((sum, r) => sum + parseFloat(r.reward_amount || 0), 0);
+    const pendingCount = referrals.filter(r => r.status === 'pending').length;
+    const completedCount = referrals.filter(r => r.status === 'completed').length;
+
+    res.json({
+      success: true,
+      referrals,
+      stats: {
+        totalEarned,
+        pendingCount,
+        completedCount,
+        totalCount: referrals.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching referrals:', error);
+    res.status(500).json({ error: 'Failed to fetch referrals' });
+  }
+});
+
 server.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 

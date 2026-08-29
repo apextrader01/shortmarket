@@ -24,6 +24,7 @@ import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
 import OnboardingWizard from './components/OnboardingWizard';
 import PricingView from './components/PricingView';
+import ReferralsView from './components/ReferralsView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
@@ -490,7 +491,8 @@ function App() {
               <SettingsView />
             </div>
           )}
-          {activeTab === 'Pricing' && (
+          {activeTab === 'Referrals' && <ReferralsView setActiveTab={setActiveTab} />}
+            {activeTab === 'Pricing' && (
             <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
               <PricingView setActiveTab={setActiveTab} />
             </div>

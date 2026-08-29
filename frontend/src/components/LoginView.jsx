@@ -9,6 +9,14 @@ export default function LoginView() {
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset'
   const [view, setView] = useState('login');
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    if (ref) {
+      localStorage.setItem('referral_code', ref);
+    }
+  }, []);
+
   
   const [username, setUsername] = useState('');
   const [phone,    setPhone]    = useState('');

@@ -125,7 +125,7 @@ export const useStore = create(persist((set, get) => ({
     try {
       set({ authError: null });
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, phone, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, phone, password, referral_code: localStorage.getItem('referral_code') }),
       });
       const data = await res.json();
       if (data.success) {
