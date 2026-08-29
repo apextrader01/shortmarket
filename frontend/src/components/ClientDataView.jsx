@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
+import ReferralsView from './ReferralsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
@@ -26,6 +27,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
   
 
   const handleResetAccount = async () => {
@@ -230,7 +232,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription" color="#34D399" onClick={() => setActiveTab('Referrals')} />
+            <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription" color="#34D399" onClick={() => setShowReferrals(true)} />
             <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
           </div>
         </div>
@@ -365,10 +367,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         </div>
       )}
 
-          
+      {/* Referrals Full-Screen Overlay - no routing needed */}
+      {showReferrals && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-dark)', zIndex: 200, overflowY: 'auto' }}>
+          <ReferralsView setActiveTab={() => setShowReferrals(false)} />
+        </div>
+      )}
+
     </div>
-
-
-
   );
 }
