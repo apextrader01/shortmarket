@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Box } from 'lucide-react';
+import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
 
 export default function OrdersView() {
@@ -134,16 +134,29 @@ export default function OrdersView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? 'center' : 'flex-start', minHeight: 0, width: '100%' }}>
         {(activeTab === 'Pending Triggers' ? displayTriggers.length === 0 : displayOrders.length === 0) ? (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: '120px', height: '100px', background: 'var(--bg-panel)', 
-              borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.2)', margin: '0 auto 24px', position: 'relative'
-            }}>
-              <Box size={40} color="var(--color-green-light)" />
-              <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
-            </div>
-            <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any {activeTab.toLowerCase()}</h2>
+            {(() => {
+              let Icon = Box;
+              let subtitle = '';
+              if (activeTab === 'Open Orders') { Icon = Clock; subtitle = 'Limit and Stop orders waiting to be executed will appear here.'; }
+              else if (activeTab === 'Pending Triggers') { Icon = Target; subtitle = 'Bracket (BO), Cover (CO), and GTT orders waiting for a price trigger will be listed here.'; }
+              else if (activeTab === 'Order History') { Icon = History; subtitle = 'Your executed, cancelled, and rejected orders for today will appear here.'; }
+              else if (activeTab === 'Basket Orders') { Icon = ShoppingBag; subtitle = 'Create and execute multiple orders simultaneously.'; }
 
+              return (
+                <>
+                  <div style={{ 
+                    width: '120px', height: '100px', background: 'var(--bg-panel)', 
+                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)', margin: '0 auto 24px', position: 'relative'
+                  }}>
+                    <Icon size={40} color="var(--color-green-light)" />
+                    <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
+                  </div>
+                  <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any {activeTab.toLowerCase()}</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', maxWidth: '300px', margin: '0 auto', lineHeight: '1.5' }}>{subtitle}</p>
+                </>
+              );
+            })()}
           </div>
         ) : (
           <div style={{ padding: window.innerWidth <= 1200 ? '12px' : '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
