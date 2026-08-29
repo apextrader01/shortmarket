@@ -458,6 +458,20 @@ async function ensureCriticalColumns() {
       )
     `);
 
+
+    // Ensure referrals table always exists (guaranteed path - no migration needed)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id SERIAL PRIMARY KEY,
+        referrer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        referred_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'pending',
+        reward_amount DECIMAL(14,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Retroactively assign professional client IDs to existing users who don't have one
     const usersWithoutClientId = await db('users').whereNull('client_id');
     for (const u of usersWithoutClientId) {
