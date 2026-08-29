@@ -46,7 +46,7 @@ export default function PricingView({ setActiveTab }) {
         key: orderData.key_id || 'rzp_test_placeholder', // Comes from backend
         
         
-        name: 'ShortMarket',
+        name: 'Short Edge',
         description: `Upgrade to PRO (${plan})`,
         image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Placeholder logo
         subscription_id: orderData.subscription_id,
@@ -229,6 +229,7 @@ export default function PricingView({ setActiveTab }) {
     </div>
   );
 }
+
 
 
 
