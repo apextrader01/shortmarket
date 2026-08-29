@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Copy, CheckCircle, Clock, TrendingUp, IndianRupee, Loader2 } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { API } from '../utils/api';
+import { API } from '../store';
 
 export default function ReferralsView({ setActiveTab }) {
   const { user } = useStore(useShallow(state => ({ user: state.user })));
@@ -147,3 +147,4 @@ export default function ReferralsView({ setActiveTab }) {
     </div>
   );
 }
+
