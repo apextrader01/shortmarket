@@ -250,10 +250,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-hover)', padding: '4px', borderRadius: '4px' }}>
-                <span onClick={() => setFontSize('small')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'small' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'small' ? '#FFF' : 'inherit' }}>Small</span>
-                <span onClick={() => setFontSize('medium')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'medium' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'medium' ? '#FFF' : 'inherit' }}>Medium</span>
-                <span onClick={() => setFontSize('large')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'large' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'large' ? '#FFF' : 'inherit' }}>Large</span>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <span onClick={() => setFontSize('small')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'small' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'small' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'small' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'small' ? '600' : '500' }}>Small</span>
+                <span onClick={() => setFontSize('medium')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'medium' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'medium' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'medium' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'medium' ? '600' : '500' }}>Medium</span>
+                <span onClick={() => setFontSize('large')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'large' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'large' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'large' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'large' ? '600' : '500' }}>Large</span>
               </div>
             </div>
 
@@ -272,25 +272,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-hover)', padding: '4px', borderRadius: '4px' }}>
-                <span 
-                  onClick={() => setTheme('light')} 
-                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
-                >
-                  Light
-                </span>
-                <span 
-                  onClick={() => setTheme('dark')} 
-                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
-                >
-                  Dark
-                </span>
-                <span 
-                  onClick={() => setTheme('system')} 
-                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'system' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'system' ? '#FFF' : 'var(--text-secondary)' }}
-                >
-                  System
-                </span>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <span onClick={() => setTheme('light')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'light' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'light' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'light' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'light' ? '600' : '500' }}>Light</span>
+                <span onClick={() => setTheme('dark')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'dark' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'dark' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'dark' ? '600' : '500' }}>Dark</span>
+                <span onClick={() => setTheme('system')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'system' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'system' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'system' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'system' ? '600' : '500' }}>System</span>
               </div>
             </div>
 
@@ -385,6 +370,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
   );
 }
+
 
 
 
