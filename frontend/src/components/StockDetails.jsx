@@ -10,7 +10,7 @@ export default function StockDetails({ symbol, price, candles }) {
   useEffect(() => {
     if (!symbol) return;
     setLoading(true);
-    fetch(`${API}/api/stocks/${encodeURIComponent(symbol)}/details`)
+    fetch(`${API}/api/stocks/${encodeURIComponent(symbol)}/details`, { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         setDetails(data);

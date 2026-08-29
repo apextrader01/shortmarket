@@ -2773,6 +2773,7 @@ async function fetchGoogleNews(symbol) {
 }
 
 app.get('/api/stocks/:symbol/details', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const symbol = req.params.symbol;
   let rawName = symbol.split('-')[0];
 
