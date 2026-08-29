@@ -71,7 +71,7 @@ export const useStore = create(persist((set, get) => ({
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
   hasSkippedOnboarding: localStorage.getItem("hasSkippedOnboarding") === "true",
-  skipOnboarding: () => { localStorage.setItem("hasSkippedOnboarding", "true"); set({ hasSkippedOnboarding: true }); },
+  skipOnboarding: async () => { `r`n    localStorage.setItem("hasSkippedOnboarding", "true"); `r`n    set({ hasSkippedOnboarding: true }); `r`n    try { await fetch(`${API}/api/auth/skip-onboarding`, { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }); } catch (e) {}`r`n  },
   
   authError: null,
 
@@ -1261,6 +1261,7 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
+
 
 
 

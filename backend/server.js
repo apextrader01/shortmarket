@@ -452,6 +452,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 });
 
 // Logout endpoint
+app.post('/api/auth/skip-onboarding', authenticateToken, async (req, res) => {
+  try {
+    await db('users').where({ id: req.user.id }).update({ is_onboarded: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error skipping onboarding:', error);
+    res.status(500).json({ error: 'Failed to skip onboarding' });
+  }
+});
+
 app.post('/api/auth/logout', (req, res) => {
   const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
   res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
@@ -3140,6 +3150,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 
 
 
