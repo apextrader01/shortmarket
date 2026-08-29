@@ -323,17 +323,7 @@ const TradesAndCharges = () => {
   const [viewMode, setViewMode] = useState('Date-Wise View');
   const { orders } = useStore(useShallow(state => ({ orders: state.orders })));
 
-  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
-  const executedOrders = allExecutedOrders.filter(entry => {
-      const entryDate = new Date(entry.created_at);
-      const now = new Date();
-      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
-      if (filterPeriod === 'Week' && diffDays > 7) return false;
-      if (filterPeriod === '15 Days' && diffDays > 15) return false;
-      if (filterPeriod === 'Month' && diffDays > 30) return false;
-      if (filterPeriod === '3 Months' && diffDays > 90) return false;
-      return true;
-  });
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
 
   const filteredOrders = executedOrders.filter(entry => {
     const entryDate = new Date(entry.created_at);
@@ -540,17 +530,7 @@ const TradesAndCharges = () => {
 const PnLCalendarHeatmap = ({ positions, orders }) => {
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null });
 
-  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
-  const executedOrders = allExecutedOrders.filter(entry => {
-      const entryDate = new Date(entry.created_at);
-      const now = new Date();
-      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
-      if (filterPeriod === 'Week' && diffDays > 7) return false;
-      if (filterPeriod === '15 Days' && diffDays > 15) return false;
-      if (filterPeriod === 'Month' && diffDays > 30) return false;
-      if (filterPeriod === '3 Months' && diffDays > 90) return false;
-      return true;
-  });
+  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
   
   if (!executedOrders || executedOrders.length === 0) {
     return (
@@ -1356,6 +1336,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
     </div>
   );
 }
+
 
 
 
