@@ -171,7 +171,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Get ready to invest</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Edge</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
@@ -228,7 +228,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Market & get rewarded ₹500" color="#34D399" />
+            <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Edge & get rewarded ₹500" color="#34D399" />
             <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
           </div>
         </div>
@@ -366,6 +366,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
   );
 }
+
 
 
 
