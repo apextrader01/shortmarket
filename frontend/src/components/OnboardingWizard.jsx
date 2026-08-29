@@ -73,7 +73,7 @@ export default function OnboardingWizard() {
       setError(res.error || 'Failed to save profile. Please try again.');
       setLoading(false);
     }
-    // On success, the store will update and App.jsx will automatically unmount this component.
+    else { skipOnboarding(); } // Force local state to bypass modal permanently on success
   };
 
   const steps = [
