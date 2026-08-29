@@ -2777,7 +2777,8 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
   const symbol = req.params.symbol;
   let rawName = symbol.split('-')[0];
 
-  if (stockDetailsCache[rawName] && (Date.now() - stockDetailsCache[rawName].timestamp < 3600000)) {
+  const cached = stockDetailsCache[rawName];
+  if (cached && (Date.now() - cached.timestamp < 3600000) && cached.data && Array.isArray(cached.data.fundamentals) && cached.data.fundamentals.length > 0) {
     return res.json(stockDetailsCache[rawName].data);
   }
 
