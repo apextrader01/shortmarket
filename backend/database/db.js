@@ -407,6 +407,8 @@ async function initSchema() {
         table.boolean('is_onboarded').defaultTo(false);
       });
       console.log('Added is_onboarded to users table');
+
+    }
       // 10. Referrals Table
       const hasReferrals = await db.schema.hasTable('referrals');
       if (!hasReferrals) {
@@ -421,9 +423,7 @@ async function initSchema() {
         console.log('Created referrals table');
       }
 
-    }
-
-    // Check if we need to migrate existing better-sqlite3 data?
+      // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
     console.error('Failed to initialize database schema:', error);

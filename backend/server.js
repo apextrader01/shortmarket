@@ -3043,23 +3043,6 @@ app.use(express.static(path.join(__dirname, '../frontend/dist'), {
     }
   }
 }));
-app.use((req, res) => {
-  // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
-  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-    return res.status(404).send('Asset not found');
-  }
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
-
-// ─── Start ────────────────────────────────────────────────────────────────
-const { initFyers, setPriceCache } = require('./services/fyers');
-setPriceCache(priceCache);
-
-const { updateOptionsMaster } = require('./database/updateOptionsMaster');
-
-const PORT = process.env.PORT || 5000;
-
 app.get('/api/referrals', authenticateToken, async (req, res) => {
   try {
     const referrals = await db('referrals')
@@ -3082,6 +3065,24 @@ app.get('/api/referrals', authenticateToken, async (req, res) => {
         totalCount: referrals.length
       }
     });
+
+app.use((req, res) => {
+  // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+    return res.status(404).send('Asset not found');
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
+// ─── Start ────────────────────────────────────────────────────────────────
+const { initFyers, setPriceCache } = require('./services/fyers');
+setPriceCache(priceCache);
+
+const { updateOptionsMaster } = require('./database/updateOptionsMaster');
+
+const PORT = process.env.PORT || 5000;
+
   } catch (error) {
     console.error('Error fetching referrals:', error);
     res.status(500).json({ error: 'Failed to fetch referrals' });
