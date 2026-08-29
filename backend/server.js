@@ -542,6 +542,16 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // ─── User ─────────────────────────────────────────────────────────────────
+
+app.get('/api/debug-db', async (req, res) => {
+    try {
+        const columns = await db('users').columnInfo();
+        res.json(columns);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await db('users').where({ id: req.user.id }).first();
@@ -590,6 +600,34 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
     };
     const order = await razorpay.orders.create(options);
     res.json({ ...order, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
+  } catch (error) {
+    res.status(500).json({ error: 'Razorpay error: ' + error.message });
+  }
+});
+
+app.post('/api/payment/create-subscription', authenticateToken, async (req, res) => {
+  try {
+    const { plan } = req.body || {};
+    
+    // These must be created in Razorpay Dashboard -> Subscriptions -> Plans
+    const planId = plan === 'monthly' ? (process.env.RAZORPAY_PLAN_ID_MONTHLY || 'plan_placeholder_monthly') : (process.env.RAZORPAY_PLAN_ID_YEARLY || 'plan_placeholder_yearly');
+
+    if (planId.includes('placeholder')) {
+      console.warn('WARNING: Using placeholder Plan ID. Real Razorpay recurring payments will fail until you configure RAZORPAY_PLAN_ID_MONTHLY in .env');
+    }
+
+    // 7 days from now in Unix timestamp
+    const startAt = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+
+    const options = {
+      plan_id: planId,
+      customer_notify: 1,
+      total_count: plan === 'monthly' ? 120 : 10, // Max billing cycles (10 years)
+      start_at: startAt, // This creates the 7-day free trial delay
+    };
+
+    const subscription = await razorpay.subscriptions.create(options);
+    res.json({ subscription_id: subscription.id, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
   } catch (error) {
     res.status(500).json({ error: 'Razorpay error: ' + error.message });
   }
@@ -3095,6 +3133,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 
 
 

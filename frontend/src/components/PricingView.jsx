@@ -30,7 +30,7 @@ export default function PricingView({ setActiveTab }) {
 
       const token = localStorage.getItem('token');
       // 1. Create order
-      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-order`, {
+      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -39,17 +39,17 @@ export default function PricingView({ setActiveTab }) {
         body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create order');
+      if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create subscription');
 
       // 2. Open Razorpay Checkout
       const options = {
         key: orderData.key_id || 'rzp_test_placeholder', // Comes from backend
-        amount: orderData.amount,
-        currency: orderData.currency,
+        
+        
         name: 'ShortMarket',
         description: `Upgrade to PRO (${plan})`,
         image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Placeholder logo
-        order_id: orderData.id,
+        subscription_id: orderData.subscription_id,
         handler: async function (response) {
           try {
             const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify`, {
@@ -178,7 +178,7 @@ export default function PricingView({ setActiveTab }) {
               onClick={() => handleUpgrade('monthly')}
               disabled={loading}
             >
-              {loading === 'monthly' ? 'Processing...' : 'Upgrade Monthly'}
+              {loading === 'monthly' ? 'Processing...' : 'Start 7-Day Free Trial'}
             </button>
           )}
         </div>
@@ -220,7 +220,7 @@ export default function PricingView({ setActiveTab }) {
               onClick={() => handleUpgrade('yearly')}
               disabled={loading}
             >
-              {loading === 'yearly' ? 'Processing...' : 'Upgrade Yearly'}
+              {loading === 'yearly' ? 'Processing...' : 'Start 7-Day Free Trial'}
             </button>
           )}
         </div>
@@ -228,6 +228,8 @@ export default function PricingView({ setActiveTab }) {
     </div>
   );
 }
+
+
 
 
 
