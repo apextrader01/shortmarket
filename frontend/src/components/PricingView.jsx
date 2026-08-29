@@ -28,11 +28,11 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      const orderRes = await fetch(${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription, {
+      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': "Bearer ${token}"
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ plan })
       });
@@ -42,16 +42,16 @@ export default function PricingView({ setActiveTab }) {
       const options = {
         key: orderData.key_id || 'rzp_test_placeholder',
         name: 'Short Edge',
-        description: "7-Day Free Trial (${plan})",
+        description: `7-Day Free Trial (${plan})`,
         image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
         subscription_id: orderData.subscription_id,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch(${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify, {
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': "Bearer ${token}"
+                'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id || response.razorpay_subscription_id,
