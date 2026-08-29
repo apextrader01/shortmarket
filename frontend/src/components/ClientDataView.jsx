@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 
@@ -26,6 +26,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const refLink = `/register?ref=${user?.id || 'unknown'}$;
 
   const handleResetAccount = async () => {
     if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to ₹10,00,000. This cannot be undone.')) {
@@ -364,18 +366,41 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         </div>
       )}
 
+          {/* Referral Modal */}
+      {showReferralModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-panel)', padding: '32px', borderRadius: '16px', width: '100%', maxWidth: '400px', border: '1px solid var(--border-color)', position: 'relative', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+            <div onClick={() => setShowReferralModal(false)} style={{ position: 'absolute', top: '16px', right: '16px', cursor: 'pointer', opacity: 0.7 }} className="hoverable"><X size={20} /></div>
+            
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ background: 'rgba(52, 211, 153, 0.1)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+                <Gift size={32} color="#34D399" />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>Refer & Earn ?500</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.5' }}>Invite your friends to Short Edge. When they make their first trade, you both get ?500 directly in your wallet!</p>
+            </div>
+            
+            <div style={{ background: 'var(--bg-dark)', padding: '16px', borderRadius: '8px', border: '1px dashed var(--border-color)', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-primary)', wordBreak: 'break-all', opacity: 0.8 }}>
+                {refLink}
+              </div>
+              <div 
+                onClick={() => {
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(refLink);
+                    alert('Link copied to clipboard!');
+                  }
+                }}
+                className="hoverable"
+                style={{ cursor: 'pointer', background: 'var(--color-blue)', padding: '8px 12px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold', color: 'white', flexShrink: 0 }}
+              >
+                COPY
+              </div>
+            </div>
+
+            <button onClick={() => setShowReferralModal(false)} className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 'bold' }}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-
-
-
-
-
-
-
-
-
-
 
