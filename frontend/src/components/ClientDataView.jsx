@@ -243,9 +243,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>Quick Settings</h3>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ minWidth: '200px', flex: 1 }}>
+          <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
+              <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Font Size</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
               </div>
@@ -256,7 +257,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Enable Accessibility Mode</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
@@ -266,7 +267,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Appearance Preference</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
@@ -293,7 +294,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Re-Confirm Order</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
@@ -303,6 +304,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Account Settings */}
