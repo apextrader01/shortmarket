@@ -161,7 +161,7 @@ function App() {
 
   // Global Hotkey Engine (Shift+B, Shift+S)
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
       // Don't trigger if user is typing in an input or textarea
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -171,7 +171,8 @@ function App() {
         const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
         const lotsize = stockInfo.lotsize || 1;
         
-        placeOrder({
+        setHotkeyToast('? Placing BUY order...');
+        const res = await placeOrder({
           symbol: selectedSymbol,
           type: 'MARKET',
           side: 'BUY',
@@ -180,8 +181,14 @@ function App() {
           product_type: 'INT'
         });
         
-        setHotkeyToast('🔥 BUY MARKET: ' + selectedSymbol);
-        setTimeout(() => setHotkeyToast(null), 1500);
+        if (res && res.success) {
+          setHotkeyToast('? BUY MARKET PLACED: ' + selectedSymbol);
+        } else {
+          const { useStore } = require('./store');
+          const errorMsg = useStore.getState().authError || 'Order Failed';
+          setHotkeyToast('? ' + errorMsg);
+        }
+        setTimeout(() => setHotkeyToast(null), 3500);
       }
       
       if (e.shiftKey && (e.key === 's' || e.key === 'S')) {
@@ -190,7 +197,8 @@ function App() {
         const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
         const lotsize = stockInfo.lotsize || 1;
         
-        placeOrder({
+        setHotkeyToast('? Placing SELL order...');
+        const res = await placeOrder({
           symbol: selectedSymbol,
           type: 'MARKET',
           side: 'SELL',
@@ -199,8 +207,14 @@ function App() {
           product_type: 'INT'
         });
         
-        setHotkeyToast('🔥 SELL MARKET: ' + selectedSymbol);
-        setTimeout(() => setHotkeyToast(null), 1500);
+        if (res && res.success) {
+          setHotkeyToast('? SELL MARKET PLACED: ' + selectedSymbol);
+        } else {
+          const { useStore } = require('./store');
+          const errorMsg = useStore.getState().authError || 'Order Failed';
+          setHotkeyToast('? ' + errorMsg);
+        }
+        setTimeout(() => setHotkeyToast(null), 3500);
       }
     };
 
