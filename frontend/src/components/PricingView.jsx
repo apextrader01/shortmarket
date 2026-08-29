@@ -127,7 +127,7 @@ export default function PricingView({ setActiveTab }) {
             <h3 style={{ fontSize: '22px', fontWeight: '800' }}>Starter</h3>
           </div>
           <div style={{ fontSize: '48px', fontWeight: '900', marginBottom: '8px', display: 'flex', alignItems: 'baseline' }}>
-            ?0<span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/forever</span>
+            ₹0<span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/forever</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Perfect for beginners exploring the markets.</p>
           
@@ -158,7 +158,7 @@ export default function PricingView({ setActiveTab }) {
           </div>
           
           <div style={{ fontSize: '56px', fontWeight: '900', marginBottom: '8px', color: '#FCD34D', display: 'flex', alignItems: 'baseline' }}>
-            ?499
+            ₹499
             <span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Massive savings. The ultimate trading experience with everything unlocked.</p>
@@ -197,7 +197,7 @@ export default function PricingView({ setActiveTab }) {
           </div>
           
           <div style={{ fontSize: '48px', fontWeight: '900', marginBottom: '8px', color: '#60A5FA', display: 'flex', alignItems: 'baseline' }}>
-            ?99
+            ₹99
             <span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/mo</span>
           </div>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Advanced tools for serious traders without the long-term commitment.</p>
