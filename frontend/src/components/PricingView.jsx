@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Check, Star, Shield, Zap, ChevronLeft, ArrowLeft } from 'lucide-react';
+import { Check, Star, Shield, Zap, ArrowLeft, X } from 'lucide-react';
 
 export default function PricingView({ setActiveTab }) {
   const { user } = useStore(useShallow(state => ({ user: state.user })));
   const [loading, setLoading] = useState(false);
 
-  // Initialize Razorpay logic
   const loadRazorpay = () => {
     return new Promise((resolve) => {
       const script = document.createElement('script');
@@ -29,69 +28,63 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      // 1. Create order
-      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription`, {
+      const orderRes = await fetch(${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
+          'Authorization': "Bearer ${token}"
         },
         body: JSON.stringify({ plan })
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) throw new Error(orderData.error || 'Failed to create subscription');
 
-      // 2. Open Razorpay Checkout
       const options = {
-        key: orderData.key_id || 'rzp_test_placeholder', // Comes from backend
-        
-        
+        key: orderData.key_id || 'rzp_test_placeholder',
         name: 'Short Edge',
-        description: `Upgrade to PRO (${plan})`,
-        image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Placeholder logo
+        description: "7-Day Free Trial (${plan})",
+        image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
         subscription_id: orderData.subscription_id,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify`, {
+            const verifyRes = await fetch(${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': "Bearer ${token}"
               },
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id || response.razorpay_subscription_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
                 razorpay_signature: response.razorpay_signature,
                 plan: plan
               })
             });
             const verifyData = await verifyRes.json();
-            if (verifyRes.ok && verifyData.success) {
-              alert('Successfully upgraded to PRO! Please log out and log back in to apply changes.');
-              window.location.reload();
+            if (verifyData.success) {
+              alert('Upgraded to PRO successfully! Please log out and log back in to see changes.');
+              setActiveTab('ClientData');
             } else {
-              alert(verifyData.error || 'Payment verification failed');
+              alert('Payment verification failed. Please contact support.');
             }
-          } catch (e) {
-            alert('Error verifying payment: ' + e.message);
+          } catch (err) {
+            alert('Error verifying payment: ' + err.message);
           }
         },
         prefill: {
-          name: user.username,
-          email: user.email,
-          contact: user.phone || '9999999999'
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
         },
-        theme: {
-          color: '#3b82f6'
-        }
+        theme: { color: '#3B82F6' }
       };
-      
-      const rzp1 = new window.Razorpay(options);
-      rzp1.on('payment.failed', function (response){
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response) {
         alert(response.error.description);
       });
-      rzp1.open();
+      rzp.open();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -102,80 +95,129 @@ export default function PricingView({ setActiveTab }) {
   const isPro = user?.subscription_tier === 'PRO';
 
   return (
-    <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto', color: 'var(--text-primary)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-          <div 
-            onClick={() => setActiveTab('ClientData')} 
-            style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-          >
-            <ArrowLeft size={16} />
-          </div>
+    <div style={{ padding: '20px 40px', maxWidth: '1200px', margin: '0 auto', color: 'var(--text-primary)' }}>
+      {/* Back Button & Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
+        <div 
+          onClick={() => setActiveTab('ClientData')} 
+          style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.2s', border: '1px solid var(--border-color)' }}
+          className="hoverable"
+        >
+          <ArrowLeft size={18} />
         </div>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '12px' }}>Choose Your Plan</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>Unlock the full potential of your trading with PRO.</p>
+      </div>
+      
+      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <h1 style={{ fontSize: '42px', fontWeight: '900', marginBottom: '16px', background: 'linear-gradient(to right, #60A5FA, #A78BFA, #F472B6)', WebkitBackgroundClip: 'text', color: 'transparent', letterSpacing: '-1px' }}>
+          Trade Like a Professional
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '16px', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' }}>
+          Unlock advanced analytics, increased watchlists, and premium features. Start with a 7-day risk-free trial today!
+        </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '30px', alignItems: 'center' }}>
+        
         {/* BASIC PLAN */}
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <Shield style={{ color: 'var(--text-secondary)' }} />
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>BASIC</h3>
+        <div style={{ background: 'linear-gradient(145deg, var(--bg-panel) 0%, rgba(255,255,255,0.02) 100%)', border: '1px solid var(--border-color)', borderRadius: '24px', padding: '40px 32px', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '12px' }}>
+              <Shield size={24} style={{ color: 'var(--text-secondary)' }} />
+            </div>
+            <h3 style={{ fontSize: '22px', fontWeight: '800' }}>Starter</h3>
           </div>
-          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px' }}>₹0<span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / forever</span></div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', minHeight: '40px' }}>Essential features for beginners to get started.</p>
+          <div style={{ fontSize: '48px', fontWeight: '900', marginBottom: '8px', display: 'flex', alignItems: 'baseline' }}>
+            ?0<span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/forever</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Perfect for beginners exploring the markets.</p>
           
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-green)' }}/> Up to 3 Watchlists</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-green)' }}/> Basic Order Placement</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-green)' }}/> Portfolio Tracking</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-secondary)' }}><Check size={18} style={{ opacity: 0.2 }}/> Advanced Charts</li>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#10B981' }}/> 3 Watchlists</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#10B981' }}/> Basic Order Placement</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#10B981' }}/> Portfolio Tracking</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', color: 'var(--text-secondary)' }}><X size={20} style={{ opacity: 0.3 }}/> <s style={{ opacity: 0.6 }}>Advanced Charts</s></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', color: 'var(--text-secondary)' }}><X size={20} style={{ opacity: 0.3 }}/> <s style={{ opacity: 0.6 }}>Premium Support</s></li>
           </ul>
 
-          <button 
-            className="btn btn-secondary" 
-            style={{ width: '100%', padding: '12px', opacity: 0.5, cursor: 'not-allowed' }}
-            disabled
-          >
+          <button className="btn btn-secondary" style={{ width: '100%', padding: '16px', borderRadius: '12px', opacity: 0.6, cursor: 'not-allowed', fontWeight: '700', letterSpacing: '0.5px' }} disabled>
             Current Plan
           </button>
         </div>
 
-        {/* MONTHLY PRO PLAN */}
-        <div style={{ background: 'var(--bg-card)', border: '2px solid var(--color-blue)', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 8px 32px rgba(59, 130, 246, 0.15)' }}>
-          <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-blue)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Zap size={12} /> PRO MONTHLY
+        {/* YEARLY PRO PLAN (CENTER, HIGHLIGHTED) */}
+        <div style={{ background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.1) 0%, var(--bg-card) 100%)', border: '2px solid #F59E0B', borderRadius: '24px', padding: '48px 32px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 20px 40px rgba(245, 158, 11, 0.15)', transform: 'scale(1.05)', zIndex: 10, height: '105%' }}>
+          <div style={{ position: 'absolute', top: '-16px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #F59E0B, #FCD34D)', color: '#000', padding: '6px 20px', borderRadius: '20px', fontSize: '13px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            <Star size={14} fill="#000" /> BEST VALUE - SAVE 58%
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>Monthly</h3>
-          </div>
-          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-blue-light)' }}>
-            ₹99 
-            <span style={{ fontSize: '18px', color: 'var(--text-secondary)', textDecoration: 'line-through', marginLeft: '8px' }}>₹149</span>
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / mo</span>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', minHeight: '40px' }}>Advanced tools for serious traders and investors.</p>
           
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-blue)' }}/> Up to 5 Watchlists</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-blue)' }}/> All Basic Features</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-blue)' }}/> Priority Support</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-blue)' }}/> Advanced Analytics (Coming Soon)</li>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: '10px', borderRadius: '12px' }}>
+              <Star size={24} style={{ color: '#F59E0B' }} fill="#F59E0B" />
+            </div>
+            <h3 style={{ fontSize: '22px', fontWeight: '800' }}>Yearly Elite</h3>
+          </div>
+          
+          <div style={{ fontSize: '56px', fontWeight: '900', marginBottom: '8px', color: '#FCD34D', display: 'flex', alignItems: 'baseline' }}>
+            ?499
+            <span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/yr</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Massive savings. The ultimate trading experience with everything unlocked.</p>
+          
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', fontWeight: '500' }}><Check size={20} style={{ color: '#F59E0B' }}/> Unlimited Watchlists</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', fontWeight: '500' }}><Check size={20} style={{ color: '#F59E0B' }}/> Advanced Option Chain</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', fontWeight: '500' }}><Check size={20} style={{ color: '#F59E0B' }}/> Advanced Analytics & Heatmaps</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', fontWeight: '500' }}><Check size={20} style={{ color: '#F59E0B' }}/> 24/7 Priority Support</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', fontWeight: '500' }}><Check size={20} style={{ color: '#F59E0B' }}/> Early Access to New Features</li>
           </ul>
 
           {isPro ? (
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: '100%', padding: '12px', background: 'var(--color-green)', color: 'white', border: 'none' }}
-              disabled
-            >
+            <button className="btn" style={{ width: '100%', padding: '16px', background: '#10B981', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '800', letterSpacing: '0.5px' }} disabled>
               Active Subscription
             </button>
           ) : (
             <button 
-              className="btn btn-primary" 
-              style={{ width: '100%', padding: '12px', fontWeight: 'bold' }}
+              className="btn btn-primary hoverable" 
+              style={{ width: '100%', padding: '18px', fontWeight: '800', background: 'linear-gradient(90deg, #F59E0B, #FCD34D)', color: 'black', border: 'none', borderRadius: '12px', fontSize: '16px', letterSpacing: '0.5px', boxShadow: '0 8px 20px rgba(245, 158, 11, 0.3)', transition: '0.3s transform' }}
+              onClick={() => handleUpgrade('yearly')}
+              disabled={loading}
+            >
+              {loading === 'yearly' ? 'Processing...' : 'Start 7-Day Free Trial'}
+            </button>
+          )}
+        </div>
+
+        {/* MONTHLY PRO PLAN */}
+        <div style={{ background: 'linear-gradient(145deg, var(--bg-panel) 0%, rgba(59, 130, 246, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '24px', padding: '40px 32px', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.15)', padding: '10px', borderRadius: '12px' }}>
+              <Zap size={24} style={{ color: '#3B82F6' }} />
+            </div>
+            <h3 style={{ fontSize: '22px', fontWeight: '800' }}>Pro Monthly</h3>
+          </div>
+          
+          <div style={{ fontSize: '48px', fontWeight: '900', marginBottom: '8px', color: '#60A5FA', display: 'flex', alignItems: 'baseline' }}>
+            ?99
+            <span style={{ fontSize: '16px', color: 'var(--text-secondary)', fontWeight: '600', marginLeft: '4px' }}>/mo</span>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '14px', lineHeight: '1.5' }}>Advanced tools for serious traders without the long-term commitment.</p>
+          
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#3B82F6' }}/> Unlimited Watchlists</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#3B82F6' }}/> Advanced Option Chain</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px' }}><Check size={20} style={{ color: '#3B82F6' }}/> Advanced Analytics & Heatmaps</li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', color: 'var(--text-secondary)' }}><X size={20} style={{ opacity: 0.3 }}/> <s style={{ opacity: 0.6 }}>Priority Support</s></li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '15px', color: 'var(--text-secondary)' }}><X size={20} style={{ opacity: 0.3 }}/> <s style={{ opacity: 0.6 }}>Early Access</s></li>
+          </ul>
+
+          {isPro ? (
+            <button className="btn" style={{ width: '100%', padding: '16px', background: '#10B981', color: 'white', border: 'none', borderRadius: '12px', fontWeight: '700', letterSpacing: '0.5px' }} disabled>
+              Active Subscription
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary hoverable" 
+              style={{ width: '100%', padding: '16px', fontWeight: '700', borderRadius: '12px', fontSize: '15px', letterSpacing: '0.5px', transition: '0.3s transform' }}
               onClick={() => handleUpgrade('monthly')}
               disabled={loading}
             >
@@ -184,55 +226,11 @@ export default function PricingView({ setActiveTab }) {
           )}
         </div>
 
-        {/* YEARLY PRO PLAN */}
-        <div style={{ background: 'var(--bg-card)', border: '2px solid var(--color-yellow)', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 8px 32px rgba(234, 179, 8, 0.15)' }}>
-          <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-yellow)', color: 'black', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Star size={12} /> BEST VALUE
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold' }}>Yearly</h3>
-          </div>
-          <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px', color: 'var(--color-yellow)' }}>
-            ₹499
-            <span style={{ fontSize: '18px', color: 'var(--text-secondary)', textDecoration: 'line-through', marginLeft: '8px' }}>₹999</span>
-            <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}> / year</span>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', minHeight: '40px' }}>Massive savings. The ultimate trading experience.</p>
-          
-          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Up to 5 Watchlists</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> All Basic Features</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Priority Support</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><Check size={18} style={{ color: 'var(--color-yellow)' }}/> Advanced Analytics (Coming Soon)</li>
-          </ul>
-
-          {isPro ? (
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: '100%', padding: '12px', background: 'var(--color-green)', color: 'white', border: 'none' }}
-              disabled
-            >
-              Active Subscription
-            </button>
-          ) : (
-            <button 
-              className="btn btn-primary" 
-              style={{ width: '100%', padding: '12px', fontWeight: 'bold', background: 'var(--color-yellow)', color: 'black', border: 'none' }}
-              onClick={() => handleUpgrade('yearly')}
-              disabled={loading}
-            >
-              {loading === 'yearly' ? 'Processing...' : 'Start 7-Day Free Trial'}
-            </button>
-          )}
-        </div>
+      </div>
+      
+      <div style={{ textAlign: 'center', marginTop: '60px', color: 'var(--text-secondary)', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <Shield size={16} /> Secure payments processed by Razorpay. Cancel anytime.
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
