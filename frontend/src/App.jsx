@@ -414,12 +414,7 @@ function App() {
                   <div style={{ fontWeight: '700', fontSize: '15px' }}>{user.username}</div>
                 </div>
               </div>
-              <div
-                  onClick={() => setActiveTab('Settings')}
-                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}
-                >
-                  <Settings size={14} color="var(--text-secondary)" />
-                </div>
+              
             </div>
           </div>
         </header>
@@ -466,11 +461,7 @@ function App() {
               <ReportsView onBack={() => setActiveTab('ClientData')} />
             </div>
           )}
-          {activeTab === 'Settings' && (
-            <div style={{ flex: 1, padding: '12px' }}>
-              <SettingsView />
-            </div>
-          )}
+          
           {activeTab === 'Referrals' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
               <ReferralsView setActiveTab={setActiveTab} />

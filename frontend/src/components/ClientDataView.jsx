@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
 import ReferralsView from './ReferralsView';
+import SettingsView from './SettingsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
@@ -44,10 +45,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   
 
   const handleResetAccount = async () => {
-    if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to ₹10,00,000. This cannot be undone.')) {
+    if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to Rs. 10,00,000. This cannot be undone.')) {
       const res = await resetAccount();
       if (!res.success) {
         alert('Failed to reset account: ' + (res.error || 'Unknown error'));
@@ -159,9 +161,9 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               Client ID: {user?.client_id || user?.id}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '2px' }}>
-              Available Margin: ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
+            <div onClick={() => setShowProfile(true)} style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE &rarr;</div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
           </div>
         </div>
