@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Wallet, ArrowRight, CheckCircle, ShieldCheck, Building2, Smartphone } from 'lucide-react';
+import { X, Wallet, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -42,16 +42,17 @@ export default function DepositModal({ onClose }) {
           </div>
           <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>Request Sent!</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: '1.5' }}>
-            Your request to add <strong style={{ color: 'var(--text-primary)' }}>?{Number(amount).toLocaleString('en-IN')}</strong> has been received and is pending admin approval.
+            Your request to add <strong style={{ color: 'var(--text-primary)' }}>&#8377;{Number(amount).toLocaleString('en-IN')}</strong> has been received and is pending admin approval.
           </p>
         </div>
-        <style>{`@keyframes scaleIn { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }`}</style>
+        <style>{'@keyframes scaleIn { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }'}</style>
       </div>
     );
   }
 
   return (
     <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <style>{'\n.no-spinners::-webkit-inner-spin-button,\n.no-spinners::-webkit-outer-spin-button {\n  -webkit-appearance: none;\n  margin: 0;\n}\n.no-spinners {\n  -moz-appearance: textfield;\n}\n'}</style>
       <div style={{ background: 'var(--bg-panel)', borderRadius: '20px', width: '420px', border: '1px solid var(--border-color)', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
         
         {/* Header */}
@@ -61,7 +62,7 @@ export default function DepositModal({ onClose }) {
               <Wallet size={22} color="var(--color-blue)" /> Add Funds
             </h2>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Available Margin: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>?{Number(user?.balance || 0).toLocaleString('en-IN')}</span>
+              Available Margin: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>&#8377;{Number(user?.balance || 0).toLocaleString('en-IN')}</span>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'var(--bg-hover)', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}>
@@ -73,17 +74,18 @@ export default function DepositModal({ onClose }) {
           <div style={{ padding: '0 24px' }}>
             
             {/* Amount Input */}
-            <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', textAlign: 'center', transition: 'border-color 0.2s', ...(amount ? { borderColor: 'var(--color-blue)' } : {}) }}>
-              <label style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', fontWeight: '500' }}>Enter Amount</label>
+            <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px 20px', textAlign: 'center', transition: 'border-color 0.2s', ...(amount ? { borderColor: 'var(--color-blue)' } : {}) }}>
+              <label style={{ fontSize: '14px', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px', fontWeight: '500' }}>Enter Amount</label>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '32px', fontWeight: '500', color: amount ? 'var(--text-primary)' : 'var(--text-secondary)' }}>?</span>
+                <span style={{ fontSize: '32px', fontWeight: '500', color: amount ? 'var(--text-primary)' : 'var(--text-secondary)' }}>&#8377;</span>
                 <input 
                   type="number" 
                   autoFocus
+                  className="no-spinners"
                   style={{ 
                     background: 'transparent', border: 'none', color: 'var(--text-primary)', 
                     fontSize: '40px', fontWeight: '700', width: '100%', outline: 'none',
-                    textAlign: 'center', padding: '0', maxWidth: '200px'
+                    textAlign: 'center', padding: '0', maxWidth: '220px'
                   }}
                   value={amount} 
                   onChange={e => setAmount(e.target.value)} 
@@ -94,7 +96,7 @@ export default function DepositModal({ onClose }) {
             </div>
             
             {/* Quick Chips */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', marginBottom: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
               {quickAmounts.map(amt => (
                 <button
                   key={amt}
@@ -112,31 +114,18 @@ export default function DepositModal({ onClose }) {
               ))}
             </div>
 
-            {/* Simulated Payment Methods */}
-            <div style={{ marginTop: '32px', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Select Payment Method</div>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-              <div style={{ flex: 1, border: '1px solid var(--color-blue)', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <Smartphone size={24} color="var(--color-blue)" />
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>UPI</span>
-              </div>
-              <div style={{ flex: 1, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
-                <Building2 size={24} color="var(--text-secondary)" />
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Net Banking</span>
-              </div>
-            </div>
-
             {error && <div style={{ color: 'var(--color-red-light)', fontSize: '13px', marginBottom: '24px', background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>{error}</div>}
           </div>
           
           {/* Footer Area */}
-          <div style={{ background: 'var(--bg-elevated)', padding: '24px', borderTop: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'var(--bg-elevated)', padding: '24px', borderTop: '1px solid var(--border-color)', marginTop: '8px' }}>
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }} disabled={loading}>
               {loading ? 'Processing...' : (
-                <>Deposit ?{amount ? Number(amount).toLocaleString('en-IN') : '0'} <ArrowRight size={18} /></>
+                <>Request Deposit {amount ? '(Rs. ' + Number(amount).toLocaleString('en-IN') + ')' : ''} <ArrowRight size={18} /></>
               )}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              <ShieldCheck size={14} /> Safe and secure transaction. Pending admin approval.
+              <ShieldCheck size={14} /> Funds will be credited once approved by an administrator.
             </div>
           </div>
         </form>
