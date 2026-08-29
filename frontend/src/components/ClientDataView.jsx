@@ -405,3 +405,6 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
 
 
+
+  );
+}
