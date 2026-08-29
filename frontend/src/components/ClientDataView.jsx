@@ -87,12 +87,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
 
 
 
-  const Card = ({ title, desc, icon: Icon, color, onClick }) => (
+  const Card = ({ title, desc, icon: Icon, color, onClick, badge }) => (
     <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
       {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
-      <div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
-        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>}
+        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', flex: 1 }}>{desc}</div>}
+        {badge && <div style={{ marginTop: '12px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>{badge}</div>}
       </div>
     </div>
   );
@@ -219,8 +220,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Coming Features</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.041% interest per day" color="#A855F7" />
-            <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" onClick={() => setActiveTab('Options')} />
+            <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.045% interest per day" color="#A855F7" badge="Coming Soon" />
+            <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" onClick={() => setActiveTab('Options')} badge="Coming Soon" />
           </div>
         </div>
 
@@ -366,6 +367,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     </div>
   );
 }
+
 
 
 
