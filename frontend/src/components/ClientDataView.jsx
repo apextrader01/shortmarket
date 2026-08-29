@@ -231,7 +231,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Edge & get rewarded ₹500" color="#34D399" />
+            <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Edge & get rewarded ?500" color="#34D399" onClick={() => setShowReferralModal(true)} />
             <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
           </div>
         </div>
