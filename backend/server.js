@@ -601,7 +601,8 @@ app.post('/api/payment/create-order', authenticateToken, async (req, res) => {
     const order = await razorpay.orders.create(options);
     res.json({ ...order, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
   } catch (error) {
-    res.status(500).json({ error: 'Razorpay error: ' + error.message });
+    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
   }
 });
 
@@ -629,7 +630,8 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
     const subscription = await razorpay.subscriptions.create(options);
     res.json({ subscription_id: subscription.id, key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder' });
   } catch (error) {
-    res.status(500).json({ error: 'Razorpay error: ' + error.message });
+    const errMsg = error.error ? error.error.description : (error.message || 'Unknown error');
+    res.status(500).json({ error: 'Razorpay API Rejected: ' + errMsg });
   }
 });
 
@@ -3133,6 +3135,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 
 
 
