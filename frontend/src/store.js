@@ -1202,8 +1202,8 @@ export const useStore = create(persist((set, get) => ({
     
     // Direct DOM manipulation for instant scaling bypassing CSS cache
     if (size === 'small') {
-      document.body.style.zoom = '0.9';
-      document.body.style.MozTransform = 'scale(0.9)';
+      document.body.style.zoom = '0.85';
+      document.body.style.MozTransform = 'scale(0.85)';
       document.body.style.MozTransformOrigin = 'top left';
     } else if (size === 'large') {
       document.body.style.zoom = '1.1';
