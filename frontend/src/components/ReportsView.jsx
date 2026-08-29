@@ -323,7 +323,17 @@ const TradesAndCharges = () => {
   const [viewMode, setViewMode] = useState('Date-Wise View');
   const { orders } = useStore(useShallow(state => ({ orders: state.orders })));
 
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executedOrders = allExecutedOrders.filter(entry => {
+      const entryDate = new Date(entry.created_at);
+      const now = new Date();
+      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      return true;
+  });
 
   const filteredOrders = executedOrders.filter(entry => {
     const entryDate = new Date(entry.created_at);
@@ -530,7 +540,17 @@ const TradesAndCharges = () => {
 const PnLCalendarHeatmap = ({ positions, orders }) => {
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, data: null });
 
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executedOrders = allExecutedOrders.filter(entry => {
+      const entryDate = new Date(entry.created_at);
+      const now = new Date();
+      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      return true;
+  });
   
   if (!executedOrders || executedOrders.length === 0) {
     return (
@@ -699,7 +719,17 @@ const ProfitAndLoss = () => {
     return true;
   });
 
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executedOrders = allExecutedOrders.filter(entry => {
+      const entryDate = new Date(entry.created_at);
+      const now = new Date();
+      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      return true;
+  });
   const filteredOrders = executedOrders.filter(entry => {
     const entryDate = new Date(entry.created_at);
     const now = new Date();
@@ -1052,7 +1082,17 @@ const TradingInsights = () => {
   })));
 
   // Daily orders (for Day Trades list)
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const allExecutedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const executedOrders = allExecutedOrders.filter(entry => {
+      const entryDate = new Date(entry.created_at);
+      const now = new Date();
+      const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
+      if (filterPeriod === 'Week' && diffDays > 7) return false;
+      if (filterPeriod === '15 Days' && diffDays > 15) return false;
+      if (filterPeriod === 'Month' && diffDays > 30) return false;
+      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      return true;
+  });
 
   // Aggregate metrics from historical orders instead of positions (since positions are wiped at EOD)
   let grossPnl = 0;
@@ -1077,6 +1117,71 @@ const TradingInsights = () => {
       }
     }
   });
+
+  const pnlPerDay = {};
+  executedOrders.forEach(o => {
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
+      const dt = new Date(o.created_at);
+      const dStr = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      if (!pnlPerDay[dStr]) pnlPerDay[dStr] = 0;
+      pnlPerDay[dStr] += parseFloat(o.realized_pnl);
+    }
+  });
+
+  const daysArr = Object.values(pnlPerDay);
+  const totalDays = daysArr.length;
+  const profitableDays = daysArr.filter(pnl => pnl > 0).length;
+  const profitableDayPercent = totalDays > 0 ? ((profitableDays / totalDays) * 100).toFixed(1) + '%' : '-';
+
+  let totalHoldingSeconds = 0;
+  let totalHoldingTrades = 0;
+  const symbolOrders = {};
+  executedOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).forEach(o => {
+    if (!symbolOrders[o.symbol]) symbolOrders[o.symbol] = [];
+    symbolOrders[o.symbol].push(o);
+  });
+
+  Object.values(symbolOrders).forEach(ordersList => {
+    let positionQty = 0;
+    let entryOrders = [];
+    ordersList.forEach(o => {
+       const qty = Number(o.quantity);
+       const isBuy = o.side === 'BUY';
+       const time = new Date(o.created_at).getTime();
+       if (positionQty === 0) {
+         entryOrders.push({ qty, time });
+         positionQty = isBuy ? qty : -qty;
+       } else if ((positionQty > 0 && isBuy) || (positionQty < 0 && !isBuy)) {
+         entryOrders.push({ qty, time });
+         positionQty += (isBuy ? qty : -qty);
+       } else {
+         let remainingCloseQty = qty;
+         while (remainingCloseQty > 0 && entryOrders.length > 0) {
+           const firstEntry = entryOrders[0];
+           const closeQty = Math.min(firstEntry.qty, remainingCloseQty);
+           const holdingTimeMs = time - firstEntry.time;
+           totalHoldingSeconds += (holdingTimeMs / 1000) * closeQty;
+           totalHoldingTrades += closeQty;
+           firstEntry.qty -= closeQty;
+           remainingCloseQty -= closeQty;
+           if (firstEntry.qty === 0) entryOrders.shift();
+         }
+         positionQty += (isBuy ? qty : -qty);
+         if (remainingCloseQty > 0) entryOrders.push({ qty: remainingCloseQty, time });
+       }
+    });
+  });
+
+  const formatHoldingTime = (seconds) => {
+    if (!seconds && seconds !== 0) return '-';
+    if (seconds < 60) return Math.round(seconds) + 's';
+    const mins = seconds / 60;
+    if (mins < 60) return Math.round(mins) + 'm';
+    const hours = mins / 60;
+    if (hours < 24) return Math.round(hours) + 'h';
+    return Math.round(hours / 24) + 'd';
+  };
+  const avgHoldingTime = totalHoldingTrades > 0 ? formatHoldingTime(totalHoldingSeconds / totalHoldingTrades) : '-';
 
   const profitableTradePercent = totalTrades > 0 ? ((profitableTrades / totalTrades) * 100).toFixed(1) : '-';
   const profitFactor = totalGrossLoss > 0 ? (totalGrossProfit / totalGrossLoss).toFixed(2) : (totalGrossProfit > 0 ? 'MAX' : '-');
@@ -1113,10 +1218,10 @@ const TradingInsights = () => {
         <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>F&O Key Metrics</div>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <StatCard title="Gross P/L" value={`${grossPnl >= 0 ? '+' : ''}₹${grossPnl.toFixed(2)}`} colorClass={grossPnl >= 0 ? '--color-green-light' : '--color-red-light'} />
-          <StatCard title="Profitable Day %" value="-" sub="DAYS" />
+          <StatCard title="Profitable Day %" value={profitableDayPercent} sub={totalDays > 0 ? totalDays + " DAYS" : "DAYS"} colorClass={profitableDays > (totalDays/2) ? "--color-green-light" : "--text-primary"} />
           <StatCard title="Profitable Trade %" value={`${profitableTradePercent}%`} sub={`${profitableTrades} TRADES`} colorClass="--color-green-light" />
           <StatCard title="Profit Factor" value={profitFactor} icon={Target} />
-          <StatCard title="Avg. Holding Time" value="-" icon={Clock} />
+          <StatCard title="Avg. Holding Time" value={avgHoldingTime} icon={Clock} />
         </div>
       </div>
 
@@ -1251,6 +1356,10 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
     </div>
   );
 }
+
+
+
+
 
 
 
