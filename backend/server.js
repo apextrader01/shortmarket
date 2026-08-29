@@ -2782,7 +2782,7 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
 
   // Derivatives (Options/Futures) won't be found on Groww stock search.
   // Return a mock payload so the frontend doesn't crash with 404.
-  const isDerivative = !symbol.endsWith('-EQ') && !symbol.endsWith('-INDEX');
+  const isDerivative = symbol.includes('CE') || symbol.includes('PE') || symbol.includes('FUT');
   if (isDerivative) {
     return res.json({
       header: { companyName: rawName },
