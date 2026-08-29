@@ -143,14 +143,7 @@ export default function OrdersView() {
               <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '24px' }}>✨</div>
             </div>
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>You don't have any {activeTab.toLowerCase()}</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>Check Top Gainer Recommendations</p>
-            <button style={{
-              background: 'var(--bg-panel)', color: 'var(--color-blue)', padding: '10px 24px', 
-              borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: '1px solid var(--border-color)', cursor: 'pointer'
-            }}>
-              VIEW TRADING IDEAS
-            </button>
+
           </div>
         ) : (
           <div style={{ padding: window.innerWidth <= 1200 ? '12px' : '24px', width: '100%', height: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
