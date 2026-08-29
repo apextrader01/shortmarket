@@ -1202,17 +1202,17 @@ export const useStore = create(persist((set, get) => ({
     
     // Direct DOM manipulation for instant scaling bypassing CSS cache
     if (size === 'small') {
-      document.body.style.zoom = ''; document.body.style.transform = 'scale(0.85)'; document.body.style.transformOrigin = 'top left';
+      document.body.style.zoom = '0.85';
       document.documentElement.style.setProperty('--app-scale', '0.85');
       document.body.style.MozTransform = 'scale(0.85)';
       document.body.style.MozTransformOrigin = 'top left';
     } else if (size === 'large') {
-      document.body.style.zoom = ''; document.body.style.transform = 'scale(1.1)'; document.body.style.transformOrigin = 'top left';
+      document.body.style.zoom = '1.1';
       document.documentElement.style.setProperty('--app-scale', '1.1');
       document.body.style.MozTransform = 'scale(1.1)';
       document.body.style.MozTransformOrigin = 'top left';
     } else {
-      document.body.style.zoom = ''; document.body.style.transform = 'none';
+      document.body.style.zoom = '1';
       document.documentElement.style.setProperty('--app-scale', '1');
       document.body.style.MozTransform = 'scale(1)';
       document.body.style.MozTransformOrigin = 'top left';
@@ -1261,7 +1261,6 @@ export const useStore = create(persist((set, get) => ({
     alerts:            state.alerts,
   }),
 }));
-
 
 
 
