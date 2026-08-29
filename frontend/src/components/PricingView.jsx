@@ -59,8 +59,9 @@ export default function PricingView({ setActiveTab }) {
                 'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
+                razorpay_order_id: response.razorpay_order_id || response.razorpay_subscription_id,
                 razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_subscription_id: response.razorpay_subscription_id,
                 razorpay_signature: response.razorpay_signature,
                 plan: plan
               })
@@ -228,6 +229,7 @@ export default function PricingView({ setActiveTab }) {
     </div>
   );
 }
+
 
 
 

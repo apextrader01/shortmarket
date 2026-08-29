@@ -637,8 +637,13 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
 
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
+    // For subscriptions, Razorpay generates signature using payment_id + '|' + subscription_id
+    // For normal orders, it uses order_id + '|' + payment_id
+    let body = razorpay_order_id + "|" + razorpay_payment_id;
+    if (razorpay_subscription_id) {
+      body = razorpay_payment_id + "|" + razorpay_subscription_id;
+    }
     
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder')
@@ -3135,6 +3140,7 @@ process.on('SIGINT', cleanupAndExit);
 process.on('SIGTERM', cleanupAndExit);
 
 module.exports = { io, priceCache };
+
 
 
 
