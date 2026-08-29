@@ -92,7 +92,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
       <div>
         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
-        {desc && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>}
+        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>}
       </div>
     </div>
   );
@@ -102,7 +102,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
-        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '12px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
+        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
           <LogOut size={14} /> LOGOUT
         </div>
       </div>
@@ -144,41 +144,41 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           />
 
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
               {user?.username || 'Hari Krishnan I Vijayan'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
               Client ID: {user?.client_id || user?.id}
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '2px' }}>
               Available Margin: ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
+            <div style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '11px' }}>
           <Star size={14} /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
         </div>
       </div>
 
       {/* Add Funds Banner */}
       {/* Add Funds Banner */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
+      <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
             ₹
           </div>
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Get ready to invest</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Get ready to invest</div>
             <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: 'var(--text-primary)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: 'var(--text-primary)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             DEPOSIT
           </button>
-          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             RESET ACCOUNT
           </button>
         </div>
@@ -194,23 +194,23 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trades & Charges</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trades & Charges</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Statements</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Statements</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <PieChart size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Profit & Loss</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Profit & Loss</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <BarChart2 size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trading Insights</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trading Insights</span>
               </div>
             </div>
           </div>
@@ -245,59 +245,59 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           
           <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
-              <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
                 <div style={{ minWidth: '200px', flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Font Size</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-hover)', padding: '4px', borderRadius: '4px' }}>
-                <span onClick={() => setFontSize('small')} style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'small' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'small' ? '#FFF' : 'inherit' }}>Small</span>
-                <span onClick={() => setFontSize('medium')} style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'medium' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'medium' ? '#FFF' : 'inherit' }}>Medium</span>
-                <span onClick={() => setFontSize('large')} style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'large' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'large' ? '#FFF' : 'inherit' }}>Large</span>
+                <span onClick={() => setFontSize('small')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'small' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'small' ? '#FFF' : 'inherit' }}>Small</span>
+                <span onClick={() => setFontSize('medium')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'medium' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'medium' ? '#FFF' : 'inherit' }}>Medium</span>
+                <span onClick={() => setFontSize('large')} style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: fontSize === 'large' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: fontSize === 'large' ? '#FFF' : 'inherit' }}>Large</span>
               </div>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Enable Accessibility Mode</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Enable Accessibility Mode</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
               </div>
               <div onClick={() => setAccessibilityMode(!accessibilityMode)} style={{ width: '36px', height: '20px', background: accessibilityMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
                 <div style={{ width: '16px', height: '16px', background: accessibilityMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: accessibilityMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Appearance Preference</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-hover)', padding: '4px', borderRadius: '4px' }}>
                 <span 
                   onClick={() => setTheme('light')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
+                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
                 >
                   Light
                 </span>
                 <span 
                   onClick={() => setTheme('dark')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
+                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
                 >
                   Dark
                 </span>
                 <span 
                   onClick={() => setTheme('system')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'system' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'system' ? '#FFF' : 'var(--text-secondary)' }}
+                  style={{ fontSize: '11px', padding: '6px 12px', cursor: 'pointer', background: theme === 'system' ? 'var(--border-color)' : 'transparent', borderRadius: '4px', color: theme === 'system' ? '#FFF' : 'var(--text-secondary)' }}
                 >
                   System
                 </span>
               </div>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Re-Confirm Order</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
               </div>
               <div onClick={() => setOneClickMode(!!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
                 <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
@@ -313,7 +313,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
             <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Subscription Plans</span>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Subscription Plans</span>
             </div>
             <div 
               className="glass-panel hoverable" 
@@ -321,24 +321,24 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
             >
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Keyboard & Shortcut</span>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Keyboard & Shortcut</span>
             </div>
             <div className="glass-panel hoverable" onClick={() => setActiveTab('AboutUs')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
               <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>About Us</span>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>About Us</span>
             </div>
           </div>
         </div>
 
         {/* OneHelp */}
-        <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
+        <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
           <div>
             <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               OneHelp
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
           </div>
-          <button style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             KNOW MORE
           </button>
         </div>
@@ -347,7 +347,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {/* Floating Ask Angel / Support Button */}
       <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
         <HelpCircle size={18} />
-        <span style={{ fontSize: '14px', fontWeight: '700' }}>Ask Support</span>
+        <span style={{ fontSize: '13px', fontWeight: '700' }}>Ask Support</span>
       </div>
       
       {/* Hotkeys Modal */}
@@ -356,7 +356,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '20px', position: 'relative' }}>
             <button 
               onClick={() => setShowHotkeysModal(false)}
               style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}
@@ -370,11 +370,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Buy (Market)</span>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Buy (Market)</span>
                 <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Sell (Market)</span>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Sell (Market)</span>
                 <span style={{ fontSize: '13px', background: 'var(--color-red)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
               </div>
             </div>
