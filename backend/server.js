@@ -1362,8 +1362,8 @@ let allMutualFunds = [];
 
 let mfInitializationPromise = null;
 
-async function initMutualFundsList() {
-    if (allMutualFunds.length > 0) return; // already loaded
+async function initMutualFundsList(force = false) {
+    if (!force && allMutualFunds.length > 0) return; // already loaded
     
     // Prevent concurrent initialization attempts
     if (mfInitializationPromise) return mfInitializationPromise;
@@ -1419,6 +1419,9 @@ async function initMutualFundsList() {
 }
 
 initMutualFundsList();
+
+// Auto-refresh the AMFI master list every 24 hours
+setInterval(() => initMutualFundsList(true), 86400000);
 
 // Helper to calculate CAGR
 function calculateReturn(historicalData, years) {
@@ -1588,7 +1591,7 @@ app.get('/api/mf/enrich', async (req, res) => {
         const results = await Promise.all(ids.map(async (schemeCode) => {
             try {
                 let data = null;
-                if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 3600000)) {
+                if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 86400000)) { // 24 hours cache
                     data = mfCache[schemeCode].data;
                 } else {
                     const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
@@ -1628,7 +1631,7 @@ app.get('/api/mf/details', async (req, res) => {
         if (!name) return res.status(400).json({ error: 'Name required' });
         
         // Check cache first
-        if (mfDetailsCache[name] && (Date.now() - mfDetailsCache[name].timestamp < 43200000)) { // 12 hours cache
+        if (mfDetailsCache[name] && (Date.now() - mfDetailsCache[name].timestamp < 86400000)) { // 24 hours cache
             return res.json(mfDetailsCache[name].data);
         }
 
