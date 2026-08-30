@@ -1370,7 +1370,7 @@ async function initMutualFundsList() {
 
     mfInitializationPromise = (async () => {
         try {
-            console.log('Fetching master list from amfiindia.com (bypassing mfapi.in 502 error)...');
+            console.log('Fetching master list from amfiindia.com (Filtered for active direct growth only)...');
             const amfiRes = await myFetch('https://www.amfiindia.com/spages/NAVAll.txt');
             const amfiText = await amfiRes.text();
             
@@ -1387,7 +1387,16 @@ async function initMutualFundsList() {
                             schemeName += ' - ' + parts[4].trim();
                         }
                         
-                        if (schemeName.toLowerCase().includes('growth')) {
+                        const n = schemeName.toLowerCase();
+                        // FILTER: Keep only Direct Growth retail funds (< 2000 items)
+                        if (
+                            n.includes('growth') &&
+                            n.includes('direct') &&
+                            !n.includes('regular') &&
+                            !n.includes('etf') &&
+                            !n.includes('fmp') &&
+                            !n.includes('fixed maturity')
+                        ) {
                             funds.push({
                                 schemeCode: parseInt(parts[0].trim()),
                                 schemeName: schemeName
@@ -1398,7 +1407,7 @@ async function initMutualFundsList() {
             }
             
             allMutualFunds = funds;
-            console.log(`Successfully parsed ${allMutualFunds.length} active mutual funds from AMFI.`);
+            console.log(`Successfully parsed ${allMutualFunds.length} highly active retail mutual funds from AMFI.`);
             
         } catch (err) {
             console.error('Failed to fetch mutual funds master list:', err.message);
