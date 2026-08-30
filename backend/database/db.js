@@ -13,7 +13,14 @@ if (!isProduction) {
 const dbConfig = {
   client: 'pg',
   connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
-  pool: { min: 2, max: 10 }
+  pool: { 
+    min: 2, 
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 10,
+    idleTimeoutMillis: 30000,
+    createTimeoutMillis: 3000,
+    acquireTimeoutMillis: 30000,
+    propagateCreateError: false
+  }
 };
 
 const db = knex(dbConfig);
