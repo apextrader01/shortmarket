@@ -1,23 +1,77 @@
-    const sortedFunds = [...filteredFunds].sort((a, b) => {
-        if (!sortConfig.key) return 0;
-        
-        let valA = a[sortConfig.key];
-        let valB = b[sortConfig.key];
-        
-        if (sortConfig.key === 'category' || sortConfig.key === 'risk') {
-            valA = String(valA || '').toLowerCase();
-            valB = String(valB || '').toLowerCase();
-            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
-        } else {
-            valA = valA !== undefined && valA !== null ? valA : -999999;
-            valB = valB !== undefined && valB !== null ? valB : -999999;
-            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
-        }
-    });
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
+import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
+import MutualFundDetailsModal from './MutualFundDetailsModal';
+
+import { API } from '../store';
+
+export default function MutualFundsView() {
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const mobileStyles = `
+    @media (max-width: 768px) {
+      .mobile-scroll { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 8px !important; }
+      .mobile-scroll::-webkit-scrollbar { display: none; }
+      .mf-card { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; }
+      .mf-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .mf-card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .mf-card-subtitle { font-size: 12px; color: var(--text-secondary); }
+      .mf-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; margin-top: 4px; }
+      .mf-stat-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+      .mf-stat-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    }
+  `;
+  const [mainTab, setMainTab] = useState('Explore');
+  const [activeTab, setActiveTab] = useState('All');
+  const [search, setSearch] = useState('');
+  const [selectedFund, setSelectedFund] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [page, setPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+  const searchIdRef = useRef(0);
+
+  const [mfNames, setMfNames] = useState({});
+  useEffect(() => {
+    const symbols = [
+      ...(sips || []).map(s => s.symbol),
+      ...(holdings || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol),
+      ...(positions || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol)
+    ];
+    const unique = [...new Set(symbols)];
+    if (unique.length > 0) {
+      fetch(`${API}/api/mf/names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: unique })
+      })
+      .then(r => {
+          if (!r.ok) throw new Error('Backend failed');
+          return r.json();
+      })
+      .then(data => {
+          setMfNames(prev => ({ ...prev, ...data }));
+          
+          // For any missing names, fallback to direct mfapi fetch
+          unique.forEach(symbol => {
+             if (!data[symbol]) {
+                 const cleanId = String(symbol).replace('-MF', '');
+                 fetch(`https://api.mfapi.in/mf/${cleanId}`)
+                   .then(r => r.json())
+                   .then(mfData => {
+                       if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                           setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+                       }
+                   }).catch(() => {});
+             }
+          });
       })
       .catch(err => {
           console.error("Backend fetch failed, falling back to mfapi:", err);
@@ -256,15 +310,9 @@
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
                                 <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Fund Name</th>
-                                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('category')}>
-                                    Category {sortConfig.key === 'category' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                                </th>
-                                <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('risk')}>
-                                    Risk {sortConfig.key === 'risk' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                                </th>
-                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('nav')}>
-                                    NAV {sortConfig.key === 'nav' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
-                                </th>
+                                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Category</th>
+                                <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: 'var(--text-secondary)' }}>Risk</th>
+                                <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)' }}>NAV</th>
                                 <th style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('return1y')}>
                                     1Y Return {sortConfig.key === 'return1y' ? (sortConfig.direction === 'desc' ? '↓' : '↑') : '↕'}
                                 </th>
