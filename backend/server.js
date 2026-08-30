@@ -1796,7 +1796,7 @@ app.get('/api/options/futures/:symbol', async (req, res) => {
 // ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
-    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc');
+    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(150);
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
