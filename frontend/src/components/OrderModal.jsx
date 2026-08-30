@@ -4,7 +4,8 @@ import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal })));
+  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal })));
+  const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
@@ -28,8 +29,8 @@ export default function OrderModal() {
   const [side, setSide] = useState('BUY');
 
   const symbol = orderModal.symbol;
-  const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
-  const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
+  const livePrice = symbol ? livePriceData?.ltp || 0 : 0;
+  const isUp = symbol ? livePriceData?.pct >= 0 : true;
 
   // Initialize modal state when it opens
   useEffect(() => {
