@@ -21,10 +21,15 @@ class MTMRiskManager {
         if (this.isChecking) return;
         this.isChecking = true;
         try {
-            // Group active positions by user (Exclude Delivery, which is cash-and-carry and has no margin risk)
-            const openPositions = await db('positions')
-                .whereNot({ quantity: 0 })
-                .whereNotIn('product_type', ['DEL']);
+            const now = Date.now();
+            if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 15000) {
+                this.cachedPositions = await db('positions')
+                    .whereNot({ quantity: 0 })
+                    .whereNotIn('product_type', ['DEL']);
+                this.lastCacheTime = now;
+            }
+            
+            const openPositions = this.cachedPositions;
             if (openPositions.length === 0) {
                 this.isChecking = false;
                 return;

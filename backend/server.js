@@ -1162,7 +1162,7 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
     // To be safe and reuse exact P&L logic, we will just insert it as a MARKET order 
     // and let the orderExecutor pick it up in the next 1-second tick!
     
-    const [orderId] = await db('orders').insert({
+    const orderPayload = {
       user_id: position.user_id,
       symbol: position.symbol,
       type: 'MARKET',
@@ -1170,9 +1170,16 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
       quantity: quantity,
       product_type: position.product_type,
       status: 'PENDING'
-    }).returning('id');
+    };
+    
+    const [orderId] = await db('orders').insert(orderPayload).returning('id');
+    const finalOrderId = typeof orderId === 'object' ? orderId.id : orderId;
+    orderPayload.id = finalOrderId;
 
-    res.json({ success: true, message: 'Force close order placed', orderId: typeof orderId === 'object' ? orderId.id : orderId });
+    const triggerEngine = require('./services/triggerEngine');
+    triggerEngine.executeOrder(orderPayload, priceCache[position.symbol]?.ltp || 0).catch(console.error);
+
+    res.json({ success: true, message: 'Force close order placed', orderId: finalOrderId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

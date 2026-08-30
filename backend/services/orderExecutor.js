@@ -60,7 +60,7 @@ function initOrderExecutor(priceCache) {
     } finally {
       isExecuting = false;
     }
-  }, 2000); // Check every 2 seconds
+  }, 60000); // Check every 60 seconds (Fallback only, MARKET orders now instantly execute)
 }
 
 const { calculateTaxes } = require('./taxCalculator');
