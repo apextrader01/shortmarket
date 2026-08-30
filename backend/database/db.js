@@ -495,6 +495,7 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_user_id ON sips(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at)');
     
     console.log('✅ Critical columns and indexes verified on tables');
   } catch (e) {
