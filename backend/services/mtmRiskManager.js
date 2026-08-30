@@ -13,8 +13,8 @@ class MTMRiskManager {
         if (this.isRunning) return;
         this.isRunning = true;
         // Run the MTM check every 2 seconds
-        setInterval(() => this.evaluateMTM(), 2000);
-        console.log('MTM Risk Manager started checking every 2 seconds.');
+        setInterval(() => this.evaluateMTM(), 60000);
+        console.log('MTM Risk Manager started checking every 60 seconds (1 minute).');
     }
 
     async evaluateMTM() {
