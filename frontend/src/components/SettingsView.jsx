@@ -97,6 +97,35 @@ export default function SettingsView() {
           </div>
         </div>
 
+        {/* Bank Details Card (For Withdrawals) */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CreditCard size={18} color="var(--color-blue)" /> Bank & UPI Details (For Withdrawals)
+          </h3>
+          {bankMsg.text && (
+            <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', background: bankMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: bankMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '14px' }}>
+              {bankMsg.text}
+            </div>
+          )}
+          <form onSubmit={handleBankSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>UPI ID</label>
+              <input type="text" className="input" value={bankDetails.upi_id} onChange={e => setBankDetails({...bankDetails, upi_id: e.target.value})} placeholder="username@upi" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank Account Number</label>
+              <input type="text" className="input" value={bankDetails.bank_account_no} onChange={e => setBankDetails({...bankDetails, bank_account_no: e.target.value})} placeholder="Account Number" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank IFSC Code</label>
+              <input type="text" className="input" value={bankDetails.bank_ifsc} onChange={e => setBankDetails({...bankDetails, bank_ifsc: e.target.value})} placeholder="IFSC Code" />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={bankLoading}>
+              <Save size={16} /> {bankLoading ? 'Saving...' : 'Save Bank Details'}
+            </button>
+          </form>
+        </div>
+
         {/* Security Card */}
         <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>

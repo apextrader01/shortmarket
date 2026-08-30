@@ -82,6 +82,9 @@ export default function ReferralsView({ setActiveTab }) {
             <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '8px', borderRadius: '8px' }}><span style={{color: "#34D399", fontSize: "20px", fontWeight: "bold"}}>₹</span></div>
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#34D399' }}>₹{data.stats.totalEarned.toFixed(2)}</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+            Available to Withdraw: ?{data.stats.availableRewardBalance?.toFixed(2) || '0.00'}
+          </div>
         </div>
 
         <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -98,6 +101,38 @@ export default function ReferralsView({ setActiveTab }) {
             <div style={{ background: 'rgba(251, 191, 36, 0.1)', padding: '8px', borderRadius: '8px' }}><Clock size={20} color="#FBBF24" /></div>
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#FBBF24' }}>{data.stats.pendingCount}</div>
+        </div>
+      </div>
+
+      {/* WITHDRAWAL SECTION */}
+      <div className="glass-panel" style={{ padding: '32px', marginBottom: '32px', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          Withdraw Rewards
+        </h3>
+        {withdrawMsg.text && (
+          <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', background: withdrawMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: withdrawMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '14px' }}>
+            {withdrawMsg.text}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <input 
+            type="number" 
+            className="input" 
+            placeholder="Amount to withdraw" 
+            value={withdrawAmount} 
+            onChange={e => setWithdrawAmount(e.target.value)}
+            style={{ maxWidth: '200px' }}
+          />
+          <button 
+            className="btn btn-primary" 
+            onClick={handleWithdraw} 
+            disabled={withdrawLoading || !withdrawAmount || withdrawAmount <= 0}
+          >
+            {withdrawLoading ? 'Requesting...' : 'Request Withdrawal'}
+          </button>
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '12px' }}>
+          Note: Update your Bank/UPI details in Settings before withdrawing. Minimum withdrawal is ?100.
         </div>
       </div>
 
