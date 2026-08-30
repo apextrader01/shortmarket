@@ -43,15 +43,13 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;  // Skip commodities during EQ sweep
                     if (assetType === 'COM' && !isCom) continue; // Skip equities during COM sweep
                     
-                    // Sweep all intraday-type orders: INT, BO, CO
-                    if (order.product_type === 'INT' || order.product_type === 'BO' || order.product_type === 'CO') {
-                        await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
-                        if (parseFloat(order.margin) > 0) {
-                            await LedgerService.releaseMargin(trx, order.user_id, order.margin, `Phase 2 Sweep Cancelled: ${order.symbol}`);
-                        }
-                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                        console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type} order ${order.id} for ${order.symbol}`);
+                    // Sweep ALL pending entry orders (INT, BO, CO, DEL, CNC)
+                    await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
+                    if (parseFloat(order.margin) > 0) {
+                        await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
                     }
+                    triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                    console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type || 'DEL'} order ${order.id} for ${order.symbol}`);
                 }
             });
         } catch (err) {
