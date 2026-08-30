@@ -871,4 +871,4 @@ setInterval(async () => {
             pubClient.publish('fyers_ws_tick', JSON.stringify(updates)); 
         } catch (e) {}
     }
-}, 300000); // Poll every 5 minutes
+}, 43200000); // Poll every 12 hours (Mutual Funds update NAV daily)
