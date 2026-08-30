@@ -1915,18 +1915,18 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           if (effectiveProductType === 'DEL' && !isDerivative) {
               // 1. Fetch available Holdings
               const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
-              const holdingQty = holding ? holding.quantity : 0;
+              const holdingQty = holding ? Number(holding.quantity) : 0;
               
               // 2. Fetch open Positions for today
               const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
-              const posQty = existingPos && existingPos.quantity > 0 ? existingPos.quantity : 0;
+              const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
               
               // 3. Fetch Pending Sell Orders for this symbol
               const pendingOrders = await trx('orders')
                   .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
               const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
               
-              const totalAvailable = holdingQty + posQty - pendingSellQty;
+              const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
               
               if (Number(quantity) > totalAvailable) {
                   throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
@@ -2319,16 +2319,16 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           const qtyRequested = sellDelQuantities[symbol];
           
           const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
-          const holdingQty = holding ? holding.quantity : 0;
+          const holdingQty = holding ? Number(holding.quantity) : 0;
           
           const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
-          const posQty = existingPos && existingPos.quantity > 0 ? existingPos.quantity : 0;
+          const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
           
           const pendingOrders = await trx('orders')
               .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
           const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
           
-          const totalAvailable = holdingQty + posQty - pendingSellQty;
+          const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
           
           if (qtyRequested > totalAvailable) {
               throw new Error(`Insufficient holdings for ${symbol}. You only have ${totalAvailable} shares available to sell.`);

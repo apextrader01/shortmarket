@@ -46,7 +46,7 @@ export default function PositionsView() {
       if (agg.id !== pos.id) { // Merge
          const prevQty = agg.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
-         agg.closed_quantity = (parseInt(agg.closed_quantity) || 0) + (parseInt(pos.closed_quantity) || 0);
+         agg.closed_quantity = (parseFloat(agg.closed_quantity) || 0) + (parseFloat(pos.closed_quantity) || 0);
          
          if (isOpen) {
            const currentTotal = Math.abs(Number(agg.quantity)) * parseFloat(agg.average_price || 0);
@@ -57,10 +57,10 @@ export default function PositionsView() {
            if (parseFloat(pos.average_price) > 0 && parseFloat(agg.average_price) === 0) {
              agg.average_price = pos.average_price;
            }
-           const prevClosed = parseInt(agg.closed_quantity) - (parseInt(pos.closed_quantity) || 0);
+           const prevClosed = parseFloat(agg.closed_quantity) - (parseFloat(pos.closed_quantity) || 0);
            const prevExitTotal = prevClosed * parseFloat(agg.exit_price || 0);
-           const newExitTotal = (parseInt(pos.closed_quantity) || 0) * parseFloat(pos.exit_price || 0);
-           const totalClosed = parseInt(agg.closed_quantity) || 1;
+           const newExitTotal = (parseFloat(pos.closed_quantity) || 0) * parseFloat(pos.exit_price || 0);
+           const totalClosed = parseFloat(agg.closed_quantity) || 1;
            agg.exit_price = (prevExitTotal + newExitTotal) / totalClosed;
          }
          
@@ -468,7 +468,7 @@ export default function PositionsView() {
                     onChange={(e) => setPartialExitQty(e.target.value)}
                     max={Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)}
                     min="1"
-                    step="1"
+                    step="any"
                     style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
@@ -499,7 +499,7 @@ export default function PositionsView() {
 
               <button
                 onClick={async () => {
-                  const inputVal = parseInt(partialExitQty);
+                  const inputVal = parseFloat(partialExitQty);
                   const ls = partialExitPos.lotSize || 1;
                   const qtyToExit = inputVal * ls;
                   const maxQty = Math.abs(partialExitPos.unencumberedQty);
