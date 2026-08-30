@@ -4,7 +4,29 @@ import { useShallow } from 'zustand/react/shallow';
 import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap } from 'lucide-react';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier } = useStore(useShallow(state => ({ user: state.user, updatePassword: state.updatePassword, logout: state.logout, oneClickMode: state.oneClickMode, setOneClickMode: state.setOneClickMode, oneClickMultiplier: state.oneClickMultiplier, setOneClickMultiplier: state.setOneClickMultiplier })));
+  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier, updateBankDetails } = useStore(useShallow(state => ({ user: state.user, updatePassword: state.updatePassword, logout: state.logout, oneClickMode: state.oneClickMode, setOneClickMode: state.setOneClickMode, oneClickMultiplier: state.oneClickMultiplier, setOneClickMultiplier: state.setOneClickMultiplier, updateBankDetails: state.updateBankDetails })));
+
+  const [bankDetails, setBankDetails] = useState({
+    upi_id: user?.upi_id || '',
+    bank_account_no: user?.bank_account_no || '',
+    bank_ifsc: user?.bank_ifsc || ''
+  });
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankMsg, setBankMsg] = useState({ type: '', text: '' });
+
+  const handleBankSubmit = async (e) => {
+    e.preventDefault();
+    setBankLoading(true);
+    setBankMsg({ type: '', text: '' });
+    try {
+      await updateBankDetails(bankDetails);
+      setBankMsg({ type: 'success', text: 'Bank details updated successfully!' });
+    } catch(err) {
+      setBankMsg({ type: 'error', text: err.message });
+    }
+    setBankLoading(false);
+  };
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

@@ -5,10 +5,33 @@ import { useShallow } from 'zustand/react/shallow';
 import { API } from '../store';
 
 export default function ReferralsView({ setActiveTab }) {
-  const { user } = useStore(useShallow(state => ({ user: state.user })));
+  const { user, requestWithdrawal } = useStore(useShallow(state => ({ user: state.user, requestWithdrawal: state.requestWithdrawal })));
+  
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState({ type: '', text: '' });
+  
+  const handleWithdraw = async (e) => {
+    e.preventDefault();
+    setWithdrawLoading(true);
+    setWithdrawMsg({ type: '', text: '' });
+    try {
+      if (!user?.upi_id && (!user?.bank_account_no || !user?.bank_ifsc)) {
+         throw new Error('Please go to Settings to add your UPI or Bank Account details first.');
+      }
+      await requestWithdrawal(withdrawAmount);
+      setWithdrawMsg({ type: 'success', text: 'Withdrawal requested successfully!' });
+      setWithdrawAmount('');
+      fetchReferrals(); // refresh balances
+    } catch(err) {
+      setWithdrawMsg({ type: 'error', text: err.message });
+    }
+    setWithdrawLoading(false);
+  };
+
   
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState({ referrals: [], stats: { totalEarned: 0, pendingCount: 0, completedCount: 0, totalCount: 0 } });
+  const [data, setData] = useState({ referrals: [], stats: { totalEarned: 0, pendingCount: 0, completedCount: 0, totalCount: 0, totalWithdrawn: 0, pendingWithdrawalAmount: 0, availableRewardBalance: 0 } });
   
   const refLink = `${window.location.origin}/register?ref=${user?.id || 'unknown'}`;
 
