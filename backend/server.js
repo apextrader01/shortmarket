@@ -2695,8 +2695,29 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
 // ─── Historical Chart Data (Candles) ──────────────────────────────────────────────────
 const candleCache = {}; // Cache to protect Fyers from rate limits (e.g. 1000 users opening charts)
-// Smart Timeframe Cache: Determine cache limit based on requested resolution
-function getCacheDuration(interval) {
+// Smart Timeframe Cache: Determine cache limit based on requested resolution and Market Hours
+function getCacheDuration(interval, symbol) {
+  // 1. After-Hours Mega Cache Logic (Exclude MCX Commodities)
+  const isCommodity = symbol && symbol.toUpperCase().includes('MCX');
+  
+  if (!isCommodity) {
+      const now = new Date();
+      const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      const hours = istTime.getHours();
+      
+      // If market is closed (4:00 PM to 8:59 AM IST)
+      if (hours >= 16 || hours < 9) {
+          // Calculate exact milliseconds until 9:00 AM IST tomorrow morning
+          const next9AM = new Date(istTime);
+          if (hours >= 16) {
+              next9AM.setDate(next9AM.getDate() + 1);
+          }
+          next9AM.setHours(9, 0, 0, 0);
+          return next9AM.getTime() - istTime.getTime(); // Cache expires exactly at 9:00 AM!
+      }
+  }
+
+  // 2. Standard Market-Hours Smart Timeframe Logic
   if (interval === '1') return 60 * 1000; // 1 min
   if (interval === '2') return 2 * 60 * 1000;
   if (interval === '3') return 3 * 60 * 1000;
@@ -2721,7 +2742,7 @@ app.get('/api/candles/:symbol', async (req, res) => {
     const now = Date.now();
     
     // Serve from cache if valid
-    const maxAgeMs = getCacheDuration(interval);
+    const maxAgeMs = getCacheDuration(interval, cleanSymbol);
       if (candleCache[cacheKey] && (now - candleCache[cacheKey].timestamp < maxAgeMs)) {
       return res.json(candleCache[cacheKey].data);
     }
