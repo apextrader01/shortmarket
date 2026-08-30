@@ -83,7 +83,7 @@ export default function ReferralsView({ setActiveTab }) {
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#34D399' }}>₹{data.stats.totalEarned.toFixed(2)}</div>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            Available to Withdraw: ?{data.stats.availableRewardBalance?.toFixed(2) || '0.00'}
+            Available to Withdraw: ₹{data.stats.availableRewardBalance?.toFixed(2) || '0.00'}
           </div>
         </div>
 
@@ -132,7 +132,7 @@ export default function ReferralsView({ setActiveTab }) {
           </button>
         </div>
         <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '12px' }}>
-          Note: Update your Bank/UPI details in Settings before withdrawing. Minimum withdrawal is ?100.
+          Note: Update your Bank/UPI details in Settings before withdrawing. Minimum withdrawal is ₹100.
         </div>
       </div>
 
