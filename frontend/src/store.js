@@ -35,7 +35,27 @@ const temporaryOptionSubscriptions = new Set();
 function applySnapshot(snapshot, state, isFromWebSocket = false) {
   const newPrices = { ...state.prices };
   const now = Date.now();
-  for (const [symbol, data] of Object.entries(snapshot)) {
+  for (const [symbol, rawData] of Object.entries(snapshot)) {
+    // Data Compression logic: Decompress Array to Object if needed
+    let data = rawData;
+    if (Array.isArray(rawData)) {
+      // [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
+      data = {
+        symbol: symbol,
+        ltp: rawData[0],
+        ch: rawData[1],
+        chp: rawData[2],
+        timestamp: rawData[3],
+        open: rawData[4],
+        high: rawData[5],
+        low: rawData[6],
+        close: rawData[7],
+        vol: rawData[8],
+        totBuyQuan: rawData[9],
+        totSellQuan: rawData[10]
+      };
+    }
+
     const old = newPrices[symbol];
     
     // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 4 seconds.
