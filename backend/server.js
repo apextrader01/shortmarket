@@ -3150,6 +3150,12 @@ server.listen(PORT, async () => {
 
     if (isMaster) {
       console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
+
+      // Daily Garbage Collector: Wipe dead positions from yesterday
+      db('positions').where({ quantity: 0 }).delete()
+        .then(count => console.log(`[DB MAINTENANCE] Cleared ${count} dead positions (qty=0) on startup.`))
+        .catch(err => console.error('Failed to run position garbage collector:', err));
+
       
       // Listen for WebSocket subscriptions from Worker nodes
       const { subClient: cacheSubClient } = require('./services/redisClient');
