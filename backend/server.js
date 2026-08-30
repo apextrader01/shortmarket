@@ -840,6 +840,7 @@ app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
 });
 
 // ─── Admin ────────────────────────────────────────────────────────────────
+
 app.post('/api/admin/users/:id/toggle_ban', authenticateToken, async (req, res) => {
   try {
     const db = require('./database/db');
@@ -863,16 +864,8 @@ app.post('/api/admin/users/:id/toggle_ban', authenticateToken, async (req, res) 
 
 app.get('/api/admin/users', authenticateToken, async (req, res) => {
   try {
-    const db = require('./database/db');
     const caller = await db('users').where({ id: req.user.id }).first();
-    if (!caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-
-    const users = await db('users').select('id', 'username', 'balance', 'created_at', 'client_id', 'is_banned').orderBy('created_at', 'desc');
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
@@ -896,7 +889,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const total = countResult ? parseInt(countResult.total) : 0;
 
     const users = await query
-      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
+      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
       .orderBy('users.created_at', 'desc')
       .limit(limit)
       .offset(offset);
