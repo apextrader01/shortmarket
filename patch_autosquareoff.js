@@ -1,23 +1,26 @@
 const fs = require('fs');
-let code = fs.readFileSync('backend/services/autoSquareOff.js', 'utf8');
+const file = 'backend/services/autoSquareOff.js';
+let content = fs.readFileSync(file, 'utf8');
 
-const regex = /for \(const pos of openPositions\) \{[\s\S]*?console\.log\(`.*Intraday Square-Off Complete.*?Closed \$\{closedCount\} positions\.\\n`\);/m;
+const masterSquareOffCode = `
+async function runMasterSquareOff() {
+    console.log(\`\\n=========================================\`);
+    console.log(\`?? MASTER SQUARE-OFF INITIATED (ALL POSITIONS)\`);
+    console.log(\`=========================================\\n\`);
 
-const newCode = `const positionsToClose = openPositions.filter(pos => {
-            const isMcx = pos.symbol.includes('MCX');
-            if (exchangeFilter === 'MCX' && !isMcx) return false;
-            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) return false;
-            return true;
-        });
-
-        console.log(\`Filtered down to \${positionsToClose.length} positions for \${exchangeFilter}.\`);
-        console.log('Starting 50-order-per-second Throttle Queue...');
+    try {
+        const openPositions = await db('positions').whereRaw('quantity != closed_quantity');
+        
+        console.log(\`Found \${openPositions.length} open positions total.\`);
+        
+        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
+        const port = process.env.PORT || 5000;
 
         let closedCount = 0;
         const BATCH_SIZE = 50;
 
-        for (let i = 0; i < positionsToClose.length; i += BATCH_SIZE) {
-            const batch = positionsToClose.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < openPositions.length; i += BATCH_SIZE) {
+            const batch = openPositions.slice(i, i + BATCH_SIZE);
             
             await Promise.all(batch.map(async (pos) => {
                 const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
@@ -45,24 +48,27 @@ const newCode = `const positionsToClose = openPositions.filter(pos => {
                     const data = await res.json();
                     if (data.success) {
                         closedCount++;
-                        console.log(\`? Auto-closed intraday position for User \${pos.user_id} on \${pos.symbol}\`);
+                        console.log(\`[Master-Close] User \${pos.user_id} on \${pos.symbol}\`);
                     }
                 } catch(e) {
-                    console.error(\`? Failed to reach API for User \${pos.user_id} on \${pos.symbol}:\`, e.message);
+                    console.error(\`[Error] Failed to reach API for User \${pos.user_id} on \${pos.symbol}:\`, e.message);
                 }
             }));
 
-            // Throttle: Wait exactly 1 second before firing the next batch to protect Broker API limits
-            if (i + BATCH_SIZE < positionsToClose.length) {
+            if (i + BATCH_SIZE < openPositions.length) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-        console.log(\`? Intraday Square-Off Complete. Closed \${closedCount} positions.\\n\`);`;
-
-if (regex.test(code)) {
-    code = code.replace(regex, newCode);
-    fs.writeFileSync('backend/services/autoSquareOff.js', code);
-    console.log('Successfully patched runIntradaySquareOff using regex');
-} else {
-    console.log('Regex did not match!');
+        
+        console.log(\`? Master Square-Off Complete. Closed \${closedCount} positions.\\n\`);
+        return { success: true, count: closedCount };
+    } catch (err) {
+        console.error('? Master Square-Off Error:', err);
+        throw err;
+    }
 }
+`;
+
+// Inject before module.exports
+content = content.replace('module.exports = {', masterSquareOffCode + '\nmodule.exports = { runMasterSquareOff,');
+fs.writeFileSync(file, content);
