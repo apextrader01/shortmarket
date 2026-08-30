@@ -1073,6 +1073,26 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Admin ───────────────────────────────────────────────────────────────────
+  toggleUserBan: async (userId) => {
+    try {
+      const res = await fetch(`${API}/api/admin/users/${userId}/toggle_ban`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh admin users list after ban status changes
+        get().fetchAdminUsers();
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to toggle ban');
+      }
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
+  },
+
   fetchAdminUsers: async (page = 1, limit = 50, search = '') => {
     try {
       const res = await fetch(`${API}/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include'

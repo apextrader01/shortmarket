@@ -1,0 +1,17 @@
+const fs = require('fs');
+let app = fs.readFileSync('frontend/src/App.jsx', 'utf8');
+
+// The duplicate alerts watcher
+let alertsWatcherRegex = /useEffect\(\(\) => \{\s+alerts\.forEach\(alert => \{\s+if \(alert\.triggered\) return;\s+const priceData = prices\[alert\.symbol\];[\s\S]*?\}\);\s*\}, \[prices, alerts, updateAlert\]\);/g;
+
+// The duplicate pendingTriggers watcher
+let triggersWatcherRegex = /useEffect\(\(\) => \{\s+pendingTriggers\.forEach\(trigger => \{\s+if \(trigger\.status !== 'PENDING_TRIGGER'\) return;\s+const priceData = prices\[trigger\.symbol\];[\s\S]*?\}\);\s*\}, \[prices, pendingTriggers, updatePendingTrigger, placeOrder\]\);/g;
+
+app = app.replace(alertsWatcherRegex, "");
+app = app.replace(triggersWatcherRegex, "");
+
+// The duplicate TOP_INDICES mapper
+let indicesRegex = /<div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>[\s\S]*?\{TOP_INDICES\.map\(\(idx\) => \{[\s\S]*?const p      = prices\[idx\];[\s\S]*?\}\)\]\}[\s\S]*?<\/div>\s*<\/div>/g;
+
+// Instead of raw regex for HTML which is hard, I will find and replace exactly the remaining blocks.
+// Wait, I can just write a quick script to find "prices" inside function App() and eliminate it.
