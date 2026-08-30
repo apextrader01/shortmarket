@@ -138,24 +138,29 @@ function initCronJobs(priceCache, triggerEngine) {
                         const user = await trx('users').where({ id: sip.user_id }).first();
                         const finalMargin = Number(sip.amount);
                         
-                        if (Number(user.balance) < finalMargin) {
-                            console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - Insufficient Funds`);
-                            continue;
-                        }
-                        
-                        // Deduct balance
-                        const newBalance = Number(user.balance) - finalMargin;
-                        await trx('users').where({ id: sip.user_id }).update({ balance: newBalance });
-                        
-                        await trx('ledger').insert({
-                            user_id: sip.user_id,
-                            amount: -finalMargin,
-                            type: 'MARGIN_BLOCK',
-                            description: `Auto SIP installment blocked for ${sip.symbol}`
-                        });
-                        
-                        // Execute Market Order
-                        const execPrice = priceCache[sip.symbol]?.ltp || 1;
+                        const execPrice = priceCache[sip.symbol]?.ltp;
+                          if (!execPrice || execPrice <= 0) {
+                              console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - Live price unavailable for ${sip.symbol}. Will retry tomorrow.`);
+                              continue;
+                          }
+
+                          if (Number(user.balance) < finalMargin) {
+                              console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - Insufficient Funds`);
+                              continue;
+                          }
+                          
+                          // Deduct balance
+                          const newBalance = Number(user.balance) - finalMargin;
+                          await trx('users').where({ id: sip.user_id }).update({ balance: newBalance });
+                          
+                          await trx('ledger').insert({
+                              user_id: sip.user_id,
+                              amount: -finalMargin,
+                              type: 'MARGIN_BLOCK',
+                              description: `Auto SIP installment blocked for ${sip.symbol}`
+                          });
+                          
+                          // Execute Market Order
                         const qty = parseFloat((finalMargin / execPrice).toFixed(4));
                         
                         const [id] = await trx('orders').insert({
