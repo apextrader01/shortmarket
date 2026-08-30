@@ -41,6 +41,10 @@ class MTMRiskManager {
                 userPositions[pos.user_id].push(pos);
             });
 
+            const userIdsInLoss = [];
+            const userLossMap = {};
+
+            // 1. Calculate P&L for everyone in memory (0 DB Queries)
             for (const [userId, positions] of Object.entries(userPositions)) {
                 let totalMtmLoss = 0;
 
@@ -62,16 +66,25 @@ class MTMRiskManager {
                 }
 
                 if (totalMtmLoss > 0) {
-                    const user = await db('users').where({ id: userId }).first();
-                    if (!user) continue;
+                    userIdsInLoss.push(userId);
+                    userLossMap[userId] = totalMtmLoss;
+                }
+            }
 
-                    // The total available balance (excluding blocked margin) is `user.balance`
+            // 2. Fetch ALL balances in ONE single trip to the DB! (The N+1 Fix)
+            if (userIdsInLoss.length > 0) {
+                const users = await db('users')
+                    .whereIn('id', userIdsInLoss)
+                    .select('id', 'balance');
+
+                for (const user of users) {
+                    const totalMtmLoss = userLossMap[user.id];
                     const availableBalance = Number(user.balance);
 
                     // 95% Threshold Check against Available Balance
                     if (totalMtmLoss >= (availableBalance * 0.95)) {
-                        console.log(`[RMS ALERT] User ${userId} hit 95% MTM Loss (${totalMtmLoss} >= ${availableBalance * 0.95}). Liquidating!`);
-                        await this.liquidateUser(userId, positions);
+                        console.log(`[RMS ALERT] User ${user.id} hit 95% MTM Loss (${totalMtmLoss} >= ${availableBalance * 0.95}). Liquidating!`);
+                        await this.liquidateUser(user.id, userPositions[user.id]);
                     }
                 }
             }
