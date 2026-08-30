@@ -91,7 +91,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         setIsInvesting(true);
         setOrderStatus(null);
 
-        const currentNav = details?.nav || fund.nav || 1;
+        const currentNav = fund.nav || details?.nav || 1;
         const numAmount = Number(amount) || 0;
         let res;
 
@@ -156,7 +156,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         }
     };
 
-    const holdingCurrentValue = userHolding ? (userHolding.quantity * (details?.nav || fund.nav || userHolding.ltp)) : 0;
+    const holdingCurrentValue = userHolding ? (userHolding.quantity * (fund.nav || details?.nav || userHolding.ltp)) : 0;
     const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * Number(userHolding.quantity || 0) : 0;
     const holdingPnL = holdingCurrentValue - holdingInvested;
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
@@ -251,7 +251,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             <div>
                                 <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Current NAV</div>
                                 <div className="mf-nav-big" style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    ₹{details?.nav || fund.nav}
+                                    ₹{fund.nav || details?.nav}
                                     {fund.dayChange !== undefined && (
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: fund.dayChange >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', display: 'flex', alignItems: 'center' }}>
                                             {fund.dayChange >= 0 ? <TrendingUp size={16} style={{marginRight: '4px'}}/> : <TrendingUp size={16} style={{marginRight: '4px', transform: 'rotate(180deg)'}}/>}
