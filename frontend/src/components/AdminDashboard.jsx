@@ -599,21 +599,46 @@ export default function AdminDashboard() {
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-primary" 
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                          onClick={() => { 
-                            setSelectedUser(u); 
-                            setNewBalance(u.balance); 
-                            setNewSubTier(u.subscription_tier || 'BASIC');
-                            setNewUsername(u.username || '');
-                            setNewEmail(u.email || '');
-                            setNewPhone(u.phone || '');
-                          }}
-                        >
-                          Manage Client
-                        </button>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              background: u.is_banned ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)',
+                              color: u.is_banned ? 'var(--color-green-light)' : 'var(--color-yellow)',
+                              border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)'}`
+                            }}
+                            onClick={async () => {
+                              if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
+                                try {
+                                  await toggleUserBan(u.id);
+                                } catch(e) {
+                                  alert(e.message);
+                                }
+                              }
+                            }}
+                          >
+                            {u.is_banned ? 'Unban' : 'Ban'}
+                          </button>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                            onClick={() => { 
+                              setSelectedUser(u); 
+                              setNewBalance(u.balance); 
+                              setNewSubTier(u.subscription_tier || 'BASIC');
+                              setNewUsername(u.username || '');
+                              setNewEmail(u.email || '');
+                              setNewPhone(u.phone || '');
+                            }}
+                          >
+                            Manage Client
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
