@@ -1585,7 +1585,7 @@ app.get('/api/mf/search', async (req, res) => {
 // 2b. Enrich a batch of funds with live NAV and returns
 app.get('/api/mf/enrich', async (req, res) => {
     try {
-        const ids = (req.query.ids || '').split(',').filter(Boolean).slice(0, 10);
+        const ids = (req.query.ids || '').split(',').filter(Boolean).slice(0, 50);
         if (ids.length === 0) return res.json([]);
 
         const results = await Promise.all(ids.map(async (schemeCode) => {
