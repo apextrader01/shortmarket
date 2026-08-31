@@ -1,4 +1,11 @@
-const { generalClient } = require('../services/redisClient');
+﻿const { generalClient } = require('../services/redisClient');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
+
+function getMinuteBucket(d = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
+}
 
 async function recordTelemetry(req, res, next) {
     if (!generalClient || !generalClient.isReady) return next();
@@ -17,14 +24,10 @@ async function recordTelemetry(req, res, next) {
             routePath = routePath.replace(/\/\d+/g, '/:id');
             const routeKey = `${req.method} ${routePath}`;
             
-            
             let userId = 'anonymous';
             if (req.user && req.user.id) {
                 userId = req.user.id;
             } else {
-                // Try to manually decode token if present so we can track users even on routes where authenticateToken isn't applied globally
-                const jwt = require('jsonwebtoken');
-                const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
                 const token = (req.cookies && req.cookies.token) || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
                 if (token) {
                     try {
@@ -34,24 +37,41 @@ async function recordTelemetry(req, res, next) {
                 }
             }
 
-
-            // Try to get content length if available
             let responseBodySize = 0;
             const contentLength = res.get('Content-Length');
             if (contentLength) {
                 responseBodySize = parseInt(contentLength, 10);
             }
 
+            const currentBucket = getMinuteBucket();
             const p = generalClient.multi();
+
+            // 1. All-time cumulative stats
             p.hIncrBy(`telemetry:api:${routeKey}`, 'count', 1);
             p.hIncrBy(`telemetry:api:${routeKey}`, 'time_ms', timeMs);
             if (responseBodySize > 0) p.hIncrBy(`telemetry:api:${routeKey}`, 'bytes', responseBodySize);
 
+            // 2. Minute-bucket stats (24 hour TTL)
+            const mbApiKey = `telemetry:mb:${currentBucket}:api:${routeKey}`;
+            p.hIncrBy(mbApiKey, 'count', 1);
+            p.hIncrBy(mbApiKey, 'time_ms', timeMs);
+            if (responseBodySize > 0) p.hIncrBy(mbApiKey, 'bytes', responseBodySize);
+            p.expire(mbApiKey, 86400);
+
             if (userId !== 'anonymous') {
+                // User all-time
                 p.hIncrBy(`telemetry:user:${userId}`, 'api_calls', 1);
                 p.hIncrBy(`telemetry:user:${userId}`, 'api_time_ms', timeMs);
                 if (responseBodySize > 0) p.hIncrBy(`telemetry:user:${userId}`, 'api_bytes', responseBodySize);
+
+                // User minute-bucket (24 hour TTL)
+                const mbUserKey = `telemetry:mb:${currentBucket}:user:${userId}`;
+                p.hIncrBy(mbUserKey, 'api_calls', 1);
+                p.hIncrBy(mbUserKey, 'api_time_ms', timeMs);
+                if (responseBodySize > 0) p.hIncrBy(mbUserKey, 'api_bytes', responseBodySize);
+                p.expire(mbUserKey, 86400);
             }
+
             await p.exec();
         } catch (err) {
             console.error("TELEMETRY ERROR:", err);

@@ -1133,14 +1133,31 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminTelemetry: async () => {
+  fetchAdminTelemetry: async (timeframe = 'all') => {
     try {
-      set({ loading: true });
-      const res = await fetch(`${API}/api/admin/telemetry`, { credentials: 'omit' });
+      const res = await fetch(`${API}/api/admin/telemetry?timeframe=${timeframe}`, { credentials: 'omit' });
       const data = await res.json();
-      set({ adminTelemetry: data, loading: false });
+      set({ adminTelemetry: data });
+      return data;
     } catch (err) {
-      set({ error: err.message || 'Failed to load telemetry', loading: false });
+      console.error('Failed to load telemetry:', err);
+    }
+  },
+
+  resetAdminTelemetry: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telemetry/reset`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data.success) {
+        set({ adminTelemetry: { api: [], users: [] } });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
     }
   },
 

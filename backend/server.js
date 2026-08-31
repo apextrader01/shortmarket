@@ -875,37 +875,119 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [] });
 
-        const apiKeys = await generalClient.keys('telemetry:api:*');
-        const userKeys = await generalClient.keys('telemetry:user:*');
-
-        const apiStats = [];
-        for (const k of apiKeys) {
-            const data = await generalClient.hGetAll(k);
-            apiStats.push({
-                route: k.replace('telemetry:api:', ''),
-                count: parseInt(data.count || 0),
-                totalTime: parseInt(data.time_ms || 0),
-                totalBytes: parseInt(data.bytes || 0)
-            });
+        const tf = req.query.timeframe || 'all';
+        let minutes = 0;
+        const match = tf.match(/^(\d+)([mh])$/);
+        if (match) {
+            const val = parseInt(match[1], 10);
+            minutes = match[2] === 'h' ? val * 60 : val;
         }
 
-        const userStats = [];
-        for (const k of userKeys) {
-            const userId = k.replace('telemetry:user:', '');
-            const data = await generalClient.hGetAll(k);
-            const dbUser = await db('users').where({ id: userId }).first();
-            userStats.push({
-                userId,
-                username: dbUser ? dbUser.username : 'Unknown',
-                apiCalls: parseInt(data.api_calls || 0),
-                apiBytes: parseInt(data.api_bytes || 0),
-                wsMinutes: parseInt(data.ws_minutes || 0)
-            });
+        if (minutes === 0 || tf === 'all') {
+            // Cumulative All-Time Stats
+            const apiKeys = await generalClient.keys('telemetry:api:*');
+            const userKeys = await generalClient.keys('telemetry:user:*');
+
+            const apiStats = [];
+            for (const k of apiKeys) {
+                const data = await generalClient.hGetAll(k);
+                apiStats.push({
+                    route: k.replace('telemetry:api:', ''),
+                    count: parseInt(data.count || 0),
+                    totalTime: parseInt(data.time_ms || 0),
+                    totalBytes: parseInt(data.bytes || 0)
+                });
+            }
+
+            const userStats = [];
+            for (const k of userKeys) {
+                const userId = k.replace('telemetry:user:', '');
+                const data = await generalClient.hGetAll(k);
+                const dbUser = await db('users').where({ id: userId }).first();
+                userStats.push({
+                    userId,
+                    username: dbUser ? dbUser.username : 'Unknown',
+                    apiCalls: parseInt(data.api_calls || 0),
+                    apiBytes: parseInt(data.api_bytes || 0),
+                    wsMinutes: parseInt(data.ws_minutes || 0)
+                });
+            }
+            return res.json({ api: apiStats, users: userStats, timeframe: 'all' });
+        } else {
+            // Timeframe / Minute-Bucket Aggregation
+            const now = Date.now();
+            const targetBuckets = new Set();
+            const pad = (n) => String(n).padStart(2, '0');
+            for (let i = 0; i < minutes; i++) {
+                const d = new Date(now - i * 60 * 1000);
+                const bucket = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
+                targetBuckets.add(bucket);
+            }
+
+            const mbKeys = await generalClient.keys('telemetry:mb:*');
+            const apiMap = {};
+            const userMap = {};
+
+            for (const k of mbKeys) {
+                const parts = k.split(':');
+                if (parts.length < 5) continue;
+                const bucket = parts[2];
+                const type = parts[3];
+                const identifier = parts.slice(4).join(':');
+
+                if (!targetBuckets.has(bucket)) continue;
+
+                const data = await generalClient.hGetAll(k);
+                if (type === 'api') {
+                    if (!apiMap[identifier]) apiMap[identifier] = { route: identifier, count: 0, totalTime: 0, totalBytes: 0 };
+                    apiMap[identifier].count += parseInt(data.count || 0, 10);
+                    apiMap[identifier].totalTime += parseInt(data.time_ms || 0, 10);
+                    apiMap[identifier].totalBytes += parseInt(data.bytes || 0, 10);
+                } else if (type === 'user') {
+                    if (!userMap[identifier]) userMap[identifier] = { userId: identifier, apiCalls: 0, apiBytes: 0, apiTimeMs: 0, wsMinutes: 0 };
+                    userMap[identifier].apiCalls += parseInt(data.api_calls || 0, 10);
+                    userMap[identifier].apiTimeMs += parseInt(data.api_time_ms || 0, 10);
+                    userMap[identifier].apiBytes += parseInt(data.api_bytes || 0, 10);
+                }
+            }
+
+            const apiStats = Object.values(apiMap);
+            const userStats = [];
+            for (const u of Object.values(userMap)) {
+                const dbUser = await db('users').where({ id: u.userId }).first();
+                userStats.push({
+                    userId: u.userId,
+                    username: dbUser ? dbUser.username : 'Unknown',
+                    apiCalls: u.apiCalls,
+                    apiBytes: u.apiBytes,
+                    wsMinutes: u.wsMinutes
+                });
+            }
+
+            return res.json({ api: apiStats, users: userStats, timeframe: tf });
         }
-        res.json({ api: apiStats, users: userStats });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch telemetry' });
+    }
+});
+
+app.post('/api/admin/telemetry/reset', authenticateToken, async (req, res) => {
+    try {
+        const caller = await db('users').where({ id: req.user.id }).first();
+        if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+        const { generalClient } = require('./services/redisClient');
+        if (!generalClient || !generalClient.isReady) return res.status(503).json({ error: 'Redis offline' });
+
+        const keys = await generalClient.keys('telemetry:*');
+        if (keys.length > 0) {
+            await generalClient.del(keys);
+        }
+        res.json({ success: true, message: 'Telemetry metrics reset successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to reset telemetry' });
     }
 });
 
