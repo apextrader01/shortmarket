@@ -7,6 +7,7 @@ let global_io = null;
 let sharedPriceCache = null;
 let wsInstance = null;
 let clientSubscriptions = new Set();
+let mfSubscriptions = new Set();
 let watchdogInterval = null;
 let reconnectAttempts = 0;
 let lastDataSocketError = null;
