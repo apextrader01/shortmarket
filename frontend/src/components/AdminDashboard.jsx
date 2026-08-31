@@ -140,7 +140,9 @@ export default function AdminDashboard() {
           setUsers(res.users || []);
           setTotalPages(res.totalPages || 1);
         }
-      } else if (activeTab === 'withdrawals') {
+      } else if (activeTab === 'telemetry') {
+      fetchAdminTelemetry();
+    } else if (activeTab === 'withdrawals') {
       const data = await fetchAdminWithdrawals();
       setWithdrawals(data);
     } else if (activeTab === 'deposits') {

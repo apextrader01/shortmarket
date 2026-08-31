@@ -159,6 +159,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(compression()); // Compress all API responses to fix frontend loading lag
 
+const recordTelemetry = require('./middleware/telemetry');
+app.use(recordTelemetry);
+
+
 // ─── Health ────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', symbols: Object.keys(priceCache).length });
@@ -862,6 +866,45 @@ app.post('/api/admin/users/:id/toggle_ban', authenticateToken, async (req, res) 
   }
 });
 
+
+app.get('/api/admin/telemetry', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const { generalClient } = require('./services/redisClient');
+        if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [] });
+
+        const apiKeys = await generalClient.keys('telemetry:api:*');
+        const userKeys = await generalClient.keys('telemetry:user:*');
+
+        const apiStats = [];
+        for (const k of apiKeys) {
+            const data = await generalClient.hGetAll(k);
+            apiStats.push({
+                route: k.replace('telemetry:api:', ''),
+                count: parseInt(data.count || 0),
+                totalTime: parseInt(data.time_ms || 0),
+                totalBytes: parseInt(data.bytes || 0)
+            });
+        }
+
+        const userStats = [];
+        for (const k of userKeys) {
+            const userId = k.replace('telemetry:user:', '');
+            const data = await generalClient.hGetAll(k);
+            const dbUser = await db('users').where({ id: userId }).first();
+            userStats.push({
+                userId,
+                username: dbUser ? dbUser.username : 'Unknown',
+                apiCalls: parseInt(data.api_calls || 0),
+                apiBytes: parseInt(data.api_bytes || 0),
+                wsMinutes: parseInt(data.ws_minutes || 0)
+            });
+        }
+        res.json({ api: apiStats, users: userStats });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch telemetry' });
+    }
+});
 
 app.post('/api/admin/master_square_off', authenticateToken, async (req, res) => {
   try {

@@ -1133,6 +1133,16 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  fetchAdminTelemetry: async () => {
+    try {
+      set({ loading: true });
+      const res = await API.get('/api/admin/telemetry');
+      set({ adminTelemetry: res.data, loading: false });
+    } catch (err) {
+      set({ error: err.response?.data?.error || 'Failed to load telemetry', loading: false });
+    }
+  },
+
   fetchAdminLedger: async () => {
     
     
