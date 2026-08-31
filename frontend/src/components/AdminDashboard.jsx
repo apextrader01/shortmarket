@@ -306,7 +306,7 @@ export default function AdminDashboard() {
             <Shield size={24} style={{ color: 'var(--color-red)' }} />
             Admin Control Center
           </h2>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '16px', overflowX: 'auto' }} className="scrollbar-hide">
+          <div style={{ display: 'flex', gap: '16px', marginTop: '16px', flexWrap: 'wrap' }}>
             <button 
                 onClick={() => setActiveTab('system')} 
                 style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
