@@ -1136,10 +1136,11 @@ export const useStore = create(persist((set, get) => ({
   fetchAdminTelemetry: async () => {
     try {
       set({ loading: true });
-      const res = await API.get('/api/admin/telemetry');
-      set({ adminTelemetry: res.data, loading: false });
+      const res = await fetch(`${API}/api/admin/telemetry`, { credentials: 'omit' });
+      const data = await res.json();
+      set({ adminTelemetry: data, loading: false });
     } catch (err) {
-      set({ error: err.response?.data?.error || 'Failed to load telemetry', loading: false });
+      set({ error: err.message || 'Failed to load telemetry', loading: false });
     }
   },
 
