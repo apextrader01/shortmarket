@@ -872,7 +872,6 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
         const caller = await db('users').where({ id: req.user.id }).first();
         if (!caller || caller.role !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
 
-    try {
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [] });
 
