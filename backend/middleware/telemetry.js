@@ -17,7 +17,23 @@ async function recordTelemetry(req, res, next) {
             routePath = routePath.replace(/\/\d+/g, '/:id');
             const routeKey = `${req.method} ${routePath}`;
             
-            const userId = (req.user && req.user.id) ? req.user.id : 'anonymous';
+            
+            let userId = 'anonymous';
+            if (req.user && req.user.id) {
+                userId = req.user.id;
+            } else {
+                // Try to manually decode token if present so we can track users even on routes where authenticateToken isn't applied globally
+                const jwt = require('jsonwebtoken');
+                const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
+                const token = (req.cookies && req.cookies.token) || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+                if (token) {
+                    try {
+                        const decoded = jwt.verify(token, JWT_SECRET);
+                        if (decoded && decoded.id) userId = decoded.id;
+                    } catch(e) {}
+                }
+            }
+
 
             // Try to get content length if available
             let responseBodySize = 0;
