@@ -870,7 +870,7 @@ app.post('/api/admin/users/:id/toggle_ban', authenticateToken, async (req, res) 
 app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
     try {
         const caller = await db('users').where({ id: req.user.id }).first();
-        if (!caller || caller.role !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
+        if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [] });
