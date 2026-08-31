@@ -42,7 +42,7 @@ async function recordTelemetry(req, res, next) {
                 responseBodySize = parseInt(contentLength, 10);
             }
 
-            const p = generalClient.pipeline();
+            const p = generalClient.multi();
             p.hIncrBy(`telemetry:api:${routeKey}`, 'count', 1);
             p.hIncrBy(`telemetry:api:${routeKey}`, 'time_ms', timeMs);
             if (responseBodySize > 0) p.hIncrBy(`telemetry:api:${routeKey}`, 'bytes', responseBodySize);
