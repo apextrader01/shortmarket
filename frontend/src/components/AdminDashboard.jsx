@@ -300,69 +300,11 @@ export default function AdminDashboard() {
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Shield size={24} style={{ color: 'var(--color-red)' }} />
-            Admin Control Center
-          </h2>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '16px', flexWrap: 'wrap' }}>
-            <button 
-                onClick={() => setActiveTab('system')} 
-                style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                System Status
-              </button>
-              <button 
-                onClick={() => setActiveTab('analytics')}
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Analytics & Insights
-            </button>
-            <button 
-              onClick={() => setActiveTab('users')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Client Management
-            </button>
-            <button 
-              onClick={() => setActiveTab('positions')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'positions' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'positions' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'positions' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Live Positions
-            </button>
-            <button 
-              onClick={() => setActiveTab('orders')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'orders' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'orders' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'orders' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Order Flow
-            </button>
-            <button 
-              onClick={() => setActiveTab('ledger')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'ledger' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'ledger' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'ledger' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Platform Ledger
-            </button>
-            <button 
-              onClick={() => setActiveTab('deposits')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Deposit Requests
-            </button>
-            <button 
-              onClick={() => setActiveTab('withdrawals')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'withdrawals' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'withdrawals' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'withdrawals' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Withdrawals
-            </button>
-            <button 
-              onClick={() => setActiveTab('telemetry')} 
-              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'telemetry' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'telemetry' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'telemetry' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              Resource Telemetry
-            </button>
-          </div>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <Shield size={24} style={{ color: 'var(--color-red)' }} />
+          Admin Control Center
+        </h2>
         
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           <button
@@ -407,6 +349,64 @@ export default function AdminDashboard() {
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
+      </div>
+
+      {/* Tabs Navigation Bar (Full Width) */}
+      <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', overflowX: 'auto' }} className="scrollbar-hide">
+        <button 
+          onClick={() => setActiveTab('system')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          System Status
+        </button>
+        <button 
+          onClick={() => setActiveTab('analytics')}
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Analytics & Insights
+        </button>
+        <button 
+          onClick={() => setActiveTab('users')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Client Management
+        </button>
+        <button 
+          onClick={() => setActiveTab('positions')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'positions' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'positions' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'positions' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Live Positions
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'orders' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'orders' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'orders' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Order Flow
+        </button>
+        <button 
+          onClick={() => setActiveTab('ledger')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'ledger' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'ledger' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'ledger' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Platform Ledger
+        </button>
+        <button 
+          onClick={() => setActiveTab('deposits')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Deposit Requests
+        </button>
+        <button 
+          onClick={() => setActiveTab('withdrawals')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'withdrawals' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'withdrawals' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'withdrawals' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          Withdrawals
+        </button>
+        <button 
+          onClick={() => setActiveTab('telemetry')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'telemetry' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'telemetry' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'telemetry' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          ⚡ Resource Telemetry
+        </button>
       </div>
 
       {/* Content */}
