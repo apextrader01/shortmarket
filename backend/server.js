@@ -379,8 +379,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
+    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : (req.socket?.remoteAddress || req.ip || '');
     const [id] = await db('users').insert({ 
-      username, email, phone, password_hash, watchlists: defaultWatchlist 
+      username, email, phone, password_hash, watchlists: defaultWatchlist,
+      registration_ip: clientIp, last_ip: clientIp 
     }).returning('id');
     
     // Some db engines return an object from returning(), handle both
@@ -3329,13 +3331,166 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
         'users.phone',
         'users.upi_id',
         'users.bank_account_no',
-        'users.bank_ifsc'
+        'users.bank_ifsc',
+        'users.last_ip',
+        'users.registration_ip'
       )
       .orderBy('reward_withdrawals.created_at', 'desc');
 
-    res.json({ success: true, withdrawals });
+    // Group users by IP to detect multi-account fraud
+    const ipCounts = await db('users')
+      .whereNotNull('last_ip')
+      .whereNot('last_ip', '')
+      .groupBy('last_ip')
+      .select('last_ip')
+      .count('id as count');
+
+    const ipMap = {};
+    ipCounts.forEach(r => {
+      ipMap[r.last_ip] = parseInt(r.count, 10);
+    });
+
+    const enhanced = [];
+    for (const w of withdrawals) {
+      const ip = w.last_ip || w.registration_ip;
+      const sharedCount = ip ? (ipMap[ip] || 1) : 1;
+      let sharedUsers = [];
+      if (sharedCount > 1 && ip) {
+        const matching = await db('users')
+          .where(function() {
+            this.where('last_ip', ip).orWhere('registration_ip', ip);
+          })
+          .whereNot('id', w.user_id)
+          .select('id', 'username')
+          .limit(5);
+        sharedUsers = matching.map(m => m.username);
+      }
+      enhanced.push({
+        ...w,
+        shared_ip_count: sharedCount,
+        shared_users: sharedUsers
+      });
+    }
+
+    res.json({ success: true, withdrawals: enhanced });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Live Leaderboard (Cached in Redis for 60s) ───────────────────────────
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const { generalClient } = require('./services/redisClient');
+    const cacheKey = 'leaderboard:daily:top50';
+
+    if (generalClient && generalClient.isReady) {
+      const cached = await generalClient.get(cacheKey);
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const topTraders = await db('positions')
+      .join('users', 'positions.user_id', 'users.id')
+      .where('users.is_admin', false)
+      .where('positions.created_at', '>=', todayStart)
+      .groupBy('users.id', 'users.username', 'users.profile_picture_url')
+      .select(
+        'users.id as user_id',
+        'users.username',
+        'users.profile_picture_url',
+        db.raw('COALESCE(SUM(positions.realized_pnl), 0) as total_pnl'),
+        db.raw('COUNT(positions.id) as total_trades'),
+        db.raw('SUM(CASE WHEN positions.realized_pnl > 0 THEN 1 ELSE 0 END) as winning_trades')
+      )
+      .having(db.raw('COALESCE(SUM(positions.realized_pnl), 0) > 0'))
+      .orderBy('total_pnl', 'desc')
+      .limit(50);
+
+    const formatted = topTraders.map((t, idx) => {
+      const total = parseInt(t.total_trades || 0, 10);
+      const wins = parseInt(t.winning_trades || 0, 10);
+      const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+      return {
+        rank: idx + 1,
+        username: t.username,
+        profile_picture_url: t.profile_picture_url,
+        pnl: parseFloat(t.total_pnl || 0),
+        totalTrades: total,
+        winRate: winRate
+      };
+    });
+
+    const result = { success: true, leaderboard: formatted, lastUpdated: Date.now() };
+
+    if (generalClient && generalClient.isReady) {
+      await generalClient.setEx(cacheKey, 60, JSON.stringify(result)).catch(() => null);
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('Leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// ─── Platform Announcements ────────────────────────────────────────────────
+app.get('/api/announcement', async (req, res) => {
+  try {
+    const { generalClient } = require('./services/redisClient');
+    let announcement = null;
+
+    if (generalClient && generalClient.isReady) {
+      const data = await generalClient.hGetAll('platform:announcement');
+      if (data && data.text) {
+        announcement = {
+          text: data.text,
+          type: data.type || 'info',
+          updated_at: data.updated_at
+        };
+      }
+    }
+    res.json({ success: true, announcement });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch announcement' });
+  }
+});
+
+app.post('/api/admin/announcement', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { text, type } = req.body;
+    const { generalClient } = require('./services/redisClient');
+
+    if (!text || text.trim() === '') {
+      if (generalClient && generalClient.isReady) {
+        await generalClient.del('platform:announcement');
+      }
+      io.emit('announcement_update', null);
+      return res.json({ success: true, message: 'Announcement cleared' });
+    }
+
+    const announcementData = {
+      text: text.trim(),
+      type: type || 'info',
+      updated_at: new Date().toISOString()
+    };
+
+    if (generalClient && generalClient.isReady) {
+      await generalClient.hSet('platform:announcement', announcementData);
+    }
+
+    io.emit('announcement_update', announcementData);
+
+    res.json({ success: true, announcement: announcementData });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save announcement' });
   }
 });
 

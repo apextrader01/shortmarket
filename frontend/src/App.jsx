@@ -25,17 +25,19 @@ import LoginView from './components/LoginView';
 import OnboardingWizard from './components/OnboardingWizard';
 import PricingView from './components/PricingView';
 import ReferralsView from './components/ReferralsView';
+import LeaderboardView from './components/LeaderboardView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
 function App() {
-  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, prices, toggleTheme, theme, setTheme, orderModal, editOrderModal, alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, prices: state.prices, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, alerts: state.alerts, updateAlert: state.updateAlert, clearOldAlerts: state.clearOldAlerts, pendingTriggers: state.pendingTriggers, updatePendingTrigger: state.updatePendingTrigger, placeOrder: state.placeOrder, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding })));
+  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, prices, toggleTheme, theme, setTheme, orderModal, editOrderModal, alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, prices: state.prices, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, alerts: state.alerts, updateAlert: state.updateAlert, clearOldAlerts: state.clearOldAlerts, pendingTriggers: state.pendingTriggers, updatePendingTrigger: state.updatePendingTrigger, placeOrder: state.placeOrder, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
+  const [isDismissedAnnouncement, setIsDismissedAnnouncement] = useState(false);
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
@@ -46,6 +48,7 @@ function App() {
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
+      'leaderboard': 'Leaderboard',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
         'aboutus': 'AboutUs'
@@ -59,6 +62,7 @@ function App() {
   useEffect(() => {
     setFontSize(fontSize);
     if (theme) setTheme(theme);
+    if (fetchAnnouncement) fetchAnnouncement();
   }, []);
 
   // Sync activeTab to URL and handle browser back/forward buttons
@@ -298,6 +302,33 @@ function App() {
 
   return (
     <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
+      {/* Real-time Global Announcement Banner */}
+      {announcement && announcement.text && !isDismissedAnnouncement && (
+        <div style={{
+          background: announcement.type === 'alert' ? 'linear-gradient(90deg, #b91c1c, #991b1b)' : (announcement.type === 'warning' ? 'linear-gradient(90deg, #b45309, #d97706)' : 'linear-gradient(90deg, #1d4ed8, #2563eb)'),
+          color: '#fff',
+          padding: '7px 16px',
+          fontSize: '12px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255,255,255,0.15)',
+          zIndex: 100
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px' }}>📢</span>
+            <span>{announcement.text}</span>
+          </div>
+          <button
+            onClick={() => setIsDismissedAnnouncement(true)}
+            style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.8, fontSize: '14px' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
           {/* Left: title + index pills */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -366,7 +397,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Analytics', 'Mutual Funds',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Analytics', 'Mutual Funds', 'Leaderboard',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -446,6 +477,7 @@ function App() {
 
           {activeTab === 'Analytics' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}><AnalyticsView /></div>}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
+          {activeTab === 'Leaderboard' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}><LeaderboardView /></div>}
           {activeTab === 'ClientData' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />

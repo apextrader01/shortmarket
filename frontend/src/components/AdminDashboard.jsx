@@ -95,11 +95,13 @@ function SystemStatusTab() {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement })));
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [telemetryTimeframe, setTelemetryTimeframe] = useState('all');
   const [isLiveTelemetry, setIsLiveTelemetry] = useState(true);
+  const [announcementInput, setAnnouncementInput] = useState('');
+  const [announcementType, setAnnouncementType] = useState('info');
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -359,6 +361,55 @@ export default function AdminDashboard() {
           >
             <RefreshCw size={14} /> Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Platform Announcement Broadcast Bar */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '280px' }}>
+          <span style={{ fontSize: '16px' }}>📢</span>
+          <input
+            type="text"
+            placeholder="Broadcast a live announcement banner to all active traders..."
+            value={announcementInput}
+            onChange={(e) => setAnnouncementInput(e.target.value)}
+            style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 12px', color: '#fff', fontSize: '12px' }}
+          />
+          <select
+            value={announcementType}
+            onChange={(e) => setAnnouncementType(e.target.value)}
+            style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', color: '#fff', fontSize: '12px' }}
+          >
+            <option value="info">Info (Blue)</option>
+            <option value="warning">Warning (Orange)</option>
+            <option value="alert">Alert (Red)</option>
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              if (!announcementInput.trim()) return;
+              await setAdminAnnouncement(announcementInput, announcementType);
+              alert('Live announcement broadcasted to all users!');
+            }}
+            style={{ padding: '6px 14px', fontSize: '12px', background: 'var(--color-blue)', color: '#fff', cursor: 'pointer' }}
+          >
+            Broadcast
+          </button>
+          {announcement && announcement.text && (
+            <button
+              className="btn btn-secondary"
+              onClick={async () => {
+                await setAdminAnnouncement('', 'info');
+                setAnnouncementInput('');
+                alert('Announcement banner cleared!');
+              }}
+              style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer' }}
+            >
+              Clear Banner
+            </button>
+          )}
         </div>
       </div>
 
@@ -751,7 +802,30 @@ export default function AdminDashboard() {
                 withdrawals.map(w => (
                   <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '16px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{w.username}</div><div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{w.phone}</div></td>
+                    <td style={{ padding: '16px' }}>
+                      <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {w.username}
+                        {w.shared_ip_count > 1 && (
+                          <span 
+                            title={`Multi-Account Fraud Risk! ${w.shared_ip_count} accounts share this IP (${w.shared_users?.join(', ') || ''})`}
+                            style={{ 
+                              background: 'rgba(239, 68, 68, 0.15)', 
+                              color: '#ef4444', 
+                              border: '1px solid rgba(239, 68, 68, 0.3)', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '10px', 
+                              fontWeight: '700',
+                              cursor: 'help' 
+                            }}
+                          >
+                            ⚠️ {w.shared_ip_count} ACCOUNTS ON SAME IP
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{w.phone}</div>
+                      {w.last_ip && <div style={{ fontSize: '10px', color: 'var(--text-secondary)', opacity: 0.6 }}>IP: {w.last_ip}</div>}
+                    </td>
                     <td style={{ padding: '16px' }}>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>UPI: <span style={{color: '#fff'}}>{w.upi_id || 'N/A'}</span></div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>A/C: <span style={{color: '#fff'}}>{w.bank_account_no || 'N/A'}</span></div>

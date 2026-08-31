@@ -1404,6 +1404,62 @@ export const useStore = create(persist((set, get) => ({
   setOneClickMode: (val) => set({ oneClickMode: val }),
   setOneClickMultiplier: (val) => set({ oneClickMultiplier: val }),
 
+  // ── Leaderboard ─────────────────────────────────────────────────────────────
+  leaderboard: [],
+  leaderboardLoading: false,
+  fetchLeaderboard: async () => {
+    try {
+      set({ leaderboardLoading: true });
+      const res = await fetch(`${API}/api/leaderboard`, { credentials: 'omit' });
+      const data = await res.json();
+      if (data?.success) {
+        set({ leaderboard: data.leaderboard || [], leaderboardLoading: false });
+      } else {
+        set({ leaderboardLoading: false });
+      }
+      return data;
+    } catch (err) {
+      set({ leaderboardLoading: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  // ── Announcements ───────────────────────────────────────────────────────────
+  announcement: null,
+  fetchAnnouncement: async () => {
+    try {
+      const res = await fetch(`${API}/api/announcement`, { credentials: 'omit' });
+      const data = await res.json();
+      if (data?.success) {
+        set({ announcement: data.announcement });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch announcement:', err);
+    }
+  },
+  setAdminAnnouncement: async (text, type = 'info') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/announcement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text, type })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        set({ announcement: data.announcement || null });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+  setAnnouncement: (announcement) => set({ announcement }),
+
 }), {
   name: 'shortmarket-storage',
   partialize: (state) => ({

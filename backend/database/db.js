@@ -447,6 +447,9 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip VARCHAR(50)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_ip VARCHAR(50)`);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_users_last_ip ON users(last_ip)');
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
     
