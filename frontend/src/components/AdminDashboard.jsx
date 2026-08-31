@@ -95,14 +95,265 @@ function SystemStatusTab() {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan } = useStore(useShallow(state => ({ toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails })));
+  const { fetchAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails })));
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [deposits, setDeposits] = useState([]);
-  const [withdrawals, setWithdrawals
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  
+  const [orders, setOrders] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [ledger, setLedger] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1); // reset to page 1 on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Modal state
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [newBalance, setNewBalance] = useState('');
+  const [newSubTier, setNewSubTier] = useState('BASIC');
+  const [newUsername, setNewUsername] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      if (activeTab === 'users') {
+        const res = await fetchAdminUsers?.(page, 50, debouncedSearch);
+        if (res?.success) {
+          setUsers(res.users || []);
+          setTotalPages(res.totalPages || 1);
+        }
+      } else if (activeTab === 'telemetry') {
+        await fetchAdminTelemetry?.();
+      } else if (activeTab === 'withdrawals') {
+      const data = await fetchAdminWithdrawals();
+      setWithdrawals(data);
+    } else if (activeTab === 'deposits') {
+        const res = await fetchDepositRequests?.();
+        if (res?.success) setDeposits(res.deposits || []);
+      } else if (activeTab === 'analytics') {
+        const res = await fetchAdminAnalytics?.();
+        if (res?.success) setAnalytics(res.data);
+      } else if (activeTab === 'orders') {
+        const res = await fetchAdminOrders?.();
+        if (res?.success) setOrders(res.orders || []);
+      } else if (activeTab === 'positions') {
+        const res = await fetchAdminPositions?.();
+        if (res?.success) setPositions(res.positions || []);
+      } else if (activeTab === 'ledger') {
+        const res = await fetchAdminLedger?.();
+        if (res?.success) setLedger(res.ledger || []);
+      }
+    } catch (err) {
+      console.error("Error loading admin data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [activeTab, page, debouncedSearch]);
+
+  const handleUpdateSubscription = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !newSubTier) return;
+    
+    // Set expiry to 1 year from now if PRO, else null
+    let expires = null;
+    if (newSubTier === 'PRO') {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      expires = d.toISOString();
+    }
+    
+    setUpdating(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/user/${selectedUser.id}/subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ tier: newSubTier, expires })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Subscription updated successfully!');
+        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, subscription_tier: newSubTier, subscription_expires: expires } : u));
+        setSelectedUser({ ...selectedUser, subscription_tier: newSubTier, subscription_expires: expires });
+      } else throw new Error(data.error);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleUpdateBalance = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !newBalance) return;
+    setUpdating(true);
+    const res = await updateUserBalance(selectedUser.id, parseFloat(newBalance));
+    if (res.success) {
+      alert('Balance updated successfully!');
+      setSelectedUser(null);
+      loadData();
+    } else {
+      alert(`Error updating balance: ${res.error}`);
+    }
+    setUpdating(false);
+  };
+
+  const handleUpdateDetails = async (e) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setUpdating(true);
+    const res = await updateUserDetails(selectedUser.id, {
+      username: newUsername,
+      email: newEmail,
+      phone: newPhone
+    });
+    if (res.success) {
+      alert('Client details updated successfully!');
+      setSelectedUser(null);
+      loadData();
+    } else {
+      alert(`Error updating details: ${res.error}`);
+    }
+    setUpdating(false);
+  };
+
+  const handleResetUser = async () => {
+    if (!selectedUser) return;
+    if (window.confirm(`Are you absolutely sure you want to reset ${selectedUser.username}'s account? This will permanently delete ALL their trades, positions, and reset their balance to ₹10,00,000. This CANNOT be undone.`)) {
+      setUpdating(true);
+      const res = await adminResetUser(selectedUser.id);
+      if (res.success) {
+        alert(`${selectedUser.username}'s account successfully reset to ₹10,00,000!`);
+        loadData();
+        setSelectedUser(null);
+      } else {
+        alert(res.error || 'Failed to reset user account');
+      }
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    const confirmation = window.prompt(
+      `⚠️ PERMANENT DELETE ⚠️\n\nThis will PERMANENTLY delete ${selectedUser.username}'s account and ALL their data (orders, positions, holdings, ledger, deposits).\n\nThis CANNOT be undone!\n\nType the username "${selectedUser.username}" to confirm:`
+    );
+    if (confirmation !== selectedUser.username) {
+      if (confirmation !== null) alert('Username did not match. Deletion cancelled.');
+      return;
+    }
+    setUpdating(true);
+    const res = await adminDeleteUser(selectedUser.id);
+    if (res.success) {
+      alert(`✅ ${selectedUser.username}'s account has been permanently deleted.`);
+      loadData();
+      setSelectedUser(null);
+    } else {
+      alert(res.error || 'Failed to delete user account');
+    }
+    setUpdating(false);
+  };
+
+  const handleProcessDeposit = async (id, action) => {
+    const res = await processDeposit(id, action);
+    if (res.success) {
+      loadData();
+    } else {
+      alert(`Error: ${res.error}`);
+    }
+  };
+
+  const handleForceClose = async (id) => {
+    if (!window.confirm("Are you sure you want to force close this position? A market order will be placed to close it.")) return;
+    const res = await forceCloseUserPosition(id);
+    if (res.success) {
+      alert(`Force close order placed (ID: ${res.orderId})`);
+      loadData();
+    } else {
+      alert(`Error: ${res.error}`);
+    }
+  };
+
+  return (
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Shield size={24} style={{ color: 'var(--color-red)' }} />
+            Admin Control Center
+          </h2>
+          <div style={{ display: 'flex', gap: '16px', marginTop: '16px', overflowX: 'auto' }} className="scrollbar-hide">
+            <button 
+                onClick={() => setActiveTab('system')} 
+                style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                System Status
+              </button>
+              <button 
+                onClick={() => setActiveTab('analytics')}
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'analytics' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'analytics' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'analytics' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Analytics & Insights
+            </button>
+            <button 
+              onClick={() => setActiveTab('users')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'users' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'users' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'users' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Client Management
+            </button>
+            <button 
+              onClick={() => setActiveTab('positions')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'positions' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'positions' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'positions' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Live Positions
+            </button>
+            <button 
+              onClick={() => setActiveTab('orders')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'orders' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'orders' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'orders' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Order Flow
+            </button>
+            <button 
+              onClick={() => setActiveTab('ledger')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'ledger' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'ledger' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'ledger' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Platform Ledger
+            </button>
+            <button 
+              onClick={() => setActiveTab('deposits')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'deposits' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'deposits' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'deposits' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Deposit Requests
+            </button>
+            <button 
+              onClick={() => setActiveTab('withdrawals')} 
+              style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'withdrawals' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'withdrawals' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'withdrawals' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Withdrawals
             </button>
             <button 
               onClick={() => setActiveTab('telemetry')} 
@@ -536,6 +787,69 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
+        ) : activeTab === 'telemetry' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '24px' }}>
+            {/* API APM TABLE */}
+            <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px' }}><Activity size={18} color="var(--color-blue)" /> API Performance (APM)</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 16px' }}>Route</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Hits</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Avg Latency</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Bandwidth</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminTelemetry?.api?.length === 0 ? <tr><td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected yet</td></tr> : 
+                    [...(adminTelemetry?.api || [])].sort((a,b) => b.totalTime - a.totalTime).map(row => {
+                      const avgLatency = row.count > 0 ? (row.totalTime / row.count).toFixed(2) : 0;
+                      const sizeKb = (row.totalBytes / 1024).toFixed(2);
+                      return (
+                        <tr key={row.route} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{row.route}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>{row.count}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', color: avgLatency > 100 ? 'var(--color-red)' : 'var(--color-green-light)' }}>{avgLatency} ms</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>{sizeKb} KB</td>
+                        </tr>
+                      )
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            {/* USER RESOURCE TABLE */}
+            <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 16px' }}><Users size={18} color="var(--color-blue)" /> Expensive Users</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                    <th style={{ padding: '12px 16px' }}>User</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Live Market Time</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>API Calls</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Bandwidth</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminTelemetry?.users?.length === 0 ? <tr><td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected yet</td></tr> : 
+                    [...(adminTelemetry?.users || [])].sort((a,b) => b.apiBytes - a.apiBytes).map(u => {
+                      const sizeMb = (u.apiBytes / (1024 * 1024)).toFixed(3);
+                      return (
+                        <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{u.username}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>{u.apiCalls}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>{sizeMb} MB</td>
+                        </tr>
+                      )
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
