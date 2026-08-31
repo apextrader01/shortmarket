@@ -54,7 +54,7 @@ async function recordTelemetry(req, res, next) {
             }
             await p.exec();
         } catch (err) {
-            // Silently fail
+            console.error("TELEMETRY ERROR:", err);
         }
     });
 
