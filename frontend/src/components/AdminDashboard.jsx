@@ -95,7 +95,11 @@ function SystemStatusTab() {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity })));
+  
+  const [manualBanType, setManualBanType] = useState('IP');
+  const [manualBanValue, setManualBanValue] = useState('');
+  const [manualBanReason, setManualBanReason] = useState('');
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [telemetryTimeframe, setTelemetryTimeframe] = useState('all');
@@ -153,6 +157,8 @@ export default function AdminDashboard() {
           setUsers(res.users || []);
           setTotalPages(res.totalPages || 1);
         }
+      } else if (activeTab === 'security') {
+        await fetchBannedEntities?.();
       } else if (activeTab === 'telemetry') {
         await fetchAdminTelemetry?.(telemetryTimeframe);
       } else if (activeTab === 'withdrawals') {
@@ -475,7 +481,136 @@ export default function AdminDashboard() {
       <div style={{ background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>
-        ) : activeTab === 'system' ? (
+        ) : activeTab === 'security' ? (
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Manual Ban Card */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '20px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '700', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🛡️ Manual Restriction & Ban Engine
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
+                  Ban abusive IP addresses, fraudulent phone numbers, or user accounts. Banned entities are blocked in 0.01ms via in-memory Redis lookup.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                  <select
+                    value={manualBanType}
+                    onChange={(e) => setManualBanType(e.target.value)}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '13px' }}
+                  >
+                    <option value="IP">IP Address</option>
+                    <option value="PHONE">Phone Number</option>
+                    <option value="USER">Username / Client ID</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder={manualBanType === 'IP' ? 'e.g. 152.58.16.5' : manualBanType === 'PHONE' ? 'e.g. 9876543210' : 'e.g. johndoe or SE000123'}
+                    value={manualBanValue}
+                    onChange={(e) => setManualBanValue(e.target.value)}
+                    style={{ flex: 1, minWidth: '220px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '13px' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Reason (Optional, e.g. Multi-account spam)"
+                    value={manualBanReason}
+                    onChange={(e) => setManualBanReason(e.target.value)}
+                    style={{ flex: 1, minWidth: '200px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '13px' }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!manualBanValue.trim()) return alert('Please enter a value to ban');
+                      const res = await banEntity(manualBanType, manualBanValue.trim(), manualBanReason.trim());
+                      if (res.success) {
+                        alert(res.message || 'Entity banned successfully!');
+                        setManualBanValue('');
+                        setManualBanReason('');
+                        loadData();
+                      } else {
+                        alert(res.error || 'Failed to ban entity');
+                      }
+                    }}
+                    style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 18px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    🚫 Apply Ban
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Bans Table */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#fff' }}>
+                    Active Restricted Entities ({bannedEntities?.length || 0})
+                  </div>
+                  <button onClick={loadData} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '11px' }}>
+                    Refresh
+                  </button>
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '12px 16px', fontWeight: '600' }}>Type</th>
+                      <th style={{ padding: '12px 16px', fontWeight: '600' }}>Target Value</th>
+                      <th style={{ padding: '12px 16px', fontWeight: '600' }}>Reason</th>
+                      <th style={{ padding: '12px 16px', fontWeight: '600' }}>Date Banned</th>
+                      <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(!bannedEntities || bannedEntities.length === 0) ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          No active IP or Phone bans in place.
+                        </td>
+                      </tr>
+                    ) : (
+                      bannedEntities.map(b => (
+                        <tr key={b.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{
+                              background: b.type === 'IP' ? 'rgba(59,130,246,0.15)' : b.type === 'PHONE' ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: b.type === 'IP' ? '#60a5fa' : b.type === 'PHONE' ? '#eab308' : '#ef4444',
+                              border: `1px solid ${b.type === 'IP' ? 'rgba(59,130,246,0.3)' : b.type === 'PHONE' ? 'rgba(234,179,8,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                              padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700'
+                            }}>
+                              {b.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fff' }}>
+                            {b.value}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                            {b.reason || 'Restricted by Admin'}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                            {b.created_at ? new Date(b.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Unban ${b.type} ${b.value}?`)) {
+                                  const res = await unbanEntity({ id: b.id, type: b.type, value: b.value });
+                                  if (res.success) {
+                                    alert('Unbanned successfully!');
+                                    loadData();
+                                  } else {
+                                    alert(res.error || 'Failed to unban');
+                                  }
+                                }
+                              }}
+                              style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              🟢 Unban
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : activeTab === 'system' ? (
           <SystemStatusTab />
         ) : activeTab === 'analytics' ? (
           <div style={{ padding: '24px' }}>
@@ -706,7 +841,19 @@ export default function AdminDashboard() {
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                               {u.client_id || u.id}
-                              {u.last_ip && <span style={{ marginLeft: '8px', opacity: 0.6 }}>• IP: {u.last_ip}</span>}
+                              {u.last_ip && <span style={{ marginLeft: '8px', opacity: 0.7, color: '#93c5fd' }}>• IP: {u.last_ip}</span>}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                              {u.device_model && (
+                                <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 6px', borderRadius: '4px', fontWeight: '500' }}>
+                                  📱 {u.device_model} {u.os_name ? `(${u.os_name})` : ''}
+                                </span>
+                              )}
+                              {u.city && (
+                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.12)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '1px 6px', borderRadius: '4px', fontWeight: '500' }}>
+                                  📍 {u.city}{u.state ? `, ${u.state}` : ''}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

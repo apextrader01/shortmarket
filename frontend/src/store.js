@@ -1460,6 +1460,66 @@ export const useStore = create(persist((set, get) => ({
   },
   setAnnouncement: (announcement) => set({ announcement }),
 
+  bannedEntities: [],
+  fetchBannedEntities: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/banned`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.bans) {
+        set({ bannedEntities: data.bans });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch banned entities:', err);
+      return { bans: [] };
+    }
+  },
+
+  banEntity: async (type, value, reason = '') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/ban`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ type, value, reason })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        get().fetchBannedEntities();
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  unbanEntity: async ({ id, type, value }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/unban`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ id, type, value })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        get().fetchBannedEntities();
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
 }), {
   name: 'shortmarket-storage',
   partialize: (state) => ({

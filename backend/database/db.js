@@ -450,7 +450,26 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip VARCHAR(50)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_ip VARCHAR(50)`);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_users_last_ip ON users(last_ip)');
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS device_model VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS os_name VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS browser_name VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
+    
+    // Ensure banned_entities table exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS banned_entities (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(20) NOT NULL,
+        value VARCHAR(100) NOT NULL,
+        reason TEXT,
+        banned_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw(`CREATE INDEX IF NOT EXISTS idx_banned_type_val ON banned_entities(type, value)`);
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
     
     // Fix integer quantities to support fractional SIP units

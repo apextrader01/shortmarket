@@ -310,6 +310,7 @@ app.get('/api/stocks', async (req, res) => {
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
+const { parseDeviceDetails, parseIpLocation, syncBannedEntities, isIpBanned, isPhoneBanned } = require('./services/deviceSecurity');
 const rateLimit = require('express-rate-limit');
 
 // Rate Limiting Config
@@ -380,9 +381,23 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
     const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : (req.socket?.remoteAddress || req.ip || '');
+    
+    // Check if IP or Phone is banned
+    if (await isIpBanned(clientIp, generalClient)) {
+      return res.status(403).json({ error: 'Registration blocked: Your IP address has been restricted.' });
+    }
+    if (await isPhoneBanned(phone, generalClient)) {
+      return res.status(403).json({ error: 'Registration blocked: This phone number has been restricted.' });
+    }
+
+    const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+    const { city, state } = parseIpLocation(clientIp);
+
     const [id] = await db('users').insert({ 
       username, email, phone, password_hash, watchlists: defaultWatchlist,
-      registration_ip: clientIp, last_ip: clientIp 
+      registration_ip: clientIp, last_ip: clientIp,
+      device_model: deviceModel, os_name: osName, browser_name: browserName,
+      city: city, state: state
     }).returning('id');
     
     // Some db engines return an object from returning(), handle both
@@ -455,6 +470,28 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+
+    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : (req.socket?.remoteAddress || req.ip || '');
+    
+    // Check if IP or Account is banned
+    if (await isIpBanned(clientIp, generalClient)) {
+      return res.status(403).json({ error: 'Access restricted: Your IP address has been restricted.' });
+    }
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
+    }
+
+    const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+    const { city, state } = parseIpLocation(clientIp);
+
+    await db('users').where({ id: user.id }).update({
+      last_ip: clientIp,
+      device_model: deviceModel,
+      os_name: osName,
+      browser_name: browserName,
+      city: city,
+      state: state
+    }).catch(e => console.error('Failed to update user login meta:', e));
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
@@ -1035,7 +1072,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const total = countResult ? parseInt(countResult.total) : 0;
 
     const rawUsers = await query
-      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'users.last_ip', 'users.registration_ip', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
+      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name', 'users.browser_name', 'users.city', 'users.state', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
       .orderBy('users.created_at', 'desc')
       .limit(limit)
       .offset(offset);
@@ -3738,3 +3775,83 @@ module.exports = { io, priceCache };
 
 
 
+
+// ─── Security Shield & Ban Management ──────────────────────────────────────────
+app.get('/api/admin/banned', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    const bans = await db('banned_entities').orderBy('created_at', 'desc');
+    res.json({ bans });
+  } catch (err) {
+    console.error('Fetch Banned Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/ban', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    const { type, value, reason } = req.body;
+    if (!type || !value) return res.status(400).json({ error: 'Type and value are required' });
+
+    const upperType = type.toUpperCase();
+    const cleanValue = value.trim();
+
+    const existing = await db('banned_entities').where({ type: upperType, value: cleanValue }).first();
+    if (!existing) {
+      await db('banned_entities').insert({
+        type: upperType,
+        value: cleanValue,
+        reason: reason || 'Restricted by Admin',
+        banned_by: caller.id
+      });
+    }
+
+    if (upperType === 'USER') {
+      await db('users').where({ id: cleanValue }).orWhere({ username: cleanValue }).update({ is_banned: true });
+    } else if (upperType === 'PHONE') {
+      await db('users').where({ phone: cleanValue }).update({ is_banned: true });
+    }
+
+    await syncBannedEntities(db, generalClient);
+    res.json({ success: true, message: `Successfully banned ${upperType}: ${cleanValue}` });
+  } catch (err) {
+    console.error('Ban Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/unban', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    const { id, type, value } = req.body;
+
+    if (id) {
+      const ban = await db('banned_entities').where({ id }).first();
+      if (ban) {
+        await db('banned_entities').where({ id }).del();
+        if (ban.type === 'USER') {
+          await db('users').where({ id: ban.value }).orWhere({ username: ban.value }).update({ is_banned: false });
+        } else if (ban.type === 'PHONE') {
+          await db('users').where({ phone: ban.value }).update({ is_banned: false });
+        }
+      }
+    } else if (type && value) {
+      await db('banned_entities').where({ type: type.toUpperCase(), value: value.trim() }).del();
+      if (type.toUpperCase() === 'USER') {
+        await db('users').where({ id: value }).orWhere({ username: value }).update({ is_banned: false });
+      } else if (type.toUpperCase() === 'PHONE') {
+        await db('users').where({ phone: value }).update({ is_banned: false });
+      }
+    }
+
+    await syncBannedEntities(db, generalClient);
+    res.json({ success: true, message: 'Unbanned successfully' });
+  } catch (err) {
+    console.error('Unban Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
