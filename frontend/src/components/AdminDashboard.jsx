@@ -470,6 +470,12 @@ export default function AdminDashboard() {
           Withdrawals
         </button>
         <button 
+          onClick={() => setActiveTab('security')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'security' ? '2px solid var(--color-red)' : '2px solid transparent', color: activeTab === 'security' ? '#ef4444' : 'var(--text-secondary)', fontWeight: activeTab === 'security' ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          🛡️ Security Shield
+        </button>
+        <button 
           onClick={() => setActiveTab('telemetry')} 
           style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'telemetry' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'telemetry' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'telemetry' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
@@ -843,15 +849,13 @@ export default function AdminDashboard() {
                               {u.client_id || u.id}
                               {u.last_ip && <span style={{ marginLeft: '8px', opacity: 0.7, color: '#93c5fd' }}>• IP: {u.last_ip}</span>}
                             </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
-                              {u.device_model && (
-                                <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '1px 6px', borderRadius: '4px', fontWeight: '500' }}>
-                                  📱 {u.device_model} {u.os_name ? `(${u.os_name})` : ''}
-                                </span>
-                              )}
-                              {u.city && (
-                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.12)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.25)', padding: '1px 6px', borderRadius: '4px', fontWeight: '500' }}>
-                                  📍 {u.city}{u.state ? `, ${u.state}` : ''}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                              <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                📱 {u.device_model || 'Desktop PC'} {u.os_name ? `(${u.os_name})` : ''}
+                              </span>
+                              {(u.city || u.state) && (
+                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  📍 {u.city || ''}{u.city && u.state ? ', ' : ''}{u.state || ''}
                                 </span>
                               )}
                             </div>
@@ -884,27 +888,51 @@ export default function AdminDashboard() {
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
                           <button
                             style={{
-                              padding: '6px 12px',
+                              padding: '6px 10px',
                               borderRadius: '4px',
                               fontSize: '11px',
                               fontWeight: '600',
                               cursor: 'pointer',
-                              background: u.is_banned ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)',
-                              color: u.is_banned ? 'var(--color-green-light)' : 'var(--color-yellow)',
-                              border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)'}`
+                              background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: u.is_banned ? '#22c55e' : '#ef4444',
+                              border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
                             }}
                             onClick={async () => {
                               if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
                                 try {
                                   await toggleUserBan(u.id);
+                                  loadData();
                                 } catch(e) {
                                   alert(e.message);
                                 }
                               }
                             }}
                           >
-                            {u.is_banned ? 'Unban' : 'Ban'}
+                            {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
                           </button>
+                          {u.last_ip && (
+                            <button
+                              style={{
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                background: 'rgba(239,68,68,0.1)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239,68,68,0.3)'
+                              }}
+                              onClick={async () => {
+                                if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
+                                  const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
+                                  alert(res.message || `IP ${u.last_ip} has been banned!`);
+                                  loadData();
+                                }
+                              }}
+                            >
+                              Ban IP
+                            </button>
+                          )}
                           <button 
                             className="btn btn-primary" 
                             style={{ padding: '6px 12px', fontSize: '12px' }}
@@ -1466,6 +1494,51 @@ export default function AdminDashboard() {
                     {updating ? 'Saving...' : 'Update Tier'}
                   </button>
                 </form>
+              </div>
+
+              {/* Device & Security Fingerprint Card */}
+              <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🛡️ Device & Security Fingerprint
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Device Model:</span> <strong style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.device_model || 'Desktop PC'}</strong></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>OS & Browser:</span> <span style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.os_name || 'Windows'} ({selectedUser.browser_name || 'Chrome'})</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>{selectedUser.city || selectedUser.state || 'India'}</span></div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {selectedUser.last_ip && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm(`Ban IP ${selectedUser.last_ip}?`)) {
+                          await banEntity('IP', selectedUser.last_ip, `Banned from ${selectedUser.username}`);
+                          alert(`IP ${selectedUser.last_ip} banned successfully!`);
+                          loadData();
+                        }
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      🚫 Ban IP ({selectedUser.last_ip})
+                    </button>
+                  )}
+                  {selectedUser.phone && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm(`Ban Phone ${selectedUser.phone}?`)) {
+                          await banEntity('PHONE', selectedUser.phone, `Banned from ${selectedUser.username}`);
+                          alert(`Phone ${selectedUser.phone} banned successfully!`);
+                          loadData();
+                        }
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      🚫 Ban Phone ({selectedUser.phone})
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* User Profile Details */}
