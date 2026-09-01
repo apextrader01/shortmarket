@@ -42,7 +42,7 @@ function SystemStatusTab() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: isMobile ? '10px' : '16px' }}>
         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Fyers Access Token</div>
           <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.hasAccessToken ? 'var(--color-green)' : 'var(--color-red)' }}>
@@ -100,6 +100,13 @@ export default function AdminDashboard() {
   const [manualBanType, setManualBanType] = useState('IP');
   const [manualBanValue, setManualBanValue] = useState('');
   const [manualBanReason, setManualBanReason] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const [activeTab, setActiveTab] = useState('analytics');
   const [telemetryTimeframe, setTelemetryTimeframe] = useState('all');
@@ -317,7 +324,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+    <div style={{ padding: isMobile ? '12px 8px' : '24px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', height: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -1269,7 +1276,7 @@ export default function AdminDashboard() {
             })()}
 
             {/* TABLES GRID */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '24px' }}>
               {/* API APM TABLE */}
               <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 16px 0' }}>

@@ -29,7 +29,7 @@ import LeaderboardView from './components/LeaderboardView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -548,17 +548,21 @@ function App() {
             { label: 'Positions', icon: Briefcase },
             { label: 'Orders', icon: List },
             { label: 'Portfolio', icon: Briefcase },
-
+            { label: 'Leaderboard', icon: Trophy },
             { label: 'Analytics', icon: LineChart },
             { label: 'Mutual Funds', icon: CircleDollarSign },
-            ...(user?.is_admin ? [{ label: 'Admin Panel', icon: Settings }] : [])
+            { label: 'Reports', icon: FileText },
+            { label: 'Referrals', icon: Gift },
+            { label: 'Pricing', icon: Star },
+            { label: 'About Us', icon: Info },
+            ...(user?.is_admin ? [{ label: 'Admin Panel', icon: ShieldCheck }] : [])
           ].map(tab => (
             <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
               <tab.icon size={20} />
               {tab.label}
             </div>
           ))}
-          <div className="mobile-menu-item" onClick={logout} style={{ color: 'var(--color-red)', marginTop: 'auto' }}>
+          <div className="mobile-menu-item" onClick={logout} style={{ color: 'var(--color-red)', marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
             <LogOut size={20} />
             Logout
           </div>
