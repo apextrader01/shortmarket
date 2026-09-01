@@ -40,6 +40,12 @@ const LedgerStatement = () => {
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('Broking');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Filter states
   const [filterPeriod, setFilterPeriod] = useState('Week');
@@ -191,61 +197,91 @@ const LedgerStatement = () => {
       </div>
 
       {/* Table */}
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
-              <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
-              <th style={{ padding: '16px', fontWeight: '500' }}>Transaction Type</th>
-              <th style={{ padding: '16px', fontWeight: '500' }}>Description</th>
-              <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Credit</th>
-              <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Debit</th>
-              <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Net</th>
-              <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Available Balance</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="glass-panel" style={{ padding: isMobile ? '12px' : '0', overflow: 'hidden', borderRadius: '12px' }}>
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {loading ? (
-              <tr><td colSpan="7" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ledger...</div>
             ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
-              <tr>
-                <td colSpan="7" style={{ padding: '64px', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ background: 'var(--bg-hover)', padding: '24px', borderRadius: '12px' }}>
-                      <FileText size={48} color="var(--text-secondary)" />
-                    </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No Results Found.</div>
-                  </div>
-                </td>
-              </tr>
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No Results Found.</div>
             ) : (
               filteredLedger.map((entry) => (
-                <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '16px' }}>
-                    <div>{new Date(entry.created_at).toLocaleDateString('en-GB')}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {new Date(entry.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px' }}>{entry.type.replace('_', ' ')}</td>
-                  <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{entry.description || entry.type}</td>
-                  <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)' }}>
-                    {entry.amount > 0 ? `₹${Number(entry.amount).toFixed(2)}` : '-'}
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-red-light)' }}>
-                    {entry.amount < 0 ? `₹${Math.abs(entry.amount).toFixed(2)}` : '-'}
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>
-                    ₹{Number(entry.amount).toFixed(2)}
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--color-blue-light)' }}>
-                    ₹{Number(entry.running_balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                  </td>
-                </tr>
+                <div key={entry.id} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                      {entry.type.replace('_', ' ')}
+                    </span>
+                    <span style={{ fontWeight: '800', fontSize: '14px', color: entry.amount >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                      {entry.amount >= 0 ? '+' : ''}₹{Math.abs(Number(entry.amount)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    {entry.description || entry.type}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span>{new Date(entry.created_at).toLocaleString()}</span>
+                    <span>Balance: <strong style={{ color: '#fff' }}>₹{Number(entry.running_balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}</strong></span>
+                  </div>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Transaction Type</th>
+                <th style={{ padding: '16px', fontWeight: '500' }}>Description</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Credit</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Debit</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Net</th>
+                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Available Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="7" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
+              ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
+                <tr>
+                  <td colSpan="7" style={{ padding: '64px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ background: 'var(--bg-hover)', padding: '24px', borderRadius: '12px' }}>
+                        <FileText size={48} color="var(--text-secondary)" />
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>No Results Found.</div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredLedger.map((entry) => (
+                  <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '16px' }}>
+                      <div>{new Date(entry.created_at).toLocaleDateString('en-GB')}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {new Date(entry.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px' }}>{entry.type.replace('_', ' ')}</td>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{entry.description || entry.type}</td>
+                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)' }}>
+                      {entry.amount > 0 ? `₹${Number(entry.amount).toFixed(2)}` : '-'}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-red-light)' }}>
+                      {entry.amount < 0 ? `₹${Math.abs(entry.amount).toFixed(2)}` : '-'}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>
+                      ₹{Number(entry.amount).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+                      ₹{Number(entry.running_balance).toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -435,32 +471,32 @@ const TradesAndCharges = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <FileText size={18} color="var(--color-purple)" />
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? '14px' : '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+               <FileText size={18} color="#60a5fa" />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Trades ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>{totalTrades}</div>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Trades</div>
+               <div style={{ fontSize: '18px', fontWeight: '800' }}>{totalTrades}</div>
              </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <FileText size={18} color="var(--color-purple)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: isMobile ? 'none' : '1px solid var(--border-color)', paddingLeft: isMobile ? '0' : '24px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+               <FileText size={18} color="#f59e0b" />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Brokerage ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalBrokerage.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Brokerage</div>
+               <div style={{ fontSize: '18px', fontWeight: '800' }}>₹{totalBrokerage.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <FileText size={18} color="var(--color-purple)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: isMobile ? 'none' : '1px solid var(--border-color)', paddingLeft: isMobile ? '0' : '24px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+               <FileText size={18} color="#ef4444" />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges</div>
+               <div style={{ fontSize: '18px', fontWeight: '800' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
         </div>
@@ -708,6 +744,12 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
 
 const ProfitAndLoss = () => {
   const [filterPeriod, setFilterPeriod] = useState('Year');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Month-Wise View');
@@ -861,34 +903,34 @@ const ProfitAndLoss = () => {
       </div>
 
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? '14px' : '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                <PieChart size={18} color="var(--color-green-light)" />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Realized P/L ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700', color: realizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Realized P/L</div>
+               <div style={{ fontSize: '18px', fontWeight: '800', color: realizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                  {realizedPnl >= 0 ? '+' : ''}₹{realizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
                </div>
              </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: isMobile ? 'none' : '1px solid var(--border-color)', paddingLeft: isMobile ? '0' : '24px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                <FileText size={18} color="var(--color-red-light)" />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Total Charges</div>
+               <div style={{ fontSize: '18px', fontWeight: '800' }}>₹{totalCharges.toLocaleString('en-IN', {minimumFractionDigits: 2})}</div>
              </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid var(--border-color)', paddingLeft: '24px' }}>
-             <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <PieChart size={18} color="var(--color-green-light)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: isMobile ? 'none' : '1px solid var(--border-color)', paddingLeft: isMobile ? '0' : '24px' }}>
+             <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+               <PieChart size={18} color={netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)'} />
              </div>
              <div>
-               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Net Realized P/L ⓘ</div>
-               <div style={{ fontSize: '16px', fontWeight: '700', color: netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Net Realized P/L</div>
+               <div style={{ fontSize: '18px', fontWeight: '800', color: netRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                  {netRealizedPnl >= 0 ? '+' : ''}₹{netRealizedPnl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
                </div>
              </div>
@@ -916,8 +958,33 @@ const ProfitAndLoss = () => {
            </div>
          </div>
 
-         <div style={{ overflowX: 'auto' }}>
-           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+         {isMobile ? (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+               {(viewMode === 'Month-Wise View' ? monthWiseData : scripWiseData).length === 0 ? (
+                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</div>
+               ) : (
+                 (viewMode === 'Month-Wise View' ? monthWiseData : scripWiseData).map((row, idx) => {
+                   const net = (row.pnl - row.charges);
+                   return (
+                     <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff' }}>{viewMode === 'Month-Wise View' ? row.name : row.symbol}</span>
+                         <span style={{ fontWeight: '800', fontSize: '14px', color: net >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                           {net >= 0 ? '+' : ''}₹{net.toFixed(2)}
+                         </span>
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                         <span>Gross P&L: <strong style={{ color: row.pnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{row.pnl >= 0 ? '+' : ''}₹{row.pnl.toFixed(2)}</strong></span>
+                         <span>Charges: <strong style={{ color: '#fff' }}>₹{row.charges.toFixed(2)}</strong></span>
+                       </div>
+                     </div>
+                   );
+                 })
+               )}
+             </div>
+           ) : (
+             <div style={{ overflowX: 'auto' }}>
+               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
              <thead>
                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                  <th style={{ padding: '12px', fontWeight: '500' }}>{viewMode === 'Month-Wise View' ? 'Month' : 'Scrip'}</th>
@@ -964,7 +1031,8 @@ const ProfitAndLoss = () => {
                )}
              </tbody>
            </table>
-         </div>
+             </div>
+           )}
       </div>
     </div>
   );
