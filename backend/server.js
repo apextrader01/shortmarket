@@ -1034,13 +1034,48 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const [countResult] = await countQuery.count('id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
 
-    const users = await query
-      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
+    const rawUsers = await query
+      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'users.last_ip', 'users.registration_ip', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
       .orderBy('users.created_at', 'desc')
       .limit(limit)
       .offset(offset);
 
-    res.json({ users, total, page, totalPages: Math.ceil(total / limit) });
+    // Group users by IP to detect multi-account fraud across all users
+    const ipCounts = await db('users')
+      .whereNotNull('last_ip')
+      .whereNot('last_ip', '')
+      .groupBy('last_ip')
+      .select('last_ip')
+      .count('id as count');
+
+    const ipMap = {};
+    ipCounts.forEach(r => {
+      ipMap[r.last_ip] = parseInt(r.count, 10);
+    });
+
+    const enhancedUsers = [];
+    for (const u of rawUsers) {
+      const ip = u.last_ip || u.registration_ip;
+      const sharedCount = ip ? (ipMap[ip] || 1) : 1;
+      let sharedUsers = [];
+      if (sharedCount > 1 && ip) {
+        const matching = await db('users')
+          .where(function() {
+            this.where('last_ip', ip).orWhere('registration_ip', ip);
+          })
+          .whereNot('id', u.id)
+          .select('id', 'username')
+          .limit(5);
+        sharedUsers = matching.map(m => m.username);
+      }
+      enhancedUsers.push({
+        ...u,
+        shared_ip_count: sharedCount,
+        shared_users: sharedUsers
+      });
+    }
+
+    res.json({ users: enhancedUsers, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     console.error("Admin Users Error:", err);
     res.status(500).json({ error: err.message });

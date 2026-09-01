@@ -683,8 +683,31 @@ export default function AdminDashboard() {
                             {(u.username || 'U').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '600' }}>{u.username || 'Unknown User'} {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}</div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.client_id || u.id}</div>
+                            <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              {u.username || 'Unknown User'} 
+                              {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}
+                              {u.shared_ip_count > 1 && (
+                                <span 
+                                  title={`Multi-Account Risk! ${u.shared_ip_count} accounts on this IP (${u.shared_users?.join(', ') || ''})`}
+                                  style={{ 
+                                    background: 'rgba(239, 68, 68, 0.15)', 
+                                    color: '#ef4444', 
+                                    border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                    padding: '2px 6px', 
+                                    borderRadius: '4px', 
+                                    fontSize: '10px', 
+                                    fontWeight: '700',
+                                    cursor: 'help' 
+                                  }}
+                                >
+                                  ⚠️ ${u.shared_ip_count} ACCOUNTS ON SAME IP
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              {u.client_id || u.id}
+                              {u.last_ip && <span style={{ marginLeft: '8px', opacity: 0.6 }}>• IP: {u.last_ip}</span>}
+                            </div>
                           </div>
                         </div>
                       </td>
