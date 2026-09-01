@@ -1278,6 +1278,13 @@ const TradingInsights = () => {
 
 export default function ReportsView({ initialTab = 'Statement - Ledger', onBack }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const tabs = [
     'Trading Insights', 
