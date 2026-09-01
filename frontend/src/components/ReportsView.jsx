@@ -1280,7 +1280,7 @@ const TradingInsights = () => {
   const profitFactor = totalGrossLoss > 0 ? (totalGrossProfit / totalGrossLoss).toFixed(2) : (totalGrossProfit > 0 ? 'MAX' : '-');
 
   const StatCard = ({ title, value, sub, icon: Icon, colorClass }) => (
-    <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px', flex: 1 }}>
+    <div className="glass-panel hoverable" style={{ padding: isMobile ? '14px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '6px', borderRadius: '10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{title}</div>
         {Icon && <Icon size={16} color="var(--text-secondary)" />}
@@ -1308,8 +1308,8 @@ const TradingInsights = () => {
 
       {/* Key Metrics */}
       <div>
-        <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>F&O Key Metrics</div>
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px' }}>F&O Key Metrics</div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: isMobile ? '10px' : '16px' }}>
           <StatCard title="Gross P/L" value={`${grossPnl >= 0 ? '+' : ''}₹${grossPnl.toFixed(2)}`} colorClass={grossPnl >= 0 ? '--color-green-light' : '--color-red-light'} />
           <StatCard title="Profitable Day %" value={profitableDayPercent} sub={totalDays > 0 ? totalDays + " DAYS" : "DAYS"} colorClass={profitableDays > (totalDays/2) ? "--color-green-light" : "--text-primary"} />
           <StatCard title="Profitable Trade %" value={`${profitableTradePercent}%`} sub={`${profitableTrades} TRADES`} colorClass="--color-green-light" />
@@ -1319,8 +1319,8 @@ const TradingInsights = () => {
       </div>
 
       {/* Day Summary Progress Bar */}
-      <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '24px' }}>Day Summary</div>
+      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Day Summary</div>
         {totalTrades === 0 ? (
            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No trade data</div>
         ) : (
@@ -1338,14 +1338,14 @@ const TradingInsights = () => {
       </div>
 
       {/* Heatmap */}
-      <div className="glass-panel" style={{ padding: '24px' }}>
-         <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '24px' }}>Performance</div>
+      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
+         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Performance</div>
          <PnLCalendarHeatmap positions={positions} orders={orders} />
       </div>
 
       {/* Trades List */}
-      <div className="glass-panel" style={{ padding: '24px', overflowX: 'auto' }}>
-        <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '24px' }}>Per Day Trade Summary</div>
+      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', overflowX: 'auto', borderRadius: '12px' }}>
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Per Day Trade Summary</div>
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {executedOrders.length === 0 ? (
