@@ -318,6 +318,12 @@ const CalendarHeatmap = ({ orders }) => {
 
 const TradesAndCharges = () => {
   const [filterPeriod, setFilterPeriod] = useState('15 Days');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Date-Wise View');
@@ -361,8 +367,11 @@ const TradesAndCharges = () => {
     const d = new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     if (!dateWiseMap[d]) dateWiseMap[d] = { date: d, rawDate: new Date(o.created_at), totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0 };
     dateWiseMap[d].totalTrades += 1;
-    if (o.type === 'BUY') dateWiseMap[d].buyQty += (o.quantity || 0);
-    if (o.type === 'SELL') dateWiseMap[d].sellQty += (o.quantity || 0);
+    const isBuy = (o.side === 'BUY' || o.type === 'BUY');
+    const isSell = (o.side === 'SELL' || o.type === 'SELL');
+    const qty = Number(o.quantity) || 0;
+    if (isBuy) dateWiseMap[d].buyQty += qty;
+    if (isSell) dateWiseMap[d].sellQty += qty;
     dateWiseMap[d].brokerage += (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20));
     dateWiseMap[d].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
   });
@@ -374,8 +383,11 @@ const TradesAndCharges = () => {
     const sym = o.symbol || 'UNKNOWN';
     if (!scripWiseMap[sym]) scripWiseMap[sym] = { symbol: sym, totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0 };
     scripWiseMap[sym].totalTrades += 1;
-    if (o.type === 'BUY') scripWiseMap[sym].buyQty += (o.quantity || 0);
-    if (o.type === 'SELL') scripWiseMap[sym].sellQty += (o.quantity || 0);
+    const isBuy = (o.side === 'BUY' || o.type === 'BUY');
+    const isSell = (o.side === 'SELL' || o.type === 'SELL');
+    const qty = Number(o.quantity) || 0;
+    if (isBuy) scripWiseMap[sym].buyQty += qty;
+    if (isSell) scripWiseMap[sym].sellQty += qty;
     scripWiseMap[sym].brokerage += (o.brokerage || (o.product_type === 'DELIVERY' ? 0 : 20));
     scripWiseMap[sym].charges += (o.charges || (o.product_type === 'DELIVERY' ? 0 : 25));
   });
@@ -475,8 +487,34 @@ const TradesAndCharges = () => {
            </div>
          </div>
 
-         <div style={{ overflowX: 'auto' }}>
-           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+         {isMobile ? (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+               {(viewMode === 'Date-Wise View' ? dateWiseData : scripWiseData).length === 0 ? (
+                 <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trading activity</div>
+               ) : (
+                 (viewMode === 'Date-Wise View' ? dateWiseData : scripWiseData).map((row, idx) => (
+                   <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ fontWeight: '700', fontSize: '14px', color: '#fff' }}>{viewMode === 'Date-Wise View' ? row.date : row.symbol}</span>
+                       <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                         {row.totalTrades} Trades
+                       </span>
+                     </div>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                       <span>Buy Qty: <strong style={{ color: 'var(--color-green-light)' }}>{Number(row.buyQty)}</strong></span>
+                       <span>Sell Qty: <strong style={{ color: 'var(--color-red-light)' }}>{Number(row.sellQty)}</strong></span>
+                     </div>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                       <span>Brokerage: <strong style={{ color: '#fff' }}>₹{row.brokerage.toFixed(2)}</strong></span>
+                       <span>Charges: <strong style={{ color: '#fff' }}>₹{row.charges.toFixed(2)}</strong></span>
+                     </div>
+                   </div>
+                 ))
+               )}
+             </div>
+           ) : (
+             <div style={{ overflowX: 'auto' }}>
+               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
              <thead>
                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                  <th style={{ padding: '12px', fontWeight: '500' }}>{viewMode === 'Date-Wise View' ? 'Date' : 'Scrip'}</th>
@@ -521,7 +559,8 @@ const TradesAndCharges = () => {
                )}
              </tbody>
            </table>
-         </div>
+             </div>
+           )}
       </div>
     </div>
   );
@@ -1055,6 +1094,12 @@ const DownloadReports = () => {
 
 const TradingInsights = () => {
   const [filterPeriod, setFilterPeriod] = useState('Month');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const { positions, orders } = useStore(useShallow(state => ({ 
     positions: state.positions, 
@@ -1233,42 +1278,75 @@ const TradingInsights = () => {
       {/* Trades List */}
       <div className="glass-panel" style={{ padding: '24px', overflowX: 'auto' }}>
         <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '24px' }}>Per Day Trade Summary</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-              <th style={{ padding: '12px', fontWeight: '500' }}>Scrip Name</th>
-              <th style={{ padding: '12px', fontWeight: '500' }}>Timing</th>
-              <th style={{ padding: '12px', fontWeight: '500' }}>Type</th>
-              <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Quantity</th>
-              <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Net P/L</th>
-            </tr>
-          </thead>
-          <tbody>
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {executedOrders.length === 0 ? (
-              <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</td></tr>
+              <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</div>
             ) : (
               executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
                 const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
-                const pnl = isPnLAvailable ? parseFloat(o.realized_pnl).toFixed(2) : '--';
+                const pnlVal = isPnLAvailable ? parseFloat(o.realized_pnl) : null;
+                const side = o.side || o.type || 'BUY';
                 return (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>
-                    <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '12px' }}>
-                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'var(--bg-hover)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
-                          {o.side}
-                       </span>
-                    </td>
-                    <td style={{ padding: '12px', textAlign: 'right' }}>{o.quantity}</td>
-                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: pnl > 0 ? 'var(--color-green-light)' : (pnl < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
-                       {pnl > 0 ? '+' : ''}{pnl !== '--' ? `₹${pnl}` : pnl}
-                    </td>
-                  </tr>
-                )
+                  <div key={idx} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
+                          {side}
+                        </span>
+                        <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff' }}>{o.symbol}</span>
+                      </div>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: pnlVal > 0 ? 'var(--color-green-light)' : (pnlVal < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
+                        {pnlVal !== null ? `${pnlVal > 0 ? '+' : ''}₹${pnlVal.toFixed(2)}` : '--'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <span>Qty: <strong style={{ color: '#fff' }}>{Number(o.quantity || 0)}</strong></span>
+                      <span>{new Date(o.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                );
               })
             )}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '600px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                <th style={{ padding: '12px', fontWeight: '500' }}>Scrip Name</th>
+                <th style={{ padding: '12px', fontWeight: '500' }}>Timing</th>
+                <th style={{ padding: '12px', fontWeight: '500' }}>Type</th>
+                <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Quantity</th>
+                <th style={{ padding: '12px', fontWeight: '500', textAlign: 'right' }}>Net P/L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {executedOrders.length === 0 ? (
+                <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</td></tr>
+              ) : (
+                executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
+                  const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
+                  const pnl = isPnLAvailable ? parseFloat(o.realized_pnl).toFixed(2) : '--';
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '12px', fontWeight: '500' }}>{o.symbol}</td>
+                      <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>{new Date(o.created_at).toLocaleString()}</td>
+                      <td style={{ padding: '12px' }}>
+                         <span style={{ color: o.side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'var(--bg-hover)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                            {o.side}
+                         </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>{Number(o.quantity || 0)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: pnl > 0 ? 'var(--color-green-light)' : (pnl < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
+                         {pnl > 0 ? '+' : ''}{pnl !== '--' ? `₹${pnl}` : pnl}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
