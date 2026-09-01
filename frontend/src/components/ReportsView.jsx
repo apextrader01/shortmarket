@@ -197,7 +197,7 @@ const LedgerStatement = () => {
       </div>
 
       {/* Table */}
-      <div className="glass-panel" style={{ padding: isMobile ? '12px' : '0', overflow: 'hidden', borderRadius: '12px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: isMobile ? '12px' : '0', overflow: 'hidden', borderRadius: '12px' }}>
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {loading ? (
@@ -470,7 +470,7 @@ const TradesAndCharges = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? '14px' : '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
              <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -504,7 +504,7 @@ const TradesAndCharges = () => {
         <CalendarHeatmap orders={filteredOrders} />
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: '24px' }}>
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing Trades and Charges Summary for current period</div>
            <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -530,9 +530,9 @@ const TradesAndCharges = () => {
                ) : (
                  (viewMode === 'Date-Wise View' ? dateWiseData : scripWiseData).map((row, idx) => (
                    <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontWeight: '700', fontSize: '14px', color: '#fff' }}>{viewMode === 'Date-Wise View' ? row.date : row.symbol}</span>
-                       <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                       <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Date-Wise View' ? row.date : row.symbol}</span>
+                       <span style={{ flexShrink: 0, fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
                          {row.totalTrades} Trades
                        </span>
                      </div>
@@ -671,8 +671,8 @@ const PnLCalendarHeatmap = ({ positions, orders }) => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', width: '100%' }}>
-       <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', width: '100%', paddingBottom: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0', width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+       <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', width: '100%', maxWidth: '100%', paddingBottom: '8px', WebkitOverflowScrolling: 'touch', boxSizing: 'border-box' }} className="scrollbar-hide">
           {months.map((m, idx) => (
              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '60px' }}>
                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px' }}>{m.name}</div>
@@ -902,7 +902,7 @@ const ProfitAndLoss = () => {
         </div>
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? '14px' : '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
              <div style={{ width: '38px', height: '38px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -939,7 +939,7 @@ const ProfitAndLoss = () => {
         <PnLCalendarHeatmap positions={filteredPositions} orders={filteredOrders} />
       </div>
 
-      <div className="glass-panel" style={{ padding: '24px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: '24px' }}>
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Showing P&L Summary for current period</div>
            <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -967,9 +967,9 @@ const ProfitAndLoss = () => {
                    const net = (row.pnl - row.charges);
                    return (
                      <div key={idx} style={{ padding: '14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                         <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff' }}>{viewMode === 'Month-Wise View' ? row.name : row.symbol}</span>
-                         <span style={{ fontWeight: '800', fontSize: '14px', color: net >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                         <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1 }}>{viewMode === 'Month-Wise View' ? row.name : row.symbol}</span>
+                         <span style={{ flexShrink: 0, fontWeight: '800', fontSize: '14px', color: net >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                            {net >= 0 ? '+' : ''}₹{net.toFixed(2)}
                          </span>
                        </div>
@@ -1319,7 +1319,7 @@ const TradingInsights = () => {
       </div>
 
       {/* Day Summary Progress Bar */}
-      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Day Summary</div>
         {totalTrades === 0 ? (
            <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No trade data</div>
@@ -1338,13 +1338,13 @@ const TradingInsights = () => {
       </div>
 
       {/* Heatmap */}
-      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: isMobile ? '16px' : '24px', borderRadius: '12px' }}>
          <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Performance</div>
          <PnLCalendarHeatmap positions={positions} orders={orders} />
       </div>
 
       {/* Trades List */}
-      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', overflowX: 'auto', borderRadius: '12px' }}>
+      <div className="glass-panel" style={{ maxWidth: "100%", boxSizing: "border-box",  padding: isMobile ? '16px' : '24px', overflowX: 'auto', borderRadius: '12px' }}>
         <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: isMobile ? '14px' : '24px' }}>Per Day Trade Summary</div>
         {isMobile ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1357,14 +1357,14 @@ const TradingInsights = () => {
                 const side = o.side || o.type || 'BUY';
                 return (
                   <div key={idx} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                        <span style={{ flexShrink: 0, color: side === 'BUY' ? 'var(--color-blue-light)' : 'var(--color-red-light)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
                           {side}
                         </span>
-                        <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff' }}>{o.symbol}</span>
+                        <span style={{ fontWeight: '700', fontSize: '13px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.symbol}</span>
                       </div>
-                      <div style={{ fontWeight: '700', fontSize: '13px', color: pnlVal > 0 ? 'var(--color-green-light)' : (pnlVal < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
+                      <div style={{ flexShrink: 0, fontWeight: '700', fontSize: '13px', color: pnlVal > 0 ? 'var(--color-green-light)' : (pnlVal < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
                         {pnlVal !== null ? `${pnlVal > 0 ? '+' : ''}₹${pnlVal.toFixed(2)}` : '--'}
                       </div>
                     </div>
@@ -1441,7 +1441,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
   ];
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '12px 8px 60px 8px' : '32px', overflowY: 'auto', background: 'var(--bg-dark)', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+    <div style={{ flex: 1, padding: isMobile ? '12px 8px 60px 8px' : '32px', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg-dark)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
         <div 
