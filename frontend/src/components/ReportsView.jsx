@@ -142,8 +142,8 @@ const LedgerStatement = () => {
       </div>
 
       {/* Filters and Download */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Period:</span>
           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
@@ -384,8 +384,8 @@ const TradesAndCharges = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months'].map(p => (
@@ -413,7 +413,7 @@ const TradesAndCharges = () => {
           )}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Search size={14} color="var(--text-secondary)" /></div>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Filter size={14} color="var(--text-secondary)" /></div>
           <button onClick={() => downloadCSV(filteredOrders.length ? filteredOrders : [{Message: 'No trades'}], 'Trades_History.csv')} style={{ background: 'transparent', border: '1px solid var(--color-blue-light)', color: 'var(--color-blue-light)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
@@ -424,7 +424,7 @@ const TradesAndCharges = () => {
 
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
              <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <FileText size={18} color="var(--color-purple)" />
              </div>
@@ -775,8 +775,8 @@ const ProfitAndLoss = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
             {['Week', '15 Days', 'Month', '3 Months', 'Year'].map(p => (
@@ -804,7 +804,7 @@ const ProfitAndLoss = () => {
           )}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Search size={14} color="var(--text-secondary)" /></div>
           <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Filter size={14} color="var(--text-secondary)" /></div>
           <button onClick={() => {
@@ -823,7 +823,7 @@ const ProfitAndLoss = () => {
 
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
              <div style={{ width: '40px', height: '40px', background: 'var(--bg-hover)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <PieChart size={18} color="var(--color-green-light)" />
              </div>
@@ -1168,7 +1168,7 @@ const TradingInsights = () => {
 
   const StatCard = ({ title, value, sub, icon: Icon, colorClass }) => (
     <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px', flex: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{title}</div>
         {Icon && <Icon size={16} color="var(--text-secondary)" />}
       </div>
@@ -1288,7 +1288,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
   ];
 
   return (
-    <div style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'var(--bg-dark)' }}>
+    <div style={{ flex: 1, padding: isMobile ? '12px 8px 60px 8px' : '32px', overflowY: 'auto', background: 'var(--bg-dark)', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
         <div 
@@ -1304,19 +1304,21 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
       </div>
 
       {/* Main Tabs */}
-      <div style={{ display: 'flex', gap: '32px', borderBottom: '1px solid var(--border-color)', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px', borderBottom: '1px solid var(--border-color)', marginBottom: isMobile ? '20px' : '32px', overflowX: 'auto', flexWrap: 'nowrap', WebkitOverflowScrolling: 'touch' }} className="scrollbar-hide">
         {tabs.map(tab => (
           <div
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              fontSize: '14px',
+              fontSize: isMobile ? '13px' : '14px',
               fontWeight: '600',
-              color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
+              color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
               borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
-              paddingBottom: '12px',
+              paddingBottom: '10px',
               marginBottom: '-1px',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
               transition: 'all 0.2s ease'
             }}
           >
