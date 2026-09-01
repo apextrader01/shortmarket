@@ -1,4 +1,9 @@
-﻿const geoip = require('geoip-lite');
+﻿let geoip = null;
+try {
+  geoip = require('geoip-lite');
+} catch (e) {
+  // Graceful fallback if geoip-lite is not yet installed
+}
 
 let localBannedIps = new Set();
 let localBannedPhones = new Set();
@@ -76,19 +81,27 @@ function parseIpLocation(ip) {
   if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
     return { city: 'Local Network', state: 'Local', country: 'IN' };
   }
-  
-  const cleanIp = ip.replace(/^::ffff:/, '').trim();
-  const geo = geoip.lookup(cleanIp);
-  
-  if (!geo) {
+
+  if (!geoip) {
     return { city: 'India', state: '', country: 'IN' };
   }
+  
+  try {
+    const cleanIp = ip.replace(/^::ffff:/, '').trim();
+    const geo = geoip.lookup(cleanIp);
+    
+    if (!geo) {
+      return { city: 'India', state: '', country: 'IN' };
+    }
 
-  return {
-    city: geo.city || geo.region || 'India',
-    state: geo.region || '',
-    country: geo.country || 'IN'
-  };
+    return {
+      city: geo.city || geo.region || 'India',
+      state: geo.region || '',
+      country: geo.country || 'IN'
+    };
+  } catch (e) {
+    return { city: 'India', state: '', country: 'IN' };
+  }
 }
 
 /**
