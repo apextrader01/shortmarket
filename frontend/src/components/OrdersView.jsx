@@ -10,6 +10,36 @@ export default function OrdersView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [tagModalOrder, setTagModalOrder] = useState(null);
+  const [activeTag, setActiveTag] = useState('');
+  const [tradeNotes, setTradeNotes] = useState('');
+  const [isSavingTag, setIsSavingTag] = useState(false);
+
+  const openTagModal = (order) => {
+    setTagModalOrder(order);
+    setActiveTag(order.tag || '');
+    setTradeNotes(order.notes || '');
+  };
+
+  const handleSaveTag = async (tagToSave, notesToSave) => {
+    if (!tagModalOrder) return;
+    try {
+      setIsSavingTag(true);
+      const res = await fetch(`${API}/api/order/${tagModalOrder.id}/tag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: tagToSave, notes: notesToSave })
+      });
+      if (res.ok) {
+        useStore.getState().fetchUserData();
+        setTagModalOrder(null);
+      }
+    } catch (e) {
+      alert('Error saving tag: ' + e.message);
+    } finally {
+      setIsSavingTag(false);
+    }
+  };
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
 
@@ -338,7 +368,7 @@ export default function OrdersView() {
                       </td>
                     )}
                     {activeTab === 'Order History' && (
-                      <td style={{ padding: '12px 16px' }} onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
+                      <td style={{ padding: '12px 16px' }} onClick={(e) => { e.stopPropagation(); openTagModal(order); }}>
                         {order.tag ? (
                           <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 8px', borderRadius: '4px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
                             {order.tag}
@@ -386,6 +416,111 @@ export default function OrdersView() {
       </div>
 
       )}
+
+      {/* Dedicated Trade Tagging & Journal Modal */}
+      {tagModalOrder && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.65)', zIndex: 1100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }} onClick={() => setTagModalOrder(null)}>
+          <div style={{
+            background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px',
+            width: '90%', maxWidth: '420px', border: '1px solid var(--border-color)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: '16px'
+          }} onClick={e => e.stopPropagation()}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  🏷️ Tag Trade — {(tagModalOrder.symbol || '').split('-')[0]}
+                </h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  {tagModalOrder.side} {Number(tagModalOrder.quantity)} Qty @ ₹{parseFloat(tagModalOrder.price || tagModalOrder.average_price || 0).toFixed(2)}
+                </div>
+              </div>
+              <button onClick={() => setTagModalOrder(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}>×</button>
+            </div>
+
+            {/* Quick Preset Tags */}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>Select Trade Reason / Tag:</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[
+                  { tag: 'Breakout 🚀', color: '#3b82f6' },
+                  { tag: 'Scalp ⚡', color: '#10b981' },
+                  { tag: 'FOMO ⚠️', color: '#ef4444' },
+                  { tag: 'Reversal 🔄', color: '#8b5cf6' },
+                  { tag: 'News 📰', color: '#f59e0b' },
+                  { tag: 'Support/Res 📊', color: '#06b6d4' }
+                ].map(item => (
+                  <button
+                    key={item.tag}
+                    onClick={() => setActiveTag(activeTag === item.tag ? '' : item.tag)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: activeTag === item.tag ? `1px solid ${item.color}` : '1px solid var(--border-color)',
+                      background: activeTag === item.tag ? `${item.color}25` : 'var(--bg-hover)',
+                      color: activeTag === item.tag ? '#fff' : 'var(--text-primary)',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    {item.tag} {activeTag === item.tag ? '✓' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Trade Notes */}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Notes & Journal (Optional):</div>
+              <textarea
+                value={tradeNotes}
+                onChange={(e) => setTradeNotes(e.target.value)}
+                placeholder="What was your setup or emotional state?"
+                rows={3}
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  color: 'var(--text-primary)',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  resize: 'none',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              {tagModalOrder.tag && (
+                <button
+                  onClick={() => handleSaveTag('', '')}
+                  disabled={isSavingTag}
+                  style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--color-red-light)', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Clear Tag
+                </button>
+              )}
+              <button
+                onClick={() => handleSaveTag(activeTag, tradeNotes)}
+                disabled={isSavingTag}
+                style={{ flex: 2, padding: '10px', background: 'var(--color-blue)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {isSavingTag ? 'Saving...' : 'Save Tag & Note ✓'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Order Details Modal */}
       {selectedOrder && (
         <div style={{
