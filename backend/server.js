@@ -2532,6 +2532,21 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (endpoint) {
+      await db('push_subscriptions').where({ endpoint }).delete();
+    } else {
+      await db('push_subscriptions').where({ user_id: req.user.id }).delete();
+    }
+    res.json({ success: true, message: 'Unsubscribed from push notifications' });
+  } catch (err) {
+    console.error('Failed to unsubscribe push:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/push/test', authenticateToken, async (req, res) => {
   try {
     await sendPushNotification(req.user.id, {

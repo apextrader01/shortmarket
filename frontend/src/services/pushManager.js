@@ -106,6 +106,34 @@ export async function subscribeUserToPush(token) {
   return true;
 }
 
+export async function unsubscribeUserFromPush(token) {
+  if (typeof window === 'undefined') return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      const subscription = await reg.pushManager.getSubscription();
+      if (subscription) {
+        const subJson = subscription.toJSON();
+        await subscription.unsubscribe().catch(() => {});
+        await fetch(`${API}/api/push/unsubscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ endpoint: subJson.endpoint })
+        }).catch(() => {});
+      }
+    }
+    return true;
+  } catch (err) {
+    console.warn('Unsubscribe error:', err);
+    return false;
+  }
+}
+
 export async function triggerTestPushNotification(token) {
   const res = await fetch(`${API}/api/push/test`, {
     method: 'POST',

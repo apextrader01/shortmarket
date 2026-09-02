@@ -1,4 +1,4 @@
-import { subscribeUserToPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
+import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
 import { Bell, CheckCircle } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
@@ -63,16 +63,26 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   }, []);
 
   const handleTogglePush = async () => {
-    try {
-      const token = localStorage.getItem('token') || (user && user.token);
-      setPushStatusMsg('Requesting browser permission...');
-      await subscribeUserToPush(token);
-      setIsPushEnabled(true);
-      setPushStatusMsg('Push Notifications Active! 🔔');
-      setTimeout(() => setPushStatusMsg(''), 4000);
-    } catch (err) {
-      alert('Notification Setup: ' + err.message);
-      setPushStatusMsg('');
+    const token = localStorage.getItem('token') || (user && user.token);
+    if (isPushEnabled) {
+      // Turn OFF
+      setPushStatusMsg('Disabling push...');
+      await unsubscribeUserFromPush(token);
+      setIsPushEnabled(false);
+      setPushStatusMsg('Push Notifications Disabled');
+      setTimeout(() => setPushStatusMsg(''), 3000);
+    } else {
+      // Turn ON
+      try {
+        setPushStatusMsg('Requesting browser permission...');
+        await subscribeUserToPush(token);
+        setIsPushEnabled(true);
+        setPushStatusMsg('Push Notifications Active! 🔔');
+        setTimeout(() => setPushStatusMsg(''), 4000);
+      } catch (err) {
+        alert('Notification Setup: ' + err.message);
+        setPushStatusMsg('');
+      }
     }
   };
 
@@ -307,14 +317,18 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
                 <div style={{ minWidth: '200px', flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Bell size={15} color="var(--color-blue)" /> Push & Trade Alerts (PWA)
+                    <Bell size={15} color={isPushEnabled ? 'var(--color-blue-light)' : 'var(--text-secondary)'} /> Push & Trade Alerts (PWA)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Receive real-time phone lock-screen and desktop alerts on order executions and triggers
                   </div>
-                  {pushStatusMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{pushStatusMsg}</div>}
+                  {pushStatusMsg && (
+                    <div style={{ fontSize: '11px', color: isPushEnabled ? 'var(--color-green-light)' : '#f87171', marginTop: '4px', fontWeight: '600' }}>
+                      {pushStatusMsg}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {isPushEnabled && (
                     <button 
                       onClick={handleTestPush}
@@ -323,24 +337,34 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                       Test Alert 🔔
                     </button>
                   )}
-                  <button
-                    onClick={handleTogglePush}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: isPushEnabled ? 'rgba(34, 197, 94, 0.15)' : 'var(--color-blue)',
-                      color: isPushEnabled ? 'var(--color-green-light)' : '#fff',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
+                  {/* Modern Toggle Switch: Blue when ON, Gray when OFF */}
+                  <div 
+                    onClick={handleTogglePush} 
+                    title={isPushEnabled ? 'Click to Turn OFF' : 'Click to Turn ON'}
+                    style={{ 
+                      width: '40px', 
+                      height: '22px', 
+                      background: isPushEnabled ? 'var(--color-blue)' : 'var(--border-color)', 
+                      borderRadius: '11px', 
+                      position: 'relative', 
+                      cursor: 'pointer', 
+                      transition: 'background 0.2s',
+                      flexShrink: 0
                     }}
                   >
-                    {isPushEnabled ? <><CheckCircle size={14} /> Active</> : 'Enable Alerts'}
-                  </button>
+                    <div 
+                      style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        background: isPushEnabled ? '#FFF' : 'var(--text-secondary)', 
+                        borderRadius: '50%', 
+                        position: 'absolute', 
+                        top: '2px', 
+                        left: isPushEnabled ? '20px' : '2px', 
+                        transition: 'left 0.2s' 
+                      }} 
+                    />
+                  </div>
                 </div>
               </div>
 
