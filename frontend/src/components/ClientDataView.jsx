@@ -1,22 +1,28 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView from './SettingsView';
+// import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
+// ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
 function Card({ title, desc, icon: Icon, color, onClick, badge }) {
   return (
-    <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s', minHeight: '110px' }}>
-      {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '8px', borderRadius: '8px', width: 'fit-content' }}><Icon size={18} /></div>}
+    <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s', minHeight: '120px' }}>
+      {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>{title}</div>
-        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4', flex: 1 }}>{desc}</div>}
-        {badge && <div style={{ marginTop: '10px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>{badge}</div>}
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
+        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', flex: 1 }}>{desc}</div>}
+        {badge && <div style={{ marginTop: '12px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>{badge}</div>}
       </div>
     </div>
   );
 }
+
+
+
+
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode } = useStore(useShallow(state => ({ 
@@ -34,20 +40,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     oneClickMode: state.oneClickMode,
     setOneClickMode: state.setOneClickMode
   })));
-  
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  
 
   const handleResetAccount = async () => {
     if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to Rs. 10,00,000. This cannot be undone.')) {
@@ -61,51 +60,58 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setUploadError('Please select a valid image file');
+      setUploadError('Please select an image file.');
+      if (e.target) e.target.value = '';
       return;
     }
+
     if (file.size > 2 * 1024 * 1024) {
-      setUploadError('Image size must be less than 2MB');
+      setUploadError('Image is too large. Please select a file smaller than 2MB.');
+      if (e.target) e.target.value = '';
       return;
     }
 
-    try {
-      setIsUploading(true);
-      setUploadError(null);
-      
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const base64Image = event.target.result;
-          await updateProfilePicture(base64Image);
+    setIsUploading(true);
+    setUploadError(null);
+
+      try {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64String = reader.result;
+          const res = await updateProfilePicture(base64String);
+          
+          if (!res.success) {
+            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+          }
+          
           setIsUploading(false);
-        } catch (err) {
-          console.error(err);
-          setUploadError('Failed to save profile picture');
+          if (e.target) e.target.value = '';
+        };
+        reader.onerror = () => {
           setIsUploading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error(err);
-      setUploadError('Failed to upload image');
-      setIsUploading(false);
-    }
+          setUploadError('Failed to read image file.');
+          if (e.target) e.target.value = '';
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        setIsUploading(false);
+        setUploadError(err.message || 'Failed to process image.');
+        if (e.target) e.target.value = '';
+      }
   };
-
-  if (showReferrals) {
-    return <ReferralsView setActiveTab={() => setShowReferrals(false)} />;
-  }
-
   if (showProfile) {
     return (
-      <div style={{ padding: isMobile ? '12px 8px' : '24px' }}>
-        <button onClick={() => setShowProfile(false)} className="btn" style={{ marginBottom: '16px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>
-          &larr; Back to Account
+      <div style={{ padding: '24px', animation: 'fadeIn 0.3s ease-out', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setShowProfile(false)} 
+          style={{ marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+        >
+          &larr; Back to Dashboard
         </button>
         <SettingsView />
       </div>
@@ -113,295 +119,275 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '20px' : '32px', maxWidth: '1000px', margin: '0 auto', width: '100%', padding: isMobile ? '8px 4px 60px 4px' : '16px 16px 40px 16px' }}>
-      
-      {/* Profile Header */}
-      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '20px' }}>
-          
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              width: isMobile ? '56px' : '68px',
-              height: isMobile ? '56px' : '68px',
-              borderRadius: '50%',
-              background: 'var(--bg-hover)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid var(--border-color)',
-              overflow: 'hidden'
-            }}>
-              {isUploading ? (
-                <Loader2 className="spinner" size={24} color="var(--color-blue)" />
-              ) : user?.profile_picture_url ? (
-                <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  {user?.username ? user.username.substring(0, 2).toUpperCase() : 'U'}
-                </span>
-              )}
-            </div>
-            
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              style={{
-                position: 'absolute',
-                bottom: '-2px',
-                right: '-2px',
-                background: 'var(--color-blue)',
-                border: '2px solid var(--bg-dark)',
-                borderRadius: '50%',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                cursor: 'pointer'
-              }}
-              title="Change Profile Picture"
-            >
-              <Upload size={12} />
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              style={{ display: 'none' }}
-            />
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>
-                {user?.username || 'Client User'}
-              </h2>
-              {user?.subscription_tier === 'PRO' && (
-                <span style={{ fontSize: '10px', background: 'var(--color-blue)', color: 'white', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>PRO</span>
-              )}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {user?.client_id || user?.id || 'CLIENT_ID'}
-            </div>
-            {uploadError && (
-              <div style={{ color: 'var(--color-red-light)', fontSize: '11px', marginTop: '4px' }}>
-                {uploadError}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
-          <button onClick={() => setShowProfile(true)} className="btn" style={{ flex: isMobile ? 1 : 'none', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-            Profile Settings
-          </button>
-          <button onClick={logout} className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-red-light)', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <LogOut size={14} /> Logout
-          </button>
+    <div style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'var(--bg-dark)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
+        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
+          <LogOut size={14} /> LOGOUT
         </div>
       </div>
 
-      {/* Balance Card */}
-      <div className="glass-panel" style={{ padding: isMobile ? '16px' : '24px', display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '16px' }}>
-        <div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>AVAILABLE TRADING BALANCE</div>
-          <div style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '800', color: 'var(--color-green-light)' }}>
-            ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+      {/* Profile Section */}
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          
+          <div 
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+            style={{ 
+              width: '48px', height: '48px', borderRadius: '50%', 
+              background: user?.profile_picture_url ? `url(${user.profile_picture_url}) center/cover` : 'linear-gradient(135deg, var(--color-navy-light), var(--color-blue))', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              fontSize: '18px', fontWeight: '700', cursor: 'pointer',
+              position: 'relative', overflow: 'hidden'
+            }}
+            title="Upload Profile Picture"
+          >
+            {isUploading ? (
+              <Loader2 size={24} className="animate-spin" color="var(--text-primary)" />
+            ) : !user?.profile_picture_url ? (
+              user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
+            ) : null}
+            
+            {!isUploading && (
+              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '30%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Upload size={12} color="var(--text-primary)" />
+              </div>
+            )}
+          </div>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept="image/*" 
+            style={{ display: 'none' }} 
+          />
+
+          <div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
+              {user?.username || 'Hari Krishnan I Vijayan'}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+              Client ID: {user?.client_id || user?.id}
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '2px' }}>
+              Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div onClick={() => setShowProfile(true)} style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE &rarr;</div>
+            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '10px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '11px' }}>
+          <Star size={14} /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
+        </div>
+      </div>
+
+      {/* Add Funds Banner */}
+      {/* Add Funds Banner */}
+      <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+            ₹
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Get ready to invest</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Edge</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: 'var(--text-primary)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             DEPOSIT
           </button>
-          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '10px 16px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             RESET ACCOUNT
           </button>
         </div>
       </div>
 
+
       {/* Sections */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '24px' : '36px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
         
         {/* Reports */}
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Reports</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trades & Charges</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <FileText size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Statements</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <PieChart size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Profit & Loss</span>
+              </div>
+              <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <BarChart2 size={18} color="var(--color-blue-light)" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trading Insights</span>
+              </div>
+            </div>
+          </div>
+
+        {/* Coming Features */}
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-primary)' }}>Reports & Insights</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
-            <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '8px' }}>
-              <FileText size={16} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>Ledger Passbook</span>
-            </div>
-            <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '8px' }}>
-              <FileText size={16} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>Trades & Charges</span>
-            </div>
-            <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '8px' }}>
-              <PieChart size={16} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>Profit & Loss</span>
-            </div>
-            <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '14px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderRadius: '8px' }}>
-              <BarChart2 size={16} color="var(--color-blue-light)" />
-              <span style={{ fontSize: '12px', fontWeight: '600' }}>Trading Insights</span>
-            </div>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Coming Features</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.045% interest per day" color="#A855F7" badge="Coming Soon" />
+            <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" onClick={() => setActiveTab('Options')} badge="Coming Soon" />
           </div>
         </div>
 
-        {/* Subscription Plan & Referrals */}
+        {/* Subscription Plan */}
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-primary)' }}>Plans & Earnings</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-            <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription fee directly" color="#34D399" onClick={() => setShowReferrals(true)} />
-            <Card icon={Star} title="Subscription Plans" desc="Curated plans to save on charges and unlock PRO features" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription" color="#34D399" onClick={() => setShowReferrals(true)} />
+            <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
           </div>
         </div>
 
-        {/* Quick Settings (Fully Optimized for Mobile) */}
+        {/* Quick Settings */}
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-primary)' }}>Quick Settings</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>Quick Settings</h3>
+          </div>
           
-          <div className="glass-panel" style={{ overflow: 'hidden', padding: 0, borderRadius: '12px' }}>
-            
-            {/* Font Size Row */}
-            <div style={{ padding: '16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '12px', borderBottom: '1px solid var(--border-color)' }}>
-              <div>
+          <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 600px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
+              <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise readability across all pages</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
               </div>
-              <div style={{ display: 'flex', gap: '6px', width: isMobile ? '100%' : 'auto' }}>
-                {['small', 'medium', 'large'].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => setFontSize(size)}
-                    style={{
-                      flex: isMobile ? 1 : 'none',
-                      fontSize: '11px',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      background: fontSize === size ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                      border: fontSize === size ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      color: fontSize === size ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                      fontWeight: fontSize === size ? '700' : '500',
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {size}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <span onClick={() => setFontSize('small')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'small' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'small' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'small' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'small' ? '600' : '500' }}>Small</span>
+                <span onClick={() => setFontSize('medium')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'medium' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'medium' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'medium' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'medium' ? '600' : '500' }}>Medium</span>
+                <span onClick={() => setFontSize('large')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'large' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'large' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'large' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'large' ? '600' : '500' }}>Large</span>
               </div>
             </div>
 
-            {/* Appearance Theme Row */}
-            <div style={{ padding: '16px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '12px', borderBottom: '1px solid var(--border-color)' }}>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your preferred color theme</div>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', width: isMobile ? '100%' : 'auto' }}>
-                {['light', 'dark', 'system'].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTheme(t)}
-                    style={{
-                      flex: isMobile ? 1 : 'none',
-                      fontSize: '11px',
-                      padding: '8px 12px',
-                      cursor: 'pointer',
-                      background: theme === t ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                      border: theme === t ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      color: theme === t ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                      fontWeight: theme === t ? '700' : '500',
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Accessibility Mode Toggle */}
-            <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--border-color)' }}>
-              <div>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Enable Accessibility Mode</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Disables high-speed keyboard shortcuts</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
               </div>
-              <div onClick={() => setAccessibilityMode(!accessibilityMode)} style={{ width: '42px', height: '24px', background: accessibilityMode ? 'var(--color-blue)' : 'rgba(255,255,255,0.1)', borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
-                <div style={{ width: '18px', height: '18px', background: '#FFF', borderRadius: '50%', position: 'absolute', top: '3px', left: accessibilityMode ? '21px' : '3px', transition: 'left 0.2s' }} />
+              <div onClick={() => setAccessibilityMode(!accessibilityMode)} style={{ width: '36px', height: '20px', background: accessibilityMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
+                <div style={{ width: '16px', height: '16px', background: accessibilityMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: accessibilityMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
             </div>
 
-            {/* Re-Confirm Order Toggle */}
-            <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-              <div>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <span onClick={() => setTheme('light')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'light' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'light' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'light' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'light' ? '600' : '500' }}>Light</span>
+                <span onClick={() => setTheme('dark')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'dark' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'dark' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'dark' ? '600' : '500' }}>Dark</span>
+                <span onClick={() => setTheme('system')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'system' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'system' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'system' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'system' ? '600' : '500' }}>System</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Show confirmation preview before placing trade</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
               </div>
-              <div onClick={() => setOneClickMode(!oneClickMode)} style={{ width: '42px', height: '24px', background: !oneClickMode ? 'var(--color-blue)' : 'rgba(255,255,255,0.1)', borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
-                <div style={{ width: '18px', height: '18px', background: '#FFF', borderRadius: '50%', position: 'absolute', top: '3px', left: !oneClickMode ? '21px' : '3px', transition: 'left 0.2s' }} />
+              <div onClick={() => setOneClickMode(!!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
+                <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
             </div>
-
           </div>
         </div>
+        </div>
 
-        {/* Account Info & Shortcuts */}
+        {/* Account Settings */}
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-primary)' }}>Account Info & Tools</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
-            <div className="glass-panel hoverable" onClick={() => setActiveTab('Pricing')} style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', borderRadius: '8px' }}>
-              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '6px' }}><Star size={16} color="var(--color-blue)" /></div>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Account Settings & Other Info</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('Pricing')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '13px', fontWeight: '600' }}>Subscription Plans</span>
             </div>
-            <div className="glass-panel hoverable" onClick={() => setShowHotkeysModal(true)} style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', borderRadius: '8px' }}>
-              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '6px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '13px', fontWeight: '600' }}>Keyboard & Shortcuts</span>
+            <div 
+              className="glass-panel hoverable" 
+              onClick={() => setShowHotkeysModal(true)}
+              style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+            >
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Keyboard & Shortcut</span>
             </div>
-            <div className="glass-panel hoverable" onClick={() => setActiveTab('AboutUs')} style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', borderRadius: '8px' }}>
-              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '6px' }}><Info size={16} color="var(--color-blue)" /></div>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('AboutUs')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
               <span style={{ fontSize: '13px', fontWeight: '600' }}>About Us</span>
             </div>
           </div>
         </div>
 
+        {/* OneHelp */}
+        <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
+          <div>
+            <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              OneHelp
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
+          </div>
+          <button style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+            KNOW MORE
+          </button>
+        </div>
       </div>
-
+      
+      {/* Floating Ask Angel / Support Button */}
+      <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
+        <HelpCircle size={18} />
+        <span style={{ fontSize: '13px', fontWeight: '700' }}>Ask Support</span>
+      </div>
+      
       {/* Hotkeys Modal */}
       {showHotkeysModal && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px'
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '20px', position: 'relative', borderRadius: '12px' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '20px', position: 'relative' }}>
             <button 
               onClick={() => setShowHotkeysModal(false)}
               style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}
             >&times;</button>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-blue-light)' }}>
-              <Keyboard size={18} /> Global Hotkeys
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-blue)' }}>
+              <Keyboard size={20} /> Global Hotkeys
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>
-              Execute market orders instantly via keyboard shortcuts for the currently selected symbol.
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.5' }}>
+              You can execute Market Orders instantly using keyboard shortcuts. Hotkeys always target the <strong>currently selected symbol</strong> and use your default lot multiplier.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: '6px' }}>
-                <span>Buy Market Order</span>
-                <kbd style={{ background: 'var(--bg-dark)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', fontWeight: '700' }}>Shift + B</kbd>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Buy (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: '6px' }}>
-                <span>Sell Market Order</span>
-                <kbd style={{ background: 'var(--bg-dark)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', fontWeight: '700' }}>Shift + S</kbd>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: '6px' }}>
-                <span>Square Off Position</span>
-                <kbd style={{ background: 'var(--bg-dark)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)', fontWeight: '700' }}>Shift + X</kbd>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Sell (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Referrals Full-Screen Overlay - no routing needed */}
+      {showReferrals && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-dark)', zIndex: 200, overflowY: 'auto' }}>
+          <ReferralsView setActiveTab={() => setShowReferrals(false)} />
         </div>
       )}
 
