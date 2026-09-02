@@ -4,6 +4,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function PortfolioView() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [activeTab, setActiveTab] = useState('Overview');
   const { positions, holdings, prices, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices, orders: state.orders })));
 
@@ -220,7 +226,70 @@ export default function PortfolioView() {
           </div>
           
           <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className="responsive-mobile-table portfolio-layout portfolio-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          {/* 📱 High-Density Mobile Holdings List */}
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+              {deliveryPositions.map(pos => {
+                const priceData = prices[pos.symbol] || {};
+                const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
+                const qty = Math.abs(pos.quantity);
+                const invested = parseFloat(pos.average_price) * qty;
+                const current = ltp * qty;
+                const pnl = current - invested;
+                const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                const isProfit = pnl >= 0;
+                const safeSymbol = pos.symbol || '';
+
+                return (
+                  <div
+                    key={pos.id}
+                    onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                    style={{
+                      padding: '10px 14px',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '3px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {/* Line 1: Exchange & Segment | Total P&L */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: '3px', fontWeight: '600' }}>
+                        {safeSymbol.split(':')[0] || 'NSE'} • CNC
+                      </span>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {isProfit ? '+' : ''}₹{pnl.toFixed(2)} ({isProfit ? '+' : ''}{pnlPct.toFixed(2)}%)
+                      </div>
+                    </div>
+
+                    {/* Line 2: Symbol Name | Current Value */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}
+                      </div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        ₹{current.toFixed(2)}
+                      </div>
+                    </div>
+
+                    {/* Line 3: Qty & Avg Price | LTP & Sell button */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      <div>Qty: {qty} • Avg: ₹{parseFloat(pos.average_price).toFixed(2)}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>LTP: ₹{ltp.toFixed(2)}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '1px 5px', borderRadius: '3px', fontWeight: '700' }}>
+                          SELL
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* 🖥️ Desktop Table (Unchanged) */
+            <table className="desktop-portfolio-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                   <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
@@ -294,6 +363,7 @@ export default function PortfolioView() {
                 )}
               </tbody>
             </table>
+          )}
           </div>
         </div>
 
