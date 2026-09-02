@@ -794,10 +794,24 @@ const ProfitAndLoss = () => {
       const entryDate = new Date(entry.created_at);
       const now = new Date();
       const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
-      if (filterPeriod === 'Week' && diffDays > 7) return false;
-      if (filterPeriod === '15 Days' && diffDays > 15) return false;
-      if (filterPeriod === 'Month' && diffDays > 30) return false;
-      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+
+      if (filterPeriod === 'Custom') {
+        if (customStart) {
+          const start = new Date(customStart);
+          start.setHours(0, 0, 0, 0);
+          if (entryDate < start) return false;
+        }
+        if (customEnd) {
+          const end = new Date(customEnd);
+          end.setHours(23, 59, 59, 999);
+          if (entryDate > end) return false;
+        }
+      } else {
+        if (filterPeriod === 'Week' && diffDays > 7) return false;
+        if (filterPeriod === '15 Days' && diffDays > 15) return false;
+        if (filterPeriod === 'Month' && diffDays > 30) return false;
+        if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      }
       return true;
   });
   const filteredOrders = executedOrders.filter(entry => {
@@ -1307,12 +1321,25 @@ const TradingInsights = () => {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Instrument: <span style={{ color: 'var(--color-blue-light)' }}>F/O Trading Insights</span></div>
            <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
-             {['Week', '15 Days', 'Month', '3 Months', 'All', 'Custom'].map(f => (
+             {['Week', '15 Days', 'Month', '3 Months', 'All'].map(f => (
                <div key={f} onClick={() => setFilterPeriod(f)} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: filterPeriod === f ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: filterPeriod === f ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
                  {f}
                </div>
              ))}
            </div>
+           <span 
+             onClick={() => setFilterPeriod('Custom')}
+             style={{ fontSize: '12px', color: filterPeriod === 'Custom' ? 'var(--color-blue-light)' : 'var(--text-secondary)', padding: '8px 16px', border: filterPeriod === 'Custom' ? '1px solid var(--color-blue-light)' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', background: filterPeriod === 'Custom' ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+           >
+             Custom
+           </span>
+           {filterPeriod === 'Custom' && (
+             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+               <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
+               <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+             </div>
+           )}
         </div>
       </div>
 
