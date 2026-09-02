@@ -1206,10 +1206,25 @@ const TradingInsights = () => {
       const entryDate = new Date(entry.created_at);
       const now = new Date();
       const diffDays = Math.ceil(Math.abs(now - entryDate) / (1000 * 60 * 60 * 24));
-      if (filterPeriod === 'Week' && diffDays > 7) return false;
-      if (filterPeriod === '15 Days' && diffDays > 15) return false;
-      if (filterPeriod === 'Month' && diffDays > 30) return false;
-      if (filterPeriod === '3 Months' && diffDays > 90) return false;
+
+      if (filterPeriod === 'Custom') {
+        if (customStart) {
+          const start = new Date(customStart);
+          start.setHours(0, 0, 0, 0);
+          if (entryDate < start) return false;
+        }
+        if (customEnd) {
+          const end = new Date(customEnd);
+          end.setHours(23, 59, 59, 999);
+          if (entryDate > end) return false;
+        }
+      } else {
+        if (filterPeriod === 'Week' && diffDays > 7) return false;
+        if (filterPeriod === '15 Days' && diffDays > 15) return false;
+        if (filterPeriod === 'Month' && diffDays > 30) return false;
+        if (filterPeriod === '3 Months' && diffDays > 90) return false;
+        if (filterPeriod === 'All') return true;
+      }
       return true;
   });
 
