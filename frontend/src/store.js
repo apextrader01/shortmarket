@@ -1008,6 +1008,23 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  executeSipNow: async (id) => {
+    try {
+      const res = await fetch(`${API}/api/sip/${id}/execute-now`, {
+        credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData();
+      }
+      return data;
+    } catch (err) {
+      console.error('[executeSipNow ERROR]', err);
+      return { success: false, error: err.message };
+    }
+  },
   cancelSip: async (id) => {
     try {
       const res = await fetch(`${API}/api/sip/${id}`, { credentials: 'include', method: 'DELETE' });

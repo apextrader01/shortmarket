@@ -7,7 +7,18 @@ import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { API } from '../store';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds, sips, cancelSip, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, executeSipNow, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, executeSipNow: state.executeSipNow, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
+
+  
+  const handlePayNow = async (sipId) => {
+    if (!window.confirm('Do you want to process this SIP installment right now? Funds will be debited and units credited at latest NAV.')) return;
+    const res = await executeSipNow(sipId);
+    if (res && res.success) {
+      alert(res.message || 'SIP installment executed successfully!');
+    } else {
+      alert((res && res.error) || 'Failed to execute SIP');
+    }
+  };
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -467,7 +478,7 @@ export default function MutualFundsView() {
                                 <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
-    <button onClick={() => executeSipNow(sip.id)} style={{ flex: 1, padding: '10px', fontSize: '13px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
+    <button onClick={() => handlePayNow(sip.id)} style={{ flex: 1, padding: '10px', fontSize: '13px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
     <button onClick={() => cancelSip(sip.id)} style={{ flex: 1, padding: '10px', fontSize: '13px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Cancel SIP</button>
   </div>
                         </div>
@@ -502,7 +513,7 @@ export default function MutualFundsView() {
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-    <button onClick={() => executeSipNow(sip.id)} style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
+    <button onClick={() => handlePayNow(sip.id)} style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
     <button onClick={() => cancelSip(sip.id)} className="btn-cancel" style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
   </div>
                                     </td>
