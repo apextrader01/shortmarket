@@ -302,6 +302,48 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           
           <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 600px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
+              
+              {/* Push & Trade Alerts (PWA) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Bell size={15} color="var(--color-blue)" /> Push & Trade Alerts (PWA)
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Receive real-time phone lock-screen and desktop alerts on order executions and triggers
+                  </div>
+                  {pushStatusMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{pushStatusMsg}</div>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isPushEnabled && (
+                    <button 
+                      onClick={handleTestPush}
+                      style={{ padding: '6px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      Test Alert 🔔
+                    </button>
+                  )}
+                  <button
+                    onClick={handleTogglePush}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: isPushEnabled ? 'rgba(34, 197, 94, 0.15)' : 'var(--color-blue)',
+                      color: isPushEnabled ? 'var(--color-green-light)' : '#fff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {isPushEnabled ? <><CheckCircle size={14} /> Active</> : 'Enable Alerts'}
+                  </button>
+                </div>
+              </div>
+
               <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
                 <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
