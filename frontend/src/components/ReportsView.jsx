@@ -122,6 +122,10 @@ const LedgerStatement = () => {
     return true;
   });
 
+  const pageSize = 50;
+  const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
+  const paginatedLedger = filteredLedger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleDownload = () => {
     const formattedData = filteredLedger.map(entry => ({
       Date: new Date(entry.created_at).toLocaleString(),
@@ -208,7 +212,7 @@ const LedgerStatement = () => {
             ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No Results Found.</div>
             ) : (
-              filteredLedger.map((entry) => (
+              paginatedLedger.map((entry) => (
                 <div key={entry.id} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
@@ -257,7 +261,7 @@ const LedgerStatement = () => {
                   </td>
                 </tr>
               ) : (
-                filteredLedger.map((entry) => (
+                paginatedLedger.map((entry) => (
                   <tr key={entry.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '16px' }}>
                       <div>{new Date(entry.created_at).toLocaleDateString('en-GB')}</div>
