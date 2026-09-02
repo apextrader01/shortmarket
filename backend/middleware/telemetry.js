@@ -1,4 +1,4 @@
-﻿const { generalClient } = require('../services/redisClient');
+const { generalClient } = require('../services/redisClient');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
 
@@ -10,8 +10,25 @@ function getMinuteBucket(d = new Date()) {
 async function recordTelemetry(req, res, next) {
     if (!generalClient || !generalClient.isReady) return next();
     
-    // Ignore static assets
-    if (req.path.startsWith('/assets') || req.path === '/favicon.ico') return next();
+    // Ignore static assets & bot scanner probes
+    const pathLower = req.path.toLowerCase();
+    if (
+        req.path.startsWith('/assets') || 
+        req.path === '/favicon.ico' || 
+        pathLower.startsWith('/.') || 
+        pathLower.includes('.env') ||
+        pathLower.includes('.yml') ||
+        pathLower.includes('.yaml') ||
+        pathLower.includes('.bak') ||
+        pathLower.includes('.php') ||
+        pathLower.includes('credentials') ||
+        pathLower.includes('terraform') ||
+        pathLower.includes('actuator') ||
+        pathLower.includes('/etc/') ||
+        pathLower.includes('/proc/')
+    ) {
+        return next();
+    }
 
     const startTime = process.hrtime();
 
