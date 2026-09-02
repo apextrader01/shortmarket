@@ -1,7 +1,7 @@
 import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
 import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
 import ReferralsView from './ReferralsView';
@@ -59,6 +59,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [isRiskActive, setIsRiskActive] = useState(() => !!(user && user.risk_guardian_active));
   const [maxTrades, setMaxTrades] = useState(() => (user && user.max_daily_trades) || 4);
   const [maxLoss, setMaxLoss] = useState(() => (user && user.max_daily_loss) || 5000);
+  const [isCustomTrades, setIsCustomTrades] = useState(() => (user?.max_daily_trades && ![2, 4, 10].includes(Number(user.max_daily_trades))));
+  const [isCustomLoss, setIsCustomLoss] = useState(() => (user?.max_daily_loss && ![2000, 5000, 10000].includes(Number(user.max_daily_loss))));
   const [riskMsg, setRiskMsg] = useState('');
 
   const handleSaveRiskGuardian = async (activeOverride, tradesOverride, lossOverride) => {
@@ -451,34 +453,94 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 </div>
 
                 {isRiskActive && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {/* Max Trades row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Trades Per Day:</span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {[2, 4, 10].map(cnt => (
                           <span 
                             key={cnt}
-                            onClick={() => { setMaxTrades(cnt); handleSaveRiskGuardian(isRiskActive, cnt, maxLoss); }}
-                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: maxTrades === cnt ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: maxTrades === cnt ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: maxTrades === cnt ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
+                            onClick={() => { 
+                              setIsCustomTrades(false);
+                              setMaxTrades(cnt); 
+                              handleSaveRiskGuardian(isRiskActive, cnt, maxLoss); 
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: (!isCustomTrades && Number(maxTrades) === cnt) ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: (!isCustomTrades && Number(maxTrades) === cnt) ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: (!isCustomTrades && Number(maxTrades) === cnt) ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
                           >
                             {cnt} Trades
                           </span>
                         ))}
+                        <span
+                          onClick={() => setIsCustomTrades(true)}
+                          style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: isCustomTrades ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: isCustomTrades ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: isCustomTrades ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
+                        >
+                          Custom
+                        </span>
+                        {isCustomTrades && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={maxTrades}
+                              onChange={(e) => setMaxTrades(e.target.value)}
+                              placeholder="Trades"
+                              style={{ width: '65px', background: 'var(--bg-hover)', border: '1px solid #f59e0b', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                            />
+                            <button
+                              onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
+                              style={{ padding: '4px 8px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
+                    {/* Max Loss row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Daily Loss Limit:</span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {[2000, 5000, 10000].map(amt => (
                           <span 
                             key={amt}
-                            onClick={() => { setMaxLoss(amt); handleSaveRiskGuardian(isRiskActive, maxTrades, amt); }}
-                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: maxLoss === amt ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: maxLoss === amt ? '1px solid #ef4444' : '1px solid var(--border-color)', color: maxLoss === amt ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
+                            onClick={() => { 
+                              setIsCustomLoss(false);
+                              setMaxLoss(amt); 
+                              handleSaveRiskGuardian(isRiskActive, maxTrades, amt); 
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: (!isCustomLoss && Number(maxLoss) === amt) ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: (!isCustomLoss && Number(maxLoss) === amt) ? '1px solid #ef4444' : '1px solid var(--border-color)', color: (!isCustomLoss && Number(maxLoss) === amt) ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
                           >
                             ₹{amt.toLocaleString('en-IN')}
                           </span>
                         ))}
+                        <span
+                          onClick={() => setIsCustomLoss(true)}
+                          style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: isCustomLoss ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: isCustomLoss ? '1px solid #ef4444' : '1px solid var(--border-color)', color: isCustomLoss ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
+                        >
+                          Custom
+                        </span>
+                        {isCustomLoss && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              min="100"
+                              step="500"
+                              value={maxLoss}
+                              onChange={(e) => setMaxLoss(e.target.value)}
+                              placeholder="₹ Max Loss"
+                              style={{ width: '85px', background: 'var(--bg-hover)', border: '1px solid #ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                            />
+                            <button
+                              onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
+                              style={{ padding: '4px 8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
