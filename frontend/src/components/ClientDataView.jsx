@@ -34,8 +34,9 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode } = useStore(useShallow(state => ({ 
-    user: state.user, 
+  const { user, orders, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode } = useStore(useShallow(state => ({ 
+    user: state.user,
+    orders: state.orders, 
     logout: state.logout, 
     updateProfilePicture: state.updateProfilePicture, 
     theme: state.theme, 
@@ -61,7 +62,24 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [maxLoss, setMaxLoss] = useState(() => (user && user.max_daily_loss) || 5000);
   const [isCustomTrades, setIsCustomTrades] = useState(() => (user?.max_daily_trades && ![2, 4, 10].includes(Number(user.max_daily_trades))));
   const [isCustomLoss, setIsCustomLoss] = useState(() => (user?.max_daily_loss && ![2000, 5000, 10000].includes(Number(user.max_daily_loss))));
+  const [tradesSaved, setTradesSaved] = useState(false);
+  const [lossSaved, setLossSaved] = useState(false);
   const [riskMsg, setRiskMsg] = useState('');
+
+  // Calculate today's discipline status
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayCompletedOrders = (orders || []).filter(o => (o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED') && new Date(o.created_at) >= todayStart);
+  const todayTradesCount = todayCompletedOrders.length;
+  let todayRealizedLoss = 0;
+  todayCompletedOrders.forEach(o => {
+    if (o.realized_pnl && parseFloat(o.realized_pnl) < 0) {
+      todayRealizedLoss += Math.abs(parseFloat(o.realized_pnl));
+    }
+  });
+  const isTradesLocked = isRiskActive && maxTrades && todayTradesCount >= Number(maxTrades);
+  const isLossLocked = isRiskActive && maxLoss && todayRealizedLoss >= Number(maxLoss);
+  const isLockedTonight = isTradesLocked || isLossLocked;
 
   const handleSaveRiskGuardian = async (activeOverride, tradesOverride, lossOverride) => {
     try {
@@ -82,8 +100,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       const data = await res.json();
       if (res.ok) {
         setRiskMsg('Rules Saved & Enforced! 🛡️');
+        setTradesSaved(true);
+        setLossSaved(true);
         if (data.user) useStore.getState().fetchUserData();
-        setTimeout(() => setRiskMsg(''), 3000);
+        setTimeout(() => { setRiskMsg(''); setTradesSaved(false); setLossSaved(false); }, 3000);
       } else {
         alert(data.error || 'Failed to save Risk Guardian');
         setRiskMsg('');
@@ -414,8 +434,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                     <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <ShieldAlert size={15} color={isRiskActive ? '#f59e0b' : 'var(--text-secondary)'} /> Risk Guardian (Discipline & Capital Protection)
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      Auto-locks trading if daily max loss or trade count is exceeded to stop revenge trading
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      Auto-locks trading if daily max loss or trade count is exceeded to stop revenge trading. Trading remains locked for tonight and unlocks automatically next trading morning.
                     </div>
                     {riskMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{riskMsg}</div>}
                   </div>
@@ -452,6 +472,22 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                   </div>
                 </div>
 
+                {/* Live Status Badge */}
+                {isRiskActive && (
+                  <div>
+                    {isLockedTonight ? (
+                      <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>🔒</span> Trading is LOCKED for tonight ({isTradesLocked ? `Hit ${maxTrades} trades limit` : `Hit ₹${Number(maxLoss).toLocaleString('en-IN')} max loss limit`}). Will unlock next morning.
+                      </div>
+                    ) : (
+                      <div style={{ padding: '8px 12px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', color: 'var(--color-green-light)', fontSize: '11px', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span>🛡️ Status: Active & Protecting Capital</span>
+                        <span>Today: {todayTradesCount} / {maxTrades || '∞'} Trades | Realized Loss: ₹{todayRealizedLoss.toFixed(2)} / ₹{maxLoss ? Number(maxLoss).toLocaleString('en-IN') : '∞'}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {isRiskActive && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     {/* Max Trades row */}
@@ -484,15 +520,16 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                               min="1"
                               max="100"
                               value={maxTrades}
-                              onChange={(e) => setMaxTrades(e.target.value)}
+                              onChange={(e) => { setMaxTrades(e.target.value); setTradesSaved(false); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
                               placeholder="Trades"
                               style={{ width: '65px', background: 'var(--bg-hover)', border: '1px solid #f59e0b', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
                             />
                             <button
                               onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
-                              style={{ padding: '4px 8px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                              style={{ padding: '4px 8px', background: tradesSaved ? 'var(--color-green-light)' : '#f59e0b', color: '#000', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
                             >
-                              Save
+                              {tradesSaved ? '✓ Saved' : 'Save'}
                             </button>
                           </div>
                         )}
@@ -529,15 +566,16 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                               min="100"
                               step="500"
                               value={maxLoss}
-                              onChange={(e) => setMaxLoss(e.target.value)}
+                              onChange={(e) => { setMaxLoss(e.target.value); setLossSaved(false); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
                               placeholder="₹ Max Loss"
                               style={{ width: '85px', background: 'var(--bg-hover)', border: '1px solid #ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
                             />
                             <button
                               onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
-                              style={{ padding: '4px 8px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
+                              style={{ padding: '4px 8px', background: lossSaved ? 'var(--color-green-light)' : '#ef4444', color: lossSaved ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
                             >
-                              Save
+                              {lossSaved ? '✓ Saved' : 'Save'}
                             </button>
                           </div>
                         )}
