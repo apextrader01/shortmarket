@@ -516,6 +516,14 @@ async function ensureCriticalColumns() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_push_sub_user_id ON push_subscriptions(user_id)');
 
+    // Risk Guardian & Trader Journal Columns
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_loss DECIMAL(14,2)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS risk_guardian_active BOOLEAN DEFAULT false');
+
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
+
     // Retroactively assign professional client IDs to existing users who don't have one
     const usersWithoutClientId = await db('users').whereNull('client_id');
     for (const u of usersWithoutClientId) {

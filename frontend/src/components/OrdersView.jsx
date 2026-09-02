@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
@@ -290,7 +290,14 @@ export default function OrdersView() {
                         return isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
                       })()}
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>{(order.symbol || '').split('-')[0] || '—'}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: '600' }}>
+                      {(order.symbol || '').split('-')[0] || '—'}
+                      {order.tag && (
+                        <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: '600' }}>
+                          {order.tag}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 16px', color: order.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
                       <span style={{ background: order.side === 'BUY' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span>{order.side}</span>

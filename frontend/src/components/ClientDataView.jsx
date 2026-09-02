@@ -1,5 +1,5 @@
 import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
-import { Bell, CheckCircle } from 'lucide-react';
+import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -55,6 +55,42 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+    // 🛡️ Risk Guardian State
+  const [isRiskActive, setIsRiskActive] = useState(() => !!(user && user.risk_guardian_active));
+  const [maxTrades, setMaxTrades] = useState(() => (user && user.max_daily_trades) || 4);
+  const [maxLoss, setMaxLoss] = useState(() => (user && user.max_daily_loss) || 5000);
+  const [riskMsg, setRiskMsg] = useState('');
+
+  const handleSaveRiskGuardian = async (activeOverride, tradesOverride, lossOverride) => {
+    try {
+      const activeVal = activeOverride !== undefined ? activeOverride : isRiskActive;
+      const tradesVal = tradesOverride !== undefined ? tradesOverride : maxTrades;
+      const lossVal = lossOverride !== undefined ? lossOverride : maxLoss;
+      
+      setRiskMsg('Saving rules...');
+      const res = await fetch(`${API}/api/user/risk-guardian`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          risk_guardian_active: activeVal,
+          max_daily_trades: tradesVal ? Number(tradesVal) : null,
+          max_daily_loss: lossVal ? Number(lossVal) : null
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRiskMsg('Rules Saved & Enforced! 🛡️');
+        if (data.user) useStore.getState().fetchUserData();
+        setTimeout(() => setRiskMsg(''), 3000);
+      } else {
+        alert(data.error || 'Failed to save Risk Guardian');
+        setRiskMsg('');
+      }
+    } catch (e) {
+      alert('Error saving Risk Guardian: ' + e.message);
+      setRiskMsg('');
+    }
+  };
   const [isPushEnabled, setIsPushEnabled] = useState(false);
   const [pushStatusMsg, setPushStatusMsg] = useState('');
   
@@ -368,7 +404,87 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 </div>
               </div>
 
-              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
+              
+              {/* 🛡️ Risk Guardian (Capital & Trade Discipline) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ minWidth: '200px', flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldAlert size={15} color={isRiskActive ? '#f59e0b' : 'var(--text-secondary)'} /> Risk Guardian (Discipline & Capital Protection)
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Auto-locks trading if daily max loss or trade count is exceeded to stop revenge trading
+                    </div>
+                    {riskMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{riskMsg}</div>}
+                  </div>
+                  <div 
+                    onClick={() => {
+                      const next = !isRiskActive;
+                      setIsRiskActive(next);
+                      handleSaveRiskGuardian(next, maxTrades, maxLoss);
+                    }} 
+                    title={isRiskActive ? 'Click to Disable' : 'Click to Enable'}
+                    style={{ 
+                      width: '40px', 
+                      height: '22px', 
+                      background: isRiskActive ? '#f59e0b' : 'var(--border-color)', 
+                      borderRadius: '11px', 
+                      position: 'relative', 
+                      cursor: 'pointer', 
+                      transition: 'background 0.2s',
+                      flexShrink: 0
+                    }}
+                  >
+                    <div 
+                      style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        background: isRiskActive ? '#FFF' : 'var(--text-secondary)', 
+                        borderRadius: '50%', 
+                        position: 'absolute', 
+                        top: '2px', 
+                        left: isRiskActive ? '20px' : '2px', 
+                        transition: 'left 0.2s' 
+                      }} 
+                    />
+                  </div>
+                </div>
+
+                {isRiskActive && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Trades Per Day:</span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[2, 4, 10].map(cnt => (
+                          <span 
+                            key={cnt}
+                            onClick={() => { setMaxTrades(cnt); handleSaveRiskGuardian(isRiskActive, cnt, maxLoss); }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: maxTrades === cnt ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: maxTrades === cnt ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: maxTrades === cnt ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
+                          >
+                            {cnt} Trades
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Daily Loss Limit:</span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {[2000, 5000, 10000].map(amt => (
+                          <span 
+                            key={amt}
+                            onClick={() => { setMaxLoss(amt); handleSaveRiskGuardian(isRiskActive, maxTrades, amt); }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: maxLoss === amt ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: maxLoss === amt ? '1px solid #ef4444' : '1px solid var(--border-color)', color: maxLoss === amt ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
+                          >
+                            ₹{amt.toLocaleString('en-IN')}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+<div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
                 <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>

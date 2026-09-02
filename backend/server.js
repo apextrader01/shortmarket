@@ -2094,6 +2094,51 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // 🛡️ RISK GUARDIAN ENFORCEMENT 🛡️
+  const currentUser = await db('users').where({ id: req.user.id }).first();
+  if (currentUser && currentUser.risk_guardian_active) {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // 1. Check Max Daily Trades Limit
+    if (currentUser.max_daily_trades && currentUser.max_daily_trades > 0) {
+      const todayOrdersCount = await db('orders')
+        .where({ user_id: req.user.id })
+        .where('created_at', '>=', todayStart)
+        .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
+        .count('id as count')
+        .first();
+      
+      const count = parseInt(todayOrdersCount?.count || 0);
+      if (count >= currentUser.max_daily_trades) {
+        return res.status(400).json({
+          error: `🛡️ Risk Guardian Active: You have reached your limit of ${currentUser.max_daily_trades} trade(s) for today. Trading is locked to protect your discipline.`
+        });
+      }
+    }
+
+    // 2. Check Max Daily Loss Limit
+    if (currentUser.max_daily_loss && currentUser.max_daily_loss > 0) {
+      const todayOrders = await db('orders')
+        .where({ user_id: req.user.id })
+        .where('created_at', '>=', todayStart)
+        .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED']);
+
+      let todayRealizedPnl = 0;
+      for (const ord of todayOrders) {
+        if (ord.realized_pnl !== null && ord.realized_pnl !== undefined) {
+          todayRealizedPnl += parseFloat(ord.realized_pnl);
+        }
+      }
+
+      if (todayRealizedPnl < 0 && Math.abs(todayRealizedPnl) >= parseFloat(currentUser.max_daily_loss)) {
+        return res.status(400).json({
+          error: `🛡️ Risk Guardian Active: You have hit your maximum daily loss limit of ₹${parseFloat(currentUser.max_daily_loss).toLocaleString('en-IN')}. Trading is locked for today to protect your capital.`
+        });
+      }
+    }
+  }
+
   // Block new Intraday orders outside valid time windows
   if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
@@ -2528,6 +2573,106 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'Push subscription registered successfully' });
   } catch (err) {
     console.error('Failed to save push subscription:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// 🛡️ Risk Guardian Settings 🛡️
+app.post('/api/user/risk-guardian', authenticateToken, async (req, res) => {
+  try {
+    const { max_daily_loss, max_daily_trades, risk_guardian_active } = req.body;
+    await db('users').where({ id: req.user.id }).update({
+      max_daily_loss: max_daily_loss !== undefined && max_daily_loss !== null ? parseFloat(max_daily_loss) : null,
+      max_daily_trades: max_daily_trades !== undefined && max_daily_trades !== null ? parseInt(max_daily_trades) : null,
+      risk_guardian_active: !!risk_guardian_active,
+      updated_at: new Date()
+    });
+    const updatedUser = await db('users').where({ id: req.user.id }).first();
+    res.json({ success: true, message: 'Risk Guardian settings saved successfully', user: updatedUser });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ⚡ Exit All Holdings ⚡
+app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
+  try {
+    const activeHoldings = await db('holdings')
+      .where({ user_id: req.user.id })
+      .where('quantity', '>', 0);
+
+    if (!activeHoldings || activeHoldings.length === 0) {
+      return res.status(400).json({ error: 'No active holdings to exit' });
+    }
+
+    let totalSoldAmount = 0;
+    const exitOrders = [];
+
+    await db.transaction(async (trx) => {
+      for (const holding of activeHoldings) {
+        const qty = parseInt(holding.quantity);
+        const ltp = priceCache[holding.symbol]?.ltp || parseFloat(holding.average_price) || 0;
+        const totalValue = qty * ltp;
+        totalSoldAmount += totalValue;
+
+        // 1. Create completed sell order
+        await trx('orders').insert({
+          user_id: req.user.id,
+          symbol: holding.symbol,
+          type: 'MARKET',
+          side: 'SELL',
+          quantity: qty,
+          price: ltp,
+          average_price: ltp,
+          status: 'COMPLETED',
+          product_type: 'CNC',
+          margin: 0,
+          realized_pnl: (ltp - parseFloat(holding.average_price)) * qty,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        // 2. Reduce holding to 0
+        await trx('holdings').where({ id: holding.id }).update({
+          quantity: 0,
+          updated_at: new Date()
+        });
+
+        // 3. Credit funds to ledger and user balance
+        await trx('users').where({ id: req.user.id }).increment('balance', totalValue);
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: totalValue,
+          type: 'HOLDINGS_SELL',
+          description: `Exited Holdings: SELL ${qty} ${holding.symbol} @ ₹${ltp.toFixed(2)}`,
+          created_at: new Date()
+        });
+
+        exitOrders.push({ symbol: holding.symbol, quantity: qty, price: ltp });
+      }
+    });
+
+    res.json({ success: true, message: `Successfully exited ${exitOrders.length} holding(s)`, totalSoldAmount });
+  } catch (err) {
+    console.error('Exit all holdings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📝 Tag / Journal Trade 📝
+app.post('/api/order/:id/tag', authenticateToken, async (req, res) => {
+  try {
+    const { tag, notes } = req.body;
+    await db('orders')
+      .where({ id: req.params.id, user_id: req.user.id })
+      .update({
+        tag: tag || null,
+        notes: notes || null,
+        updated_at: new Date()
+      });
+    res.json({ success: true, message: 'Trade tagged successfully' });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

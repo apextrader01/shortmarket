@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
