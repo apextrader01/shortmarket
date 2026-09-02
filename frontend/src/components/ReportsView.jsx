@@ -1186,6 +1186,8 @@ const DownloadReports = () => {
 const TradingInsights = () => {
   const [insightsPage, setInsightsPage] = useState(1);
   const [filterPeriod, setFilterPeriod] = useState('Month');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
