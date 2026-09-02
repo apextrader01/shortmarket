@@ -13,14 +13,65 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, prices } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices })));
+  const { positions, holdings, prices, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices, orders: state.orders })));
   
   const mergedHoldingsMap = {};
   if (viewMode === 'HOLDINGS') {
     (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });
   }
   
-  const sourceData = viewMode === 'HOLDINGS' ? Object.values(mergedHoldingsMap).filter(h => h.quantity > 0) : (positions || []);
+  let sourceData = [];
+  if (viewMode === 'HOLDINGS') {
+    sourceData = Object.values(mergedHoldingsMap).filter(h => h.quantity > 0);
+  } else if (viewMode === 'OPEN') {
+    sourceData = (positions || []).filter(p => Number(p.quantity) !== 0);
+  } else if (viewMode === 'CLOSED') {
+    // 1. Include explicit closed positions from database
+    const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0);
+    
+    // 2. Synthesize closed positions from executed orders that recorded realized P&L
+    const closedOrdersMap = {};
+    (orders || []).forEach(o => {
+      const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+      if (isExecuted && hasRealizedPnl) {
+        const key = `${o.symbol}-${o.product_type || 'INT'}`;
+        if (!closedOrdersMap[key]) {
+          closedOrdersMap[key] = {
+            id: `closed-ord-${o.id}`,
+            symbol: o.symbol,
+            product_type: o.product_type || 'INT',
+            quantity: 0,
+            closed_quantity: 0,
+            average_price: Number(o.average_price || o.price || 0),
+            exit_price: Number(o.average_price || o.price || 0),
+            realized_pnl: 0,
+            created_at: o.created_at,
+            updated_at: o.updated_at || o.created_at
+          };
+        }
+        closedOrdersMap[key].closed_quantity += Number(o.quantity || 0);
+        closedOrdersMap[key].realized_pnl += Number(o.realized_pnl);
+        closedOrdersMap[key].exit_price = Number(o.average_price || o.price || closedOrdersMap[key].exit_price);
+      }
+    });
+
+    const orderClosedList = Object.values(closedOrdersMap);
+    
+    // Combine and deduplicate
+    const combinedMap = {};
+    [...dbClosed, ...orderClosedList].forEach(p => {
+      const key = `${p.symbol}-${p.product_type}`;
+      if (!combinedMap[key]) {
+        combinedMap[key] = { ...p };
+      } else {
+        combinedMap[key].realized_pnl = Number(combinedMap[key].realized_pnl || 0) + Number(p.realized_pnl || 0);
+        combinedMap[key].closed_quantity = Number(combinedMap[key].closed_quantity || 0) + Number(p.closed_quantity || 0);
+      }
+    });
+
+    sourceData = Object.values(combinedMap);
+  }
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
