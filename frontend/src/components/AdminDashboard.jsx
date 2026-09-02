@@ -374,6 +374,29 @@ export default function AdminDashboard() {
           >
             <RefreshCw size={14} /> Refresh
           </button>
+          <button
+            className="btn btn-secondary"
+            onClick={async () => {
+              if (!window.confirm('Process all due/overdue SIP installments across all active users now?')) return;
+              try {
+                const res = await fetch(`${API}/api/admin/sips/process-all`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  }
+                });
+                const data = await res.json();
+                alert(data.message || 'SIP processing complete');
+                loadData();
+              } catch (e) {
+                alert('Error: ' + e.message);
+              }
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', cursor: 'pointer' }}
+          >
+            ⚡ Process Due SIPs
+          </button>
         </div>
       </div>
 

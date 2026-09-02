@@ -466,7 +466,10 @@ export default function MutualFundsView() {
                                 <span style={{ color: 'var(--text-secondary)' }}>Next Exec</span>
                                 <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{new Date(sip.next_execution_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                             </div>
-                            <button onClick={() => cancelSip(sip.id)} style={{ width: '100%', padding: '10px', fontSize: '14px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Cancel SIP</button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+    <button onClick={() => executeSipNow(sip.id)} style={{ flex: 1, padding: '10px', fontSize: '13px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
+    <button onClick={() => cancelSip(sip.id)} style={{ flex: 1, padding: '10px', fontSize: '13px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>Cancel SIP</button>
+  </div>
                         </div>
                     ))}
                 </div>
@@ -498,7 +501,10 @@ export default function MutualFundsView() {
                                         <span style={{ color: 'var(--color-green)', fontWeight: '600', fontSize: '12px' }}>{sip.status}</span>
                                     </td>
                                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                                        <button onClick={() => cancelSip(sip.id)} className="btn-cancel" style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+    <button onClick={() => executeSipNow(sip.id)} style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', cursor: 'pointer', fontWeight: '700' }}>⚡ Pay Now</button>
+    <button onClick={() => cancelSip(sip.id)} className="btn-cancel" style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+  </div>
                                     </td>
                                 </tr>
                             ))}

@@ -2420,6 +2420,37 @@ app.get('/api/sips', authenticateToken, async (req, res) => {
   }
 });
 
+
+// ⚡ Execute a single SIP installment on demand
+app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
+  try {
+    const sip = await db('sips').where({ id: req.params.id, user_id: req.user.id }).first();
+    if (!sip) return res.status(404).json({ error: 'SIP not found' });
+    
+    const result = await SIPEngine.executeSingleSip(sip.id, priceCache);
+    if (!result.success) {
+      if (result.reason === 'INSUFFICIENT_FUNDS') {
+        return res.status(400).json({ error: `Insufficient funds. Needed ₹${result.required}, Available ₹${result.available.toFixed(2)}` });
+      }
+      return res.status(500).json({ error: 'Failed to execute SIP installment' });
+    }
+    res.json({ success: true, message: `Successfully executed SIP installment! ${result.units} units credited @ NAV ₹${result.nav}`, data: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
+// ⚡ Admin: Process all due SIPs
+app.post('/api/admin/sips/process-all', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const result = await SIPEngine.processDueSips(priceCache);
+    res.json({ success: true, message: `Processed ${result.total} due SIPs: ${result.success} succeeded, ${result.failed} failed/skipped.`, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
 app.delete('/api/sip/:id', authenticateToken, async (req, res) => {
   try {
     await db('sips').where({ id: req.params.id, user_id: req.user.id }).del();
@@ -3980,6 +4011,7 @@ server.listen(PORT, async () => {
     const { initOrderExecutor } = require('./services/orderExecutor');
     const triggerEngine = require('./services/triggerEngine');
     const MTMRiskManager = require('./services/mtmRiskManager');
+const SIPEngine = require('./services/sipEngine');
     const { initCronJobs } = require('./services/cronJobs');
     const schedule = require('node-schedule');
 
@@ -4020,6 +4052,7 @@ server.listen(PORT, async () => {
     startSquareOffJobs();
     initRiskyStocksSync();
     initOrderExecutor(priceCache);
+    SIPEngine.init(priceCache);
   } else {
     console.log(`👷 Worker Instance: Listening for API requests and WS connections...`);
   }
