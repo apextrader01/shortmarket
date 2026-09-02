@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { useStore } from '../store';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Activity, X } from 'lucide-react';
 
