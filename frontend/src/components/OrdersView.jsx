@@ -206,6 +206,7 @@ export default function OrdersView() {
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Order Type</th>
                     {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Charges</th>}
                     {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Realized P&L</th>}
+                    {activeTab === 'Order History' && <th style={{ padding: '12px 16px', fontWeight: '500' }}>Tag / Journal</th>}
                     <th style={{ padding: '12px 16px', fontWeight: '500' }}>Status</th>
                     {activeTab === 'Open Orders' && <th style={{ padding: '12px 16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>}
                   </tr>
@@ -334,6 +335,19 @@ export default function OrdersView() {
                     {activeTab === 'Order History' && (
                       <td style={{ padding: '12px 16px', fontWeight: '600', color: !order.realized_pnl ? 'var(--text-secondary)' : parseFloat(order.realized_pnl) > 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                         {order.realized_pnl ? `${parseFloat(order.realized_pnl) > 0 ? '+' : ''}₹${parseFloat(order.realized_pnl).toFixed(2)}` : '—'}
+                      </td>
+                    )}
+                    {activeTab === 'Order History' && (
+                      <td style={{ padding: '12px 16px' }} onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}>
+                        {order.tag ? (
+                          <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 8px', borderRadius: '4px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                            {order.tag}
+                          </span>
+                        ) : (
+                          <button style={{ background: 'var(--bg-hover)', border: '1px dashed var(--border-color)', color: 'var(--text-secondary)', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}>
+                            + Tag
+                          </button>
+                        )}
                       </td>
                     )}
                     <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>

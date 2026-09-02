@@ -249,6 +249,35 @@ export default function PositionsView() {
             EXIT ALL POSITIONS
           </button>
         )}
+        {viewMode === 'HOLDINGS' && flatPositions.length > 0 && (
+          <button
+            onClick={async () => {
+              if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
+              try {
+                const res = await fetch(`${API}/api/holdings/exit-all`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  alert(data.message || 'Successfully exited all holdings!');
+                  useStore.getState().fetchUserData();
+                } else {
+                  alert(data.error || 'Failed to exit holdings');
+                }
+              } catch (e) {
+                alert('Error exiting holdings: ' + e.message);
+              }
+            }}
+            style={{
+              background: 'var(--color-red-light)', color: '#fff', border: 'none',
+              padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            EXIT ALL HOLDINGS ⚡
+          </button>
+        )}
       </div>
       
       {flatPositions.length === 0 ? (
