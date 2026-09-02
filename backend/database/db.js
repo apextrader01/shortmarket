@@ -521,6 +521,7 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS risk_guardian_active BOOLEAN DEFAULT false');
 
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
 
