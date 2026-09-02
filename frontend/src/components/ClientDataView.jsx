@@ -65,13 +65,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const handleTogglePush = async () => {
     try {
       const token = localStorage.getItem('token') || (user && user.token);
-      setPushStatusMsg('Activating push...');
+      setPushStatusMsg('Requesting browser permission...');
       await subscribeUserToPush(token);
       setIsPushEnabled(true);
       setPushStatusMsg('Push Notifications Active! 🔔');
-      setTimeout(() => setPushStatusMsg(''), 3000);
+      setTimeout(() => setPushStatusMsg(''), 4000);
     } catch (err) {
-      alert('Push notification setup: ' + err.message);
+      alert('Notification Setup: ' + err.message);
       setPushStatusMsg('');
     }
   };

@@ -15,10 +15,10 @@ export async function registerServiceWorker() {
   if (typeof window === 'undefined') return null;
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      return registration;
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      return reg;
     } catch (error) {
-      console.warn('Service Worker registration error:', error);
+      console.warn('[SW] Service Worker registration failed:', error);
       return null;
     }
   }
@@ -27,9 +27,12 @@ export async function registerServiceWorker() {
 
 export async function getPushSubscriptionStatus() {
   if (typeof window === 'undefined') return false;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+  
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return false;
     const sub = await reg.pushManager.getSubscription();
     return !!sub;
   } catch (e) {
@@ -39,23 +42,40 @@ export async function getPushSubscriptionStatus() {
 
 export async function subscribeUserToPush(token) {
   if (typeof window === 'undefined') return false;
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     throw new Error('Push notifications are not supported in this browser.');
   }
 
   // 1. Request user permission
-  const permission = await Notification.requestPermission();
+  let permission = Notification.permission;
   if (permission !== 'granted') {
-    throw new Error('Notification permission was not granted.');
+    permission = await Notification.requestPermission();
+  }
+  if (permission !== 'granted') {
+    throw new Error('Notification permission was denied. Please allow notifications in your browser address bar.');
   }
 
-  // 2. Fetch VAPID public key
-  const res = await fetch(`${API}/api/push/vapid-public-key`);
-  const { publicKey } = await res.json();
-  if (!publicKey) throw new Error('VAPID public key unavailable.');
+  // 2. Ensure Service Worker is registered & active
+  let reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) {
+    reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  }
 
-  // 3. Register push subscription
-  const reg = await navigator.serviceWorker.ready;
+  // Wait with 3-second fallback timeout for activation so it NEVER hangs
+  await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise(resolve => setTimeout(resolve, 3000))
+  ]);
+
+  reg = (await navigator.serviceWorker.getRegistration()) || reg;
+
+  // 3. Fetch VAPID public key
+  const res = await fetch(`${API}/api/push/vapid-public-key`);
+  const data = await res.json().catch(() => ({}));
+  const publicKey = data.publicKey;
+  if (!publicKey) throw new Error('VAPID public key unavailable from server.');
+
+  // 4. Register push subscription
   let subscription = await reg.pushManager.getSubscription();
   if (!subscription) {
     subscription = await reg.pushManager.subscribe({
@@ -64,13 +84,13 @@ export async function subscribeUserToPush(token) {
     });
   }
 
-  // 4. Send subscription to backend
+  // 5. Send subscription to backend
   const subJson = subscription.toJSON();
   const subRes = await fetch(`${API}/api/push/subscribe`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     },
     body: JSON.stringify({
       endpoint: subJson.endpoint,
@@ -79,8 +99,8 @@ export async function subscribeUserToPush(token) {
   });
 
   if (!subRes.ok) {
-    const errData = await subRes.json();
-    throw new Error(errData.error || 'Failed to save push subscription.');
+    const errData = await subRes.json().catch(() => ({}));
+    throw new Error(errData.error || 'Failed to save push subscription on server.');
   }
 
   return true;
@@ -91,7 +111,7 @@ export async function triggerTestPushNotification(token) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     }
   });
   return res.json();
