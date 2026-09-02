@@ -153,17 +153,34 @@ function App() {
     loadStocks();
     refreshPrices();
 
+    // ⚡ Smart Price Polling: Only poll REST as fallback when WebSocket is NOT connected
     const priceInterval = setInterval(() => {
-      refreshPrices();
-    }, 2000);
+      if (document.hidden) return; // Pause when tab is minimized/hidden
+      const isWsLive = useStore.getState().isConnected && window._lastWsTick && (Date.now() - window._lastWsTick < 5000);
+      if (!isWsLive) {
+        refreshPrices();
+      }
+    }, 5000);
 
+    // ⚡ Smart User Data Polling: 30s when tab active, paused when hidden
     const userInterval = setInterval(() => {
+      if (document.hidden) return;
       if (user) fetchUserData();
-    }, 20000); // Fallback database poll every 20 seconds
+    }, 30000);
+
+    // ⚡ Instant Resync when user tabs back into the app
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshPrices(true);
+        if (user) fetchUserData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       clearInterval(priceInterval);
       clearInterval(userInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
