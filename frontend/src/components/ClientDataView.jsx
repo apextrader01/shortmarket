@@ -1,3 +1,5 @@
+import { subscribeUserToPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
+import { Bell, CheckCircle } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -53,6 +55,37 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [isPushEnabled, setIsPushEnabled] = useState(false);
+  const [pushStatusMsg, setPushStatusMsg] = useState('');
+  
+  useEffect(() => {
+    getPushSubscriptionStatus().then(setIsPushEnabled);
+  }, []);
+
+  const handleTogglePush = async () => {
+    try {
+      const token = localStorage.getItem('token') || (user && user.token);
+      setPushStatusMsg('Activating push...');
+      await subscribeUserToPush(token);
+      setIsPushEnabled(true);
+      setPushStatusMsg('Push Notifications Active! 🔔');
+      setTimeout(() => setPushStatusMsg(''), 3000);
+    } catch (err) {
+      alert('Push notification setup: ' + err.message);
+      setPushStatusMsg('');
+    }
+  };
+
+  const handleTestPush = async () => {
+    try {
+      const token = localStorage.getItem('token') || (user && user.token);
+      await triggerTestPushNotification(token);
+      setPushStatusMsg('Test alert sent! Check your notification center.');
+      setTimeout(() => setPushStatusMsg(''), 4000);
+    } catch (err) {
+      alert('Test push error: ' + err.message);
+    }
+  };
   
 
   const handleResetAccount = async () => {

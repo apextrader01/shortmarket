@@ -2277,6 +2277,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const finalOrder = await db('orders').where({ id: ord.id }).first();
     const finalStatus = finalOrder ? finalOrder.status : ord.status;
 
+    // Send instant push notification
+    sendPushNotification(req.user.id, {
+      title: `Order Placed: ${side} ${quantity} ${symbol}`,
+      body: `Status: ${finalStatus} (${product_type || 'INT'})`,
+      url: '/orders'
+    }).catch(() => {});
+
     res.json({ success: true, orderId: ord.id, status: finalStatus });
 
   } catch (error) {
@@ -2470,6 +2477,58 @@ app.get('/api/estimate-charges', authenticateToken, (req, res) => {
     res.json(taxes);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+
+// 🔔 Web Push Notification Endpoints 🔔
+const { sendPushNotification, vapidPublicKey } = require('./services/pushService');
+
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: vapidPublicKey });
+});
+
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+      return res.status(400).json({ error: 'Invalid subscription payload' });
+    }
+
+    const existing = await db('push_subscriptions').where({ endpoint }).first();
+    if (existing) {
+      await db('push_subscriptions').where({ endpoint }).update({
+        user_id: req.user.id,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        updated_at: new Date()
+      });
+    } else {
+      await db('push_subscriptions').insert({
+        user_id: req.user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth
+      });
+    }
+
+    res.json({ success: true, message: 'Push subscription registered successfully' });
+  } catch (err) {
+    console.error('Failed to save push subscription:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/push/test', authenticateToken, async (req, res) => {
+  try {
+    await sendPushNotification(req.user.id, {
+      title: '🔔 Short Edge Alert',
+      body: 'Live trade alerts and order push notifications are active on this device!',
+      url: '/clientdata'
+    });
+    res.json({ success: true, message: 'Test notification dispatched' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

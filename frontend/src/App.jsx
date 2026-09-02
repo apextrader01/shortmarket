@@ -1,3 +1,4 @@
+import { registerServiceWorker } from './services/pushManager';
 import React, { useEffect, useState } from 'react';
 import MarketWatch from './components/MarketWatch';
 import ChartWidget from './components/ChartWidget';
@@ -34,6 +35,9 @@ import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, Li
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
 function App() {
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
   const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, prices, toggleTheme, theme, setTheme, orderModal, editOrderModal, alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, prices: state.prices, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, alerts: state.alerts, updateAlert: state.updateAlert, clearOldAlerts: state.clearOldAlerts, pendingTriggers: state.pendingTriggers, updatePendingTrigger: state.updatePendingTrigger, placeOrder: state.placeOrder, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
