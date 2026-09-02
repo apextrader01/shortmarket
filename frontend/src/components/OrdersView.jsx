@@ -47,7 +47,7 @@ export default function OrdersView() {
     }
   };
 
-  const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Basket Orders', 'Alerts'];
+  const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Alerts'];
 
   const isToday = (dateString) => {
      if (!dateString) return false;
