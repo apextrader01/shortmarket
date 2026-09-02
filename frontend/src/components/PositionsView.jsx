@@ -212,38 +212,39 @@ export default function PositionsView() {
   };
 
   return (
-    <div style={{ padding: '24px', paddingBottom: '100px', width: '100%', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h2 style={{ fontSize: '22px', fontWeight: '800' }}>Positions</h2>
-          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '4px' }}>
+    <div style={{ padding: isMobile ? '12px 12px 80px 12px' : '24px', paddingBottom: '100px', width: '100%', boxSizing: 'border-box', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '12px' : '24px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', margin: 0 }}>Positions</h2>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px' }}>
             <button
               onClick={() => setViewMode('OPEN')}
-              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
             >
               OPEN
             </button>
             <button
               onClick={() => setViewMode('HOLDINGS')}
-              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
             >
               HOLDINGS
             </button>
             <button
               onClick={() => setViewMode('CLOSED')}
-              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-primary)', border: 'none', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
             >
               CLOSED
             </button>
           </div>
         </div>
-        {viewMode === 'OPEN' && (
+        {viewMode === 'OPEN' && flatPositions.length > 0 && (
           <button
             onClick={exitAllPositions}
             style={{
-              background: 'var(--color-red-light)', color: 'var(--text-primary)', border: 'none',
-              padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+              background: 'var(--color-red-light)', color: '#fff', border: 'none',
+              padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '4px', fontSize: isMobile ? '11px' : '12px', fontWeight: 'bold', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+              width: isMobile ? '100%' : 'auto'
             }}
           >
             EXIT ALL POSITIONS
@@ -271,8 +272,9 @@ export default function PositionsView() {
             }}
             style={{
               background: 'var(--color-red-light)', color: '#fff', border: 'none',
-              padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+              padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '4px', fontSize: isMobile ? '11px' : '12px', fontWeight: 'bold', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+              width: isMobile ? '100%' : 'auto'
             }}
           >
             EXIT ALL HOLDINGS ⚡
@@ -501,31 +503,33 @@ export default function PositionsView() {
         </>
       )}
 
-      {/* Global MTM Banner */}
-        <div style={{
-          position: 'fixed', bottom: '24px', right: '24px', 
-          background: 'var(--bg-panel)',
-          backdropFilter: 'blur(16px)', 
-          border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-          boxShadow: `0 12px 40px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
-          borderRadius: '16px',
-          padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '32px',
-          zIndex: 50, transition: 'all 0.3s ease'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Live market ticks</div>
+      {/* Global MTM Banner (Only on desktop to avoid covering mobile bottom nav) */}
+        {!isMobile && (
+          <div style={{
+            position: 'fixed', bottom: '24px', right: '24px', 
+            background: 'var(--bg-panel)',
+            backdropFilter: 'blur(16px)', 
+            border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+            boxShadow: `0 12px 40px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
+            borderRadius: '16px',
+            padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '32px',
+            zIndex: 50, transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Live market ticks</div>
+              </div>
+            </div>
+            <div style={{ 
+              fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px',
+              color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
+            }}>
+              {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
-          <div style={{ 
-            fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px',
-            color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
-          }}>
-            {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
+        )}
 
       {/* Partial Exit Modal */}
       {partialExitPos && (
