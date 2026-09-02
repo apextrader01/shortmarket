@@ -27,6 +27,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
+const SIPEngine = require('./services/sipEngine');
 
 const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
@@ -4011,7 +4012,6 @@ server.listen(PORT, async () => {
     const { initOrderExecutor } = require('./services/orderExecutor');
     const triggerEngine = require('./services/triggerEngine');
     const MTMRiskManager = require('./services/mtmRiskManager');
-const SIPEngine = require('./services/sipEngine');
     const { initCronJobs } = require('./services/cronJobs');
     const schedule = require('node-schedule');
 
