@@ -965,31 +965,35 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             }
 
             const mbKeys = await generalClient.keys('telemetry:mb:*');
+            const validKeys = [];
+            for (const k of mbKeys) {
+                const parts = k.split(':');
+                if (parts.length >= 5 && targetBuckets.has(parts[2])) {
+                    validKeys.push({ key: k, type: parts[3], identifier: parts.slice(4).join(':') });
+                }
+            }
+
+            const pipeline = generalClient.multi();
+            validKeys.forEach(vk => pipeline.hGetAll(vk.key));
+            const results = validKeys.length > 0 ? await pipeline.exec() : [];
+
             const apiMap = {};
             const userMap = {};
 
-            for (const k of mbKeys) {
-                const parts = k.split(':');
-                if (parts.length < 5) continue;
-                const bucket = parts[2];
-                const type = parts[3];
-                const identifier = parts.slice(4).join(':');
-
-                if (!targetBuckets.has(bucket)) continue;
-
-                const data = await generalClient.hGetAll(k);
-                if (type === 'api') {
-                    if (!apiMap[identifier]) apiMap[identifier] = { route: identifier, count: 0, totalTime: 0, totalBytes: 0 };
-                    apiMap[identifier].count += parseInt(data.count || 0, 10);
-                    apiMap[identifier].totalTime += parseInt(data.time_ms || 0, 10);
-                    apiMap[identifier].totalBytes += parseInt(data.bytes || 0, 10);
-                } else if (type === 'user') {
-                    if (!userMap[identifier]) userMap[identifier] = { userId: identifier, apiCalls: 0, apiBytes: 0, apiTimeMs: 0, wsMinutes: 0 };
-                    userMap[identifier].apiCalls += parseInt(data.api_calls || 0, 10);
-                    userMap[identifier].apiTimeMs += parseInt(data.api_time_ms || 0, 10);
-                    userMap[identifier].apiBytes += parseInt(data.api_bytes || 0, 10);
+            validKeys.forEach((vk, idx) => {
+                const data = results[idx] || {};
+                if (vk.type === 'api') {
+                    if (!apiMap[vk.identifier]) apiMap[vk.identifier] = { route: vk.identifier, count: 0, totalTime: 0, totalBytes: 0 };
+                    apiMap[vk.identifier].count += parseInt(data.count || 0, 10);
+                    apiMap[vk.identifier].totalTime += parseInt(data.time_ms || 0, 10);
+                    apiMap[vk.identifier].totalBytes += parseInt(data.bytes || 0, 10);
+                } else if (vk.type === 'user') {
+                    if (!userMap[vk.identifier]) userMap[vk.identifier] = { userId: vk.identifier, apiCalls: 0, apiBytes: 0, apiTimeMs: 0, wsMinutes: 0 };
+                    userMap[vk.identifier].apiCalls += parseInt(data.api_calls || 0, 10);
+                    userMap[vk.identifier].apiTimeMs += parseInt(data.api_time_ms || 0, 10);
+                    userMap[vk.identifier].apiBytes += parseInt(data.api_bytes || 0, 10);
                 }
-            }
+            });
 
             const apiStats = Object.values(apiMap);
             const userStats = [];
