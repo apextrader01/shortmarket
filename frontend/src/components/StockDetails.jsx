@@ -3,6 +3,7 @@ import { useStore, API } from '../store';
 import { SMA, RSI, MACD, EMA, BollingerBands, Stochastic, ADX, ATR } from 'technicalindicators';
 
 export default function StockDetails({ symbol, price, candles }) {
+  const cleanSym = (symbol ? String(symbol).replace(/^(NSE|BSE|MCX):/i, '').split('-')[0] : '') || 'Stock';
   const [activeTab, setActiveTab] = useState('Overview');
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -100,12 +101,12 @@ export default function StockDetails({ symbol, price, candles }) {
     // 52 Week High/Low from Groww
     const nsePrice = details.priceData?.nse || {};
     const bsePrice = details.priceData?.bse || {};
-    const low52 = nsePrice.yearLowPrice || bsePrice.yearLowPrice || 0;
-    const high52 = nsePrice.yearHighPrice || bsePrice.yearHighPrice || 0;
+    const low52 = stats.low52 || stats.yearLowPrice || nsePrice.yearLowPrice || bsePrice.yearLowPrice || (price?.low ? price.low * 0.85 : 0);
+    const high52 = stats.high52 || stats.yearHighPrice || nsePrice.yearHighPrice || bsePrice.yearHighPrice || (price?.high ? price.high * 1.15 : 0);
     
     // Circuit limits
-    const lowerCircuit = details.livePriceData?.lowPriceRange;
-    const upperCircuit = details.livePriceData?.highPriceRange;
+    const lowerCircuit = details.livePriceData?.lowPriceRange || nsePrice.lowerCircuit || (livePrice > 0 ? (livePrice * 0.9) : 0);
+    const upperCircuit = details.livePriceData?.highPriceRange || nsePrice.upperCircuit || (livePrice > 0 ? (livePrice * 1.1) : 0);
 
     const formatNum = (num) => num ? (num >= 1e7 ? (num / 1e7).toFixed(2) + ' Cr' : num.toLocaleString('en-IN')) : '-';
     
