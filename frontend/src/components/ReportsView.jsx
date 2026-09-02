@@ -48,7 +48,8 @@ const LedgerStatement = () => {
   }, []);
   
   // Filter states
-  const [filterPeriod, setFilterPeriod] = useState('Week');
+  const [filterPeriod, setFilterPeriod] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -114,6 +115,8 @@ const LedgerStatement = () => {
       if (filterPeriod === '15 Days' && diffDays > 15) return false;
       if (filterPeriod === 'Month' && diffDays > 30) return false;
       if (filterPeriod === '3 Months' && diffDays > 90) return false;
+      if (filterPeriod === 'All') return true;
+      if (filterPeriod === 'All') return true;
     }
 
     return true;
@@ -152,7 +155,7 @@ const LedgerStatement = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Period:</span>
           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
-            {['Week', '15 Days', 'Month', '3 Months'].map(p => (
+            {['Week', '15 Days', 'Month', '3 Months', 'All'].map(p => (
               <span 
                 key={p} 
                 onClick={() => setFilterPeriod(p)}
@@ -282,6 +285,7 @@ const LedgerStatement = () => {
             </tbody>
           </table>
         )}
+        <Pagination currentPage={insightsPage} totalPages={Math.ceil(executedOrders.length / 50) || 1} onPageChange={setInsightsPage} totalItems={executedOrders.length} pageSize={50} />
       </div>
     </div>
   );
@@ -353,7 +357,8 @@ const CalendarHeatmap = ({ orders }) => {
 };
 
 const TradesAndCharges = () => {
-  const [filterPeriod, setFilterPeriod] = useState('15 Days');
+  const [filterPeriod, setFilterPeriod] = useState('All');
+  const [tradesPage, setTradesPage] = useState(1);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -436,7 +441,7 @@ const TradesAndCharges = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Date Range:</span>
           <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
-            {['Week', '15 Days', 'Month', '3 Months'].map(p => (
+            {['Week', '15 Days', 'Month', '3 Months', 'All'].map(p => (
               <span 
                 key={p} 
                 onClick={() => setFilterPeriod(p)}
@@ -1161,6 +1166,7 @@ const DownloadReports = () => {
 };
 
 const TradingInsights = () => {
+  const [insightsPage, setInsightsPage] = useState(1);
   const [filterPeriod, setFilterPeriod] = useState('Month');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -1297,7 +1303,7 @@ const TradingInsights = () => {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
            <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Instrument: <span style={{ color: 'var(--color-blue-light)' }}>F/O Trading Insights</span></div>
            <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', overflow: 'hidden' }}>
-             {['Week', '15 Days', 'Month', '3 Months', 'Custom'].map(f => (
+             {['Week', '15 Days', 'Month', '3 Months', 'All', 'Custom'].map(f => (
                <div key={f} onClick={() => setFilterPeriod(f)} style={{ padding: '8px 16px', fontSize: '12px', cursor: 'pointer', background: filterPeriod === f ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: filterPeriod === f ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
                  {f}
                </div>
@@ -1351,7 +1357,7 @@ const TradingInsights = () => {
             {executedOrders.length === 0 ? (
               <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</div>
             ) : (
-              executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
+              executedOrders.slice().reverse().slice((insightsPage - 1) * 50, insightsPage * 50).map((o, idx) => {
                 const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
                 const pnlVal = isPnLAvailable ? parseFloat(o.realized_pnl) : null;
                 const side = o.side || o.type || 'BUY';
@@ -1392,7 +1398,7 @@ const TradingInsights = () => {
               {executedOrders.length === 0 ? (
                 <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No trade data available</td></tr>
               ) : (
-                executedOrders.slice().reverse().slice(0, 50).map((o, idx) => {
+                executedOrders.slice().reverse().slice((insightsPage - 1) * 50, insightsPage * 50).map((o, idx) => {
                   const isPnLAvailable = o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0;
                   const pnl = isPnLAvailable ? parseFloat(o.realized_pnl).toFixed(2) : '--';
                   return (
@@ -1421,6 +1427,71 @@ const TradingInsights = () => {
 };
 
 // --- Main ReportsView Component ---
+
+
+function Pagination({ currentPage, totalPages, onPageChange, totalItems, pageSize = 50 }) {
+  if (!totalItems || totalPages <= 1) return null;
+  const startIdx = (currentPage - 1) * pageSize + 1;
+  const endIdx = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 12px', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+        Showing <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{startIdx}</span> - <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{endIdx}</span> of <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{totalItems}</span> entries
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <button
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          style={{
+            padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-color)',
+            background: currentPage === 1 ? 'transparent' : 'var(--bg-hover)',
+            color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600'
+          }}
+        >
+          Previous
+        </button>
+
+        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+          let pageNum;
+          if (totalPages <= 5) pageNum = i + 1;
+          else if (currentPage <= 3) pageNum = i + 1;
+          else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+          else pageNum = currentPage - 2 + i;
+          return (
+            <button
+              key={pageNum}
+              onClick={() => onPageChange(pageNum)}
+              style={{
+                padding: '5px 10px', borderRadius: '6px',
+                border: pageNum === currentPage ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                background: pageNum === currentPage ? 'var(--color-blue)' : 'var(--bg-hover)',
+                color: pageNum === currentPage ? '#fff' : 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: '12px', fontWeight: '700', minWidth: '32px'
+              }}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+
+        <button
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          style={{
+            padding: '5px 12px', borderRadius: '6px', border: '1px solid var(--border-color)',
+            background: currentPage === totalPages ? 'transparent' : 'var(--bg-hover)',
+            color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text-primary)',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: '600'
+          }}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ReportsView({ initialTab = 'Statement - Ledger', onBack }) {
   const [activeTab, setActiveTab] = useState(initialTab);

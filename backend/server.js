@@ -2036,7 +2036,8 @@ app.get('/api/options/futures/:symbol', async (req, res) => {
 // ─── Order Management ───────────────────────────────────────────────────────────────
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
-    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(150);
+    const limit = parseInt(req.query.limit) || 5000;
+    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit);
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2475,10 +2476,11 @@ app.get('/api/estimate-charges', authenticateToken, (req, res) => {
 // 📖 Get Ledger History 📖
 app.get('/api/ledger', authenticateToken, async (req, res) => {
   try {
+    const limit = parseInt(req.query.limit) || 5000;
     const ledger = await db('ledger')
       .where({ user_id: req.user.id })
       .orderBy('created_at', 'desc')
-      .limit(100);
+      .limit(limit);
     res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });
