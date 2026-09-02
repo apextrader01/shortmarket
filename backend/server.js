@@ -3066,39 +3066,59 @@ async function fetchGoogleNews(symbol) {
 
 app.get('/api/stocks/:symbol/details', async (req, res) => {
   const symbol = req.params.symbol;
-  let rawName = symbol.split('-')[0];
-
-  if (stockDetailsCache[rawName] && (Date.now() - stockDetailsCache[rawName].timestamp < 3600000)) {
-    return res.json(stockDetailsCache[rawName].data);
-  }
+  // Clean symbol by stripping exchange prefix (NSE:, BSE:, MCX:) and suffix (-EQ, -A, -B, -INDEX, etc.)
+  let cleanName = symbol.replace(/^(NSE|BSE|MCX):/i, '').split('-')[0].trim();
 
   // Derivatives (Options/Futures) won't be found on Groww stock search.
-  // Return a mock payload so the frontend doesn't crash with 404.
-  const isDerivative = !symbol.endsWith('-EQ') && !symbol.endsWith('-INDEX');
+  const isDerivative = /(CE|PE|\d+FUT)$/i.test(symbol) || symbol.includes('FUT') || symbol.includes('CE') || symbol.includes('PE');
   if (isDerivative) {
     return res.json({
-      header: { companyName: rawName },
+      header: { companyName: symbol, nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Derivatives' },
       priceData: {},
       stats: {},
-      details: {},
+      details: { businessSummary: `Derivative contract (${symbol}) traded on Indian financial exchanges.`, managingDirector: '-', foundedYear: '-' },
       isDerivative: true
     });
   }
 
+  if (stockDetailsCache[cleanName] && (Date.now() - stockDetailsCache[cleanName].timestamp < 3600000)) {
+    return res.json(stockDetailsCache[cleanName].data);
+  }
+
   try {
     // 1. Find Groww search_id
-    const searchRes = await fetch(`https://groww.in/v1/api/search/v1/entity?app=false&entity_type=stocks&size=1&q=${encodeURIComponent(rawName)}`);
-    const searchData = await searchRes.json();
+    const searchRes = await fetch(`https://groww.in/v1/api/search/v1/entity?app=false&entity_type=stocks&size=5&q=${encodeURIComponent(cleanName)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const searchData = await searchRes.json().catch(() => ({}));
     
-    if (!searchData || !searchData.content || searchData.content.length === 0) {
-      return res.status(404).json({ error: 'Stock not found on Groww' });
+    let searchId = null;
+    let matchedItem = null;
+    if (searchData && Array.isArray(searchData.content) && searchData.content.length > 0) {
+      matchedItem = searchData.content.find(c => 
+        (c.nse_script_code && c.nse_script_code.toUpperCase() === cleanName.toUpperCase()) ||
+        (c.bse_scrip_code && String(c.bse_scrip_code).toUpperCase() === cleanName.toUpperCase()) ||
+        (c.search_id && c.search_id.toUpperCase().includes(cleanName.toUpperCase()))
+      ) || searchData.content[0];
+      searchId = matchedItem?.search_id;
     }
-    const searchId = searchData.content[0].search_id;
+
+    if (!searchId) {
+      // Return a clean fallback object instead of 404 error
+      const fallback = {
+        header: { companyName: cleanName, nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Equity' },
+        priceData: {},
+        stats: {},
+        details: { businessSummary: `${cleanName} is a publicly traded security on Indian stock exchanges.`, managingDirector: '-', foundedYear: '-' },
+        fundamentals: []
+      };
+      return res.json(fallback);
+    }
 
     // 2. Fetch full details from Groww and live price data for circuits
     const [detailsRes, liveRes] = await Promise.all([
-      fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`),
-      fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${rawName}/latest`).catch(() => null)
+      fetch(`https://groww.in/v1/api/stocks_data/v1/company/search_id/${searchId}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
+      fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${cleanName}/latest`, { headers: { 'User-Agent': 'Mozilla/5.0' } }).catch(() => null)
     ]);
     const data = await detailsRes.json();
     const liveData = liveRes && liveRes.ok ? await liveRes.json().catch(() => null) : null;
@@ -3106,13 +3126,22 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     if (liveData) {
       data.livePriceData = liveData;
     }
+
+    // Ensure header has clean readable symbol codes
+    if (data.header) {
+      if (!data.header.nseScriptCode && !data.header.bseScriptCode) {
+        data.header.nseScriptCode = cleanName;
+      }
+    }
     
     if (data.similarAssets && data.similarAssets.peerList) {
-      const peerPromises = data.similarAssets.peerList.map(p => 
-        fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${p.companyHeader.nseScriptCode || p.companyHeader.bseScriptCode}/latest`)
+      const peerPromises = data.similarAssets.peerList.map(p => {
+        const pCode = p.companyHeader?.nseScriptCode || p.companyHeader?.bseScriptCode;
+        if (!pCode) return Promise.resolve(null);
+        return fetch(`https://groww.in/v1/api/stocks_data/v1/tr_live_prices/exchange/NSE/segment/CASH/${pCode}/latest`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
           .then(r => r.json())
-          .catch(() => null)
-      );
+          .catch(() => null);
+      });
       const peerLivePrices = await Promise.all(peerPromises);
       data.similarAssets.peerList.forEach((p, i) => {
         if (peerLivePrices[i]) {
@@ -3121,13 +3150,24 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
       });
     }
     
-    data.news = await fetchGoogleNews(rawName); // Replaced with Google News RSS
+    try {
+      data.news = await fetchGoogleNews(cleanName);
+    } catch(e) {
+      data.news = [];
+    }
 
-    stockDetailsCache[rawName] = { timestamp: Date.now(), data };
+    stockDetailsCache[cleanName] = { timestamp: Date.now(), data };
     res.json(data);
   } catch (err) {
-    console.error('Groww API Error for', rawName, err.message);
-    res.status(500).json({ error: 'Failed to fetch stock details', details: err.message, stack: err.stack });
+    console.error('Stock Details Fetch Error for', cleanName, err.message);
+    const fallback = {
+      header: { companyName: cleanName, nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Equity' },
+      priceData: {},
+      stats: {},
+      details: { businessSummary: `${cleanName} is a publicly traded security on Indian stock exchanges.`, managingDirector: '-', foundedYear: '-' },
+      fundamentals: []
+    };
+    res.json(fallback);
   }
 });
 

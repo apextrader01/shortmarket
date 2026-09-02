@@ -158,7 +158,7 @@ export default function StockDetails({ symbol, price, candles }) {
           <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Open price</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.open ? price.open.toFixed(2) : '-'}</span>
+              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.open ? price.open.toFixed(2) : (details.livePriceData?.open ? Number(details.livePriceData.open).toFixed(2) : (price?.close ? price.close.toFixed(2) : '-'))}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Previous close</span>
@@ -196,12 +196,12 @@ export default function StockDetails({ symbol, price, candles }) {
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>About Company</h4>
           <p style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: '1.6', marginBottom: '16px', opacity: 0.9 }}>
-            {profile.businessSummary ? profile.businessSummary.substring(0, 300) + '...' : 'No description available.'}
+            {profile.businessSummary ? profile.businessSummary.substring(0, 400) + '...' : (profile.aboutCompany || `${header.companyName || cleanSym} is an actively traded enterprise listed on Indian stock exchanges.`)}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div className="glass-panel" style={{ padding: '10px' }}>
               <div style={{ fontSize: '10px', color: '#94A3B8' }}>MD/CEO</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.managingDirector || profile.ceo || '-'}</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.managingDirector || profile.ceo || profile.directors?.[0] || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
               <div style={{ fontSize: '10px', color: '#94A3B8' }}>Founded</div>
@@ -209,7 +209,7 @@ export default function StockDetails({ symbol, price, candles }) {
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
               <div style={{ fontSize: '10px', color: '#94A3B8' }}>Symbol</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.nseScriptCode || header.bseScriptCode || '-'}</div>
+              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.nseScriptCode || header.bseScriptCode || cleanSym || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
               <div style={{ fontSize: '10px', color: '#94A3B8' }}>Industry</div>
