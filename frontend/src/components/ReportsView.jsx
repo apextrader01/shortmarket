@@ -285,7 +285,7 @@ const LedgerStatement = () => {
             </tbody>
           </table>
         )}
-        <Pagination currentPage={insightsPage} totalPages={Math.ceil(executedOrders.length / 50) || 1} onPageChange={setInsightsPage} totalItems={executedOrders.length} pageSize={50} />
+        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={filteredLedger.length} pageSize={pageSize} />
       </div>
     </div>
   );
@@ -1421,6 +1421,7 @@ const TradingInsights = () => {
             </tbody>
           </table>
         )}
+        <Pagination currentPage={insightsPage} totalPages={Math.ceil(executedOrders.length / 50) || 1} onPageChange={setInsightsPage} totalItems={executedOrders.length} pageSize={50} />
       </div>
     </div>
   );
