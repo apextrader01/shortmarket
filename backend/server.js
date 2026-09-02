@@ -2495,6 +2495,19 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid subscription payload' });
     }
 
+    // Ensure push_subscriptions table exists defensively
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const existing = await db('push_subscriptions').where({ endpoint }).first();
     if (existing) {
       await db('push_subscriptions').where({ endpoint }).update({
