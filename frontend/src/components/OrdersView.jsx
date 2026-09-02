@@ -5,6 +5,12 @@ import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
 
 export default function OrdersView() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const { orders, pendingTriggers, removePendingTrigger } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger })));
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -212,7 +218,163 @@ export default function OrdersView() {
               )}
             </div>
             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table className={`responsive-mobile-table orders-layout ${activeTab === 'Pending Triggers' ? 'triggers-table' : 'orders-table'}`} style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
+            {/* 📱 High-Density Kite/Fyers-Style Mobile Order List (Only renders on mobile screens) */}
+            {isMobile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                {activeTab === 'Pending Triggers' ? (
+                  displayTriggers.map(trigger => {
+                    const isBuy = trigger.side === 'BUY';
+                    const timeStr = trigger.createdAt ? new Date(trigger.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                    return (
+                      <div
+                        key={trigger.id}
+                        style={{
+                          padding: '12px 14px',
+                          borderBottom: '1px solid rgba(255,255,255,0.06)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: isBuy ? 'var(--color-green-light)' : 'var(--color-red-light)', background: isBuy ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '1px 6px', borderRadius: '3px' }}>
+                              {trigger.side}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Qty. {Number(trigger.quantity)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
+                            <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-yellow)' }}>TRIGGER PENDING</span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            {(trigger.symbol || '').split('-')[0]}
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-blue)' }}>
+                            Trg: ₹{(trigger.triggerPrice || trigger.limitPrice || 0).toFixed(2)}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          <div>{trigger.productType} • {trigger.type}</div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {trigger.isBackendOrder && (
+                              <button onClick={() => useStore.getState().openEditOrderModal(trigger)} style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                                EDIT
+                              </button>
+                            )}
+                            <button onClick={() => { if (window.confirm('Cancel trigger?')) { if (trigger.isBackendOrder) useStore.getState().cancelOrder(trigger.id); else removePendingTrigger(trigger.id); } }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                              CANCEL
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  displayOrders.map(order => {
+                    const isBuy = order.side === 'BUY';
+                    const isExecuted = order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE';
+                    const isPending = order.status === 'PENDING';
+                    const statusColor = isExecuted ? 'var(--color-green-light)' : (isPending ? 'var(--color-yellow)' : 'var(--color-red-light)');
+                    const timeStr = order.created_at ? new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+                    const pnlVal = order.realized_pnl ? parseFloat(order.realized_pnl) : 0;
+                    const priceVal = parseFloat(order.average_price || order.price || 0);
+
+                    return (
+                      <div
+                        key={order.id}
+                        onClick={() => setSelectedOrder(order)}
+                        style={{
+                          padding: '10px 14px',
+                          borderBottom: '1px solid rgba(255,255,255,0.06)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {/* Top Line: Side & Qty (Left) | Time & Status (Right) */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: isBuy ? 'var(--color-green-light)' : 'var(--color-red-light)', background: isBuy ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', padding: '1px 5px', borderRadius: '3px' }}>
+                              {order.side}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              Qty. {Number(order.quantity)}/{Number(order.quantity)}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
+                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: statusColor }}>
+                              {order.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Main Line: Symbol Name (Left) | Execution Price (Right) */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%' }}>
+                            {(order.symbol || '').split('-')[0]}
+                          </div>
+                          <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            ₹{priceVal.toFixed(2)}
+                          </div>
+                        </div>
+
+                        {/* Bottom Line: Product/Exchange (Left) | Tag & Realized P&L (Right) */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span>{order.symbol?.includes(':') ? order.symbol.split(':')[0] : 'NSE'}</span>
+                            <span>{order.product_type || 'NRML'}</span>
+                            <span>{order.type || 'MKT'}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {pnlVal !== 0 && (
+                              <span style={{ color: pnlVal > 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>
+                                {pnlVal > 0 ? '+' : ''}₹{pnlVal.toFixed(2)}
+                              </span>
+                            )}
+                            {activeTab === 'Order History' && (
+                              order.tag ? (
+                                <span 
+                                  onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
+                                  style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '1px 5px', borderRadius: '3px', fontWeight: '600' }}
+                                >
+                                  {order.tag}
+                                </span>
+                              ) : (
+                                <span 
+                                  onClick={(e) => { e.stopPropagation(); openTagModal(order); }}
+                                  style={{ fontSize: '10px', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)', padding: '1px 5px', borderRadius: '3px' }}
+                                >
+                                  + Tag
+                                </span>
+                              )
+                            )}
+                            {activeTab === 'Open Orders' && (
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button onClick={(e) => { e.stopPropagation(); useStore.getState().openEditOrderModal(order); }} style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                                  EDIT
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Cancel order?')) useStore.getState().cancelOrder(order.id); }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                                  CANCEL
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              /* 🖥️ Full Desktop Table (Unchanged for web screens) */
+            <table className="desktop-orders-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 {activeTab === 'Pending Triggers' ? (
                   <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
@@ -410,6 +572,7 @@ export default function OrdersView() {
                 )}
               </tbody>
             </table>
+            )}
             </div>
           </div>
         )}
