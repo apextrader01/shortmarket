@@ -4,6 +4,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X } from 'lucide-react';
 
 export default function PositionsView() {
+  const isToday = (dateString) => {
+    if (!dateString) return false;
+    const d = new Date(dateString);
+    const today = new Date();
+    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+  };
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -26,15 +32,15 @@ export default function PositionsView() {
   } else if (viewMode === 'OPEN') {
     sourceData = (positions || []).filter(p => Number(p.quantity) !== 0);
   } else if (viewMode === 'CLOSED') {
-    // 1. Include explicit closed positions from database
-    const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0);
+    // 1. Include explicit closed positions updated/closed today
+    const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
     
-    // 2. Synthesize closed positions from executed orders that recorded realized P&L
+    // 2. Synthesize closed positions from executed orders that recorded realized P&L TODAY
     const closedOrdersMap = {};
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
       const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
-      if (isExecuted && hasRealizedPnl) {
+      if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at)) {
         const key = `${o.symbol}-${o.product_type || 'INT'}`;
         if (!closedOrdersMap[key]) {
           closedOrdersMap[key] = {
