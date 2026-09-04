@@ -1496,6 +1496,29 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
       .where({ user_id: req.user.id })
       .whereNot({ quantity: 0 })
       .orderBy('id', 'desc');
+
+    // Auto-align legacy MF holdings (EDEL, MIRA, NIPP) with real AMFI NAVs and calculate correct units
+    const LEGACY_FIX_MAP = {
+      'EDEL-MF': { code: '118615', fallbackNav: 61.66 },
+      'EDEL':    { code: '118615', fallbackNav: 61.66 },
+      'MIRA-MF': { code: '118825', fallbackNav: 126.99 },
+      'MIRA':    { code: '118825', fallbackNav: 126.99 },
+      'NIPP-MF': { code: '118778', fallbackNav: 209.96 },
+      'NIPP':    { code: '118778', fallbackNav: 209.96 }
+    };
+
+    for (const h of holdings) {
+      if (LEGACY_FIX_MAP[h.symbol] && Math.round(Number(h.average_price)) === 100) {
+        const item = LEGACY_FIX_MAP[h.symbol];
+        const realNav = priceCache[h.symbol]?.ltp || item.fallbackNav;
+        const invested = Number(h.quantity) * Number(h.average_price);
+        const correctedQty = parseFloat((invested / realNav).toFixed(4));
+        h.average_price = realNav;
+        h.quantity = correctedQty;
+        db('holdings').where({ id: h.id }).update({ average_price: realNav, quantity: correctedQty }).catch(() => {});
+      }
+    }
+
     res.json(holdings);
   } catch (err) {
     res.status(500).json({ error: err.message });
