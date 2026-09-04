@@ -467,19 +467,27 @@ export const useStore = create(persist((set, get) => ({
       set((state) => ({ prices: applySnapshot(snapshot, state, false) }));
     });
 
+    let pendingSnapshots = {};
+    let snapshotThrottleTimer = null;
+
+    const flushSnapshots = () => {
+      if (Object.keys(pendingSnapshots).length > 0) {
+        const batch = pendingSnapshots;
+        pendingSnapshots = {};
+        set((state) => ({ prices: applySnapshot(batch, state, true) }));
+      }
+      snapshotThrottleTimer = null;
+    };
+
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
       // isFromWebSocket = true — these are real live ticks, block REST for 4s
       window._lastWsTick = Date.now();
-      set((state) => ({ prices: applySnapshot(snapshot, state, true) }));
+      Object.assign(pendingSnapshots, snapshot);
+      if (!snapshotThrottleTimer) {
+        snapshotThrottleTimer = setTimeout(flushSnapshots, 80); // ~12 updates/sec max, smooth 80ms throttle
+      }
     });
-    
-    // Keep TOP_INDICES alive in the backend so they don't freeze after 30s GC
-    if (!window._topIndicesPingInterval) {
-      window._topIndicesPingInterval = setInterval(() => {
-        socket.emit('ping_subscriptions', ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
-      }, 15000);
-    }
 
     // Polling fallback: Force sync all subscribed symbols from REST API every 15s
     // ONLY if the WebSocket is disconnected, to prevent flickering between REST and WS prices

@@ -34,11 +34,149 @@ import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, Li
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
+// ⚡ Isolated Top Index Ticker: Prevents App.jsx from re-rendering when index prices tick
+const TopIndexTicker = React.memo(() => {
+  const prices = useStore(state => state.prices);
+  return (
+    <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
+      {TOP_INDICES.map((idx) => {
+        const p = prices[idx];
+        const isUp = p?.pct >= 0;
+        return (
+          <div
+            key={idx}
+            style={{
+              display:      'flex',
+              alignItems:   'center',
+              gap:          '4px',
+              background:   p
+                ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
+                : 'rgba(255,255,255,0.05)',
+              color: p
+                ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
+                : 'var(--text-secondary)',
+              padding:      '2px 6px',
+              borderRadius: '12px',
+              fontSize:     '10px',
+              fontWeight:   '700',
+            }}
+          >
+            {p && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
+            {idx.split('-')[0]}{' '}
+            {p ? `${p.ltp.toFixed(2)}` : '...'}
+            {p && (
+              <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
+                {p.change !== undefined ? `${p.change > 0 ? '+' : ''}${Number(p.change).toFixed(2)} (${p.pct > 0 ? '+' : ''}${Number(p.pct).toFixed(2)}%)` : ''}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+
+// ⚡ Isolated Background Alert & Trigger Monitor: Runs checks without re-rendering App.jsx
+const BackgroundPriceMonitor = React.memo(() => {
+  const prices = useStore(state => state.prices);
+  const alerts = useStore(state => state.alerts);
+  const updateAlert = useStore(state => state.updateAlert);
+  const pendingTriggers = useStore(state => state.pendingTriggers);
+  const updatePendingTrigger = useStore(state => state.updatePendingTrigger);
+  const placeOrder = useStore(state => state.placeOrder);
+
+  // Background Alert Checking Engine
+  useEffect(() => {
+    alerts.forEach(alert => {
+      if (alert.triggered) return;
+      const priceData = prices[alert.symbol];
+      if (!priceData) return;
+      
+      const ltp = priceData.ltp;
+      let triggered = false;
+      
+      if (alert.condition === 'ABOVE' && ltp >= alert.targetPrice) {
+        triggered = true;
+      } else if (alert.condition === 'BELOW' && ltp <= alert.targetPrice) {
+        triggered = true;
+      }
+      
+      if (triggered) {
+        updateAlert(alert.id, { triggered: true, triggeredAt: new Date().toISOString(), triggerPrice: ltp });
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Price Alert Triggered! 🚨", {
+            body: `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
+            icon: '/logo.png'
+          });
+        }
+      }
+    });
+  }, [prices, alerts, updateAlert]);
+
+  // Client-Side Advanced Order Trigger Engine
+  useEffect(() => {
+    pendingTriggers.forEach(trigger => {
+      if (trigger.status !== 'PENDING_TRIGGER') return;
+      const priceData = prices[trigger.symbol];
+      if (!priceData) return;
+      
+      const ltp = priceData.ltp;
+      let isBreached = false;
+      let newTriggerPrice = trigger.triggerPrice;
+      
+      if (trigger.type === 'GTT') {
+         if (trigger.side === 'BUY' && ltp <= trigger.triggerPrice) isBreached = true;
+         if (trigger.side === 'SELL' && ltp >= trigger.triggerPrice) isBreached = true;
+      } 
+      else if (trigger.type === 'SL' || trigger.type === 'TRAILING_SL') {
+         if (trigger.side === 'BUY' && ltp >= trigger.triggerPrice) isBreached = true;
+         if (trigger.side === 'SELL' && ltp <= trigger.triggerPrice) isBreached = true;
+         
+         if (trigger.type === 'TRAILING_SL' && trigger.trailingJump > 0 && !isBreached) {
+            if (trigger.side === 'BUY') {
+                if (ltp <= trigger.triggerPrice - trigger.trailingJump) {
+                    newTriggerPrice = trigger.triggerPrice - trigger.trailingJump;
+                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
+                }
+            } else {
+                if (ltp >= trigger.triggerPrice + trigger.trailingJump) {
+                    newTriggerPrice = trigger.triggerPrice + trigger.trailingJump;
+                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
+                }
+            }
+         }
+      }
+      
+      if (isBreached) {
+         updatePendingTrigger(trigger.id, { status: 'EXECUTED', executedAt: new Date().toISOString(), executionPrice: ltp });
+         
+         placeOrder({
+            symbol: trigger.symbol,
+            type: trigger.limitPrice ? 'LIMIT' : 'MARKET',
+            side: trigger.side,
+            quantity: trigger.quantity,
+            price: trigger.limitPrice || 0,
+            product_type: trigger.productType
+         });
+         
+         if ("Notification" in window && Notification.permission === "granted") {
+           new Notification(`${trigger.type} Order Triggered! 🎯`, {
+             body: `${trigger.side} ${trigger.quantity} ${trigger.symbol} @ ₹${ltp.toFixed(2)}`,
+             icon: '/logo.png'
+           });
+         }
+      }
+    });
+  }, [prices, pendingTriggers, updatePendingTrigger, placeOrder]);
+
+  return null;
+});
+
 function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, prices, toggleTheme, theme, setTheme, orderModal, editOrderModal, alerts, updateAlert, clearOldAlerts, pendingTriggers, updatePendingTrigger, placeOrder, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, prices: state.prices, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, alerts: state.alerts, updateAlert: state.updateAlert, clearOldAlerts: state.clearOldAlerts, pendingTriggers: state.pendingTriggers, updatePendingTrigger: state.updatePendingTrigger, placeOrder: state.placeOrder, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
+  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
   const [isDismissedAnnouncement, setIsDismissedAnnouncement] = useState(false);
@@ -213,99 +351,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedSymbol, stocks]);
 
-  // Background Alert Checking Engine
-  useEffect(() => {
-    alerts.forEach(alert => {
-      if (alert.triggered) return;
-      const priceData = prices[alert.symbol];
-      if (!priceData) return;
-      
-      const ltp = priceData.ltp;
-      let triggered = false;
-      
-      if (alert.condition === 'ABOVE' && ltp >= alert.targetPrice) {
-        triggered = true;
-      } else if (alert.condition === 'BELOW' && ltp <= alert.targetPrice) {
-        triggered = true;
-      }
-      
-      if (triggered) {
-        updateAlert(alert.id, { triggered: true, triggeredAt: new Date().toISOString(), triggerPrice: ltp });
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Price Alert Triggered! 🚨", {
-            body: `${alert.symbol} crossed ${alert.condition.toLowerCase()} ₹${alert.targetPrice}. Current price is ₹${ltp.toFixed(2)}`,
-            icon: '/logo.png'
-          });
-        }
-      }
-    });
-  }, [prices, alerts, updateAlert]);
-
-  // Client-Side Advanced Order Trigger Engine
-  useEffect(() => {
-    pendingTriggers.forEach(trigger => {
-      if (trigger.status !== 'PENDING_TRIGGER') return;
-      const priceData = prices[trigger.symbol];
-      if (!priceData) return;
-      
-      const ltp = priceData.ltp;
-      
-      let isBreached = false;
-      let newTriggerPrice = trigger.triggerPrice;
-      
-      // GTT Logic: usually GTT BUY is when price drops to/below trigger, GTT SELL is when price rises to/above trigger.
-      if (trigger.type === 'GTT') {
-         if (trigger.side === 'BUY' && ltp <= trigger.triggerPrice) isBreached = true;
-         if (trigger.side === 'SELL' && ltp >= trigger.triggerPrice) isBreached = true;
-      } 
-      // Stop Loss Logic: SL BUY is when price rises to/above trigger, SL SELL is when price drops to/below trigger.
-      else if (trigger.type === 'SL' || trigger.type === 'TRAILING_SL') {
-         if (trigger.side === 'BUY' && ltp >= trigger.triggerPrice) isBreached = true;
-         if (trigger.side === 'SELL' && ltp <= trigger.triggerPrice) isBreached = true;
-         
-         // Trailing logic
-         if (trigger.type === 'TRAILING_SL' && trigger.trailingJump > 0 && !isBreached) {
-            if (trigger.side === 'BUY') {
-                // If we are short (buy to cover SL), as price drops, we trail SL down.
-                // But normally trailing SL is relative to a reference price. 
-                // For simplicity: if LTP drops below (triggerPrice - trailingJump), we move triggerPrice down.
-                if (ltp <= trigger.triggerPrice - trigger.trailingJump) {
-                    newTriggerPrice = trigger.triggerPrice - trigger.trailingJump;
-                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
-                }
-            } else {
-                // If we are long (sell SL), as price rises, we trail SL up.
-                if (ltp >= trigger.triggerPrice + trigger.trailingJump) {
-                    newTriggerPrice = trigger.triggerPrice + trigger.trailingJump;
-                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
-                }
-            }
-         }
-      }
-      
-      if (isBreached) {
-         updatePendingTrigger(trigger.id, { status: 'EXECUTED', executedAt: new Date().toISOString(), executionPrice: ltp });
-         
-         // Fire the real order!
-         placeOrder({
-            symbol: trigger.symbol,
-            type: trigger.limitPrice ? 'LIMIT' : 'MARKET',
-            side: trigger.side,
-            quantity: trigger.quantity,
-            price: trigger.limitPrice || 0,
-            product_type: trigger.productType
-         });
-         
-         if ("Notification" in window && Notification.permission === "granted") {
-           new Notification(`${trigger.type} Order Triggered! 🎯`, {
-             body: `${trigger.side} ${trigger.quantity} ${trigger.symbol} @ ₹${ltp.toFixed(2)}`,
-             icon: '/logo.png'
-           });
-         }
-      }
-    });
-  }, [prices, pendingTriggers, updatePendingTrigger, placeOrder]);
-
   // ── Guard: show login screen when not authenticated ──────────────────────────
   
   useEffect(() => {
@@ -319,10 +364,10 @@ function App() {
   }
 
   // ── Authenticated layout ─────────────────────────────────────────────────────
-  const price = prices[selectedSymbol];
 
   return (
     <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
+      <BackgroundPriceMonitor />
       {/* Real-time Global Announcement Banner */}
       {announcement && announcement.text && !isDismissedAnnouncement && (
         <div style={{
@@ -357,41 +402,7 @@ function App() {
               <img src="/logo.png" alt="Short Market Logo" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
             </div>
 
-            <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
-              {TOP_INDICES.map((idx) => {
-                const p      = prices[idx];
-                const isUp   = p?.pct >= 0;
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      display:      'flex',
-                      alignItems:   'center',
-                      gap:          '4px',
-                      background:   p
-                        ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
-                        : 'rgba(255,255,255,0.05)',
-                      color: p
-                        ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
-                        : 'var(--text-secondary)',
-                      padding:      '2px 6px',
-                      borderRadius: '12px',
-                      fontSize:     '10px',
-                      fontWeight:   '700',
-                    }}
-                  >
-                    {p && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
-                    {idx.split('-')[0]}{' '}
-                    {p ? `${p.ltp.toFixed(2)}` : '...'}
-                    {p && (
-                      <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
-                        {p.change !== undefined ? `${p.change > 0 ? '+' : ''}${Number(p.change).toFixed(2)} (${p.pct > 0 ? '+' : ''}${Number(p.pct).toFixed(2)}%)` : ''}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <TopIndexTicker />
           </div>
 
           {/* Right: nav tabs + user info */}

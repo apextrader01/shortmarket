@@ -177,11 +177,27 @@ async function initFyers(io, pc, isMaster = true) {
     if (isMasterNode) {
         setInterval(() => {
             if (dirtySymbols.size > 0 && global_io) {
-                // Build one batch object with ALL updated prices
+                // Build one batch object with ALL updated prices — slimmed to essential fields
+                // to slash network egress bandwidth and Redis loopback traffic by >80%
                 const batchUpdate = {};
                 dirtySymbols.forEach(uniqueSymbol => {
                     const priceObj = sharedPriceCache[uniqueSymbol];
-                    if (priceObj) batchUpdate[uniqueSymbol] = priceObj;
+                    if (priceObj) {
+                        batchUpdate[uniqueSymbol] = {
+                            symbol: priceObj.symbol,
+                            timestamp: priceObj.timestamp,
+                            ltp: priceObj.ltp,
+                            open: priceObj.open,
+                            high: priceObj.high,
+                            low: priceObj.low,
+                            close: priceObj.close,
+                            volume: priceObj.volume,
+                            change: priceObj.change,
+                            pct: priceObj.pct,
+                            totBuyQuan: priceObj.totBuyQuan,
+                            totSellQuan: priceObj.totSellQuan
+                        };
+                    }
                 });
                 dirtySymbols.clear();
 
@@ -344,7 +360,7 @@ function startLiveWebSocket() {
                         low: tick.low_price !== undefined ? tick.low_price : (oldPriceObj.low || null),
                         close: prev || null,
                         volume: tick.vol_traded_today !== undefined ? tick.vol_traded_today : (oldPriceObj.volume || 0),
-                        ltt: tick.last_traded_time ? new Date(tick.last_traded_time * 1000).toLocaleString('en-GB') : (oldPriceObj.ltt || null),
+                        ltt: tick.last_traded_time ? tick.last_traded_time * 1000 : (oldPriceObj.ltt || null),
                         change: change,
                         pct: pct,
                         bids: bids.length > 0 ? bids : (oldPriceObj.bids || []),
@@ -445,7 +461,7 @@ function addSubscriptionBatch(symbols) {
     
     // Start GC if not already running
     if (!gcInterval) {
-        gcInterval = setInterval(garbageCollectSubscriptions, 10000);
+        gcInterval = setInterval(garbageCollectSubscriptions, 30000);
     }
 }
 
@@ -487,7 +503,7 @@ function handlePingSubscriptions(symbols) {
     
     // Start GC if not running
     if (!gcInterval) {
-        gcInterval = setInterval(garbageCollectSubscriptions, 10000); // Check every 10 seconds
+        gcInterval = setInterval(garbageCollectSubscriptions, 30000); // Check every 30 seconds
     }
 }
 
@@ -498,8 +514,8 @@ async function garbageCollectSubscriptions() {
     const staleFyersSymbols = [];
     
     // --- ANTI-GC FOR ESSENTIAL SYMBOLS ---
-    // Prevent garbage collection for open orders, positions, and active watchlists
-    // even if frontend clients disconnect or fail to ping.
+    // Prevent garbage collection for open orders, positions, and indices
+    // Active user watchlists are automatically protected by ping_subscriptions from client
     try {
         const db = require('../database/db');
         const protectSymbol = (sym) => {
@@ -527,15 +543,6 @@ async function garbageCollectSubscriptions() {
         // 3. Protect Open Positions
         const posRows = await db('positions').where('qty', '!=', 0).distinct('symbol').catch(()=>[]);
         posRows.forEach(r => protectSymbol(r.symbol));
-            
-        // 4. Protect ALL Watchlists (they are small enough to always keep alive)
-        const wlRows = await db('watchlists').select('symbols').catch(()=>[]);
-        wlRows.forEach(row => {
-            try {
-                const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
-                syms.forEach(s => { const sym = typeof s === 'string' ? s : s?.symbol; protectSymbol(sym); });
-            } catch(e) {}
-        });
 
         if (wsInstance && isFyersConnected && subQueue.length > 0) {
             processSubQueue();
