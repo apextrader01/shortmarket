@@ -429,7 +429,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Analytics', 'Mutual Funds', 'Leaderboard',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -581,7 +581,6 @@ function App() {
             { label: 'Orders', icon: List },
             { label: 'Portfolio', icon: Briefcase },
             { label: 'Leaderboard', icon: Trophy },
-            { label: 'Analytics', icon: LineChart },
             { label: 'Mutual Funds', icon: CircleDollarSign },
             { label: 'Reports', icon: FileText },
             { label: 'Referrals', icon: Gift },
