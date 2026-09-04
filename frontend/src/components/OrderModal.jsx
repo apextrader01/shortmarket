@@ -69,7 +69,8 @@ export default function OrderModal() {
   const balanceNum = Number(user?.balance) || 0;
   const totalQuantity = quantity * (orderModal.lotsize || 1);
   const isBuy = side === 'BUY';
-  const isOption = symbol.includes('CE') || symbol.includes('PE');
+  const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+  const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   
   // Fetch Estimated Charges
   useEffect(() => {
@@ -101,7 +102,7 @@ export default function OrderModal() {
     return () => clearTimeout(timer);
   }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
 
-  const isFuture = symbol.includes('FUT');
+  const isFuture = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
   const leverageMultiplier = (productType === 'INT' && !isOption && !isFuture) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
   
   let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));

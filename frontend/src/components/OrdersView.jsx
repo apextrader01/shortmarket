@@ -331,7 +331,7 @@ export default function OrdersView() {
                         {/* Bottom Line: Product/Exchange (Left) | Tag & Realized P&L (Right) */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <span>{order.symbol?.includes(':') ? order.symbol.split(':')[0] : 'NSE'}</span>
+                            <span>{order.symbol?.includes(':') ? order.symbol.split(':')[0] : (((order.symbol || '').endsWith('-MF') || /^\d{5,6}$/.test(order.symbol || '') || ['EDEL', 'MIRA', 'NIPP'].includes(order.symbol)) ? 'MF' : 'NSE')}</span>
                             <span>{order.product_type || 'NRML'}</span>
                             <span>{order.type || 'MKT'}</span>
                           </div>
@@ -487,7 +487,20 @@ export default function OrdersView() {
                       })()}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
-                      {(order.symbol || '').split('-')[0] || '—'}
+                      {(() => {
+                        const clean = (order.symbol || '').includes(':') ? (order.symbol || '').split(':')[1] : (order.symbol || '');
+                        const isMf = clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+                        return (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{(order.symbol || '').split('-')[0] || '—'}</span>
+                            {isMf && (
+                              <span style={{ fontSize: '9px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '1px 5px', borderRadius: '3px', fontWeight: '700' }}>
+                                MF
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       {order.tag && (
                         <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: '600' }}>
                           {order.tag}

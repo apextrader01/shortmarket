@@ -21,7 +21,8 @@ export default function BasketModal() {
     
     // Parse strike
     let optionStrike = 0;
-    const isOption = symbol.includes('CE') || symbol.includes('PE');
+    const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+    const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
     if (isOption) {
       const robustMatch = symbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
       if (robustMatch) {
@@ -36,7 +37,7 @@ export default function BasketModal() {
       }
     }
 
-    const typeStr = symbol.includes('CE') ? 'CE' : (symbol.includes('PE') ? 'PE' : 'OTHER');
+    const typeStr = isOption ? (/(?:\d+|[-_\s])CE/i.test(cleanSym) || cleanSym.endsWith('CE') ? 'CE' : 'PE') : 'OTHER';
     const totalQuantity = item.quantity * (item.lotsize || 1);
     
     return {

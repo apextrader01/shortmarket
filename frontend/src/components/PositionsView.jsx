@@ -75,7 +75,8 @@ export default function PositionsView() {
 
   const isMutualFund = (sym) => {
     if (!sym || typeof sym !== 'string') return false;
-    return sym.endsWith('-MF') || /^\d{5,6}$/.test(sym) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(sym);
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
   };
 
   const getMfName = (sym) => {
@@ -182,13 +183,24 @@ export default function PositionsView() {
           
       const lotSize = priceData.lotsize || 1;
       
+      const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
       let segment = 'Stock';
-      if (pos.symbol.includes('CE') || pos.symbol.includes('PE')) segment = 'Option';
-      else if (pos.symbol.includes('FUT')) segment = 'Future';
+      if (isMutualFund(pos.symbol)) {
+        segment = 'MF';
+      } else if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym)) {
+        segment = 'Option';
+      } else if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT')) {
+        segment = 'Future';
+      }
       
       let exchange = 'NSE';
-      if (pos.symbol.includes('SENSEX') || pos.symbol.includes('BSE')) exchange = 'BSE';
-      if (pos.symbol.includes('NATURALGAS') || pos.symbol.includes('CRUDE') || pos.symbol.includes('MCX')) exchange = 'MCX';
+      if (isMutualFund(pos.symbol)) {
+        exchange = 'MF';
+      } else if (pos.symbol.startsWith('BSE:') || pos.symbol.includes('SENSEX') || pos.symbol.includes('BSE')) {
+        exchange = 'BSE';
+      } else if (pos.symbol.startsWith('MCX:') || pos.symbol.includes('NATURALGAS') || pos.symbol.includes('CRUDE') || pos.symbol.includes('MCX')) {
+        exchange = 'MCX';
+      }
 
       let productLabel = 'Delivery';
       if (pos.product_type === 'INT') productLabel = 'Intraday';
@@ -383,7 +395,7 @@ export default function PositionsView() {
                           </div>
                         ) : (
                           <>
-                            {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
+                            {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{(pos.symbol.includes(':') ? pos.symbol.split(':')[0] : pos.exchange) || 'NSE'}</span>
                           </>
                         )}
                       </td>
