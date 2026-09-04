@@ -2611,30 +2611,39 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         } catch(e) {}
     }, 500);
     
-    // Manually trigger an evaluation to instantly process Market orders in the background
-    // IMPORTANT: Only use real cached LTP for evaluation, NOT the order's limit price.
-    // Using the order's own price would cause LIMIT orders to self-trigger immediately.
+    // Instantly execute Market orders & Marketable Limit orders with 0ms delay
     if (ord.isMarket) {
-      
-      const isMutualFund = ord.symbol.endsWith('-MF') || /^\d+$/.test(ord.symbol);
-      if (isMutualFund) {
-         try {
-             const triggerEngineLocal = require('./services/triggerEngine');
-             triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
-             triggerEngineLocal.executeOrder(ord, ord.price).catch(e => console.error(e));
-         } catch(e) {}
-      } else {
-         const realLtp = priceCache[ord.symbol]?.ltp || 0;
-         if (realLtp > 0) {
-            try {
-              await triggerEngine.evaluateTick(ord.symbol, realLtp);
-              await new Promise(r => setTimeout(r, 250));
-            } catch (err) {
-              console.error('Immediate evaluation error:', err);
-            }
-         }
-      }
+      const execLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
+        ? Number(priceCache[ord.symbol].ltp)
+        : (parseFloat(ord.price) || parseFloat(req.body.price) || 0);
 
+      if (execLtp > 0) {
+        try {
+          await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+          await triggerEngine.executeOrder(ord, execLtp);
+        } catch (err) {
+          console.error('Immediate market execution error:', err);
+        }
+      }
+    } else if (ord.type === 'LIMIT') {
+      // Check for marketable limit order (e.g. BUY with limit >= LTP, or SELL with limit <= LTP)
+      const currentLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
+        ? Number(priceCache[ord.symbol].ltp)
+        : (parseFloat(req.body.price) || 0);
+      
+      const limitPrice = parseFloat(ord.price) || 0;
+      if (currentLtp > 0 && limitPrice > 0) {
+        const isMarketableBuy = ord.side === 'BUY' && currentLtp <= limitPrice;
+        const isMarketableSell = ord.side === 'SELL' && currentLtp >= limitPrice;
+        if (isMarketableBuy || isMarketableSell) {
+          try {
+            await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+            await triggerEngine.executeOrder(ord, currentLtp);
+          } catch (err) {
+            console.error('Immediate marketable limit execution error:', err);
+          }
+        }
+      }
     }
 
     // Fetch the final status after evaluation to send back to frontend

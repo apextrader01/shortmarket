@@ -293,6 +293,7 @@ export default function OrderModal() {
 
     const result = await useStore.getState().placeOrder(payload);
     if (result && result.success) {
+      closeOrderModal();
       if (result.status === 'EXECUTED') {
         alert("✅ Order Executed Successfully!");
       } else if (result.status === 'PENDING_TRIGGER') {
@@ -302,7 +303,6 @@ export default function OrderModal() {
       } else {
         alert("⏳ Order Placed (Pending)");
       }
-      closeOrderModal();
     } else {
       const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
       alert(errorMsg);
