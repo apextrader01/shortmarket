@@ -2,7 +2,14 @@ const db = require('../database/db');
 const cron = require('node-cron');
 const triggerEngine = require('./triggerEngine');
 
-const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'];
+const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+const isCommoditySymbol = (symbol) => {
+    if (!symbol || typeof symbol !== 'string') return false;
+    if (symbol.includes('MCX') || symbol.includes('NCDEX')) return true;
+    const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return COMMODITIES.some(c => clean.startsWith(c));
+};
 
 const ensureLivePrices = async (symbols) => {
     const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
@@ -86,7 +93,7 @@ class PositionsEngine {
                 .whereIn('product_type', ['INT', 'BO', 'CO']);
 
             for (const order of pendingEntryOrders) {
-                const isCommodity = COMMODITIES.some(c => order.symbol.startsWith(c));
+                const isCommodity = isCommoditySymbol(order.symbol);
                 if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                     await db.transaction(async (trx) => {
                         const updated = await trx('orders')
@@ -110,7 +117,7 @@ class PositionsEngine {
                 .whereIn('product_type', ['INT', 'BO', 'CO']);
 
             for (const order of pendingTriggerOrders) {
-                const isCommodity = COMMODITIES.some(c => order.symbol.startsWith(c));
+                const isCommodity = isCommoditySymbol(order.symbol);
                 if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                     await db.transaction(async (trx) => {
                         const updated = await trx('orders')
@@ -142,7 +149,7 @@ class PositionsEngine {
                     .whereIn('product_type', ['INT', 'BO', 'CO']);
                     
                 const positionsToExit = positions.filter(pos => {
-                    const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
+                    const isCommodity = isCommoditySymbol(pos.symbol);
                     return (market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity);
                 });
                 
@@ -169,7 +176,7 @@ class PositionsEngine {
                     .whereIn('product_type', ['INT', 'BO', 'CO']);
 
                 for (const leg of pendingTriggers) {
-                    const isCommodity = COMMODITIES.some(c => leg.symbol.startsWith(c));
+                    const isCommodity = isCommoditySymbol(leg.symbol);
                     if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                         const updated = await trx('orders').where({ id: leg.id, status: 'PENDING_TRIGGER' }).update({ status: 'CANCELLED', updated_at: new Date() });
                         if (updated > 0) {
@@ -330,7 +337,7 @@ class PositionsEngine {
                 const deliveryPositions = await query;
 
                 for (const pos of deliveryPositions) {
-                    const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
+                    const isCommodity = isCommoditySymbol(pos.symbol);
                     const assetClass = isCommodity ? 'COMMODITY' : 'STOCK';
 
                     // Check if holding already exists

@@ -162,13 +162,18 @@ export default function OrderModal() {
 
   const isRestricted = restrictedStocks.includes(symbol);
   
-  const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+  const cleanSymbolName = (symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+  const isCommodity = (symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSymbolName.startsWith(c));
   
   const isPastIntradayCutoff = () => {
-    if (isCommodity) return false;
     const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
+    if (isCommodity) {
+      // Commodities: Intraday trading allowed until 10:50 PM IST
+      return (hours > 22 || (hours === 22 && minutes >= 50));
+    }
+    // Equities: Intraday trading allowed until 03:15 PM IST
     return (hours > 15 || (hours === 15 && minutes >= 15));
   };
 

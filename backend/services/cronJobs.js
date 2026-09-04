@@ -27,8 +27,13 @@ function initCronJobs(priceCache, triggerEngine) {
         isIntradayBlocked = false;
     }, TZ);
 
-    // Helper: Check if a symbol is a commodity by looking for the -MCX suffix
-    const isCommoditySymbol = (symbol) => symbol && symbol.endsWith('-MCX');
+    // Helper: Check if a symbol is a commodity
+    const isCommoditySymbol = (symbol) => {
+        if (!symbol || typeof symbol !== 'string') return false;
+        if (symbol.includes('MCX') || symbol.includes('NCDEX')) return true;
+        const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
+    };
 
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {

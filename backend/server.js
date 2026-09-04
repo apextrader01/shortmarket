@@ -94,6 +94,13 @@ function isDerivativeContract(sym) {
   return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
 }
 
+function isCommodityContract(sym) {
+  if (!sym || typeof sym !== 'string') return false;
+  if (sym.includes('MCX') || sym.includes('NCDEX')) return true;
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+  return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
+}
+
 // When running in PM2 Cluster Mode, NODE_APP_INSTANCE tells us the worker ID
 const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
 
@@ -2270,7 +2277,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   // Block new Intraday orders outside valid time windows (square-off / closing orders are always permitted)
   if ((product_type === 'INT' || product_type === 'BO' || product_type === 'CO') && !isClosingOrder) {
-    const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
+    const isCommodity = isCommodityContract(symbol);
     const now = new Date();
     const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
     const hours = istTime.getUTCHours();
@@ -2950,7 +2957,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
   // Block Intraday cutoff
   for (const item of items) {
     if (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO') {
-      const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => item.symbol.startsWith(c));
+      const isCommodity = isCommodityContract(item.symbol);
       const now = new Date();
       const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
       const hours = istTime.getUTCHours();

@@ -122,10 +122,14 @@ export default function BasketModal() {
 
   // Check restrictions and cutoff
   const isTimeBlocked = enhancedItems.some(item => {
-    if (['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => item.symbol.startsWith(c))) return false;
+    const clean = (item.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const isCommodity = (item.symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
     const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
+    if (isCommodity) {
+      return (hours > 22 || (hours === 22 && minutes >= 50));
+    }
     return (hours > 15 || (hours === 15 && minutes >= 15));
   });
 
