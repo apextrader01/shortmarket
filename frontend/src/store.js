@@ -250,6 +250,7 @@ export const useStore = create(persist((set, get) => ({
     set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
     get().pingSubscriptions();
+    get().fetchBatchPrices([uniqueSymbol], true);
   },
 
   removeStockFromWatchlist: (watchlistId, uniqueSymbol) => {
