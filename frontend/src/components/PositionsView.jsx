@@ -228,7 +228,7 @@ export default function PositionsView() {
   }, [sourceData, prices, viewMode]);
 
   const exitAllPositions = async () => {
-    const openPositions = positions.filter(p => p.quantity !== 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
+    const openPositions = flatPositions.filter(p => Number(p.qty) !== 0 && Number(p.unencumberedQty) > 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
     if (openPositions.length === 0) {
       alert('No valid unencumbered positions to exit.');
       return;
@@ -236,27 +236,32 @@ export default function PositionsView() {
     if (!window.confirm(`Exit ALL ${openPositions.length} unencumbered position(s) at market price?`)) return;
     const store = useStore.getState();
     let failed = 0;
+    let lastError = '';
     for (const pos of openPositions) {
-      const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
+      const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const payload = {
         symbol: pos.symbol,
         type: 'MARKET',
         side: exitSide,
-        quantity: Math.abs(pos.quantity),
+        quantity: Math.abs(Number(pos.unencumberedQty)),
         price: 0,
         sl_price: null,
         tgt_price: null,
         margin: 0,
         product_type: pos.product_type || 'DEL'
       };
-      const success = await store.placeOrder(payload);
-      if (success) {
+      const res = await store.placeOrder(payload);
+      if (res && res.success) {
         store.clearPendingTriggersForSymbol(pos.symbol);
       } else {
         failed++;
+        lastError = store.authError || (res && res.error) || 'Failed to place exit order';
       }
     }
-    if (failed > 0) alert(`${failed} order(s) failed. Check browser console for details.`);
+    await store.fetchUserData();
+    if (failed > 0) {
+      alert(`${failed} order(s) failed: ${lastError}`);
+    }
   };
 
   return (
@@ -699,7 +704,8 @@ export default function PositionsView() {
                   if (ok) {
                     setPartialExitPos(null);
                   } else {
-                    alert('Exit failed. Check the browser console (F12) for error details.');
+                    const storeErr = useStore.getState().authError;
+                    alert(`Exit failed: ${storeErr || 'Check the browser console (F12) for error details.'}`);
                   }
                 }}
                 style={{

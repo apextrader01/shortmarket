@@ -996,12 +996,16 @@ export const useStore = create(persist((set, get) => ({
         body:    JSON.stringify(orderPayload),
       });
       const data = await res.json();
-      if (data.success) { get().fetchUserData(); return data; }
+      if (data.success) {
+        await get().fetchUserData();
+        return data;
+      }
       console.error('[placeOrder FAILED]', data);
       set({ authError: data.error || 'Order failed' });
       return null;
     } catch (err) { 
       console.error('[placeOrder ERROR]', err);
+      set({ authError: err.message || 'Network error occurred while placing order.' });
       return null;
     }
   },

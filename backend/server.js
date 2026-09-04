@@ -1488,7 +1488,16 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
 app.get('/api/positions', authenticateToken, async (req, res) => {
   try {
     const positions = await db('positions').where({ user_id: req.user.id });
-    res.json(positions);
+    const formatted = positions.map(p => ({
+      ...p,
+      quantity: Number(p.quantity),
+      closed_quantity: Number(p.closed_quantity || 0),
+      average_price: Number(p.average_price || 0),
+      exit_price: p.exit_price !== null && p.exit_price !== undefined ? Number(p.exit_price) : null,
+      margin: Number(p.margin || 0),
+      realized_pnl: Number(p.realized_pnl || 0)
+    }));
+    res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2168,9 +2177,55 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // Determine if this order is strictly closing/reducing an existing open position or holding
+  const effectiveProductType = product_type || 'DEL';
+  const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+  let isClosingOrder = false;
+
+  if (side === 'SELL') {
+    // Check if user has open long position in this symbol
+    const existingLongPos = await db('positions')
+      .where({ user_id: req.user.id, product_type: effectiveProductType })
+      .where(builder => {
+        builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+      })
+      .where('quantity', '>', 0)
+      .first();
+
+    if (existingLongPos && Number(existingLongPos.quantity) >= Number(quantity)) {
+      isClosingOrder = true;
+    } else if (effectiveProductType === 'DEL') {
+      // Check holdings
+      const holding = await db('holdings')
+        .where({ user_id: req.user.id })
+        .where(builder => {
+          builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+        })
+        .where('quantity', '>=', Number(quantity))
+        .first();
+      if (holding) {
+        isClosingOrder = true;
+      }
+    }
+  } else if (side === 'BUY') {
+    // Check if user has open short position in this symbol
+    const existingShortPos = await db('positions')
+      .where({ user_id: req.user.id, product_type: effectiveProductType })
+      .where(builder => {
+        builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+      })
+      .where('quantity', '<', 0)
+      .first();
+
+    if (existingShortPos && Math.abs(Number(existingShortPos.quantity)) >= Number(quantity)) {
+      isClosingOrder = true;
+    }
+  }
+
   // 🛡️ RISK GUARDIAN ENFORCEMENT 🛡️
+  // Note: Risk Guardian NEVER blocks closing/square-off orders for existing positions/holdings.
   const currentUser = await db('users').where({ id: req.user.id }).first();
-  if (currentUser && currentUser.risk_guardian_active) {
+  if (currentUser && currentUser.risk_guardian_active && !isClosingOrder) {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -2213,8 +2268,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
-  // Block new Intraday orders outside valid time windows
-  if (product_type === 'INT' || product_type === 'BO' || product_type === 'CO') {
+  // Block new Intraday orders outside valid time windows (square-off / closing orders are always permitted)
+  if ((product_type === 'INT' || product_type === 'BO' || product_type === 'CO') && !isClosingOrder) {
     const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
     const now = new Date();
     const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
@@ -2279,21 +2334,34 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
-      const effectiveProductType = product_type || 'DEL';
       if (side === 'SELL') {
           const isDerivative = isDerivativeContract(symbol);
           if (effectiveProductType === 'DEL' && !isDerivative) {
               // 1. Fetch available Holdings
-              const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
+              const holding = await trx('holdings')
+                  .where({ user_id: req.user.id })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
+                  .first();
               const holdingQty = holding ? Number(holding.quantity) : 0;
               
               // 2. Fetch open Positions for today
-              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
+              const existingPos = await trx('positions')
+                  .where({ user_id: req.user.id, product_type: 'DEL' })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
+                  .where('quantity', '>', 0)
+                  .first();
               const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
               
               // 3. Fetch Pending Sell Orders for this symbol
               const pendingOrders = await trx('orders')
-                  .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL' })
+                  .where({ user_id: req.user.id, side: 'SELL', product_type: 'DEL' })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
                   .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
               const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
               
@@ -2303,16 +2371,43 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
               }
               requiresMargin = false; // Selling DEL from holdings requires no margin
+          } else if (isClosingOrder) {
+              requiresMargin = false;
           } else if (!isDerivative || effectiveProductType !== 'DEL') {
-              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
-              if (existingPos && existingPos.quantity >= Number(quantity)) {
+              const existingPos = await trx('positions')
+                  .where({ user_id: req.user.id, product_type: effectiveProductType })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
+                  .where('quantity', '>', 0)
+                  .first();
+              if (existingPos && Number(existingPos.quantity) >= Number(quantity)) {
                   requiresMargin = false;
               }
           } else if (isDerivative && effectiveProductType === 'DEL') {
-              // Option writing / Future shorting in Delivery (NRML).
-              // Check if we are closing an existing long position.
-              const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
-              if (existingPos && existingPos.quantity >= Number(quantity)) {
+              const existingPos = await trx('positions')
+                  .where({ user_id: req.user.id, product_type: effectiveProductType })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
+                  .where('quantity', '>', 0)
+                  .first();
+              if (existingPos && Number(existingPos.quantity) >= Number(quantity)) {
+                  requiresMargin = false;
+              }
+          }
+      } else if (side === 'BUY') {
+          if (isClosingOrder) {
+              requiresMargin = false;
+          } else {
+              const existingPos = await trx('positions')
+                  .where({ user_id: req.user.id, product_type: effectiveProductType })
+                  .where(builder => {
+                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                  })
+                  .where('quantity', '<', 0)
+                  .first();
+              if (existingPos && Math.abs(Number(existingPos.quantity)) >= Number(quantity)) {
                   requiresMargin = false;
               }
           }

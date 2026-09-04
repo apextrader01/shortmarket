@@ -50,10 +50,11 @@ export default function PositionsTable() {
 
   const positionsWithPnl = filteredPositions.map(pos => {
     const ltp = prices[pos.symbol]?.ltp || pos.average_price;
-    const pnl = pos.quantity !== 0 
-        ? (ltp - pos.average_price) * pos.quantity 
+    const isPosOpen = Number(pos.quantity) !== 0;
+    const pnl = isPosOpen 
+        ? (ltp - pos.average_price) * Number(pos.quantity) 
         : parseFloat(pos.realized_pnl || 0);
-    const pnlPct = pos.quantity !== 0 && pos.average_price > 0 
+    const pnlPct = isPosOpen && Number(pos.average_price) > 0 
         ? ((ltp - pos.average_price) / pos.average_price) * 100 
         : 0;
     return { ...pos, ltp, pnl, pnlPct };
