@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import AnalyticsView from './AnalyticsView';
 
 export default function PortfolioView() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
@@ -51,13 +52,18 @@ export default function PortfolioView() {
           totalCurrent += current;
 
           const symbolStr = pos.symbol || '';
+          const cleanSym = symbolStr.replace(/^(NSE:|BSE:|MCX:)/i, '');
           
           if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
               totalInvestedETFs += invested;
-          } else if (symbolStr.endsWith('CE') || symbolStr.endsWith('PE') || symbolStr.endsWith('FUT')) {
-              totalInvestedDerivatives += invested;
-          } else if (symbolStr.includes('MF') || symbolStr.includes('MUTUALFUND')) {
+          } else if (symbolStr.includes('-MF') || symbolStr.includes('MUTUALFUND')) {
               totalInvestedMutualFunds += invested;
+          } else if (
+              symbolStr.endsWith('CE') || symbolStr.endsWith('PE') || symbolStr.endsWith('FUT') ||
+              symbolStr.includes('-MCX') || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym) ||
+              ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSym.startsWith(c))
+          ) {
+              totalInvestedDerivatives += invested;
           } else {
               totalInvestedStocks += invested;
           }
@@ -90,25 +96,24 @@ export default function PortfolioView() {
   const isGain = overallGain >= 0;
 
   // Chart Data
-  const COLORS = ['#3B82F6', '#22C55E', '#EAB308', '#A855F7'];
+  const COLORS = ['#3B82F6', '#22C55E', '#F59E0B', '#A855F7'];
   const chartData = [
-    { name: 'Stocks', value: totalInvestedStocks },
-    { name: 'ETFs', value: totalInvestedETFs },
-    { name: 'Derivatives', value: totalInvestedDerivatives },
-    { name: 'Mutual Funds', value: totalInvestedMutualFunds }
+    { name: 'Stocks', value: totalInvestedStocks, color: '#3B82F6' },
+    { name: 'ETFs', value: totalInvestedETFs, color: '#22C55E' },
+    { name: 'Derivatives', value: totalInvestedDerivatives, color: '#F59E0B' },
+    { name: 'Mutual Funds', value: totalInvestedMutualFunds, color: '#A855F7' }
   ].filter(d => d.value > 0);
   
   // If no investments yet, show placeholder
   if (chartData.length === 0) {
-    chartData.push({ name: 'Uninvested Cash', value: 100 });
-    COLORS[0] = 'var(--border-color)';
+    chartData.push({ name: 'Uninvested Cash', value: 100, color: 'var(--border-color)' });
   }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
       {/* Sub Navigation */}
       <div style={{ display: 'flex', gap: '24px', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
-        {['Overview', 'Equity'].map(tab => (
+        {['Overview', 'Analytics'].map(tab => (
           <div
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -127,95 +132,107 @@ export default function PortfolioView() {
         ))}
       </div>
 
-      <div style={{ padding: '24px', overflowY: 'auto' }}>
-        {/* Top Stats Cards */}
-        <div className="stats-grid">
-          {[
-            { label: 'Invested Amount (DEL)', value: `₹ ${totalInvested.toFixed(2)}`, color: 'var(--text-primary)' },
-            { label: 'Current Value (DEL)', value: `₹ ${totalCurrent.toFixed(2)}`, color: 'var(--text-primary)' },
-            { label: 'Unrealized P&L (Live)', value: `${unrealizedPnl >= 0 ? '+' : ''}₹ ${unrealizedPnl.toFixed(2)}`, sub: 'All Open Positions', color: unrealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' },
-            { label: 'Today\'s Realized P&L', value: `${todayRealizedPnl >= 0 ? '+' : ''}₹ ${todayRealizedPnl.toFixed(2)}`, sub: 'Booked Today', color: todayRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }
-          ].map((stat, i) => (
-            <div key={i} style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--bg-hover)' }} />
-                {stat.label}
-              </div>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: stat.color }}>
-                {stat.value} <span style={{ fontSize: '13px', color: stat.color, fontWeight: '500', opacity: 0.8 }}>{stat.sub || ''}</span>
-              </div>
-            </div>
-          ))}
+      {activeTab === 'Analytics' ? (
+        <div style={{ padding: isMobile ? '12px' : '24px', overflowY: 'auto' }}>
+          <AnalyticsView />
         </div>
-
-        {/* Portfolio Breakup */}
-        <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Portfolio Breakup</h3>
-        <div className="portfolio-grid">
-          
-          {/* Chart Section */}
-          <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Asset Allocation</h4>
-            <div style={{ width: '100%', height: '200px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value" isAnimationActive={false}
-                    stroke="none"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => `₹${value.toFixed(2)}`}
-                    contentStyle={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
-                    itemStyle={{ color: 'var(--text-primary)' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-          
-          {/* Stats Breakdown Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ fontWeight: '600', fontSize: '15px' }}>Equity <span style={{ color: 'var(--text-secondary)', fontWeight: '400', fontSize: '12px' }}>(₹{totalInvested.toFixed(2)})</span></div>
+      ) : (
+        <div style={{ padding: '24px', overflowY: 'auto' }}>
+          {/* Top Stats Cards */}
+          <div className="stats-grid">
+            {[
+              { label: 'Invested Amount (DEL)', value: `₹ ${totalInvested.toFixed(2)}`, color: 'var(--text-primary)' },
+              { label: 'Current Value (DEL)', value: `₹ ${totalCurrent.toFixed(2)}`, color: 'var(--text-primary)' },
+              { label: 'Unrealized P&L (Live)', value: `${unrealizedPnl >= 0 ? '+' : ''}₹ ${unrealizedPnl.toFixed(2)}`, sub: 'All Open Positions', color: unrealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' },
+              { label: 'Today\'s Realized P&L', value: `${todayRealizedPnl >= 0 ? '+' : ''}₹ ${todayRealizedPnl.toFixed(2)}`, sub: 'Booked Today', color: todayRealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }
+            ].map((stat, i) => (
+              <div key={i} style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--bg-hover)' }} />
+                  {stat.label}
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: stat.color }}>
+                  {stat.value} <span style={{ fontSize: '13px', color: stat.color, fontWeight: '500', opacity: 0.8 }}>{stat.sub || ''}</span>
+                </div>
               </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[0] }} />
-                     <span style={{ color: 'var(--text-secondary)' }}>Stocks</span>
-                   </div>
-                   <span style={{ fontWeight: '600' }}>₹{totalInvestedStocks.toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[1] }} />
-                     <span style={{ color: 'var(--text-secondary)' }}>ETFs</span>
-                   </div>
-                   <span style={{ fontWeight: '600' }}>₹{totalInvestedETFs.toFixed(2)}</span>
-                </div>
+            ))}
+          </div>
+
+          {/* Portfolio Breakup */}
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>Portfolio Breakup</h3>
+          <div className="portfolio-grid">
+            
+            {/* Chart Section */}
+            <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>Asset Allocation</h4>
+              <div style={{ width: '100%', height: '200px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value" isAnimationActive={false}
+                      stroke="none"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => `₹${value.toFixed(2)}`}
+                      contentStyle={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                      itemStyle={{ color: 'var(--text-primary)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             </div>
             
-            <div style={{ background: 'linear-gradient(145deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.6) 100%)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backdropFilter: 'blur(8px)' }}>
-              <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS[2] }} />
-                Mutual Funds
+            {/* Stats Breakdown Section */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div style={{ fontWeight: '600', fontSize: '15px' }}>Assets <span style={{ color: 'var(--text-secondary)', fontWeight: '400', fontSize: '12px' }}>(₹{totalInvested.toFixed(2)})</span></div>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3B82F6' }} />
+                       <span style={{ color: 'var(--text-secondary)' }}>Stocks</span>
+                     </div>
+                     <span style={{ fontWeight: '600' }}>₹{totalInvestedStocks.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E' }} />
+                       <span style={{ color: 'var(--text-secondary)' }}>ETFs</span>
+                     </div>
+                     <span style={{ fontWeight: '600' }}>₹{totalInvestedETFs.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B' }} />
+                       <span style={{ color: 'var(--text-secondary)' }}>Derivatives</span>
+                     </div>
+                     <span style={{ fontWeight: '600' }}>₹{totalInvestedDerivatives.toFixed(2)}</span>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{totalInvestedMutualFunds.toFixed(2)}</div>
+              
+              <div style={{ background: 'linear-gradient(145deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.6) 100%)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backdropFilter: 'blur(8px)' }}>
+                <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#A855F7' }} />
+                  Mutual Funds
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{totalInvestedMutualFunds.toFixed(2)}</div>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Holdings Table */}
         <div style={{ marginTop: '32px' }}>
@@ -369,6 +386,7 @@ export default function PortfolioView() {
         </div>
 
       </div>
+      )}
     </div>
   );
 }
