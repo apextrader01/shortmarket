@@ -167,6 +167,8 @@ export default function OrderModal() {
   
   const isPastIntradayCutoff = () => {
     const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const day = istTime.getDay(); // 0 = Sun, 6 = Sat
+    if (day === 0 || day === 6) return true;
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
     if (isCommodity) {

@@ -125,6 +125,8 @@ export default function BasketModal() {
     const clean = (item.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const isCommodity = (item.symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
     const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const day = istTime.getDay();
+    if (day === 0 || day === 6) return true;
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
     if (isCommodity) {

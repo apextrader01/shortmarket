@@ -2280,22 +2280,27 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const isCommodity = isCommodityContract(symbol);
     const now = new Date();
     const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const day = istTime.getUTCDay(); // 0 = Sunday, 6 = Saturday
     const hours = istTime.getUTCHours();
     const minutes = istTime.getUTCMinutes();
+    
+    if (day === 0 || day === 6) {
+      return res.status(400).json({ error: 'Markets are closed on weekends (Saturday & Sunday). Intraday trading is only available on trading days.' });
+    }
     
     if (!isCommodity) {
       // Equities: 9:15 AM to 3:15 PM
       const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
       const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
       if (isBeforeOpen || isAfterClose) {
-        return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
+        return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST on trading days.' });
       }
     } else {
       // Commodities: 9:00 AM to 10:50 PM
       const isBeforeOpen = hours < 9;
       const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
       if (isBeforeOpen || isAfterClose) {
-        return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
+        return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST on trading days.' });
       }
     }
   }
@@ -2960,20 +2965,25 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       const isCommodity = isCommodityContract(item.symbol);
       const now = new Date();
       const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+      const day = istTime.getUTCDay();
       const hours = istTime.getUTCHours();
       const minutes = istTime.getUTCMinutes();
+      
+      if (day === 0 || day === 6) {
+        return res.status(400).json({ error: 'Markets are closed on weekends (Saturday & Sunday). Intraday trading is only available on trading days.' });
+      }
       
       if (!isCommodity) {
         const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
         const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
         if (isBeforeOpen || isAfterClose) {
-          return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
+          return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST on trading days.' });
         }
       } else {
         const isBeforeOpen = hours < 9;
         const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
         if (isBeforeOpen || isAfterClose) {
-          return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
+          return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST on trading days.' });
         }
       }
     }
