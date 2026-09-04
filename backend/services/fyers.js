@@ -178,7 +178,11 @@ async function initFyers(io, pc, isMaster = true) {
                     // Send targeted updates to specific symbol rooms to prevent DDOSing the frontend
                     // with ticks they aren't subscribed to, which causes severe UI lag.
                     for (const sym of Object.keys(batchUpdate)) {
-                        global_io.to(sym).emit('price_snapshot', { [sym]: batchUpdate[sym] });
+                        const room = global_io.sockets?.adapter?.rooms?.get(sym);
+                        // ⚡ Skip emitting if no client is actively subscribed to this symbol
+                        if (room && room.size > 0) {
+                            global_io.to(sym).emit('price_snapshot', { [sym]: batchUpdate[sym] });
+                        }
                     }
 
                     // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)

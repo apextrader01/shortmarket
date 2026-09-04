@@ -6,6 +6,7 @@ const { calculateTaxes } = require('./taxCalculator');
 class TriggerEngine {
     constructor() {
         this.activeTriggers = new Map(); // symbol -> [order_objects]
+        this.activeTriggerSymbols = new Set(); // ⚡ In-memory active trigger symbols filter
         this.isProcessing = false;
         this.io = null;
         console.log('Real-Time WebSocket Trigger Engine Initialized.');
@@ -31,10 +32,12 @@ class TriggerEngine {
                 }
             }
             
+            this.activeTriggerSymbols.clear();
             for (const order of orders) {
                 await this.addOrderToMemory(order);
+                if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
             }
-            console.log(`Loaded ${orders.length} active triggers into Redis ZSETs.`);
+            console.log(`Loaded ${orders.length} active triggers into Redis ZSETs across ${this.activeTriggerSymbols.size} symbols.`);
         } catch (err) {
             console.error('Failed to load pending orders into TriggerEngine:', err);
         }
@@ -80,6 +83,7 @@ class TriggerEngine {
 
         if (key && score !== null) {
             await generalClient.zAdd(key, [{ score: score, value: order.id.toString() }]);
+            if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
         }
     }
 
@@ -98,6 +102,13 @@ class TriggerEngine {
         for (const key of keys) {
             await generalClient.zRem(key, orderId.toString());
         }
+        let totalRem = 0;
+        for (const key of keys) {
+            totalRem += (await generalClient.zCard(key).catch(() => 0));
+        }
+        if (totalRem === 0) {
+            this.activeTriggerSymbols.delete(symbol);
+        }
     }
 
     /**
@@ -105,7 +116,9 @@ class TriggerEngine {
      * This atomically finds triggered orders and removes them from Redis.
      */
     async evaluateTick(symbol, ltp) {
-        if (!ltp) return;
+        if (!ltp || !symbol) return;
+        // ⚡ Blazing fast O(1) in-memory check: skip Redis if NO triggers exist for this symbol!
+        if (!this.activeTriggerSymbols.has(symbol)) return;
         const { generalClient } = require('./redisClient');
         if (!generalClient || !generalClient.isReady) return;
 
@@ -158,6 +171,15 @@ class TriggerEngine {
             });
 
             if (triggeredOrderIds && triggeredOrderIds.length > 0) {
+                // Check if symbol still has remaining triggers in Redis
+                const remaining = (await generalClient.zCard(`trigger:${symbol}:BUY:LIMIT`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${symbol}:SELL:LIMIT`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${symbol}:GTE`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${symbol}:LTE`).catch(()=>0));
+                if (remaining === 0) {
+                    this.activeTriggerSymbols.delete(symbol);
+                }
+
                 for (const orderId of triggeredOrderIds) {
                     const order = await db('orders').where({ id: orderId }).first();
                     if (order) {
