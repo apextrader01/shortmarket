@@ -4,7 +4,7 @@ import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal })));
+  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal, marketStatus: state.marketStatus })));
   const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
@@ -165,22 +165,53 @@ export default function OrderModal() {
   const cleanSymbolName = (symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
   const isCommodity = (symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSymbolName.startsWith(c));
   
-  const isPastIntradayCutoff = () => {
+  const getMarketSession = () => {
+    const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
+    if (status === 'OPEN') return { open: true, mode: 'OPEN' };
+    if (status === 'CLOSED') {
+      return { 
+        open: false, 
+        mode: 'CLOSED', 
+        reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked as CLOSED / Holiday by Administrator.` 
+      };
+    }
+    // AUTO mode: Check weekend & normal hours
     const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const day = istTime.getDay(); // 0 = Sun, 6 = Sat
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
-    if (isCommodity) {
-      // Commodities: Intraday trading allowed until 10:50 PM IST
-      return (hours > 22 || (hours === 22 && minutes >= 50));
+
+    if (day === 0 || day === 6) {
+      return { open: false, mode: 'AUTO', reason: 'Markets are closed on weekends (Saturday & Sunday).' };
     }
-    // Equities: Intraday trading allowed until 03:15 PM IST
-    return (hours > 15 || (hours === 15 && minutes >= 15));
+
+    if (productType === 'INT' || isBO || isCO) {
+      if (isCommodity) {
+        const isBeforeOpen = hours < 9;
+        const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
+        if (isBeforeOpen || isAfterClose) {
+          return { open: false, mode: 'AUTO', reason: 'Intraday/BO/CO trading for Commodities is allowed only between 9:00 AM and 10:50 PM IST.' };
+        }
+      } else {
+        const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
+        const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
+        if (isBeforeOpen || isAfterClose) {
+          return { open: false, mode: 'AUTO', reason: 'Intraday/BO/CO trading for Equities is allowed only between 9:15 AM and 3:15 PM IST.' };
+        }
+      }
+    }
+    return { open: true, mode: 'AUTO' };
   };
 
-  const isTimeBlocked = isPastIntradayCutoff();
+  const marketSession = getMarketSession();
+  const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
   const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
 
   const handlePlaceOrder = async () => {
+    if (marketSession.mode === 'CLOSED') {
+      alert(marketSession.reason);
+      return;
+    }
     if (isIntradayBlocked) {
        setShowIntradayBlockedPopup(true);
        return;

@@ -7,8 +7,18 @@ import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Ch
 function SystemStatusTab() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { marketStatus, updateMarketStatus, fetchMarketStatus } = useStore();
+  const [marketUpdating, setMarketUpdating] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    fetchMarketStatus?.();
     const fetchStatus = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/fyers/status`);
@@ -28,16 +38,128 @@ function SystemStatusTab() {
   if (loading) return <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>Loading system status...</div>;
   if (!status) return <div style={{ padding: '24px', color: 'var(--color-red)' }}>Failed to fetch system status. Is the backend running?</div>;
 
-  const isHealthy = status.isFyersConnected && status.hasAccessToken && status.secondsSinceLastTick < 15;
+  const isHealthy = status.isFyersConnected && status.hasAccessToken && status.secondsSinceLastTick < 30;
 
   return (
     <div style={{ padding: '24px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: `1px solid ${isHealthy ? 'var(--color-green)' : 'var(--color-red)'}` }}>
         <Activity size={32} color={isHealthy ? 'var(--color-green)' : 'var(--color-red)'} />
         <div>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker Connection Status</h3>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker & Market Engine Status</h3>
           <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold' }}>
-            {isHealthy ? 'System is Healthy & Receiving Live Data' : 'System is Disconnected or Stalled'}
+            {isHealthy ? 'System is Healthy & Receiving Live Data' : 'Fyers Connection Disconnected or Stalled (Action Required)'}
+          </div>
+        </div>
+      </div>
+
+      {/* Market Trading Session Controls in System Status */}
+      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', color: 'var(--text-primary)' }}>Market Trading Session Control (Switches)</h4>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              Override default weekday/weekend schedules for special Saturday/Sunday sessions or declare trading holidays.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+          {/* Equity Box */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: '700', fontSize: '14px' }}>📈 NSE / BSE Equities</span>
+              <span style={{ 
+                padding: '3px 8px', 
+                borderRadius: '4px', 
+                fontSize: '11px', 
+                fontWeight: '700',
+                background: marketStatus?.equity === 'OPEN' ? 'rgba(34,197,94,0.15)' : marketStatus?.equity === 'CLOSED' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
+                color: marketStatus?.equity === 'OPEN' ? 'var(--color-green)' : marketStatus?.equity === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)',
+                border: `1px solid ${marketStatus?.equity === 'OPEN' ? 'rgba(34,197,94,0.3)' : marketStatus?.equity === 'CLOSED' ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.3)'}`
+              }}>
+                {marketStatus?.equity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.equity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (SCHEDULED)'}
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Standard hours: Mon–Fri, 9:15 AM – 3:15 PM IST.
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              {['AUTO', 'OPEN', 'CLOSED'].map(mode => (
+                <button
+                  key={mode}
+                  disabled={marketUpdating}
+                  onClick={async () => {
+                    setMarketUpdating(true);
+                    await updateMarketStatus(mode, marketStatus?.commodity || 'AUTO');
+                    setMarketUpdating(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    background: (marketStatus?.equity || 'AUTO') === mode 
+                      ? (mode === 'OPEN' ? 'var(--color-green)' : mode === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)')
+                      : 'rgba(255,255,255,0.05)',
+                    color: (marketStatus?.equity || 'AUTO') === mode ? '#fff' : 'var(--text-secondary)',
+                    border: (marketStatus?.equity || 'AUTO') === mode ? 'none' : '1px solid var(--border-color)'
+                  }}
+                >
+                  {mode === 'AUTO' ? '⚡ AUTO' : mode === 'OPEN' ? '🟢 OPEN' : '🔴 CLOSED'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Commodity Box */}
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: '700', fontSize: '14px' }}>🪙 MCX Commodities</span>
+              <span style={{ 
+                padding: '3px 8px', 
+                borderRadius: '4px', 
+                fontSize: '11px', 
+                fontWeight: '700',
+                background: marketStatus?.commodity === 'OPEN' ? 'rgba(34,197,94,0.15)' : marketStatus?.commodity === 'CLOSED' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
+                color: marketStatus?.commodity === 'OPEN' ? 'var(--color-green)' : marketStatus?.commodity === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)',
+                border: `1px solid ${marketStatus?.commodity === 'OPEN' ? 'rgba(34,197,94,0.3)' : marketStatus?.commodity === 'CLOSED' ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.3)'}`
+              }}>
+                {marketStatus?.commodity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.commodity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (SCHEDULED)'}
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Standard hours: Mon–Fri, 9:00 AM – 10:50 PM IST.
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              {['AUTO', 'OPEN', 'CLOSED'].map(mode => (
+                <button
+                  key={mode}
+                  disabled={marketUpdating}
+                  onClick={async () => {
+                    setMarketUpdating(true);
+                    await updateMarketStatus(marketStatus?.equity || 'AUTO', mode);
+                    setMarketUpdating(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 4px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    background: (marketStatus?.commodity || 'AUTO') === mode 
+                      ? (mode === 'OPEN' ? 'var(--color-green)' : mode === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)')
+                      : 'rgba(255,255,255,0.05)',
+                    color: (marketStatus?.commodity || 'AUTO') === mode ? '#fff' : 'var(--text-secondary)',
+                    border: (marketStatus?.commodity || 'AUTO') === mode ? 'none' : '1px solid var(--border-color)'
+                  }}
+                >
+                  {mode === 'AUTO' ? '⚡ AUTO' : mode === 'OPEN' ? '🟢 OPEN' : '🔴 CLOSED'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -46,7 +168,7 @@ function SystemStatusTab() {
         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Fyers Access Token</div>
           <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.hasAccessToken ? 'var(--color-green)' : 'var(--color-red)' }}>
-            {status.hasAccessToken ? 'Valid & Loaded' : 'Missing'}
+            {status.hasAccessToken ? 'Valid & Loaded' : 'Missing / Expired'}
           </div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -57,8 +179,8 @@ function SystemStatusTab() {
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
           <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Time Since Last Tick</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.secondsSinceLastTick < 10 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
-            {status.secondsSinceLastTick.toFixed(1)} seconds ago
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.secondsSinceLastTick < 15 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
+            {status.secondsSinceLastTick !== null && status.secondsSinceLastTick !== undefined ? `${status.secondsSinceLastTick.toFixed(1)}s ago` : 'N/A'}
           </div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -95,8 +217,26 @@ function SystemStatusTab() {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus })));
   
+  const [fyersStatus, setFyersStatus] = useState(null);
+  const [fyersLoading, setFyersLoading] = useState(true);
+  const [marketUpdating, setMarketUpdating] = useState(false);
+
+  useEffect(() => {
+    fetchMarketStatus?.();
+    const checkFyers = async () => {
+      try {
+        const data = await fetchFyersStatus?.();
+        if (data) setFyersStatus(data);
+      } catch (e) {}
+      finally { setFyersLoading(false); }
+    };
+    checkFyers();
+    const interval = setInterval(checkFyers, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [manualBanType, setManualBanType] = useState('IP');
   const [manualBanValue, setManualBanValue] = useState('');
   const [manualBanReason, setManualBanReason] = useState('');
@@ -332,7 +472,71 @@ export default function AdminDashboard() {
           Admin Control Center
         </h2>
         
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Fyers Live Status Hint / Badge */}
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '600',
+              background: fyersLoading 
+                ? 'rgba(255,255,255,0.05)' 
+                : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                  ? 'rgba(34, 197, 94, 0.12)' 
+                  : fyersStatus?.hasAccessToken
+                    ? 'rgba(234, 179, 8, 0.12)'
+                    : 'rgba(239, 68, 68, 0.15)',
+              border: `1px solid ${
+                fyersLoading 
+                  ? 'var(--border-color)' 
+                  : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                    ? 'rgba(34, 197, 94, 0.4)' 
+                    : fyersStatus?.hasAccessToken
+                      ? 'rgba(234, 179, 8, 0.4)'
+                      : 'rgba(239, 68, 68, 0.5)'
+              }`,
+              color: fyersLoading 
+                ? 'var(--text-secondary)' 
+                : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                  ? 'var(--color-green)' 
+                  : fyersStatus?.hasAccessToken
+                    ? 'var(--color-yellow)'
+                    : 'var(--color-red)'
+            }}
+            title={
+              fyersStatus?.hasAccessToken
+                ? `Fyers Token Loaded. Last tick: ${fyersStatus?.secondsSinceLastTick !== null && fyersStatus?.secondsSinceLastTick !== undefined ? fyersStatus.secondsSinceLastTick.toFixed(1) + 's ago' : 'N/A'}`
+                : 'No active Fyers token loaded. Daily login required!'
+            }
+          >
+            <span style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              background: (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                ? 'var(--color-green)' 
+                : fyersStatus?.hasAccessToken 
+                  ? 'var(--color-yellow)' 
+                  : 'var(--color-red)',
+              boxShadow: (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                ? '0 0 8px var(--color-green)'
+                : '0 0 8px var(--color-red)'
+            }} />
+            {fyersLoading ? (
+              <span>Checking Fyers...</span>
+            ) : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30) ? (
+              <span>🟢 Fyers Live ({fyersStatus.secondsSinceLastTick.toFixed(0)}s ago)</span>
+            ) : fyersStatus?.hasAccessToken ? (
+              <span>🟡 Fyers Stalled ({fyersStatus?.secondsSinceLastTick ? fyersStatus.secondsSinceLastTick.toFixed(0) + 's' : 'Waiting'})</span>
+            ) : (
+              <span>🔴 Token Expired (Login Required)</span>
+            )}
+          </div>
+
           <button
             className="btn btn-primary"
             onClick={async () => {
@@ -357,7 +561,7 @@ export default function AdminDashboard() {
           >
             Connect Fyers API
           </button>
-          <div className="input-group" style={{ width: '250px' }}>
+          <div className="input-group" style={{ width: '220px' }}>
             <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
             <input 
               type="text" 
@@ -397,6 +601,111 @@ export default function AdminDashboard() {
           >
             ⚡ Process Due SIPs
           </button>
+        </div>
+      </div>
+
+      {/* Market Session Trading Controls (Switches for Weekend / Holiday / Special Sessions) */}
+      <div style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: '12px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Activity size={20} style={{ color: 'var(--color-blue)' }} />
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Market Session Trading Controls</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Override or schedule market sessions for Equities & Commodities (Special Sessions / Weekend Drills / Holidays)</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          {/* NSE / BSE Equities Switch */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-panel)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>NSE / BSE EQUITIES</span>
+              <span style={{ 
+                fontSize: '10px', 
+                fontWeight: '700',
+                color: (marketStatus?.equity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.equity === 'CLOSED') ? 'var(--color-red)' : 'var(--color-blue)'
+              }}>
+                {marketStatus?.equity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.equity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (9:15-3:15)'}
+              </span>
+            </div>
+            <select
+              value={marketStatus?.equity || 'AUTO'}
+              disabled={marketUpdating}
+              onChange={async (e) => {
+                const val = e.target.value;
+                setMarketUpdating(true);
+                const res = await updateMarketStatus(val, marketStatus?.commodity || 'AUTO');
+                setMarketUpdating(false);
+                if (!res?.success) {
+                  alert('Failed to update market status: ' + (res?.error || 'Unknown error'));
+                }
+              }}
+              style={{
+                background: 'rgba(0,0,0,0.35)',
+                color: '#fff',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="AUTO">AUTO (Scheduled Mon-Fri)</option>
+              <option value="OPEN">OPEN (Special / Weekend Session)</option>
+              <option value="CLOSED">CLOSED (Holiday / Halt)</option>
+            </select>
+          </div>
+
+          {/* MCX Commodities Switch */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-panel)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>MCX COMMODITIES</span>
+              <span style={{ 
+                fontSize: '10px', 
+                fontWeight: '700',
+                color: (marketStatus?.commodity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.commodity === 'CLOSED') ? 'var(--color-red)' : 'var(--color-blue)'
+              }}>
+                {marketStatus?.commodity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.commodity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (9:00-22:50)'}
+              </span>
+            </div>
+            <select
+              value={marketStatus?.commodity || 'AUTO'}
+              disabled={marketUpdating}
+              onChange={async (e) => {
+                const val = e.target.value;
+                setMarketUpdating(true);
+                const res = await updateMarketStatus(marketStatus?.equity || 'AUTO', val);
+                setMarketUpdating(false);
+                if (!res?.success) {
+                  alert('Failed to update market status: ' + (res?.error || 'Unknown error'));
+                }
+              }}
+              style={{
+                background: 'rgba(0,0,0,0.35)',
+                color: '#fff',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="AUTO">AUTO (Scheduled Mon-Fri)</option>
+              <option value="OPEN">OPEN (Special / Weekend Session)</option>
+              <option value="CLOSED">CLOSED (Holiday / Halt)</option>
+            </select>
+          </div>
         </div>
       </div>
 

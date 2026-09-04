@@ -101,6 +101,57 @@ function isCommodityContract(sym) {
   return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 }
 
+// Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
+const marketStatusCache = { equity: 'AUTO', commodity: 'AUTO' };
+
+async function loadMarketStatusFromDb() {
+  try {
+    const rows = await db('system_settings').whereIn('key', ['equity_market_status', 'commodity_market_status']);
+    rows.forEach(r => {
+      if (r.key === 'equity_market_status') marketStatusCache.equity = r.value || 'AUTO';
+      if (r.key === 'commodity_market_status') marketStatusCache.commodity = r.value || 'AUTO';
+    });
+    console.log(`📊 Loaded Market Status: EQ=${marketStatusCache.equity}, MCX=${marketStatusCache.commodity}`);
+  } catch (e) {}
+}
+loadMarketStatusFromDb();
+
+function isSegmentMarketOpen(isCommodity) {
+  const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
+  if (status === 'OPEN') return { open: true };
+  if (status === 'CLOSED') {
+    return { open: false, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
+  }
+  
+  // AUTO: evaluate regular exchange trading schedule
+  const now = new Date();
+  const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  const day = istTime.getUTCDay(); // 0 = Sun, 6 = Sat
+  const hours = istTime.getUTCHours();
+  const minutes = istTime.getUTCMinutes();
+  
+  if (day === 0 || day === 6) {
+    return { open: false, reason: 'Markets are closed on weekends (Saturday & Sunday). Regular trading resumes on Monday.' };
+  }
+  
+  if (!isCommodity) {
+    // Equities: 9:15 AM to 3:15 PM for Intraday/BO/CO
+    const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
+    const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
+    if (isBeforeOpen || isAfterClose) {
+      return { open: false, reason: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST on trading days.' };
+    }
+  } else {
+    // Commodities: 9:00 AM to 10:50 PM for Intraday/BO/CO
+    const isBeforeOpen = hours < 9;
+    const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
+    if (isBeforeOpen || isAfterClose) {
+      return { open: false, reason: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST on trading days.' };
+    }
+  }
+  return { open: true };
+}
+
 // When running in PM2 Cluster Mode, NODE_APP_INSTANCE tells us the worker ID
 const isMaster = process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE;
 
@@ -109,20 +160,33 @@ const io = new Server(server, {
   adapter: createAdapter(adapterPubClient, adapterSubClient)
 });
 
-// Listen for Fyers token updates on all cluster nodes
+// Listen for Fyers token updates & Market Status updates on all cluster nodes
 const { subClient: globalSubClient } = require('./services/redisClient');
 if (globalSubClient) {
-    const setupTokenSync = () => {
+    const setupClusterSync = () => {
         globalSubClient.subscribe('fyers_token_updated', () => {
             try {
                 const { reloadFyersToken } = require('./services/fyers');
                 if (reloadFyersToken) reloadFyersToken();
             } catch(e) {}
         }).catch((err) => { console.error('Redis token sync subscribe error:', err); });
+
+        globalSubClient.subscribe('market_status_updated', (message) => {
+            try {
+                const data = JSON.parse(message);
+                if (data.equity) marketStatusCache.equity = data.equity;
+                if (data.commodity) marketStatusCache.commodity = data.commodity;
+                console.log(`📊 Redis Market Status Synced: EQ=${marketStatusCache.equity}, MCX=${marketStatusCache.commodity}`);
+                io.emit('market_status_updated', {
+                    equity: marketStatusCache.equity,
+                    commodity: marketStatusCache.commodity
+                });
+            } catch(e) {}
+        }).catch(() => {});
     };
     
-    if (globalSubClient.isReady) setupTokenSync();
-    else globalSubClient.on('ready', setupTokenSync);
+    if (globalSubClient.isReady) setupClusterSync();
+    else globalSubClient.on('ready', setupClusterSync);
 }
 
 // Redis Pub/Sub for syncing priceCache across cluster nodes
@@ -1399,6 +1463,87 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
   }
 });
 
+// ── Market Status Endpoints (Admin Controls) ──────────────────────────────────
+app.get('/api/market-status', (req, res) => {
+  res.json({
+    success: true,
+    equity: marketStatusCache.equity,
+    commodity: marketStatusCache.commodity
+  });
+});
+
+app.get('/api/admin/market-status', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { getFyersStatus } = require('./services/fyers');
+    const fyersStatus = getFyersStatus ? getFyersStatus() : {};
+
+    res.json({
+      success: true,
+      equity: marketStatusCache.equity,
+      commodity: marketStatusCache.commodity,
+      fyers: fyersStatus
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/market-status', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { equity, commodity } = req.body;
+    const validModes = ['AUTO', 'OPEN', 'CLOSED'];
+
+    if (equity && validModes.includes(equity.toUpperCase())) {
+      marketStatusCache.equity = equity.toUpperCase();
+      await db('system_settings')
+        .insert({ key: 'equity_market_status', value: marketStatusCache.equity, updated_at: new Date() })
+        .onConflict('key')
+        .merge();
+    }
+
+    if (commodity && validModes.includes(commodity.toUpperCase())) {
+      marketStatusCache.commodity = commodity.toUpperCase();
+      await db('system_settings')
+        .insert({ key: 'commodity_market_status', value: marketStatusCache.commodity, updated_at: new Date() })
+        .onConflict('key')
+        .merge();
+    }
+
+    // Broadcast across Redis cluster
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) {
+        pubClient.publish('market_status_updated', JSON.stringify({
+          equity: marketStatusCache.equity,
+          commodity: marketStatusCache.commodity
+        })).catch(() => {});
+      }
+    } catch(e) {}
+
+    try {
+      io.emit('market_status_updated', {
+        equity: marketStatusCache.equity,
+        commodity: marketStatusCache.commodity
+      });
+    } catch(e) {}
+
+    console.log(`[Admin] Market Status updated: Equity=${marketStatusCache.equity}, Commodity=${marketStatusCache.commodity}`);
+    res.json({
+      success: true,
+      equity: marketStatusCache.equity,
+      commodity: marketStatusCache.commodity
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
@@ -2275,27 +2420,21 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
-  // Block new Intraday orders outside valid time windows (square-off / closing orders are always permitted)
-  if ((product_type === 'INT' || product_type === 'BO' || product_type === 'CO') && !isClosingOrder) {
+  // Block new orders when market is closed (square-off / closing orders are always permitted)
+  if (!isClosingOrder) {
     const isCommodity = isCommodityContract(symbol);
-    const now = new Date();
-    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-    const hours = istTime.getUTCHours();
-    const minutes = istTime.getUTCMinutes();
+    const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
     
-    if (!isCommodity) {
-      // Equities: 9:15 AM to 3:15 PM
-      const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
-      const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
-      if (isBeforeOpen || isAfterClose) {
-        return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
+    const marketCheck = isSegmentMarketOpen(isCommodity);
+    if (!marketCheck.open) {
+      const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
+      // If Admin has marked the market CLOSED, block ALL new entries (DEL and INT)
+      if (status === 'CLOSED') {
+        return res.status(400).json({ error: marketCheck.reason });
       }
-    } else {
-      // Commodities: 9:00 AM to 10:50 PM
-      const isBeforeOpen = hours < 9;
-      const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
-      if (isBeforeOpen || isAfterClose) {
-        return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
+      // If market is in AUTO mode, block Intraday/BO/CO orders outside market hours
+      if (isIntradayProduct) {
+        return res.status(400).json({ error: marketCheck.reason });
       }
     }
   }
@@ -2954,27 +3093,21 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Basket is empty' });
   }
 
-  // Block Intraday cutoff
+  // Block new orders when market is closed
   for (const item of items) {
-    if (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO') {
-      const isCommodity = isCommodityContract(item.symbol);
-      const now = new Date();
-      const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-      const hours = istTime.getUTCHours();
-      const minutes = istTime.getUTCMinutes();
-      
-      if (!isCommodity) {
-        const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
-        const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
-        if (isBeforeOpen || isAfterClose) {
-          return res.status(400).json({ error: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST.' });
-        }
-      } else {
-        const isBeforeOpen = hours < 9;
-        const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
-        if (isBeforeOpen || isAfterClose) {
-          return res.status(400).json({ error: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST.' });
-        }
+    const isCommodity = isCommodityContract(item.symbol);
+    const isIntradayProduct = (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO');
+    
+    const marketCheck = isSegmentMarketOpen(isCommodity);
+    if (!marketCheck.open) {
+      const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
+      // If Admin has marked the market CLOSED, block ALL new entries (DEL and INT)
+      if (status === 'CLOSED') {
+        return res.status(400).json({ error: marketCheck.reason });
+      }
+      // If market is in AUTO mode, block Intraday/BO/CO orders outside market hours
+      if (isIntradayProduct) {
+        return res.status(400).json({ error: marketCheck.reason });
       }
     }
 

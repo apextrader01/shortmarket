@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag } from 'lucide-react';
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus })));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
@@ -120,24 +120,52 @@ export default function BasketModal() {
 
   const isInsufficient = balanceNum < finalMargin;
 
-  // Check restrictions and cutoff
-  const isTimeBlocked = enhancedItems.some(item => {
+  // Check market session restrictions and cutoff
+  let blockedMarketReason = null;
+  const isMarketBlocked = enhancedItems.some(item => {
     const clean = (item.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const isCommodity = (item.symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
-    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-    const hours = istTime.getHours();
-    const minutes = istTime.getMinutes();
-    if (isCommodity) {
-      return (hours > 22 || (hours === 22 && minutes >= 50));
+    const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
+    
+    if (status === 'OPEN') return false;
+    if (status === 'CLOSED') {
+      blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked CLOSED / Holiday.`;
+      return true;
     }
-    return (hours > 15 || (hours === 15 && minutes >= 15));
+    
+    // AUTO mode: Check weekend & normal hours
+    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const day = istTime.getDay();
+    if (day === 0 || day === 6) {
+      blockedMarketReason = 'Markets are closed on weekends (Saturday & Sunday).';
+      return true;
+    }
+    
+    if (productType === 'INT') {
+      const hours = istTime.getHours();
+      const minutes = istTime.getMinutes();
+      if (isCommodity) {
+        const isClosed = hours < 9 || hours > 22 || (hours === 22 && minutes >= 50);
+        if (isClosed) blockedMarketReason = 'Intraday trading for Commodities is allowed only between 9:00 AM and 10:50 PM IST.';
+        return isClosed;
+      } else {
+        const isClosed = hours < 9 || (hours === 9 && minutes < 15) || hours > 15 || (hours === 15 && minutes >= 15);
+        if (isClosed) blockedMarketReason = 'Intraday trading for Equities is allowed only between 9:15 AM and 3:15 PM IST.';
+        return isClosed;
+      }
+    }
+    return false;
   });
 
   const isAnyRestricted = enhancedItems.some(item => restrictedStocks.includes(item.symbol));
-  const isIntradayBlocked = (isAnyRestricted || isTimeBlocked) && productType === 'INT';
+  const isIntradayBlocked = (isAnyRestricted || isMarketBlocked) && productType === 'INT';
 
   const handleExecute = async () => {
     if (basketItems.length === 0) return;
+    if (isMarketBlocked) {
+      alert(blockedMarketReason || 'Market is currently closed for one or more items in the basket.');
+      return;
+    }
     if (isIntradayBlocked) return;
     if (isAnyRestricted && !showCautionPopup) {
        setShowCautionPopup(true);

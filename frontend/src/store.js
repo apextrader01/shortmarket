@@ -544,12 +544,18 @@ export const useStore = create(persist((set, get) => ({
       get().fetchUserData();
     });
 
+    socket.off('market_status_updated');
+    socket.on('market_status_updated', (data) => {
+      set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
+    });
+
     const onConnect = () => {
       set({ isConnected: true });
       const currentUser = get().user;
       if (currentUser?.id) {
         socket.emit('register_user', currentUser.id);
       }
+      get().fetchMarketStatus();
       // Force a fresh REST price fetch on every socket connect/reconnect
       get().refreshPrices(true);
       
@@ -1552,6 +1558,53 @@ export const useStore = create(persist((set, get) => ({
       return data;
     } catch (err) {
       return { success: false, error: err.message };
+    }
+  },
+
+  // ── Market Status & Fyers Health ───────────────────────────────────────────
+  marketStatus: { equity: 'AUTO', commodity: 'AUTO' },
+  fyersStatus: null,
+
+  fetchMarketStatus: async () => {
+    try {
+      const res = await fetch(`${API}/api/market-status`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
+      }
+    } catch (e) {}
+  },
+
+  fetchFyersStatus: async () => {
+    try {
+      const res = await fetch(`${API}/api/fyers/status`);
+      const data = await res.json();
+      set({ fyersStatus: data });
+      return data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  updateMarketStatus: async (equity, commodity) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ equity, commodity })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketStatus: { equity: data.equity, commodity: data.commodity } });
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to update market status' };
+    } catch (e) {
+      return { success: false, error: e.message };
     }
   },
 

@@ -542,7 +542,26 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at)');
     
-    console.log('✅ Critical columns and indexes verified on tables');
+    // System Settings Table (for Admin market toggles, maintenance mode, etc.)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed default market controls if not exist
+    const hasEq = await db('system_settings').where({ key: 'equity_market_status' }).first();
+    if (!hasEq) {
+      await db('system_settings').insert({ key: 'equity_market_status', value: 'AUTO' });
+    }
+    const hasMcx = await db('system_settings').where({ key: 'commodity_market_status' }).first();
+    if (!hasMcx) {
+      await db('system_settings').insert({ key: 'commodity_market_status', value: 'AUTO' });
+    }
+
+    console.log('✅ Critical columns, indexes, and system_settings verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }
