@@ -11,13 +11,23 @@ export default function PositionsTable() {
   if (viewMode === 'OPEN') {
     filteredPositions = (positions || []).filter(pos => Number(pos.quantity) !== 0);
   } else {
-    const dbClosed = (positions || []).filter(pos => Number(pos.quantity) === 0);
+    const isToday = (dateString) => {
+      if (!dateString) return false;
+      const d = new Date(dateString);
+      const today = new Date();
+      return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    };
+    const dbClosed = (positions || []).filter(pos => Number(pos.quantity) === 0 && isToday(pos.updated_at || pos.created_at));
+    const dbClosedKeys = new Set(dbClosed.map(p => `${p.symbol}-${p.product_type || 'INT'}`));
+
     const closedOrdersMap = {};
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
-      if (isExecuted && hasRealizedPnl) {
-        const key = `${o.symbol}-${o.product_type || 'INT'}`;
+      const isClosingSide = o.side === 'SELL' || (o.realized_pnl !== null && Number(o.realized_pnl) !== 0);
+      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+      const key = `${o.symbol}-${o.product_type || 'INT'}`;
+
+      if (isExecuted && isClosingSide && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
         if (!closedOrdersMap[key]) {
           closedOrdersMap[key] = {
             id: `closed-ord-${o.id}`,
@@ -35,17 +45,7 @@ export default function PositionsTable() {
         closedOrdersMap[key].exit_price = Number(o.average_price || o.price || closedOrdersMap[key].exit_price);
       }
     });
-    const combinedMap = {};
-    [...dbClosed, ...Object.values(closedOrdersMap)].forEach(p => {
-      const key = `${p.symbol}-${p.product_type}`;
-      if (!combinedMap[key]) {
-        combinedMap[key] = { ...p };
-      } else {
-        combinedMap[key].realized_pnl = Number(combinedMap[key].realized_pnl || 0) + Number(p.realized_pnl || 0);
-        combinedMap[key].closed_quantity = Number(combinedMap[key].closed_quantity || 0) + Number(p.closed_quantity || 0);
-      }
-    });
-    filteredPositions = Object.values(combinedMap);
+    filteredPositions = [...dbClosed, ...Object.values(closedOrdersMap)];
   }
 
   const positionsWithPnl = filteredPositions.map(pos => {

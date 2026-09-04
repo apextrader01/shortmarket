@@ -32,16 +32,20 @@ export default function PositionsView() {
   } else if (viewMode === 'OPEN') {
     sourceData = (positions || []).filter(p => Number(p.quantity) !== 0);
   } else if (viewMode === 'CLOSED') {
-    // 1. Include explicit closed positions updated/closed today
+    // 1. Include explicit closed positions updated/closed today from database
     const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
+    const dbClosedKeys = new Set(dbClosed.map(p => `${p.symbol}-${p.product_type || 'INT'}`));
     
-    // 2. Synthesize closed positions from executed orders that recorded realized P&L TODAY
+    // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed
     const closedOrdersMap = {};
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
-      if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at)) {
-        const key = `${o.symbol}-${o.product_type || 'INT'}`;
+      const isClosingSide = o.side === 'SELL' || (o.realized_pnl !== null && Number(o.realized_pnl) !== 0);
+      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+      const key = `${o.symbol}-${o.product_type || 'INT'}`;
+
+      // Only add from orders if this symbol+product wasn't already in dbClosed
+      if (isExecuted && isClosingSide && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
         if (!closedOrdersMap[key]) {
           closedOrdersMap[key] = {
             id: `closed-ord-${o.id}`,
@@ -62,21 +66,7 @@ export default function PositionsView() {
       }
     });
 
-    const orderClosedList = Object.values(closedOrdersMap);
-    
-    // Combine and deduplicate
-    const combinedMap = {};
-    [...dbClosed, ...orderClosedList].forEach(p => {
-      const key = `${p.symbol}-${p.product_type}`;
-      if (!combinedMap[key]) {
-        combinedMap[key] = { ...p };
-      } else {
-        combinedMap[key].realized_pnl = Number(combinedMap[key].realized_pnl || 0) + Number(p.realized_pnl || 0);
-        combinedMap[key].closed_quantity = Number(combinedMap[key].closed_quantity || 0) + Number(p.closed_quantity || 0);
-      }
-    });
-
-    sourceData = Object.values(combinedMap);
+    sourceData = [...dbClosed, ...Object.values(closedOrdersMap)];
   }
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
