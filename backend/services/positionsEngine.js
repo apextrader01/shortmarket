@@ -27,6 +27,8 @@ const ensureLivePrices = async (symbols) => {
     return priceCache;
 };
 
+const LedgerService = require('./ledgerService');
+
 class PositionsEngine {
     constructor() {
         console.log('PositionsEngine Initialized (EOD Automation)');
@@ -47,22 +49,12 @@ class PositionsEngine {
         }, { timezone: 'Asia/Kolkata' });
 
         // EQUITIES
-        // Phase 2: The Order Sweep - 03:19 PM IST (15:19)
-        cron.schedule('19 15 * * *', () => {
-            this.sweepPendingOrders('EQUITY');
-        }, { timezone: 'Asia/Kolkata' });
-
-        // Phase 3: The Square-Off - 03:20 PM IST (15:20)
-        cron.schedule('20 15 * * *', () => {
-            this.forceSquareOff('EQUITY');
-        }, { timezone: 'Asia/Kolkata' });
-
-        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:25 PM
+        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:25 PM IST
         cron.schedule('25 15 * * *', () => {
             this.settleExpiries(false); // false = Not Commodity
         }, { timezone: 'Asia/Kolkata' });
 
-        // Phase 4: Final Cleanup (Equities) - 04:00 PM IST (16:00)
+        // Phase 4: Final Safety Net Cleanup (Equities) - 04:00 PM IST (16:00)
         cron.schedule('0 16 * * *', () => {
             console.log('[CRON] 04:00 PM Final Cleanup for Equities triggered.');
             this.sweepPendingOrders('EQUITY');
@@ -76,17 +68,7 @@ class PositionsEngine {
             this.settleExpiries(true); // true = Commodity
         }, { timezone: 'Asia/Kolkata' });
 
-        // Phase 2: The Order Sweep - 10:59 PM IST (22:59)
-        cron.schedule('59 22 * * *', () => {
-            this.sweepPendingOrders('COMMODITY');
-        }, { timezone: 'Asia/Kolkata' });
-
-        // Phase 3: The Square-Off - 11:00 PM IST (23:00)
-        cron.schedule('0 23 * * *', () => {
-            this.forceSquareOff('COMMODITY');
-        }, { timezone: 'Asia/Kolkata' });
-
-        // Phase 4: Final Cleanup (Commodities) - 12:05 AM IST (00:05)
+        // Phase 4: Final Safety Net Cleanup (Commodities) - 12:05 AM IST (00:05)
         cron.schedule('5 0 * * *', () => {
             console.log('[CRON] 12:05 AM Final Cleanup for Commodities triggered.');
             this.sweepPendingOrders('COMMODITY');
@@ -112,15 +94,8 @@ class PositionsEngine {
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
-                            if (order.margin > 0) {
-                                const user = await trx('users').where({ id: order.user_id }).first();
-                                if (user) {
-                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
-                                    await trx('ledger').insert({
-                                        user_id: order.user_id, amount: Number(order.margin),
-                                        type: 'MARGIN_RELEASE', description: `EOD sweep: margin refunded for ${order.symbol} ${order.side}`
-                                    });
-                                }
+                            if (parseFloat(order.margin) > 0) {
+                                await LedgerService.releaseMargin(trx, order.user_id, order.margin, `EOD sweep: margin refunded for ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
                             console.log(`[EOD SWEEP] Cancelled PENDING Entry ${order.id} (${order.symbol})`);
@@ -129,9 +104,7 @@ class PositionsEngine {
                 }
             }
 
-            // BUG FIX 2: Also cancel PENDING_TRIGGER legs (BO/CO SL & Target orders).
-            // Previously only PENDING was cancelled, leaving SL/Target legs alive overnight
-            // which could fire incorrectly on the next morning's price gap.
+            // Step B: Cancel PENDING_TRIGGER legs (BO/CO SL & Target orders)
             const pendingTriggerOrders = await db('orders')
                 .where('status', 'PENDING_TRIGGER')
                 .whereIn('product_type', ['INT', 'BO', 'CO']);
@@ -145,11 +118,8 @@ class PositionsEngine {
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
-                            if (order.margin > 0) {
-                                const user = await trx('users').where({ id: order.user_id }).first();
-                                if (user) {
-                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
-                                }
+                            if (parseFloat(order.margin) > 0) {
+                                await LedgerService.releaseMargin(trx, order.user_id, order.margin, `EOD sweep: margin refunded for ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
                             console.log(`[EOD SWEEP] Cancelled PENDING_TRIGGER Leg ${order.id} (${order.symbol})`);
@@ -163,68 +133,55 @@ class PositionsEngine {
     }
 
     async forceSquareOff(market) {
-        console.log(`[EOD SQUARE-OFF] Starting Phase 3 Square-Off for ${market}...`);
+        console.log(`[EOD SQUARE-OFF] Running Final Safety Net Square-Off for ${market}...`);
         try {
-            // 1. Force Market Exit for Open Positions
-            const positions = await db('positions')
-                .whereNot('quantity', 0)
-                .whereIn('product_type', ['INT', 'BO', 'CO']);
+            await db.transaction(async (trx) => {
+                // 1. Force Market Exit for Open Positions
+                const positions = await trx('positions')
+                    .whereNot('quantity', 0)
+                    .whereIn('product_type', ['INT', 'BO', 'CO']);
+                    
+                const positionsToExit = positions.filter(pos => {
+                    const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
+                    return (market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity);
+                });
                 
-            const positionsToExit = positions.filter(pos => {
-                const isCommodity = COMMODITIES.some(c => pos.symbol.startsWith(c));
-                return (market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity);
-            });
-            
-            const priceCache = await ensureLivePrices(positionsToExit.map(p => p.symbol));
+                const priceCache = await ensureLivePrices(positionsToExit.map(p => p.symbol));
 
-            for (const pos of positionsToExit) {
-                const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
-                const exitQty = Math.abs(pos.quantity);
-                // Use real LTP; fall back to average price if no live price available
-                const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                for (const pos of positionsToExit) {
+                    const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                    if (!ltp || ltp <= 0) {
+                        console.warn(`[EOD SQUARE-OFF] No LTP for ${pos.symbol}, skipping square-off.`);
+                        continue;
+                    }
 
                     try {
-                        const [orderId] = await db('orders').insert({
-                            user_id: pos.user_id,
-                            symbol: pos.symbol,
-                            type: 'MARKET',
-                            side: exitSide,
-                            quantity: exitQty,
-                            price: ltp || null,
-                            status: 'PENDING',
-                            product_type: pos.product_type,
-                            margin: 0,
-                            is_rms: true,
-                            created_at: new Date(),
-                            updated_at: new Date()
-                        }).returning('id');
-
-                        const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
-                        const orderRow = await db('orders').where({ id: orderIdVal }).first();
-                        orderRow.is_rms = true;
-
-                        // Directly execute the exit order — avoids touching other pending orders
-                        await triggerEngine.executeOrder(orderRow, ltp || Number(pos.average_price));
-                        console.log(`[EOD SQUARE-OFF] Forced exit for ${pos.symbol} qty=${exitQty} @ ${ltp}`);
+                        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
+                        console.log(`[EOD SQUARE-OFF] Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
                     } catch (execErr) {
                         console.error(`[EOD SQUARE-OFF] Failed to exit ${pos.symbol}:`, execErr.message);
                     }
-            }
-
-            // 2. Safety net: cancel any remaining PENDING_TRIGGER legs that executeOrder may have missed
-            // (executeOrder cancels siblings only when position reaches qty=0, partial closes may leave orphans)
-            const pendingTriggers = await db('orders')
-                .where('status', 'PENDING_TRIGGER')
-                .whereIn('product_type', ['INT', 'BO', 'CO']);
-
-            for (const leg of pendingTriggers) {
-                const isCommodity = COMMODITIES.some(c => leg.symbol.startsWith(c));
-                if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
-                    await db('orders').where({ id: leg.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                    triggerEngine.removeOrderFromMemory(leg.id, leg.symbol);
-                    console.log(`[EOD SQUARE-OFF] Cancelled orphan PENDING_TRIGGER leg ${leg.id} (${leg.symbol})`);
                 }
-            }
+
+                // 2. Safety net: cancel any remaining PENDING_TRIGGER legs
+                const pendingTriggers = await trx('orders')
+                    .where('status', 'PENDING_TRIGGER')
+                    .whereIn('product_type', ['INT', 'BO', 'CO']);
+
+                for (const leg of pendingTriggers) {
+                    const isCommodity = COMMODITIES.some(c => leg.symbol.startsWith(c));
+                    if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
+                        const updated = await trx('orders').where({ id: leg.id, status: 'PENDING_TRIGGER' }).update({ status: 'CANCELLED', updated_at: new Date() });
+                        if (updated > 0) {
+                            if (parseFloat(leg.margin) > 0) {
+                                await LedgerService.releaseMargin(trx, leg.user_id, leg.margin, `EOD Cancelled: ${leg.symbol}`);
+                            }
+                            triggerEngine.removeOrderFromMemory(leg.id, leg.symbol);
+                            console.log(`[EOD SQUARE-OFF] Cancelled orphan PENDING_TRIGGER leg ${leg.id} (${leg.symbol})`);
+                        }
+                    }
+                }
+            });
         } catch (error) {
             console.error(`[EOD SQUARE-OFF ERROR] ${market}:`, error);
         }
