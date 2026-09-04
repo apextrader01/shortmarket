@@ -45,7 +45,7 @@ class TriggerEngine {
 
     async addOrderToMemory(order) {
         const { generalClient } = require('./redisClient');
-        if (!generalClient || !generalClient.isReady) return;
+        if (!generalClient || !generalClient.isReady || !order) return;
         
         let key = null;
         let score = null;
@@ -59,10 +59,17 @@ class TriggerEngine {
                 // But if they do, we can just give them a 0 (Buy) or Infinity (Sell) score to trigger instantly.
                 key = `trigger:${order.symbol}:${order.side}:LIMIT`;
                 score = order.side === 'BUY' ? 999999999 : 0;
+            } else if (order.type && (order.type.startsWith('SL') || order.type === 'GTT' || order.type === 'TRAILING_STOP')) {
+                const trigger = Number(order.trigger_price || order.price);
+                let isGreaterOrEqual = false;
+                if (order.side === 'BUY' && order.type.startsWith('SL')) isGreaterOrEqual = true;
+                if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                key = isGreaterOrEqual ? `trigger:${order.symbol}:GTE` : `trigger:${order.symbol}:LTE`;
+                score = trigger;
             }
         } else if (order.status === 'PENDING_TRIGGER') {
-            const trigger = Number(order.trigger_price);
-            if (order.type.startsWith('SL') || order.type === 'LIMIT') {
+            const trigger = Number(order.trigger_price || order.price);
+            if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'GTT' || order.type === 'TRAILING_STOP')) {
                 // Determine if this leg triggers on >= or <=
                 // Buy SL triggers when LTP >= Trigger
                 // Sell SL triggers when LTP <= Trigger
@@ -81,7 +88,9 @@ class TriggerEngine {
             }
         }
 
-        if (key && score !== null) {
+        if (key && score !== null && !isNaN(score)) {
+            // Remove from any other sets first to prevent duplicates
+            await this.removeOrderFromMemory(order.id, order.symbol);
             await generalClient.zAdd(key, [{ score: score, value: order.id.toString() }]);
             if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
         }
@@ -324,7 +333,7 @@ class TriggerEngine {
                     if (newQty === 0) {
                         await trx('positions').where({ id: existingPos.id }).update({ 
                            quantity: 0, 
-                           closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + closeQty, 
+                           closed_quantity: (parseFloat(existingPos.closed_quantity) || 0) + closeQty, 
                            exit_price: execPrice, 
                            margin: 0,
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
@@ -337,13 +346,26 @@ class TriggerEngine {
                             
                         for (const dangler of danglingOrders) {
                             await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                            const refundMargin = parseFloat(dangler.margin) || 0;
+                            if (refundMargin > 0) {
+                                const user = await trx('users').where({ id: order.user_id }).first();
+                                if (user) {
+                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + refundMargin });
+                                    await trx('ledger').insert({
+                                        user_id: order.user_id,
+                                        amount: refundMargin,
+                                        type: 'MARGIN_RELEASE',
+                                        description: `Margin released for cancelled dangling order ${dangler.symbol}`
+                                    });
+                                }
+                            }
                             this.removeOrderFromMemory(dangler.id, dangler.symbol);
                         }
                     } else {
                         await trx('positions').where({ id: existingPos.id }).update({
                            quantity: newQty,
                            margin: newMargin,
-                           closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + closeQty,
+                           closed_quantity: (parseFloat(existingPos.closed_quantity) || 0) + closeQty,
                            exit_price: execPrice,
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
@@ -358,9 +380,9 @@ class TriggerEngine {
                     if (marginRefund > 0) {
                         await trx('ledger').insert({ user_id: order.user_id, amount: marginRefund, type: 'MARGIN_RELEASE', description: `Margin released for closing ${closeQty} ${order.symbol}` });
                     }
+                    await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
                     if (realizedPnl !== 0) {
                         await trx('ledger').insert({ user_id: order.user_id, amount: realizedPnl, type: 'REALIZED_PNL', description: `Realized P&L for ${order.symbol}` });
-                        await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
                     }
                     if (rmsPenalty > 0) {
                         await trx('ledger').insert({ user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `RMS Penalty for ${order.symbol}` });

@@ -243,26 +243,12 @@ export default function OrderModal() {
       product_type: isBO ? 'BO' : isCO ? 'CO' : productType
     };
 
-    if (tab === 'Stop Loss' || tab === 'GTT') {
-      const triggerPayload = {
-        symbol,
-        type: tab === 'GTT' ? 'GTT' : 'SL',
-        side,
-        quantity: totalQuantity,
-        limitPrice: orderType === 'MARKET' ? null : parseFloat(price),
-        triggerPrice: parseFloat(slTrigger),
-        productType,
-        status: 'PENDING_TRIGGER'
-      };
-      useStore.getState().addPendingTrigger(triggerPayload);
-      closeOrderModal();
-      return;
-    }
-
     const result = await useStore.getState().placeOrder(payload);
     if (result && result.success) {
       if (result.status === 'EXECUTED') {
         alert("✅ Order Executed Successfully!");
+      } else if (result.status === 'PENDING_TRIGGER') {
+        alert("⏳ Trigger Order Placed (Pending Trigger)");
       } else if (result.status === 'REJECTED') {
         alert("❌ Order Rejected!");
       } else {

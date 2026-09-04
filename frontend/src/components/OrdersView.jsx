@@ -64,19 +64,22 @@ export default function OrdersView() {
   });
   
   const boLegTriggers = orders
-    .filter(order => order.status === 'PENDING_TRIGGER' && order.parent_order_id)
+    .filter(order => order.status === 'PENDING_TRIGGER')
     .map(order => {
       let pType = order.product_type || 'INT';
       if (order.trigger_type === 'BO') pType = 'BO';
       else if (order.trigger_type === 'CO') pType = 'CO';
-      if (pType === 'DEL') pType = 'INT'; // Legs are never DEL
+      if (pType === 'DEL' && order.parent_order_id) pType = 'INT'; // Legs are never DEL
 
       return {
+        ...order,
         id: order.id,
         symbol: order.symbol,
         type: order.type,
         side: order.side,
         quantity: order.quantity,
+        price: order.price,
+        trigger_price: order.trigger_price,
         limitPrice: order.price ? parseFloat(order.price) : null,
         triggerPrice: order.trigger_price ? parseFloat(order.trigger_price) : null,
         productType: pType,

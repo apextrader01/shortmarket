@@ -95,7 +95,7 @@ async function spawnBracketOrders(trx, order) {
     };
     const [slId] = await trx('orders').insert(slOrder).returning('id');
     slOrder.id = typeof slId === 'object' ? slId.id : slId;
-    triggerEngine.addOrderToMemory(slOrder);
+    await triggerEngine.addOrderToMemory(slOrder);
   }
 
   if (hasTgt) {
@@ -115,7 +115,7 @@ async function spawnBracketOrders(trx, order) {
     };
     const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
     tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
-    triggerEngine.addOrderToMemory(tgtOrder);
+    await triggerEngine.addOrderToMemory(tgtOrder);
   }
 }
 

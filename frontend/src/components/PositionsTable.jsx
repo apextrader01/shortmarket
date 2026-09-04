@@ -15,7 +15,7 @@ export default function PositionsTable() {
     const closedOrdersMap = {};
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
       if (isExecuted && hasRealizedPnl) {
         const key = `${o.symbol}-${o.product_type || 'INT'}`;
         if (!closedOrdersMap[key]) {

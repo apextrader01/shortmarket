@@ -770,14 +770,13 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
-  updateOrder: async (id, quantity, price, sl_price, tgt_price) => {
+  updateOrder: async (id, quantity, price, sl_price, tgt_price, isMarket = false) => {
     try {
       const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
         headers: { 
-          
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ quantity, price, sl_price, tgt_price })
+        body: JSON.stringify({ quantity, price, sl_price, tgt_price, isMarket })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

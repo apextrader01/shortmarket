@@ -155,9 +155,11 @@ class LedgerService {
         // 6. Update Position
         await trx('positions').where({ id: positionId }).update({
             quantity: 0,
-            closed_quantity: trx.raw('closed_quantity + ?', [absQty]),
+            closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [absQty]),
             exit_price: exitPrice,
-            margin: 0
+            margin: 0,
+            realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+            updated_at: new Date()
         });
 
         return { realizedPnl, exitTaxes, rmsPenalty, netRelease };

@@ -107,18 +107,24 @@ class PositionsEngine {
                 const isCommodity = COMMODITIES.some(c => order.symbol.startsWith(c));
                 if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                     await db.transaction(async (trx) => {
-                        // Refund Margin
-                        if (order.margin > 0) {
-                            const user = await trx('users').where({ id: order.user_id }).first();
-                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
-                            await trx('ledger').insert({
-                                user_id: order.user_id, amount: Number(order.margin),
-                                type: 'MARGIN_RELEASE', description: `EOD sweep: margin refunded for ${order.symbol} ${order.side}`
-                            });
+                        const updated = await trx('orders')
+                            .where({ id: order.id, status: 'PENDING' })
+                            .update({ status: 'CANCELLED', updated_at: new Date() });
+
+                        if (updated > 0) {
+                            if (order.margin > 0) {
+                                const user = await trx('users').where({ id: order.user_id }).first();
+                                if (user) {
+                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
+                                    await trx('ledger').insert({
+                                        user_id: order.user_id, amount: Number(order.margin),
+                                        type: 'MARGIN_RELEASE', description: `EOD sweep: margin refunded for ${order.symbol} ${order.side}`
+                                    });
+                                }
+                            }
+                            triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                            console.log(`[EOD SWEEP] Cancelled PENDING Entry ${order.id} (${order.symbol})`);
                         }
-                        await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                        console.log(`[EOD SWEEP] Cancelled PENDING Entry ${order.id} (${order.symbol})`);
                     });
                 }
             }
@@ -134,14 +140,20 @@ class PositionsEngine {
                 const isCommodity = COMMODITIES.some(c => order.symbol.startsWith(c));
                 if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                     await db.transaction(async (trx) => {
-                        // BO/CO legs usually have margin: 0 (margin held on parent) but check anyway
-                        if (order.margin > 0) {
-                            const user = await trx('users').where({ id: order.user_id }).first();
-                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
+                        const updated = await trx('orders')
+                            .where({ id: order.id, status: 'PENDING_TRIGGER' })
+                            .update({ status: 'CANCELLED', updated_at: new Date() });
+
+                        if (updated > 0) {
+                            if (order.margin > 0) {
+                                const user = await trx('users').where({ id: order.user_id }).first();
+                                if (user) {
+                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + Number(order.margin) });
+                                }
+                            }
+                            triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                            console.log(`[EOD SWEEP] Cancelled PENDING_TRIGGER Leg ${order.id} (${order.symbol})`);
                         }
-                        await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                        console.log(`[EOD SWEEP] Cancelled PENDING_TRIGGER Leg ${order.id} (${order.symbol})`);
                     });
                 }
             }

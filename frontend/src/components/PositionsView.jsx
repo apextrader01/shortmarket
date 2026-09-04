@@ -39,7 +39,7 @@ export default function PositionsView() {
     const closedOrdersMap = {};
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
       if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at)) {
         const key = `${o.symbol}-${o.product_type || 'INT'}`;
         if (!closedOrdersMap[key]) {
@@ -82,6 +82,46 @@ export default function PositionsView() {
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
   const [partialExitPrice, setPartialExitPrice] = useState('');
+
+  const isMutualFund = (sym) => {
+    if (!sym || typeof sym !== 'string') return false;
+    return sym.endsWith('-MF') || /^\d{5,6}$/.test(sym) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(sym);
+  };
+
+  const getMfName = (sym) => {
+    if (!sym) return null;
+    return mfNames[sym] || mfNames[sym + '-MF'] || mfNames[sym.replace('-MF', '')] || null;
+  };
+
+  const [mfNames, setMfNames] = useState({});
+  useEffect(() => {
+    const symbols = (sourceData || []).map(p => p.symbol).filter(isMutualFund);
+    const unique = [...new Set(symbols)];
+    if (unique.length > 0) {
+      fetch(`${API}/api/mf/names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: unique })
+      })
+      .then(r => r.ok ? r.json() : {})
+      .then(data => {
+        setMfNames(prev => ({ ...prev, ...data }));
+        unique.forEach(symbol => {
+          if (!data[symbol]) {
+            const cleanId = String(symbol).replace('-MF', '');
+            fetch(`https://api.mfapi.in/mf/${cleanId}`)
+              .then(r => r.json())
+              .then(mfData => {
+                if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                  setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+                }
+              }).catch(() => {});
+          }
+        });
+      })
+      .catch(() => {});
+    }
+  }, [sourceData]);
 
   // Group positions by Symbol + Product Type (Flat List)
   const { flatPositions, globalMTM } = useMemo(() => {
@@ -139,8 +179,8 @@ export default function PositionsView() {
       if (posQty === 0 && viewMode === 'OPEN') return;
 
       const priceData = prices[pos.symbol] || {};
-      const ltp = priceData.ltp || 0;
       const avg = parseFloat(pos.average_price) || 0;
+      const ltp = priceData.ltp || (isMutualFund(pos.symbol) ? avg : 0);
       const qty = posQty;
       
       const invested = avg * Math.abs(qty);
@@ -335,7 +375,27 @@ export default function PositionsView() {
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
                       <td data-label="Symbol" style={{ padding: '16px 20px' }}>
-                        {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
+                        {isMutualFund(pos.symbol) ? (
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                                {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]}
+                              </span>
+                              <span style={{ fontSize: '10px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '2px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                                MF
+                              </span>
+                            </div>
+                            {getMfName(pos.symbol) && (
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={getMfName(pos.symbol)}>
+                                {getMfName(pos.symbol)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{pos.symbol.split(':')[0] || 'NSE'}</span>
+                          </>
+                        )}
                       </td>
                       <td data-label="Side" style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
                         {sideText}
@@ -477,11 +537,25 @@ export default function PositionsView() {
                       </div>
 
                       {/* Line 2: Symbol Name (Left) | PnL % (Right) */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '68%' }}>
-                          {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ maxWidth: '68%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]}
+                            </span>
+                            {isMutualFund(pos.symbol) && (
+                              <span style={{ fontSize: '9px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>
+                                MF
+                              </span>
+                            )}
+                          </div>
+                          {isMutualFund(pos.symbol) && getMfName(pos.symbol) && (
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={getMfName(pos.symbol)}>
+                              {getMfName(pos.symbol)}
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', marginTop: '2px' }}>
                           ({isDisplayProfit ? '+' : ''}{pnlPercent.toFixed(2)}%)
                         </div>
                       </div>

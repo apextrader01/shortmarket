@@ -32,11 +32,14 @@ export default function EditOrderModal() {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
       if (isPendingTrigger) {
-        setPrice(order.type === 'SL-M' ? (order.trigger_price ? parseFloat(order.trigger_price).toFixed(2) : '') : (order.price ? parseFloat(order.price).toFixed(2) : ''));
+        const trg = order.trigger_price ?? order.triggerPrice;
+        const prc = order.price ?? order.limitPrice;
+        setPrice(order.type === 'SL-M' ? (trg ? parseFloat(trg).toFixed(2) : '') : (prc ? parseFloat(prc).toFixed(2) : (trg ? parseFloat(trg).toFixed(2) : '')));
       } else {
-        setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
+        const prc = order.price ?? order.limitPrice;
+        setPrice(prc ? parseFloat(prc).toFixed(2) : '');
       }
-      if (order.productType) setProductType(order.productType);
+      if (order.productType || order.product_type) setProductType(order.productType || order.product_type);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
       setIsMarket(false);

@@ -585,16 +585,25 @@ async function garbageCollectSubscriptions() {
 async function fetchBatchLTPs(symbols) {
     if (!Array.isArray(symbols) || symbols.length === 0) return {};
     
-    symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
-    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !s.endsWith('-MF'));
-    const mfSymbols = symbols.filter(s => typeof s === 'string' && s.endsWith('-MF'));
+    const isMfSymbol = s => typeof s === 'string' && (s.endsWith('-MF') || /^\d{5,6}$/.test(s) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(s));
+    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !isMfSymbol(s));
+    const mfSymbols = symbols.filter(isMfSymbol);
     
     const mfResults = {};
     if (mfSymbols.length > 0) {
+        const LEGACY_MF_MAP = {
+            'EDEL-MF': '118615',
+            'MIRA-MF': '118825',
+            'NIPP-MF': '118778',
+            'EDEL': '118615',
+            'MIRA': '118825',
+            'NIPP': '118778'
+        };
         const axios = require('axios');
         for (const sym of mfSymbols) {
             try {
-                const mfCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+                const rawCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+                const mfCode = LEGACY_MF_MAP[sym] || LEGACY_MF_MAP[rawCode] || rawCode;
                 const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
                 if (res.data && res.data.data && res.data.data.length > 0) {
                     const nav = parseFloat(res.data.data[0].nav);
@@ -880,9 +889,18 @@ setInterval(async () => {
     if (typeof mfSubscriptions === 'undefined' || mfSubscriptions.size === 0) return;
     const axios = require('axios');
     const updates = {};
+    const LEGACY_MF_MAP = {
+        'EDEL-MF': '118615',
+        'MIRA-MF': '118825',
+        'NIPP-MF': '118778',
+        'EDEL': '118615',
+        'MIRA': '118825',
+        'NIPP': '118778'
+    };
     for (const sym of mfSubscriptions) {
         try {
-            const mfCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+            const rawCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+            const mfCode = LEGACY_MF_MAP[sym] || LEGACY_MF_MAP[rawCode] || rawCode;
             const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
             if (res.data && res.data.data && res.data.data.length > 0) {
                 const nav = parseFloat(res.data.data[0].nav);

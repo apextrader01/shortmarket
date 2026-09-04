@@ -97,22 +97,45 @@ class MTMRiskManager {
 
     async liquidateUser(userId, positions) {
         try {
+            let cancelledOrders = [];
+
             await db.transaction(async (trx) => {
-                // 1. Cancel all pending entry orders for the user
-                await trx('orders')
+                // 1. Cancel all pending entry and trigger orders for the user and refund margin
+                const pendingOrders = await trx('orders')
                     .where({ user_id: userId })
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
-                    .update({ status: 'CANCELLED' });
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+                for (const ord of pendingOrders) {
+                    const refund = parseFloat(ord.margin) || 0;
+                    if (refund > 0) {
+                        const user = await trx('users').where({ id: userId }).first();
+                        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + refund });
+                        await trx('ledger').insert({
+                            user_id: userId,
+                            amount: refund,
+                            type: 'MARGIN_RELEASE',
+                            description: `RMS liquidation: margin refunded for cancelled order ${ord.quantity} ${ord.symbol}`
+                        });
+                    }
+                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                    cancelledOrders.push(ord);
+                }
 
                 // 2. Liquidate all positions
                 for (const pos of positions) {
-                    const ltp = this.priceCache[pos.symbol]?.ltp;
-                    if (!ltp) continue;
+                    const ltp = this.priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                    if (ltp <= 0) continue;
 
                     await LedgerService.closePosition(trx, userId, pos.id, ltp, true); // true = RMS Penalty
                     console.log(`[RMS EXECUTED] Closed ${pos.symbol} for user ${userId} at ${ltp}`);
                 }
             });
+
+            // Outside transaction: clean Redis triggers for all cancelled orders
+            const triggerEngine = require('./triggerEngine');
+            for (const ord of cancelledOrders) {
+                triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+            }
         } catch (err) {
             console.error(`[RMS ALERT] Failed to liquidate user ${userId}:`, err);
         }

@@ -1730,16 +1730,56 @@ function determineRisk(return1y) {
 
 const mfCache = {};
 
+const LEGACY_MF_NAMES = {
+    'EDEL-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    'MIRA-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    'NIPP-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    'EDEL': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    'MIRA': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    'NIPP': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '118615-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    '118825-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    '118778-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '120197-MF': 'ICICI Prudential Liquid Fund - Direct Plan - Growth'
+};
+const LEGACY_MF_CODES = {
+    'EDEL': '118615',
+    'MIRA': '118825',
+    'NIPP': '118778'
+};
+
 app.post('/api/mf/names', async (req, res) => {
     try {
+        if (!allMutualFunds || allMutualFunds.length === 0) {
+            await initMutualFundsList();
+        }
         const { ids } = req.body;
         const mapping = {};
         if (Array.isArray(ids)) {
-            ids.forEach(id => {
-                const cleanId = String(id).replace('-MF', '');
+            const axios = require('axios');
+            for (const id of ids) {
+                if (LEGACY_MF_NAMES[id]) {
+                    mapping[id] = LEGACY_MF_NAMES[id];
+                    continue;
+                }
+                let cleanId = String(id).replace('-MF', '');
+                cleanId = LEGACY_MF_CODES[cleanId] || cleanId;
                 const fund = allMutualFunds.find(f => String(f.schemeCode) === cleanId);
-                if (fund) mapping[id] = fund.schemeName;
-            });
+                if (fund) {
+                    mapping[id] = fund.schemeName;
+                } else if (LEGACY_MF_NAMES[cleanId]) {
+                    mapping[id] = LEGACY_MF_NAMES[cleanId];
+                } else if (/^\d+$/.test(cleanId)) {
+                    // Fallback to direct mfapi fetch for any future mutual fund not yet in cache
+                    try {
+                        const mfRes = await axios.get(`https://api.mfapi.in/mf/${cleanId}`, { timeout: 3000 });
+                        if (mfRes.data && mfRes.data.meta && mfRes.data.meta.scheme_name) {
+                            mapping[id] = mfRes.data.meta.scheme_name;
+                            allMutualFunds.push({ schemeCode: parseInt(cleanId), schemeName: mfRes.data.meta.scheme_name });
+                        }
+                    } catch (e) {}
+                }
+            }
         }
         res.json(mapping);
     } catch(err) {
@@ -2201,9 +2241,12 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   try {
     await db.transaction(async (trx) => {
       // 1. Determine execution status
-      const isMarket = type === 'MARKET';
-      const status = 'PENDING';
+      const hasTrigger = Boolean((type && (type.startsWith('SL') || type === 'GTT' || type === 'TRAILING_STOP')) || (trigger_price !== undefined && trigger_price !== null && Number(trigger_price) > 0));
+      const isMarket = type === 'MARKET' && !hasTrigger;
+      const isTriggerOrder = hasTrigger;
+      const status = isTriggerOrder ? 'PENDING_TRIGGER' : 'PENDING';
       const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
+      const resolvedTriggerPrice = trigger_price ? parseFloat(trigger_price) : (type && type.startsWith('SL') && price ? parseFloat(price) : null);
       
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
@@ -2221,7 +2264,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
               
               // 3. Fetch Pending Sell Orders for this symbol
               const pendingOrders = await trx('orders')
-                  .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
+                  .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL' })
+                  .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
               const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
               
               const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
@@ -2273,13 +2317,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
       req.orderToProcess = {
         id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: trigger_price || null, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         isMarket
       };
     });
@@ -2647,10 +2691,12 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
 
     await db.transaction(async (trx) => {
       for (const holding of activeHoldings) {
-        const qty = parseInt(holding.quantity);
+        const qty = parseFloat(holding.quantity);
         const ltp = priceCache[holding.symbol]?.ltp || parseFloat(holding.average_price) || 0;
         const totalValue = qty * ltp;
         totalSoldAmount += totalValue;
+
+        const realizedPnl = (ltp - parseFloat(holding.average_price)) * qty;
 
         // 1. Create executed sell order
         await trx('orders').insert({
@@ -2662,9 +2708,24 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           price: ltp,
           average_price: ltp,
           status: 'EXECUTED',
-          product_type: 'CNC',
+          product_type: 'DEL',
           margin: 0,
-          realized_pnl: (ltp - parseFloat(holding.average_price)) * qty,
+          realized_pnl: realizedPnl,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        // 1.5 Create closed position record for today
+        await trx('positions').insert({
+          user_id: req.user.id,
+          symbol: holding.symbol,
+          quantity: 0,
+          closed_quantity: qty,
+          average_price: parseFloat(holding.average_price),
+          exit_price: ltp,
+          realized_pnl: realizedPnl,
+          product_type: 'DEL',
+          margin: 0,
           created_at: new Date(),
           updated_at: new Date()
         });
@@ -2937,6 +2998,10 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
   try {
     let cancelledOrder = null;
+    let siblingsToClean = [];
+    let autoExitOrderToExecute = null;
+    let autoExitLtp = 0;
+
     await db.transaction(async (trx) => {
       const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
       // BUG FIX: Use throw instead of return res.status() inside a transaction.
@@ -2956,6 +3021,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
           for (const sib of cancelledSiblings) {
             await trx('orders').where({ id: sib.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+            siblingsToClean.push(sib);
           }
 
           // Bracket order cancelled: Auto-exit the underlying position at market
@@ -2967,13 +3033,14 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                  const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
                  
                  if (exitQty > 0) {
+                   autoExitLtp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
                    const [exitOrderId] = await trx('orders').insert({
                      user_id: req.user.id,
                      symbol: pos.symbol,
                      type: 'MARKET',
                      side: exitSide,
                      quantity: exitQty,
-                     price: null,
+                     price: autoExitLtp || null,
                      status: 'PENDING',
                      product_type: pos.product_type || 'INT',
                      margin: 0,
@@ -2981,14 +3048,11 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                      updated_at: new Date()
                    }).returning('id');
                    const exitOrderIdVal = typeof exitOrderId === 'object' ? exitOrderId.id : exitOrderId;
-                   // BUG FIX: Immediately add the auto-exit order to trigger engine memory
-                   // so it doesn't wait for reload_triggers pub/sub delay
-                   const triggerEngineLocal = require('./services/triggerEngine');
-                   await triggerEngineLocal.addOrderToMemory({
+                   autoExitOrderToExecute = {
                      id: exitOrderIdVal, user_id: req.user.id, symbol: pos.symbol, type: 'MARKET',
-                     side: exitSide, quantity: exitQty, price: null, status: 'PENDING',
+                     side: exitSide, quantity: exitQty, price: autoExitLtp || null, status: 'PENDING',
                      product_type: pos.product_type || 'INT', margin: 0
-                   });
+                   };
                  }
               }
           }
@@ -3015,6 +3079,15 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
     const triggerEngine = require('./services/triggerEngine');
     triggerEngine.removeOrderFromMemory(req.params.id, cancelledOrder.symbol);
+    for (const sib of siblingsToClean) {
+      triggerEngine.removeOrderFromMemory(sib.id, sib.symbol);
+    }
+
+    if (autoExitOrderToExecute) {
+      triggerEngine.removeOrderFromMemory(autoExitOrderToExecute.id, autoExitOrderToExecute.symbol);
+      triggerEngine.executeOrder(autoExitOrderToExecute, autoExitLtp).catch(err => console.error('Auto-exit execution error on BO cancel:', err));
+    }
+
     try {
         const { pubClient } = require('./services/redisClient');
         if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
@@ -3079,25 +3152,27 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
       try {
         let marketOrderToExecute = null;
         let ltpForMarket = 0;
+        let updatedOrder = null;
+        let updatedChildOrders = [];
         
         await db.transaction(async (trx) => {
           const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
-          if (!order) return res.status(404).json({ error: 'Order not found' });
+          if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
           if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
-            return res.status(400).json({ error: 'Only PENDING or PENDING_TRIGGER orders can be modified' });
+            throw Object.assign(new Error('Only PENDING or PENDING_TRIGGER orders can be modified'), { statusCode: 400 });
           }
 
           // Handle Market Execution override for Pending Triggers
           if (isMarket && order.status === 'PENDING_TRIGGER') {
-             ltpForMarket = priceCache[order.symbol]?.ltp || 0;
-             if (ltpForMarket <= 0) throw new Error('Live price unavailable for market execution');
+             ltpForMarket = priceCache[order.symbol]?.ltp || Number(order.trigger_price) || Number(order.price) || 0;
+             if (ltpForMarket <= 0) throw Object.assign(new Error('Live price unavailable for market execution'), { statusCode: 400 });
              
              // Update the order type to MARKET and status to PENDING so triggerEngine accepts it
              await trx('orders').where({ id: order.id }).update({ type: 'MARKET', status: 'PENDING', trigger_price: null, price: null, updated_at: new Date() });
              
              // We will execute it outside this transaction
              marketOrderToExecute = { ...order, type: 'MARKET', status: 'PENDING', trigger_price: null, price: null };
-             return; // Skip normal update logic
+             return;
           }
 
           const { calculateRequiredMargin } = require('./services/marginEngine');
@@ -3109,97 +3184,127 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           const marginDifference = newMargin - oldMargin;
       
-      // Check if user has enough balance if margin increases
-      const user = await trx('users').where({ id: req.user.id }).first();
-      if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
-         return res.status(400).json({ error: 'Insufficient Funds.' });
-      }
+          // Check if user has enough balance if margin increases
+          const user = await trx('users').where({ id: req.user.id }).first();
+          if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
+             throw Object.assign(new Error('Insufficient Funds.'), { statusCode: 400 });
+          }
 
-      // Mathematical Price Validation for PENDING_TRIGGER
-      if (order.status === 'PENDING_TRIGGER') {
-         const parent = await trx('orders').where({ id: order.parent_order_id }).first();
-         if (parent) {
-             const entryPrice = parseFloat(parent.price);
-             if (order.type === 'SL-M') {
-                 if (order.side === 'SELL' && parseFloat(price) >= entryPrice) {
-                     return res.status(400).json({ error: 'BO Buy: Stop-Loss must be lower than execution price.' });
-                 } else if (order.side === 'BUY' && parseFloat(price) <= entryPrice) {
-                     return res.status(400).json({ error: 'BO Sell: Stop-Loss must be higher than execution price.' });
-                 }
-             } else if (order.type === 'LIMIT') {
-                 if (order.side === 'SELL' && parseFloat(price) <= entryPrice) {
-                     return res.status(400).json({ error: 'BO Buy: Target must be higher than execution price.' });
-                 } else if (order.side === 'BUY' && parseFloat(price) >= entryPrice) {
-                     return res.status(400).json({ error: 'BO Sell: Target must be lower than execution price.' });
+          // Mathematical Price Validation for PENDING_TRIGGER
+          if (order.status === 'PENDING_TRIGGER') {
+             const parent = await trx('orders').where({ id: order.parent_order_id }).first();
+             if (parent) {
+                 const entryPrice = parseFloat(parent.price);
+                 if (order.type === 'SL-M') {
+                     if (order.side === 'SELL' && parseFloat(price) >= entryPrice) {
+                         throw Object.assign(new Error('BO Buy: Stop-Loss must be lower than execution price.'), { statusCode: 400 });
+                     } else if (order.side === 'BUY' && parseFloat(price) <= entryPrice) {
+                         throw Object.assign(new Error('BO Sell: Stop-Loss must be higher than execution price.'), { statusCode: 400 });
+                     }
+                 } else if (order.type === 'LIMIT') {
+                     if (order.side === 'SELL' && parseFloat(price) <= entryPrice) {
+                         throw Object.assign(new Error('BO Buy: Target must be higher than execution price.'), { statusCode: 400 });
+                     } else if (order.side === 'BUY' && parseFloat(price) >= entryPrice) {
+                         throw Object.assign(new Error('BO Sell: Target must be lower than execution price.'), { statusCode: 400 });
+                     }
                  }
              }
-         }
-      }
-
-      // Build update object
-      const updateObj = { 
-          quantity: Number(quantity), 
-          price: parseFloat(price),
-          margin: newMargin
-      };
-
-      if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M') {
-          updateObj.trigger_price = parseFloat(price);
-          updateObj.price = null; // SL-M is a market order when triggered
-      }
-
-      // Update sl_price and tgt_price if provided
-      if (sl_price !== undefined) updateObj.sl_price = sl_price;
-      if (tgt_price !== undefined) updateObj.tgt_price = tgt_price;
-
-      // Update Order
-      await trx('orders').where({ id: req.params.id }).update(updateObj);
-      
-      // Update child OCO orders (SL and Target legs) if sl_price or tgt_price changed
-      if (sl_price !== undefined || tgt_price !== undefined) {
-        const childOrders = await trx('orders')
-          .where({ parent_order_id: req.params.id, status: 'PENDING_TRIGGER' });
-        
-        const triggerEngine = require('./services/triggerEngine');
-        for (const child of childOrders) {
-          if (child.type === 'SL-M' && sl_price !== undefined) {
-            await trx('orders').where({ id: child.id }).update({ 
-              trigger_price: sl_price,
-              price: sl_price 
-            });
-          } else if (child.type === 'LIMIT' && tgt_price !== undefined) {
-            await trx('orders').where({ id: child.id }).update({ 
-              price: tgt_price 
-            });
           }
+
+          // Build update object
+          const updateObj = { 
+              quantity: Number(quantity), 
+              price: parseFloat(price),
+              margin: newMargin,
+              updated_at: new Date()
+          };
+
+          if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M') {
+              updateObj.trigger_price = parseFloat(price);
+              updateObj.price = null; // SL-M is a market order when triggered
+          }
+
+          // Update sl_price and tgt_price if provided
+          if (sl_price !== undefined) updateObj.sl_price = sl_price;
+          if (tgt_price !== undefined) updateObj.tgt_price = tgt_price;
+
+          // Update Order in database
+          await trx('orders').where({ id: req.params.id }).update(updateObj);
+          updatedOrder = { ...order, ...updateObj };
+          
+          // Update child OCO orders (SL and Target legs) if sl_price or tgt_price changed
+          if (sl_price !== undefined || tgt_price !== undefined) {
+            const childOrders = await trx('orders')
+              .where({ parent_order_id: req.params.id, status: 'PENDING_TRIGGER' });
+            
+            for (const child of childOrders) {
+              if (child.type === 'SL-M' && sl_price !== undefined) {
+                await trx('orders').where({ id: child.id }).update({ 
+                  trigger_price: sl_price,
+                  price: sl_price,
+                  updated_at: new Date()
+                });
+                updatedChildOrders.push({ ...child, trigger_price: sl_price, price: sl_price });
+              } else if (child.type === 'LIMIT' && tgt_price !== undefined) {
+                await trx('orders').where({ id: child.id }).update({ 
+                  price: tgt_price,
+                  updated_at: new Date()
+                });
+                updatedChildOrders.push({ ...child, price: tgt_price });
+              }
+            }
+          }
+
+          // Update Balance & Ledger (deduct difference if positive, refund if negative)
+          if (marginDifference > 0) {
+              await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: -marginDifference,
+                type: 'MARGIN_BLOCK',
+                description: `Additional margin blocked for modified order: ${quantity} ${order.symbol} (${order.product_type})`
+              });
+          } else if (marginDifference < 0) {
+              const refundAmount = Math.abs(marginDifference);
+              await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: refundAmount,
+                type: 'MARGIN_RELEASE',
+                description: `Margin refunded for modified order: ${quantity} ${order.symbol} (${order.product_type})`
+              });
+          }
+        });
+
+        // Outside Transaction: update Redis triggers
+        if (marketOrderToExecute) {
+            const triggerEngine = require('./services/triggerEngine');
+            triggerEngine.removeOrderFromMemory(marketOrderToExecute.id, marketOrderToExecute.symbol);
+            triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
+            return res.json({ success: true, executed: true });
         }
-      }
 
-      // Update Balance (deduct difference if positive, refund if negative)
-      if (marginDifference !== 0) {
-          await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
-      }
-      
-      const triggerEngine = require('./services/triggerEngine');
-      await triggerEngine.addOrderToMemory({ ...order, ...updateObj });
-      try {
-          const { pubClient } = require('./services/redisClient');
-          if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
-      } catch(e) {}
-      
-      res.json({ success: true });
-    });
-
-    if (marketOrderToExecute) {
         const triggerEngine = require('./services/triggerEngine');
-        triggerEngine.removeOrderFromMemory(marketOrderToExecute.id, marketOrderToExecute.symbol);
-        triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
-        return res.json({ success: true, executed: true });
-    }
+        if (updatedOrder) {
+            await triggerEngine.removeOrderFromMemory(updatedOrder.id, updatedOrder.symbol);
+            await triggerEngine.addOrderToMemory(updatedOrder);
+        }
+        for (const child of updatedChildOrders) {
+            await triggerEngine.removeOrderFromMemory(child.id, child.symbol);
+            await triggerEngine.addOrderToMemory(child);
+        }
 
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+        try {
+            const { pubClient } = require('./services/redisClient');
+            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
+        } catch(e) {}
+        
+        res.json({ success: true });
+
+      } catch (err) {
+        const statusCode = err.statusCode || 500;
+        res.status(statusCode).json({ error: err.message });
+      }
 });
 
 
@@ -4053,6 +4158,7 @@ server.listen(PORT, async () => {
     new MTMRiskManager(priceCache).start();
     console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
 
+    initCronJobs(priceCache, triggerEngine);
     startSquareOffJobs();
     initRiskyStocksSync();
     initOrderExecutor(priceCache);

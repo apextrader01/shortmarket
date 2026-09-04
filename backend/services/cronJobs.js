@@ -27,7 +27,6 @@ function initCronJobs(priceCache, triggerEngine) {
         isIntradayBlocked = false;
     }, TZ);
 
-    // Helper: Check if a symbol is a commodity
     // Helper: Check if a symbol is a commodity by looking for the -MCX suffix
     const isCommoditySymbol = (symbol) => symbol && symbol.endsWith('-MCX');
 
@@ -43,13 +42,38 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;  // Skip commodities during EQ sweep
                     if (assetType === 'COM' && !isCom) continue; // Skip equities during COM sweep
                     
-                    // Sweep ALL pending entry orders (INT, BO, CO, DEL, CNC)
-                    await trx('orders').where({ id: order.id }).update({ status: 'CANCELLED' });
-                    if (parseFloat(order.margin) > 0) {
-                        await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
+                    // Sweep ALL pending entry orders (INT, BO, CO, DEL, CNC) atomically
+                    const updated = await trx('orders')
+                        .where({ id: order.id, status: 'PENDING' })
+                        .update({ status: 'CANCELLED', updated_at: new Date() });
+
+                    if (updated > 0) {
+                        if (parseFloat(order.margin) > 0) {
+                            await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
+                        }
+                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                        console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type || 'DEL'} order ${order.id} for ${order.symbol}`);
                     }
-                    triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                    console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type || 'DEL'} order ${order.id} for ${order.symbol}`);
+                }
+
+                // Also cancel PENDING_TRIGGER legs (BO/CO SL & Target orders) so they don't linger overnight
+                const pendingTriggers = await trx('orders').whereIn('status', ['PENDING_TRIGGER']);
+                for (const trigger of pendingTriggers) {
+                    const isCom = isCommoditySymbol(trigger.symbol);
+                    if (assetType === 'EQ' && isCom) continue;
+                    if (assetType === 'COM' && !isCom) continue;
+
+                    const updated = await trx('orders')
+                        .where({ id: trigger.id, status: 'PENDING_TRIGGER' })
+                        .update({ status: 'CANCELLED', updated_at: new Date() });
+
+                    if (updated > 0) {
+                        if (parseFloat(trigger.margin) > 0) {
+                            await LedgerService.releaseMargin(trx, trigger.user_id, trigger.margin, `End of Day Sweep Cancelled: ${trigger.symbol}`);
+                        }
+                        triggerEngine.removeOrderFromMemory(trigger.id, trigger.symbol);
+                        console.log(`[CRON] Phase 2: Cancelled pending trigger order ${trigger.id} for ${trigger.symbol}`);
+                    }
                 }
             });
         } catch (err) {
@@ -60,7 +84,7 @@ function initCronJobs(priceCache, triggerEngine) {
     cron.schedule('19 15 * * *', () => phase2Sweep('EQ'), TZ);
     cron.schedule('59 22 * * *', () => phase2Sweep('COM'), TZ);
 
-    // ─── PHASE 3: Auto Square-Off (15:50 Eq / 23:00 Com) ──────────────────────
+    // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
         console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
         try {
@@ -75,8 +99,8 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
 
-                    const ltp = priceCache[pos.symbol]?.ltp;
-                    if (!ltp) {
+                    const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                    if (!ltp || ltp <= 0) {
                         console.warn(`[CRON] Phase 3: No LTP for ${pos.symbol}, skipping square-off.`);
                         continue;
                     }
@@ -88,18 +112,29 @@ function initCronJobs(priceCache, triggerEngine) {
                     // Cancel all PENDING_TRIGGER brackets for this user+symbol
                     const triggers = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' });
                     for (const t of triggers) {
-                        await trx('orders').where({ id: t.id }).update({ status: 'CANCELLED' });
-                        triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                        const updated = await trx('orders')
+                            .where({ id: t.id, status: 'PENDING_TRIGGER' })
+                            .update({ status: 'CANCELLED', updated_at: new Date() });
+                        if (updated > 0) {
+                            if (parseFloat(t.margin) > 0) {
+                                await LedgerService.releaseMargin(trx, pos.user_id, t.margin, `Phase 3 Cancelled: ${t.symbol}`);
+                            }
+                            triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                        }
                     }
                     
                     // Also cancel any remaining PENDING orders for this user+symbol
                     const pendingOrders = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' });
                     for (const o of pendingOrders) {
-                        await trx('orders').where({ id: o.id }).update({ status: 'CANCELLED' });
-                        if (parseFloat(o.margin) > 0) {
-                            await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Phase 3 Cancelled: ${o.symbol}`);
+                        const updated = await trx('orders')
+                            .where({ id: o.id, status: 'PENDING' })
+                            .update({ status: 'CANCELLED', updated_at: new Date() });
+                        if (updated > 0) {
+                            if (parseFloat(o.margin) > 0) {
+                                await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Phase 3 Cancelled: ${o.symbol}`);
+                            }
+                            triggerEngine.removeOrderFromMemory(o.id, o.symbol);
                         }
-                        triggerEngine.removeOrderFromMemory(o.id, o.symbol);
                     }
                 }
             });
@@ -110,15 +145,6 @@ function initCronJobs(priceCache, triggerEngine) {
 
     cron.schedule('20 15 * * *', () => phase3SquareOff('EQ'), TZ);
     cron.schedule('0 23 * * *', () => phase3SquareOff('COM'), TZ);
-
-    // ─── T+1 RESET: WIPE & MIGRATE TO HOLDINGS (08:00 AM) ──────────────────────
-    // REMOVED: This logic is now handled in `backend/services/positionsEngine.js`
-    // to prevent duplicate executions and data corruption.
-
-    // ─── EXPIRY DAY SETTLEMENT (03:25 PM / 07:00 PM) ─────────────────────────
-    // DISABLED: Handled exclusively in positionsEngine.js to avoid race conditions.
-    // cron.schedule('25 15 * * *', () => expirySquareOff(false), TZ);
-    // cron.schedule('0 19 * * *', () => expirySquareOff(true), TZ);
 
     
     // --- 9:30 AM SIP Execution ---
