@@ -2652,7 +2652,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
         const totalValue = qty * ltp;
         totalSoldAmount += totalValue;
 
-        // 1. Create completed sell order
+        // 1. Create executed sell order
         await trx('orders').insert({
           user_id: req.user.id,
           symbol: holding.symbol,
@@ -2661,7 +2661,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           quantity: qty,
           price: ltp,
           average_price: ltp,
-          status: 'COMPLETED',
+          status: 'EXECUTED',
           product_type: 'CNC',
           margin: 0,
           realized_pnl: (ltp - parseFloat(holding.average_price)) * qty,

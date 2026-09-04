@@ -77,7 +77,8 @@ export default function PortfolioView() {
   let todayRealizedPnl = 0;
   if (orders) {
       orders.forEach(o => {
-          if (o.status === 'EXECUTED' && o.realized_pnl && isToday(o.created_at)) {
+          const isExecuted = o.status === 'EXECUTED' || o.status === 'COMPLETED' || o.status === 'COMPLETE';
+          if (isExecuted && o.realized_pnl !== null && o.realized_pnl !== undefined && isToday(o.created_at || o.updated_at)) {
               todayRealizedPnl += parseFloat(o.realized_pnl);
           }
       });

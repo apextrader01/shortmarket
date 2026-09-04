@@ -542,7 +542,7 @@ export default function OrdersView() {
                         )}
                       </td>
                     )}
-                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : (order.status === 'EXECUTED' ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : ((order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE') ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
                       {order.status}
                     </td>
                     {activeTab === 'Open Orders' && (
@@ -740,7 +740,7 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
-                <span style={{ fontWeight: '700', color: selectedOrder.status === 'EXECUTED' ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' || selectedOrder.status === 'CANCELLED' ? 'var(--color-red-light)' : 'var(--color-yellow)') }}>
+                <span style={{ fontWeight: '700', color: (selectedOrder.status === 'EXECUTED' || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'COMPLETE') ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' || selectedOrder.status === 'CANCELLED' ? 'var(--color-red-light)' : 'var(--color-yellow)') }}>
                   {selectedOrder.status}
                 </span>
               </div>
