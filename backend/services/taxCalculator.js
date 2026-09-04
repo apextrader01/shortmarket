@@ -11,9 +11,11 @@
 function calculateTaxes(symbol, productType, side, quantity, price) {
     const turnover = quantity * price;
     
-    const isOption = /(CE|PE)(?:-[A-Za-z]+)?$/i.test(symbol);
-    const isFuture = /FUT(?:-[A-Za-z]+)?$/i.test(symbol) || symbol.includes('FUT');
-    const isEquity = !isOption && !isFuture;
+    const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    const isMutualFund = clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+    const isOption = !isMutualFund && /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+    const isFuture = !isMutualFund && !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT'));
+    const isEquity = !isMutualFund && !isOption && !isFuture;
     const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE') || symbol.includes('NATURALGAS') || symbol.includes('COPPER') || symbol.includes('ZINC');
 
     let brokerage = 0;
@@ -21,42 +23,43 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
     let exchangeCharge = 0;
     let stampDuty = 0;
     let dpCharge = 0;
+    let sebiCharge = 0;
 
-    // 1. Brokerage
-    if (isOption) {
+    if (isMutualFund) {
+        // Direct Mutual Funds: Zero brokerage, Zero DP charge
+        if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
+        if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
+    } else if (isOption) {
         brokerage = 20; // Flat ₹20 for Options
-    } else if (isEquity && productType === 'DEL') {
-        brokerage = 0; // Free equity delivery
-    } else {
-        // Equity Intraday, Futures, Commodity Futures
-        brokerage = Math.min(turnover * 0.0003, 20); 
-    }
-
-    // 2. STT/CTT
-    if (isEquity && productType === 'DEL') {
-        stt = turnover * 0.001; // 0.1% on buy & sell
-    } else if (side === 'SELL') {
-        if (isEquity && productType === 'INT') {
-            stt = turnover * 0.00025; // 0.025%
-        } else if (isFuture) {
-            stt = turnover * (isCommodity ? 0.0001 : 0.000125); // 0.01% for MCX, 0.0125% for NSE
-        } else if (isOption) {
-            stt = turnover * (isCommodity ? 0.0005 : 0.000625); // 0.05% for MCX, 0.0625% for NSE
+        if (side === 'SELL') {
+            stt = turnover * (isCommodity ? 0.0005 : 0.000625);
         }
-    }
-
-    // 3. Transaction Charges
-    if (isOption) {
-        exchangeCharge = turnover * (isCommodity ? 0.000418 : 0.0003553); // MCX: 0.0418%, NSE: 0.03553%
+        exchangeCharge = turnover * (isCommodity ? 0.000418 : 0.0003553);
+        if (side === 'BUY') stampDuty = turnover * 0.00003;
+        sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        exchangeCharge = turnover * (isCommodity ? 0.000021 : 0.0000183); // MCX: 0.0021%, NSE: 0.00183%
+        brokerage = Math.min(turnover * 0.0003, 20);
+        if (side === 'SELL') {
+            stt = turnover * (isCommodity ? 0.0001 : 0.000125);
+        }
+        exchangeCharge = turnover * (isCommodity ? 0.000021 : 0.0000183);
+        if (side === 'BUY') stampDuty = turnover * 0.00002;
+        sebiCharge = turnover * 0.000001;
     } else {
+        // Equity Stocks
+        if (productType === 'DEL') {
+            brokerage = 0; // Free equity delivery
+            stt = turnover * 0.001; // 0.1% on buy & sell
+            if (side === 'BUY') stampDuty = turnover * 0.00015;
+            if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
+        } else {
+            // Intraday Equity
+            brokerage = Math.min(turnover * 0.0003, 20); // 0.03% or ₹20 max
+            if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
+            if (side === 'BUY') stampDuty = turnover * 0.00003;
+        }
         exchangeCharge = turnover * 0.0000307; // Equity NSE: 0.00307%
-    }
-
-    // 4. DP Charges (CDSL/NSDL) - Charged ONLY when selling Equity Delivery
-    if (isEquity && productType === 'DEL' && side === 'SELL') {
-        dpCharge = 15.93; // Standard DP charge ₹13.5 + 18% GST
+        sebiCharge = turnover * 0.000001; // ₹10 per crore
     }
 
     // 5. Stamp Duty - Charged ONLY on Buy
