@@ -221,7 +221,7 @@ export default function PortfolioView() {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', height: '100%', minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
       
       {/* Sub Navigation Bar */}
       <div style={{ 
@@ -231,7 +231,8 @@ export default function PortfolioView() {
         padding: isMobile ? '0 16px' : '0 28px', 
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
         background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.6) 0%, rgba(11, 17, 33, 0.85) 100%)',
-        backdropFilter: 'blur(16px)'
+        backdropFilter: 'blur(16px)',
+        flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px' }}>
           {[
@@ -293,11 +294,11 @@ export default function PortfolioView() {
       </div>
 
       {activeTab === 'Analytics' ? (
-        <div style={{ padding: isMobile ? '12px' : '24px', overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '12px' : '24px', paddingBottom: '60px' }}>
           <AnalyticsView />
         </div>
       ) : (
-        <div style={{ padding: isMobile ? '14px' : '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: isMobile ? '14px' : '24px', paddingBottom: '80px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
           
           {/* Top 4 Key Metric Cards */}
           <div style={{ 
