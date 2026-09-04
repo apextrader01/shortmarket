@@ -435,7 +435,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                       <ShieldAlert size={15} color={isRiskActive ? '#f59e0b' : 'var(--text-secondary)'} /> Risk Guardian (Discipline & Capital Protection)
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                      Auto-locks trading if daily max loss or trade count is exceeded to stop revenge trading. Trading remains locked for tonight and unlocks automatically next trading morning.
+                      Auto-squares off all open positions and locks trading if daily max loss or trade count is exceeded to protect your capital from runaway losses. Unlocks automatically next trading morning.
                     </div>
                     {riskMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{riskMsg}</div>}
                   </div>

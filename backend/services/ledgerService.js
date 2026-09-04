@@ -67,7 +67,7 @@ class LedgerService {
      * Handles position exit, applying realized P&L, taxes, and margin release.
      * Optionally applies a ₹59 RMS Penalty for forced exits.
      */
-    static async closePosition(trx, userId, positionId, exitPrice, isForcedRMSExit = false) {
+    static async closePosition(trx, userId, positionId, exitPrice, isForcedRMSExit = false, customRemark = '') {
         const position = await trx('positions').where({ id: positionId }).first();
         if (!position || position.quantity === 0) return;
 
@@ -106,7 +106,7 @@ class LedgerService {
             margin: 0,
             realized_pnl: realizedPnl,
             taxes: exitTaxes,
-            remarks: isForcedRMSExit ? 'Auto-Square-Off (RMS)' : 'Exit'
+            remarks: customRemark || (isForcedRMSExit ? 'Auto-Square-Off (RMS)' : 'Exit')
         });
 
         // 4. Calculate Total Release Amount
