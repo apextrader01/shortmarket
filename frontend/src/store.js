@@ -80,6 +80,12 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     if (isFromWebSocket) {
         newPrices[symbol].lastWsUpdate = now;
     }
+
+    // ⚡ Dual-key prices with and without exchange prefix so watchlists always find the price
+    if (symbol.includes(':')) {
+        const rawSym = symbol.split(':')[1];
+        newPrices[rawSym] = { ...newPrices[rawSym], ...data, tick };
+    }
   }
   return newPrices;
 }

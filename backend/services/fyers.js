@@ -60,7 +60,7 @@ let triggerEngine = null;
 try { triggerEngine = require('./triggerEngine'); } catch(e) {}
 
 
-// Convert our platform's unique symbols to Fyers Symbols
+// Convert our platform's unique symbols to Fyers Symbols (guaranteeing valid exchange prefix)
 function toFyersSymbol(symbol) {
     if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
@@ -73,7 +73,18 @@ function toFyersSymbol(symbol) {
     if (nameToFyers[sym]) return nameToFyers[sym];
     if (nameToFyers[symbol]) return nameToFyers[symbol];
     
-    return symbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
+    if (symbol.includes(':')) {
+        return symbol; // Already has exchange prefix (e.g. NSE:TCS-EQ, BSE:SENSEX-INDEX)
+    }
+
+    // Auto-resolve exchange prefix for derivatives/equities passed without prefix
+    if (/(GOLD|SILVER|CRUDEOIL|NATURALGAS|COPPER|ZINC|NICKEL|ALUMINIUM|LEAD|COTTON|MENTHAOIL|STEELREBAR)/i.test(symbol)) {
+        return `MCX:${symbol}`;
+    }
+    if (/^(SENSEX|BANKEX)/i.test(symbol) || symbol.endsWith('-BSE') || symbol.endsWith('-A') || symbol.endsWith('-B')) {
+        return `BSE:${symbol}`;
+    }
+    return `NSE:${symbol}`;
 }
 
 // Convert Fyers Symbols back to our platform's unique symbols — O(1) Map lookup
@@ -343,6 +354,11 @@ function startLiveWebSocket() {
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
+                    if (uniqueSymbol.includes(':')) {
+                        const raw = uniqueSymbol.split(':')[1];
+                        sharedPriceCache[raw] = priceObj;
+                        dirtySymbols.add(raw);
+                    }
                     dirtySymbols.add(uniqueSymbol); // Mark as dirty for the debounce interval
                     
                     // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
@@ -652,6 +668,11 @@ async function fetchBatchLTPs(symbols) {
                                         };
                                         results[uniqueSymbol] = priceObj;
                                         sharedPriceCache[uniqueSymbol] = priceObj;
+                                        if (uniqueSymbol.includes(':')) {
+                                            const raw = uniqueSymbol.split(':')[1];
+                                            results[raw] = priceObj;
+                                            sharedPriceCache[raw] = priceObj;
+                                        }
                                     });
                                 }
                             }

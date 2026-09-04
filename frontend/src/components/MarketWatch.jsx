@@ -6,7 +6,14 @@ import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignR
 const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect }) => {
   const isSelected = useStore(state => state.selectedSymbol) === stock.uniqueSymbol;
   const setSelectedSymbol = useStore(state => state.setSelectedSymbol);
-  const data = useStore(state => state.prices[stock.uniqueSymbol]);
+  const data = useStore(state => 
+    state.prices[stock.uniqueSymbol] || 
+    state.prices[stock.symbol] || 
+    (stock.exchange ? state.prices[`${stock.exchange}:${stock.symbol}`] : null) ||
+    state.prices[`NSE:${stock.symbol}`] ||
+    state.prices[`MCX:${stock.symbol}`] ||
+    state.prices[`BSE:${stock.symbol}`]
+  );
   
   const addStockToWatchlist = useStore(state => state.addStockToWatchlist);
   const removeStockFromWatchlist = useStore(state => state.removeStockFromWatchlist);
