@@ -187,6 +187,8 @@ export default function PositionsView() {
       let segment = 'Stock';
       if (isMutualFund(pos.symbol)) {
         segment = 'MF';
+      } else if (cleanSym.includes('ETF') || cleanSym.includes('BEES') || cleanSym.includes('LIQUID')) {
+        segment = 'ETF';
       } else if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym)) {
         segment = 'Option';
       } else if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT')) {
