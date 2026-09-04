@@ -76,7 +76,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     }
 
     // 6. SEBI Turnover Charge
-    const sebiCharge = turnover * (isCommodity && !symbol.includes('AGRI') ? 0.000001 : 0.000001); // ₹10 per crore
+    sebiCharge = turnover * (isCommodity && !symbol.includes('AGRI') ? 0.000001 : 0.000001); // ₹10 per crore
 
     // 7. GST (Broken down into CGST 9% and SGST 9%)
     const gst = (brokerage + exchangeCharge + sebiCharge) * 0.18; // 18% on services
