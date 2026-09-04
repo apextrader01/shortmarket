@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal, marketStatus: state.marketStatus })));
@@ -37,8 +38,17 @@ export default function OrderModal() {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
       setProductType(orderModal.productType || 'INT');
+      
+      const effectiveLotsize = (orderModal.lotsize && Number(orderModal.lotsize) > 1) 
+        ? Number(orderModal.lotsize) 
+        : getInstantLotsize(orderModal.symbol);
+      
+      if (effectiveLotsize > 1 && orderModal.lotsize !== effectiveLotsize) {
+        useStore.getState().setOrderModalLotsize(effectiveLotsize);
+      }
+
       if (orderModal.totalExitQty) {
-          setQuantity(Math.max(1, orderModal.totalExitQty / (orderModal.lotsize || 1)));
+          setQuantity(Math.max(1, Math.round(orderModal.totalExitQty / effectiveLotsize)));
       } else {
           setQuantity(1);
       }
@@ -47,8 +57,8 @@ export default function OrderModal() {
       const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
       setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
       
-      // Auto-fetch lotsize if it's 1 and looks like a derivative (contains numbers)
-      if ((orderModal.lotsize || 1) === 1 && /\d/.test(orderModal.symbol)) {
+      // Background sync lotsize if still 1 and looks like a derivative (contains numbers)
+      if (effectiveLotsize === 1 && /\d/.test(orderModal.symbol)) {
         fetch(`${API}/api/stocks/lotsizes?symbols=${orderModal.symbol}`)
           .then(r => r.json())
           .then(data => {
@@ -56,7 +66,7 @@ export default function OrderModal() {
               const ls = data[orderModal.symbol];
               useStore.getState().setOrderModalLotsize(ls);
               if (orderModal.totalExitQty) {
-                  setQuantity(Math.max(1, orderModal.totalExitQty / ls));
+                  setQuantity(Math.max(1, Math.round(orderModal.totalExitQty / ls)));
               }
             }
           }).catch(console.error);
@@ -320,7 +330,7 @@ export default function OrderModal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 <input type="radio" checked readOnly style={{ accentColor: 'var(--color-blue)' }} />
-                <span>NSE <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{livePrice.toFixed(2)} {isUp ? '▲' : '▼'}</span></span>
+                <span>{symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'} <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{livePrice.toFixed(2)} {isUp ? '▲' : '▼'}</span></span>
               </label>
             </div>
           </div>

@@ -3,13 +3,14 @@ import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X } from 'lucide-react';
 import { socket } from '../store'; // Import socket to emit subscribe events
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function MarketDepthModal() {
   const { marketDepthModal, closeMarketDepthModal, marketDepthData, prices, oneClickMode, oneClickMultiplier, placeOrder, openOrderModal, orderModal } = useStore(useShallow(state => ({ marketDepthModal: state.marketDepthModal, closeMarketDepthModal: state.closeMarketDepthModal, marketDepthData: state.marketDepthData, prices: state.prices, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder, openOrderModal: state.openOrderModal, orderModal: state.orderModal })));
 
   const symbol = marketDepthModal.symbol;
   const basicData = prices[symbol] || {};
-  const lotSize = marketDepthModal.lotsize || basicData.lotsize || 1;
+  const lotSize = (marketDepthModal.lotsize && Number(marketDepthModal.lotsize) > 1) ? Number(marketDepthModal.lotsize) : (basicData.lotsize && Number(basicData.lotsize) > 1) ? Number(basicData.lotsize) : getInstantLotsize(symbol);
 
   useEffect(() => {
     if (!marketDepthModal.isOpen || !symbol) return;

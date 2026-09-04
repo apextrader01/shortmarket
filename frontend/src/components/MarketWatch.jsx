@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useRef } from 'react';
 import { useStore, API } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell } from 'lucide-react';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect }) => {
   const isSelected = useStore(state => state.selectedSymbol) === stock.uniqueSymbol;
@@ -28,7 +29,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
   
   const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId);
   const isInWatchlist = activeWatchlist?.symbols.includes(stock.uniqueSymbol);
-  const currentLotsize = stock.lotsize || data?.lotsize || 1;
+  const currentLotsize = (stock.lotsize && Number(stock.lotsize) > 1) ? Number(stock.lotsize) : (data?.lotsize && Number(data.lotsize) > 1) ? Number(data.lotsize) : getInstantLotsize(stock.uniqueSymbol);
 
   return (
     <div
@@ -146,7 +147,8 @@ export default function MarketWatch({ className = '', onStockSelect }) {
       symbol = sym;
       exchange = 'NSE';
     }
-    return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, token: '' };
+    const lotsize = getInstantLotsize(sym);
+    return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, lotsize: lotsize, token: '' };
   }).filter(Boolean) : [];
   const filteredSearchResults = searchResults.filter(s => !(activeWatchlist?.symbols || []).includes(s.uniqueSymbol));
   const displayStocks = isSearchMode ? filteredSearchResults : watchlistStocks;

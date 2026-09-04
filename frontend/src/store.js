@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
+import { getInstantLotsize } from './utils/lotsizeHelper';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -285,11 +286,17 @@ export const useStore = create(persist((set, get) => ({
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
   marketDepthModal: { isOpen: false, symbol: null, lotsize: 1 },
-  openMarketDepthModal: (symbol, lotsize) => set({ marketDepthModal: { isOpen: true, symbol, lotsize: lotsize || 1 } }),
+  openMarketDepthModal: (symbol, lotsize) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ marketDepthModal: { isOpen: true, symbol, lotsize: effectiveLotsize } });
+  },
   closeMarketDepthModal: () => set({ marketDepthModal: { isOpen: false, symbol: null, lotsize: 1 } }),
 
   domLadderModal: { isOpen: false, symbol: null, lotsize: 1 },
-  openDomLadderModal: (symbol, lotsize) => set({ domLadderModal: { isOpen: true, symbol, lotsize: lotsize || 1 } }),
+  openDomLadderModal: (symbol, lotsize) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ domLadderModal: { isOpen: true, symbol, lotsize: effectiveLotsize } });
+  },
   closeDomLadderModal: () => set({ domLadderModal: { isOpen: false, symbol: null, lotsize: 1 } }),
 
   marketDepthData: { symbol: null, bids: [], asks: [] },
@@ -352,10 +359,12 @@ export const useStore = create(persist((set, get) => ({
   },
 
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 },
-
-  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0) => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType, isExit, totalExitQty } }),
+  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty } });
+  },
   setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
-  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 } }),
+  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0 } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
