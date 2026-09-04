@@ -71,6 +71,7 @@ export default function OrderModal() {
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+  const isMutualFund = cleanSym.endsWith('-MF') || /^\d{5,6}$/.test(cleanSym) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym);
   
   // Fetch Estimated Charges
   useEffect(() => {
@@ -599,23 +600,37 @@ export default function OrderModal() {
                      <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>GST</span>
-                     <span>₹{estimatedTaxes.gst.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>SEBI</span>
-                     <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>Stamp duty</span>
-                     <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
-                  </div>
-                  {estimatedTaxes.dpCharge > 0 && (
-                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                        <span>DP Charge</span>
-                        <span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
-                     </div>
-                  )}
+                      <span>CGST (9%)</span>
+                      <span>₹{(estimatedTaxes.cgst !== undefined ? estimatedTaxes.cgst : (estimatedTaxes.gst / 2)).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>SGST (9%)</span>
+                      <span>₹{(estimatedTaxes.sgst !== undefined ? estimatedTaxes.sgst : (estimatedTaxes.gst / 2)).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>SEBI</span>
+                      <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>Stamp duty</span>
+                      <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                   </div>
+                   {estimatedTaxes.dpCharge > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>DP Charge</span>
+                         <span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
+                      </div>
+                   )}
+                   {isMutualFund && (
+                      <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                         <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-blue-light)', marginBottom: '4px' }}>Mutual Fund Capital Gains Tax (STCG / LTCG):</div>
+                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                            • <strong>STCG (≤ 12 mos):</strong> 20% on profit<br />
+                            • <strong>LTCG (&gt; 12 mos):</strong> 12.5% on profit (first ₹1.25L/yr exempt)<br />
+                            • <strong>Debt Funds:</strong> 1% on profit
+                         </div>
+                      </div>
+                   )}
                </div>
                
                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>

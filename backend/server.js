@@ -2620,13 +2620,13 @@ app.get('/api/admin/fix-tcs-position', async (req, res) => {
 
 app.get('/api/estimate-charges', authenticateToken, (req, res) => {
   try {
-    const { symbol, product_type, side, quantity, price } = req.query;
+    const { symbol, product_type, side, quantity, price, entry_price, holding_days } = req.query;
     if (!symbol || !side || !quantity || !price) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
     const { calculateTaxes } = require('./services/taxCalculator');
-    const taxes = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), Number(price));
+    const taxes = calculateTaxes(symbol, product_type || 'DEL', side, Number(quantity), Number(price), Number(entry_price || 0), Number(holding_days || 0));
     
     res.json(taxes);
   } catch (error) {

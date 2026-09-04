@@ -333,6 +333,27 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                         </div>
                                     </div>
 
+                                    <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                        <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}><Shield size={16} /> Tax Implications</h4>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>STCG (≤ 12 months)</span>
+                                                <span style={{ fontWeight: '600', color: '#f59e0b' }}>20% on profit</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>LTCG (&gt; 12 months)</span>
+                                                <span style={{ fontWeight: '600', color: 'var(--color-green-light)' }}>12.5% on profit (&gt; ₹1.25L)</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>Debt Fund Taxation</span>
+                                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>1% on profit</span>
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.4' }}>
+                                                *Profits up to ₹1.25 Lakh per financial year on LTCG are 100% tax-free.
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {details.holdings && details.holdings.length > 0 && (
                                         <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                                             <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}><PieChart size={16} /> Top Holdings</h4>
@@ -492,9 +513,19 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                                     <span>Applicable NAV Date</span>
                                                     <span style={{ color: 'var(--text-primary)' }}>Today (EOD)</span>
                                                 </div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                                     <span>Est. Exit Load</span>
                                                     <span style={{ color: 'var(--text-primary)' }}>{details?.exit_load ? 'May apply' : 'Nil'}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <span>Est. Capital Gains Tax</span>
+                                                    <span style={{ color: 'var(--color-yellow)', fontWeight: '600' }}>
+                                                        {holdingPnL > 0 ? (
+                                                            fund.category?.toLowerCase().includes('debt')
+                                                            ? `~₹${(holdingPnL * (Number(amount) / (holdingCurrentValue || 1)) * 0.01).toFixed(2)} (1% Debt)`
+                                                            : `~₹${(holdingPnL * (Number(amount) / (holdingCurrentValue || 1)) * 0.20).toFixed(2)} (20% STCG)`
+                                                        ) : '₹0.00 (No Profit)'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>

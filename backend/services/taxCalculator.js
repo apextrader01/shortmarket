@@ -8,7 +8,7 @@
  * @param {number} price - Execution price
  * @returns {object} { brokerage, stt, exchangeCharge, gst, sebiCharge, stampDuty, dpCharge, totalTaxes }
  */
-function calculateTaxes(symbol, productType, side, quantity, price) {
+function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0) {
     const turnover = quantity * price;
     
     const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
@@ -78,8 +78,33 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
     // 6. SEBI Turnover Charge
     const sebiCharge = turnover * (isCommodity && !symbol.includes('AGRI') ? 0.000001 : 0.000001); // ₹10 per crore
 
-    // 7. GST
+    // 7. GST (Broken down into CGST 9% and SGST 9%)
     const gst = (brokerage + exchangeCharge + sebiCharge) * 0.18; // 18% on services
+    const cgst = gst / 2;
+    const sgst = gst / 2;
+
+    // 8. Capital Gains Tax (STCG & LTCG for Mutual Funds & Equity Investments)
+    const isDebt = isMutualFund && (symbol.toLowerCase().includes('debt') || symbol.toLowerCase().includes('liquid') || symbol.toLowerCase().includes('gilt') || symbol.toLowerCase().includes('bond'));
+    let stcg = 0;
+    let ltcg = 0;
+    let capitalGainsTax = 0;
+    
+    if (side === 'SELL' && entryPrice > 0 && price > entryPrice) {
+        const profit = (price - entryPrice) * quantity;
+        if (isDebt) {
+            capitalGainsTax = Number((profit * 0.01).toFixed(2)); // 1% for Debt Funds
+            stcg = capitalGainsTax;
+        } else if (holdingDays > 365) {
+            // LTCG: 12.5% on profit exceeding ₹1.25 Lakh per financial year
+            const taxableProfit = Math.max(0, profit - 125000);
+            ltcg = Number((taxableProfit * 0.125).toFixed(2));
+            capitalGainsTax = ltcg;
+        } else {
+            // STCG: 20% on profit held <= 12 months
+            stcg = Number((profit * 0.20).toFixed(2));
+            capitalGainsTax = stcg;
+        }
+    }
 
     const totalTaxes = brokerage + stt + exchangeCharge + stampDuty + dpCharge + sebiCharge + gst;
 
@@ -91,6 +116,16 @@ function calculateTaxes(symbol, productType, side, quantity, price) {
         dpCharge: Number(dpCharge.toFixed(2)),
         sebiCharge: Number(sebiCharge.toFixed(2)),
         gst: Number(gst.toFixed(2)),
+        cgst: Number(cgst.toFixed(2)),
+        sgst: Number(sgst.toFixed(2)),
+        stcg,
+        ltcg,
+        capitalGainsTax,
+        capitalGainsRules: {
+            stcg: '20% on profit (held ≤ 12 months)',
+            ltcg: '12.5% on profit (held > 12 months, first ₹1.25L exempt)',
+            debtFund: '1% on profit'
+        },
         totalTaxes: Number(totalTaxes.toFixed(2))
     };
 }
