@@ -842,14 +842,16 @@ function getPriceFromCache() {
 
 function getFyersStatus() {
     const recentTick = (Date.now() - lastTickTime) < 15000;
-    // For master: report truly healthy only when BOTH the flag is set AND ticks are recent.
-    // This prevents the admin panel from showing "Connected" when the WS is physically connected
-    // but Fyers has stopped sending data (expired token, rate limit, etc.)
-    const masterConnected = isFyersConnected && recentTick;
+    const isTokenExpiredError = lastDataSocketError && (
+        lastDataSocketError.toLowerCase().includes('expired token') || 
+        lastDataSocketError.toLowerCase().includes('failed to decode jwt')
+    );
+    const masterConnected = isFyersConnected && recentTick && !isTokenExpiredError;
     return {
         isMasterNode,
         isFyersConnected: isMasterNode ? masterConnected : recentTick,
-        hasAccessToken: !!activeAccessToken,
+        hasAccessToken: (!!activeAccessToken && !isTokenExpiredError),
+        tokenExpired: !!isTokenExpiredError,
         wsInstanceExists: !!wsInstance,
         lastDataSocketError: lastDataSocketError,
         subscriptions: Array.from(clientSubscriptions),

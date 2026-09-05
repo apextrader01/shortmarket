@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 
-function SystemStatusTab() {
+function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLoading }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const { marketStatus, updateMarketStatus, fetchMarketStatus } = useStore();
@@ -48,6 +48,79 @@ function SystemStatusTab() {
           <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker & Market Engine Status</h3>
           <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold' }}>
             {isHealthy ? 'System is Healthy & Receiving Live Data' : 'Fyers Connection Disconnected or Stalled (Action Required)'}
+          </div>
+        </div>
+      </div>
+
+      {/* Automated Daily Headless Login Card */}
+      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Zap size={22} style={{ color: '#eab308' }} />
+            <div>
+              <h4 style={{ margin: '0 0 2px 0', fontSize: '16px', color: 'var(--text-primary)' }}>100% Automated Daily Headless Login (TOTP)</h4>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                Refreshes Fyers access token automatically every morning at 08:00 AM & 08:30 AM IST using 2FA TOTP.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={onTriggerAutoLogin}
+              disabled={autoLoginLoading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: autoLoginLoading ? 'not-allowed' : 'pointer',
+                opacity: autoLoginLoading ? 0.7 : 1
+              }}
+            >
+              {autoLoginLoading ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+              {autoLoginLoading ? 'Logging In...' : '⚡ Run Auto-Login Now'}
+            </button>
+            <button
+              onClick={onOpenAutoLoginModal}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                padding: '8px 14px',
+                borderRadius: '6px',
+                fontWeight: '600',
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              <Settings size={14} /> Setup Credentials
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>SCHEDULED CRON</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginTop: '2px' }}>⏰ 08:00 AM & 08:30 AM IST</div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>TOKEN STATUS</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: (status.hasAccessToken && !status.tokenExpired) ? 'var(--color-green)' : 'var(--color-red)', marginTop: '2px' }}>
+              {(status.hasAccessToken && !status.tokenExpired) ? '🟢 Valid & Active' : status.tokenExpired ? '🔴 Expired (Action Needed)' : '🟡 Not Authenticated'}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>AUTHENTICATION TYPE</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-blue)', marginTop: '2px' }}>🔐 RFC 6238 TOTP + 4-Digit PIN</div>
           </div>
         </div>
       </div>
@@ -236,6 +309,112 @@ export default function AdminDashboard() {
     const interval = setInterval(checkFyers, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fyers Auto-Login States
+  const [showAutoLoginModal, setShowAutoLoginModal] = useState(false);
+  const [autoLoginLoading, setAutoLoginLoading] = useState(false);
+  const [autoLoginStatus, setAutoLoginStatus] = useState(null);
+  const [fyersUserId, setFyersUserId] = useState('');
+  const [fyersPin, setFyersPin] = useState('');
+  const [fyersTotpKey, setFyersTotpKey] = useState('');
+  const [hasSavedPin, setHasSavedPin] = useState(false);
+  const [hasSavedTotpKey, setHasSavedTotpKey] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [showTotpKey, setShowTotpKey] = useState(false);
+
+  const fetchFyersCredentials = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/fyers/credentials`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.fyers_user_id) setFyersUserId(data.fyers_user_id);
+        setHasSavedPin(!!data.has_pin);
+        setHasSavedTotpKey(!!data.has_totp_key);
+      }
+    } catch (e) {
+      console.error('Failed to load Fyers credentials', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchFyersCredentials();
+  }, []);
+
+  const handleSaveAndAutoLogin = async (e) => {
+    if (e) e.preventDefault();
+    if (!fyersUserId) {
+      alert('Please enter your Fyers User ID (e.g. XF01234)');
+      return;
+    }
+    if (!fyersPin && !hasSavedPin) {
+      alert('Please enter your Fyers 4-digit PIN');
+      return;
+    }
+    if (!fyersTotpKey && !hasSavedTotpKey) {
+      alert('Please enter your Fyers TOTP Authenticator Key');
+      return;
+    }
+    setAutoLoginLoading(true);
+    setAutoLoginStatus(null);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/fyers/credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          fyers_user_id: fyersUserId.trim(),
+          fyers_pin: fyersPin ? fyersPin.trim() : undefined,
+          fyers_totp_key: fyersTotpKey ? fyersTotpKey.trim() : undefined
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.loginResult?.success) {
+        setAutoLoginStatus({ type: 'success', message: '✅ Credentials saved & Fyers Auto-Login succeeded! Fresh token generated and active.' });
+        fetchFyersCredentials();
+        fetchFyersStatus?.();
+        setTimeout(() => setShowAutoLoginModal(false), 2200);
+      } else {
+        const err = data.loginResult?.error || data.error || 'Auto-login failed. Please verify your User ID, PIN, and TOTP key.';
+        setAutoLoginStatus({ type: 'error', message: `❌ Login failed: ${err}` });
+      }
+    } catch (err) {
+      setAutoLoginStatus({ type: 'error', message: 'Error: ' + err.message });
+    } finally {
+      setAutoLoginLoading(false);
+    }
+  };
+
+  const handleTriggerAutoLogin = async () => {
+    setAutoLoginLoading(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/admin/fyers/auto-login`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Automated Fyers Login Successful!\nFresh access token generated and loaded across all cluster processes.');
+        fetchFyersStatus?.();
+      } else {
+        alert('❌ Auto-Login Failed: ' + (data.error || 'Unknown error') + '\n\nPlease open "Setup Auto-Login" to configure your User ID, PIN, and TOTP key.');
+        setShowAutoLoginModal(true);
+      }
+    } catch (err) {
+      alert('Error triggering auto-login: ' + err.message);
+    } finally {
+      setAutoLoginLoading(false);
+    }
+  };
 
   const [manualBanType, setManualBanType] = useState('IP');
   const [manualBanValue, setManualBanValue] = useState('');
@@ -537,6 +716,55 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* Quick Headless Auto-Login Button */}
+          <button
+            className="btn"
+            onClick={handleTriggerAutoLogin}
+            disabled={autoLoginLoading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              color: '#fff',
+              border: '1px solid #3b82f6',
+              cursor: autoLoginLoading ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '12px'
+            }}
+            title="Automatically generates TOTP code and logs into Fyers headlessly"
+          >
+            {autoLoginLoading ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+            {autoLoginLoading ? 'Logging In...' : '⚡ Auto-Login'}
+          </button>
+
+          {/* Auto-Login Settings Modal Trigger */}
+          <button
+            className="btn"
+            onClick={() => {
+              fetchFyersCredentials();
+              setShowAutoLoginModal(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255,255,255,0.06)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+              cursor: 'pointer',
+              fontWeight: '600',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              fontSize: '12px'
+            }}
+            title="Configure Fyers Client ID, PIN, and TOTP Key"
+          >
+            <Settings size={13} /> Setup
+          </button>
+
           <button
             className="btn btn-primary"
             onClick={async () => {
@@ -557,9 +785,10 @@ export default function AdminDashboard() {
                 alert('Error connecting Fyers');
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--color-blue)', color: '#fff' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-color)', fontSize: '12px', padding: '6px 12px' }}
+            title="Manual OAuth Web Login (Legacy)"
           >
-            Connect Fyers API
+            Connect Web
           </button>
           <div className="input-group" style={{ width: '220px' }}>
             <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
@@ -956,7 +1185,11 @@ export default function AdminDashboard() {
               </div>
             </div>
           ) : activeTab === 'system' ? (
-          <SystemStatusTab />
+          <SystemStatusTab
+            onOpenAutoLoginModal={() => { fetchFyersCredentials(); setShowAutoLoginModal(true); }}
+            onTriggerAutoLogin={handleTriggerAutoLogin}
+            autoLoginLoading={autoLoginLoading}
+          />
         ) : activeTab === 'analytics' ? (
           <div style={{ padding: '24px' }}>
             {analytics ? (
@@ -1957,6 +2190,160 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fyers Auto-Login Configuration Modal */}
+      {showAutoLoginModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
+        }}>
+          <div style={{
+            background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
+            borderRadius: '16px', width: '520px', maxWidth: '92vw', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Zap size={18} color="#eab308" />
+                <h3 style={{ fontSize: '17px', fontWeight: '700', margin: 0 }}>Fyers Automated Login Setup</h3>
+              </div>
+              <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowAutoLoginModal(false)} />
+            </div>
+
+            <form onSubmit={handleSaveAndAutoLogin} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', overflowY: 'auto' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                Enter your Fyers account details and 2FA TOTP Secret Key. Our headless engine will automatically generate the 6-digit TOTP code and refresh your session token daily at 08:00 AM IST.
+              </div>
+
+              {autoLoginStatus && (
+                <div style={{
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  lineHeight: '1.4',
+                  background: autoLoginStatus.type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                  border: `1px solid ${autoLoginStatus.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                  color: autoLoginStatus.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)'
+                }}>
+                  {autoLoginStatus.message}
+                </div>
+              )}
+
+              {/* Fyers User ID */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  FYERS USER ID / CLIENT ID *
+                </label>
+                <div className="input-group">
+                  <User size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. XF01234"
+                    value={fyersUserId}
+                    onChange={e => setFyersUserId(e.target.value.toUpperCase())}
+                    style={{ paddingLeft: '36px', textTransform: 'uppercase' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 4-Digit PIN */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  FYERS 4-DIGIT PIN * {hasSavedPin && <span style={{ color: 'var(--color-green)', fontWeight: 'normal' }}>(✓ Saved in Database)</span>}
+                </label>
+                <div className="input-group" style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder={hasSavedPin ? '•••• (Leave blank to keep existing)' : 'Enter 4-digit PIN'}
+                    value={fyersPin}
+                    onChange={e => setFyersPin(e.target.value)}
+                    maxLength={6}
+                    style={{ paddingLeft: '36px', paddingRight: '40px' }}
+                    required={!hasSavedPin}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                  >
+                    {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* TOTP Key */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  FYERS 32-CHARACTER TOTP SECRET KEY * {hasSavedTotpKey && <span style={{ color: 'var(--color-green)', fontWeight: 'normal' }}>(✓ Saved in Database)</span>}
+                </label>
+                <div className="input-group" style={{ position: 'relative' }}>
+                  <Key size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type={showTotpKey ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder={hasSavedTotpKey ? '•••••••••••••••• (Leave blank to keep existing)' : 'Paste 32-char Base32 Secret Key'}
+                    value={fyersTotpKey}
+                    onChange={e => setFyersTotpKey(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                    style={{ paddingLeft: '36px', paddingRight: '40px', fontFamily: 'monospace' }}
+                    required={!hasSavedTotpKey}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTotpKey(!showTotpKey)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                  >
+                    {showTotpKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Instructions Guide */}
+              <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '8px', padding: '12px 16px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                <strong style={{ color: 'var(--color-blue)', display: 'block', marginBottom: '4px' }}>💡 How to get your Fyers TOTP Key:</strong>
+                1. Go to <span style={{ color: '#fff', fontWeight: '600' }}>myaccount.fyers.in</span> → Security / 2FA.<br/>
+                2. Enable <strong>External TOTP (Authenticator App)</strong>.<br/>
+                3. Under the QR code, click <strong>"Can't scan QR?"</strong> to view the alphanumeric secret key.<br/>
+                4. Copy the 32-character key and paste it above.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAutoLoginModal(false)}
+                  disabled={autoLoginLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={autoLoginLoading}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: autoLoginLoading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {autoLoginLoading ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                  {autoLoginLoading ? 'Saving & Verifying...' : 'Save & Run Auto-Login'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

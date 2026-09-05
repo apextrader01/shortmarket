@@ -4007,6 +4007,58 @@ app.post('/api/fyers/verify', async (req, res) => {
   }
 });
 
+app.get('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  try {
+    const { getFyersCredentials } = require('./services/fyersAutoLogin');
+    const creds = await getFyersCredentials();
+    res.json({
+      success: true,
+      hasCredentials: !!(creds.fy_id && creds.pin && creds.totp_key),
+      fyers_user_id: creds.fy_id || '',
+      has_pin: !!creds.pin,
+      has_totp_key: !!creds.totp_key,
+      app_id: creds.app_id || ''
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  const { fyers_user_id, fyers_pin, fyers_totp_key } = req.body;
+  try {
+    if (fyers_user_id) {
+      await db('system_settings').insert({ key: 'fyers_user_id', value: fyers_user_id.trim(), updated_at: new Date() }).onConflict('key').merge();
+    }
+    if (fyers_pin) {
+      await db('system_settings').insert({ key: 'fyers_pin', value: fyers_pin.trim(), updated_at: new Date() }).onConflict('key').merge();
+    }
+    if (fyers_totp_key) {
+      await db('system_settings').insert({ key: 'fyers_totp_key', value: fyers_totp_key.replace(/\s+/g, ''), updated_at: new Date() }).onConflict('key').merge();
+    }
+
+    // Immediately attempt auto-login with the new credentials
+    const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+    const loginResult = await performFyersAutoLogin();
+    res.json({ success: true, message: 'Fyers credentials saved', loginResult });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/fyers/auto-login', authenticateToken, async (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  try {
+    const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+    const result = await performFyersAutoLogin();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/fyers-debug', (req, res) => {
   const { getFyersStatus } = require('./services/fyers');
   if (getFyersStatus) {
@@ -4397,26 +4449,44 @@ server.listen(PORT, async () => {
     const { initCronJobs } = require('./services/cronJobs');
     const schedule = require('node-schedule');
 
-    // Refresh Fyers Token daily at 2:00 AM IST
+    // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Mon-Fri & Weekends)
     const loginRule = new schedule.RecurrenceRule();
-    loginRule.dayOfWeek = [new schedule.Range(1, 5)]; // Mon-Fri
-    loginRule.hour = 2;
+    loginRule.hour = 8;
     loginRule.minute = 0;
     loginRule.tz = 'Asia/Kolkata';
     schedule.scheduleJob(loginRule, async () => {
-      console.log('⏰ Daily 2:00 AM Cron: Refreshing Fyers Token...');
-      await initFyers(io, priceCache, true);
-      });
+      console.log('⏰ Daily 08:00 AM Cron: Running automated Fyers TOTP Login...');
+      try {
+        const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+        await performFyersAutoLogin();
+      } catch(e) { console.error('Auto-login cron error:', e); }
+    });
 
-      const optionsRule = new schedule.RecurrenceRule();
-      optionsRule.dayOfWeek = [new schedule.Range(1, 5)];
-      optionsRule.hour = 8;
-      optionsRule.minute = 15;
-      optionsRule.tz = 'Asia/Kolkata';
-      schedule.scheduleJob(optionsRule, async () => {
-        console.log('Daily 8:15 AM Cron: Updating Options & Futures Master...');
-        await updateOptionsMaster().catch(e => console.error(e));
-      });
+    const loginBackupRule = new schedule.RecurrenceRule();
+    loginBackupRule.hour = 8;
+    loginBackupRule.minute = 30;
+    loginBackupRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(loginBackupRule, async () => {
+      console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
+      try {
+        const { getFyersStatus } = require('./services/fyers');
+        const status = getFyersStatus ? getFyersStatus() : {};
+        if (!status.hasAccessToken || status.tokenExpired) {
+          const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+          await performFyersAutoLogin();
+        }
+      } catch(e) { console.error('Backup auto-login cron error:', e); }
+    });
+
+    const optionsRule = new schedule.RecurrenceRule();
+    optionsRule.dayOfWeek = [new schedule.Range(1, 5)];
+    optionsRule.hour = 8;
+    optionsRule.minute = 15;
+    optionsRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(optionsRule, async () => {
+      console.log('Daily 8:15 AM Cron: Updating Options & Futures Master...');
+      await updateOptionsMaster().catch(e => console.error(e));
+    });
 
 
     // Initialize TriggerEngine
