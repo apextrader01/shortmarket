@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle } from 'lucide-react';
@@ -1189,6 +1189,63 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('analytics');
   const [telemetryTimeframe, setTelemetryTimeframe] = useState('all');
   const [isLiveTelemetry, setIsLiveTelemetry] = useState(true);
+  const [apmSearch, setApmSearch] = useState('');
+  const [apmMethod, setApmMethod] = useState('ALL'); // 'ALL' | 'GET' | 'POST' | 'SLOW'
+  const [apmSort, setApmSort] = useState('bandwidth'); // 'bandwidth' | 'hits' | 'latency' | 'fastest'
+  const [userSearch, setUserSearch] = useState('');
+  const [userFilter, setUserFilter] = useState('ALL'); // 'ALL' | 'ACTIVE_ONLY' | 'DELETED_ONLY' | 'HEAVY'
+  const [userSort, setUserSort] = useState('bandwidth'); // 'bandwidth' | 'calls' | 'market_time'
+
+  const filteredApm = useMemo(() => {
+    let list = adminTelemetry?.api || [];
+    if (apmSearch.trim()) {
+      const q = apmSearch.toLowerCase().trim();
+      list = list.filter(r => r.route && r.route.toLowerCase().includes(q));
+    }
+    if (apmMethod === 'GET') {
+      list = list.filter(r => r.route && (r.route.startsWith('GET') || r.route.includes('GET')));
+    } else if (apmMethod === 'POST') {
+      list = list.filter(r => r.route && (r.route.startsWith('POST') || r.route.startsWith('PUT') || r.route.startsWith('DELETE') || r.route.includes('POST')));
+    } else if (apmMethod === 'SLOW') {
+      list = list.filter(r => {
+        const avgLat = r.count > 0 ? (r.totalTime / r.count) : 0;
+        return avgLat >= 100;
+      });
+    }
+    return [...list].sort((a, b) => {
+      const avgLatA = a.count > 0 ? a.totalTime / a.count : 0;
+      const avgLatB = b.count > 0 ? b.totalTime / b.count : 0;
+      if (apmSort === 'bandwidth') return (b.totalBytes || 0) - (a.totalBytes || 0);
+      if (apmSort === 'hits') return (b.count || 0) - (a.count || 0);
+      if (apmSort === 'latency') return avgLatB - avgLatA;
+      if (apmSort === 'fastest') return avgLatA - avgLatB;
+      return (b.totalTime || 0) - (a.totalTime || 0);
+    });
+  }, [adminTelemetry?.api, apmSearch, apmMethod, apmSort]);
+
+  const filteredUsers = useMemo(() => {
+    let list = adminTelemetry?.users || [];
+    if (userSearch.trim()) {
+      const q = userSearch.toLowerCase().trim();
+      list = list.filter(u => 
+        (u.username && u.username.toLowerCase().includes(q)) || 
+        String(u.userId || '').toLowerCase().includes(q)
+      );
+    }
+    if (userFilter === 'ACTIVE_ONLY') {
+      list = list.filter(u => !String(u.username || '').includes('Deleted') && !String(u.username || '').includes('Anonymous') && u.userId !== 'unknown');
+    } else if (userFilter === 'DELETED_ONLY') {
+      list = list.filter(u => String(u.username || '').includes('Deleted') || String(u.username || '').includes('Anonymous') || u.userId === 'unknown');
+    } else if (userFilter === 'HEAVY') {
+      list = list.filter(u => (u.apiCalls || 0) >= 500 || (u.apiBytes || 0) >= 1048576);
+    }
+    return [...list].sort((a, b) => {
+      if (userSort === 'bandwidth') return (b.apiBytes || 0) - (a.apiBytes || 0);
+      if (userSort === 'calls') return (b.apiCalls || 0) - (a.apiCalls || 0);
+      if (userSort === 'market_time') return (b.wsMinutes || 0) - (a.wsMinutes || 0);
+      return (b.apiBytes || 0) - (a.apiBytes || 0);
+    });
+  }, [adminTelemetry?.users, userSearch, userFilter, userSort]);
   const [announcementInput, setAnnouncementInput] = useState('');
   const [announcementType, setAnnouncementType] = useState('info');
   const [users, setUsers] = useState([]);
@@ -2667,88 +2724,318 @@ export default function AdminDashboard() {
               );
             })()}
 
-            {/* TABLES GRID */}
+            {/* TABLES GRID WITH INTERACTIVE FILTERS & SORTING */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '8px' : '10px' }}>
               {/* API APM TABLE */}
-              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: '700', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 10px 0' }}>
-                  <Activity size={13} color="var(--color-blue)" /> API Performance (APM)
-                </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '6px 10px' }}>Route</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Hits</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Avg Latency</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Bandwidth</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(!adminTelemetry?.api || adminTelemetry.api.length === 0) ? (
-                      <tr><td colSpan={4} style={{ padding: '14px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
-                    ) : (
-                      [...(adminTelemetry.api || [])].sort((a,b) => b.totalTime - a.totalTime).map(row => {
-                        const avgLatency = row.count > 0 ? (row.totalTime / row.count).toFixed(2) : 0;
-                        const sizeKb = (row.totalBytes / 1024).toFixed(2);
-                        const latNum = parseFloat(avgLatency);
-                        
-                        return (
-                          <tr key={row.route} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{row.route}</td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: '600' }}>{row.count.toLocaleString()}</td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                              <span style={{
-                                padding: '1px 5px',
-                                borderRadius: '3px',
-                                fontSize: '9px',
-                                fontWeight: '700',
-                                background: latNum > 500 ? 'rgba(239,68,68,0.15)' : latNum > 100 ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
-                                color: latNum > 500 ? 'var(--color-red-light)' : latNum > 100 ? 'var(--color-yellow)' : 'var(--color-green-light)'
-                              }}>
-                                {avgLatency} ms
-                              </span>
-                            </td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right' }}>{sizeKb} KB</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+              <div className="card" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', flexDirection: 'column' }}>
+                {/* Header Toolbar */}
+                <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Activity size={13} color="var(--color-blue)" />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>API Performance (APM)</span>
+                      <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                        {filteredApm.length} / {(adminTelemetry?.api || []).length}
+                      </span>
+                    </div>
+
+                    {/* Sort Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                      <select
+                        value={apmSort}
+                        onChange={e => setApmSort(e.target.value)}
+                        style={{
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          fontSize: '10px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="bandwidth">Bandwidth (High → Low)</option>
+                        <option value="hits">Hits (High → Low)</option>
+                        <option value="latency">Slowest (High Latency)</option>
+                        <option value="fastest">Fastest (Low Latency)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Search and Filter Chips */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '120px' }}>
+                      <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                      <input
+                        type="text"
+                        placeholder="Search route (e.g. /order, /market)..."
+                        value={apmSearch}
+                        onChange={e => setApmSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          padding: '3px 20px 3px 22px',
+                          fontSize: '10.5px',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      {apmSearch && (
+                        <X
+                          size={11}
+                          onClick={() => setApmSearch('')}
+                          style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'All', val: 'ALL' },
+                        { label: 'GET', val: 'GET' },
+                        { label: 'POST', val: 'POST' },
+                        { label: '🐢 Slow >100ms', val: 'SLOW' }
+                      ].map(chip => (
+                        <button
+                          key={chip.val}
+                          type="button"
+                          onClick={() => setApmMethod(chip.val)}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            borderRadius: '3px',
+                            border: '1px solid',
+                            borderColor: apmMethod === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                            background: apmMethod === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                            color: apmMethod === chip.val ? '#fff' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table Body */}
+                <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-panel)', zIndex: 1 }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px' }}>Route</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setApmSort('hits')}>
+                          Hits {apmSort === 'hits' && '▼'}
+                        </th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setApmSort(apmSort === 'latency' ? 'fastest' : 'latency')}>
+                          Avg Latency {apmSort === 'latency' ? '▼' : apmSort === 'fastest' ? '▲' : ''}
+                        </th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setApmSort('bandwidth')}>
+                          Bandwidth {apmSort === 'bandwidth' && '▼'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredApm.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            {apmSearch || apmMethod !== 'ALL' ? 'No routes match your filter criteria' : `No telemetry collected for ${telemetryTimeframe}`}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredApm.map(row => {
+                          const avgLatency = row.count > 0 ? (row.totalTime / row.count).toFixed(2) : 0;
+                          const sizeKb = (row.totalBytes / 1024).toFixed(2);
+                          const latNum = parseFloat(avgLatency);
+                          
+                          return (
+                            <tr key={row.route} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '5px 8px', fontFamily: 'monospace', wordBreak: 'break-all' }}>{row.route}</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '600' }}>{row.count.toLocaleString()}</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right' }}>
+                                <span style={{
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  fontSize: '9px',
+                                  fontWeight: '700',
+                                  background: latNum > 500 ? 'rgba(239,68,68,0.15)' : latNum > 100 ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
+                                  color: latNum > 500 ? 'var(--color-red-light)' : latNum > 100 ? 'var(--color-yellow)' : 'var(--color-green-light)'
+                                }}>
+                                  {avgLatency} ms
+                                </span>
+                              </td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right' }}>{sizeKb} KB</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* USER RESOURCE TABLE */}
-              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: '700', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 10px 0' }}>
-                  <Users size={13} color="var(--color-blue)" /> Top Resource Users
-                </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '6px 10px' }}>User</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Market Time</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>API Calls</th>
-                      <th style={{ padding: '6px 10px', textAlign: 'right' }}>Bandwidth</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(!adminTelemetry?.users || adminTelemetry.users.length === 0) ? (
-                      <tr><td colSpan={4} style={{ padding: '14px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
-                    ) : (
-                      [...(adminTelemetry.users || [])].sort((a,b) => b.apiBytes - a.apiBytes).map(u => {
-                        const sizeMb = (u.apiBytes / (1024 * 1024)).toFixed(3);
-                        return (
-                          <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '6px 10px', fontWeight: 'bold' }}>{u.username}</td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right', color: 'var(--color-blue)' }}>{sizeMb} MB</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+              <div className="card" style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', flexDirection: 'column' }}>
+                {/* Header Toolbar */}
+                <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Users size={13} color="var(--color-blue)" />
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Top Resource Users</span>
+                      <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                        {filteredUsers.length} / {(adminTelemetry?.users || []).length}
+                      </span>
+                    </div>
+
+                    {/* Sort Selector */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                      <select
+                        value={userSort}
+                        onChange={e => setUserSort(e.target.value)}
+                        style={{
+                          background: 'var(--bg-primary)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          fontSize: '10px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="bandwidth">Bandwidth (High → Low)</option>
+                        <option value="calls">API Calls (High → Low)</option>
+                        <option value="market_time">Market Time (Most Active)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Search and Filter Chips */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '120px' }}>
+                      <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                      <input
+                        type="text"
+                        placeholder="Search user / ID..."
+                        value={userSearch}
+                        onChange={e => setUserSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          padding: '3px 20px 3px 22px',
+                          fontSize: '10.5px',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                      {userSearch && (
+                        <X
+                          size={11}
+                          onClick={() => setUserSearch('')}
+                          style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        />
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'All', val: 'ALL' },
+                        { label: '✅ Active', val: 'ACTIVE_ONLY' },
+                        { label: '🗑️ Deleted', val: 'DELETED_ONLY' },
+                        { label: '🔥 Heavy', val: 'HEAVY' }
+                      ].map(chip => (
+                        <button
+                          key={chip.val}
+                          type="button"
+                          onClick={() => setUserFilter(chip.val)}
+                          style={{
+                            padding: '2px 6px',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            borderRadius: '3px',
+                            border: '1px solid',
+                            borderColor: userFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                            background: userFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                            color: userFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table Body */}
+                <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-panel)', zIndex: 1 }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 8px' }}>User</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setUserSort('market_time')}>
+                          Market Time {userSort === 'market_time' && '▼'}
+                        </th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setUserSort('calls')}>
+                          API Calls {userSort === 'calls' && '▼'}
+                        </th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setUserSort('bandwidth')}>
+                          Bandwidth {userSort === 'bandwidth' && '▼'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            {userSearch || userFilter !== 'ALL' ? 'No users match your filter criteria' : `No telemetry collected for ${telemetryTimeframe}`}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map((u, idx) => {
+                          const sizeMb = (u.apiBytes / (1024 * 1024)).toFixed(3);
+                          const isDeleted = String(u.username || '').includes('Deleted') || String(u.username || '').includes('Anonymous');
+                          
+                          return (
+                            <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '5px 8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <span style={{
+                                    fontSize: '9px',
+                                    fontWeight: '700',
+                                    padding: '0 4px',
+                                    borderRadius: '2px',
+                                    background: idx === 0 ? '#eab308' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'rgba(255,255,255,0.08)',
+                                    color: idx <= 2 ? '#000' : 'var(--text-secondary)'
+                                  }}>
+                                    #{idx + 1}
+                                  </span>
+                                  <span style={{ fontWeight: 'bold', color: isDeleted ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+                                    {u.username}
+                                  </span>
+                                  {isDeleted && (
+                                    <span style={{ fontSize: '8.5px', padding: '0 4px', borderRadius: '2px', background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', fontWeight: '600' }}>
+                                      inactive
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
+                              <td style={{ padding: '5px 8px', textAlign: 'right', color: 'var(--color-blue)', fontWeight: '600' }}>{sizeMb} MB</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
