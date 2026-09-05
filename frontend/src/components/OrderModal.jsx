@@ -34,6 +34,7 @@ export default function OrderModal() {
   const [estimatedTaxes, setEstimatedTaxes] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
   const [showBreakup, setShowBreakup] = useState(false);
+  const [isPlacing, setIsPlacing] = useState(false);
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
@@ -341,21 +342,28 @@ export default function OrderModal() {
       product_type: isBO ? 'BO' : isCO ? 'CO' : productType
     };
 
-    const result = await useStore.getState().placeOrder(payload);
-    if (result && result.success) {
-      closeOrderModal();
-      if (result.status === 'EXECUTED') {
-        alert("✅ Order Executed Successfully!");
-      } else if (result.status === 'PENDING_TRIGGER') {
-        alert("⏳ Trigger Order Placed (Pending Trigger)");
-      } else if (result.status === 'REJECTED') {
-        alert("❌ Order Rejected!");
+    try {
+      setIsPlacing(true);
+      const result = await useStore.getState().placeOrder(payload);
+      setIsPlacing(false);
+      if (result && result.success) {
+        closeOrderModal();
+        if (result.status === 'EXECUTED') {
+          alert("✅ Order Executed Successfully!");
+        } else if (result.status === 'PENDING_TRIGGER') {
+          alert("⏳ Trigger Order Placed (Pending Trigger)");
+        } else if (result.status === 'REJECTED') {
+          alert("❌ Order Rejected!");
+        } else {
+          alert("⏳ Order Placed (Pending)");
+        }
       } else {
-        alert("⏳ Order Placed (Pending)");
+        const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
+        alert(errorMsg);
       }
-    } else {
-      const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
-      alert(errorMsg);
+    } catch (err) {
+      setIsPlacing(false);
+      alert("Error: " + (err.message || 'Failed to place order.'));
     }
   };
 
@@ -614,18 +622,20 @@ export default function OrderModal() {
           
           <button 
             onClick={handlePlaceOrder}
-            disabled={isInsufficient}
+            disabled={isInsufficient || isPlacing}
             style={{ 
-              background: (isInsufficient) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-              color: (isInsufficient) ? 'var(--text-secondary)' : '#fff', 
+              background: (isInsufficient || isPlacing) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
+              color: (isInsufficient || isPlacing) ? 'var(--text-secondary)' : '#fff', 
               padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
+              border: 'none', cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
               alignSelf: 'stretch',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '180px'
             }}
           >
-            PLACE {isBuy ? 'BUY' : 'SELL'} ORDER
+            {isPlacing ? 'PLACING ORDER...' : `PLACE ${isBuy ? 'BUY' : 'SELL'} ORDER`}
           </button>
         </div>
 

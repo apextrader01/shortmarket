@@ -703,7 +703,7 @@ export const useStore = create(persist((set, get) => ({
   // ── User Data ────────────────────────────────────────────────────────────────
   fetchUserData: async () => {
     try {
-      syncClientTelemetry(API);
+      syncClientTelemetry(API).catch(() => {});
       const headers = {  };
       const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
         fetch(`${API}/api/positions`, { credentials: 'include', headers }),
@@ -1046,7 +1046,6 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
-    
     try {
       const res  = await fetch(`${API}/api/order`, { credentials: 'include', method:  'POST',
         headers: { 'Content-Type': 'application/json', },
@@ -1054,7 +1053,8 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
-        await get().fetchUserData();
+        // Sync user data non-blockingly in background for sub-100ms instant execution
+        get().fetchUserData().catch(() => {});
         return data;
       }
       console.error('[placeOrder FAILED]', data);
