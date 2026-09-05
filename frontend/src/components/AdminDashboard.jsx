@@ -60,49 +60,49 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
         : 'System Connected (Waiting for Live Exchange Ticks)';
 
   return (
-    <div style={{ padding: '24px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: `1px solid ${isHealthy ? 'var(--color-green)' : 'var(--color-red)'}` }}>
-        <Activity size={32} color={isHealthy ? 'var(--color-green)' : 'var(--color-red)'} />
+    <div style={{ padding: '12px 16px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--bg-panel)', padding: '12px 16px', borderRadius: '10px', border: `1px solid ${isHealthy ? 'var(--color-green)' : 'var(--color-red)'}` }}>
+        <Activity size={24} color={isHealthy ? 'var(--color-green)' : 'var(--color-red)'} />
         <div>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker & Market Engine Status</h3>
-          <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold' }}>
+          <h3 style={{ margin: '0 0 2px 0', fontSize: '15px' }}>Broker & Market Engine Status</h3>
+          <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold', fontSize: '12px' }}>
             {statusText}
           </div>
         </div>
       </div>
 
       {/* Automated Daily Headless Login Card */}
-      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Zap size={22} style={{ color: '#eab308' }} />
+      <div style={{ background: 'var(--bg-panel)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Zap size={18} style={{ color: '#eab308' }} />
             <div>
-              <h4 style={{ margin: '0 0 2px 0', fontSize: '16px', color: 'var(--text-primary)' }}>100% Automated Daily Headless Login (TOTP)</h4>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', color: 'var(--text-primary)' }}>100% Automated Daily Headless Login (TOTP)</h4>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
                 Refreshes Fyers access token automatically every morning at 08:00 AM & 08:30 AM IST using 2FA TOTP.
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
               onClick={onTriggerAutoLogin}
               disabled={autoLoginLoading}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                 color: '#fff',
                 border: 'none',
-                padding: '8px 14px',
-                borderRadius: '6px',
+                padding: '5px 11px',
+                borderRadius: '5px',
                 fontWeight: '600',
-                fontSize: '13px',
+                fontSize: '11px',
                 cursor: autoLoginLoading ? 'not-allowed' : 'pointer',
                 opacity: autoLoginLoading ? 0.7 : 1
               }}
             >
-              {autoLoginLoading ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+              {autoLoginLoading ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
               {autoLoginLoading ? 'Logging In...' : '⚡ Run Auto-Login Now'}
             </button>
             <button
@@ -110,60 +110,60 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 background: 'rgba(255,255,255,0.06)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-color)',
-                padding: '8px 14px',
-                borderRadius: '6px',
+                padding: '5px 11px',
+                borderRadius: '5px',
                 fontWeight: '600',
-                fontSize: '13px',
+                fontSize: '11px',
                 cursor: 'pointer'
               }}
             >
-              <Settings size={14} /> Setup Credentials
+              <Settings size={12} /> Setup Credentials
             </button>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>SCHEDULED CRON</div>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginTop: '2px' }}>⏰ 08:00 AM & 08:30 AM IST</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>SCHEDULED CRON</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginTop: '2px' }}>⏰ 08:00 AM & 08:30 AM IST</div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>TOKEN STATUS</div>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: (status.hasAccessToken && !status.tokenExpired) ? 'var(--color-green)' : 'var(--color-red)', marginTop: '2px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>TOKEN STATUS</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: (status.hasAccessToken && !status.tokenExpired) ? 'var(--color-green)' : 'var(--color-red)', marginTop: '2px' }}>
               {(status.hasAccessToken && !status.tokenExpired) ? '🟢 Valid & Active' : status.tokenExpired ? '🔴 Expired (Action Needed)' : '🟡 Not Authenticated'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>AUTHENTICATION TYPE</div>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-blue)', marginTop: '2px' }}>🔐 RFC 6238 TOTP + 4-Digit PIN</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>AUTHENTICATION TYPE</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-blue)', marginTop: '2px' }}>🔐 RFC 6238 TOTP + 4-Digit PIN</div>
           </div>
         </div>
       </div>
 
       {/* Market Trading Session Controls in System Status */}
-      <div style={{ background: 'var(--bg-panel)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ background: 'var(--bg-panel)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div>
-            <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', color: 'var(--text-primary)' }}>Market Trading Session Control (Switches)</h4>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+            <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Market Trading Session Control (Switches)</h4>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
               Override default weekday/weekend schedules for special Saturday/Sunday sessions or declare trading holidays.
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
           {/* Equity Box */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: '700', fontSize: '14px' }}>📈 NSE / BSE Equities</span>
+              <span style={{ fontWeight: '700', fontSize: '13px' }}>📈 NSE / BSE Equities</span>
               <span style={{ 
-                padding: '3px 8px', 
+                padding: '2px 6px', 
                 borderRadius: '4px', 
-                fontSize: '11px', 
+                fontSize: '10px', 
                 fontWeight: '700',
                 background: marketStatus?.equity === 'OPEN' ? 'rgba(34,197,94,0.15)' : marketStatus?.equity === 'CLOSED' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
                 color: marketStatus?.equity === 'OPEN' ? 'var(--color-green)' : marketStatus?.equity === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)',
@@ -172,10 +172,10 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
                 {marketStatus?.equity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.equity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (SCHEDULED)'}
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Standard hours: Mon–Fri, 9:15 AM – 3:15 PM IST.
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
               {['AUTO', 'OPEN', 'CLOSED'].map(mode => (
                 <button
                   key={mode}
@@ -187,9 +187,9 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
                   }}
                   style={{
                     flex: 1,
-                    padding: '8px 4px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    padding: '5px 4px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
                     fontWeight: '600',
                     cursor: 'pointer',
                     background: (marketStatus?.equity || 'AUTO') === mode 
@@ -206,13 +206,13 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
           </div>
 
           {/* Commodity Box */}
-          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: '700', fontSize: '14px' }}>🪙 MCX Commodities</span>
+              <span style={{ fontWeight: '700', fontSize: '13px' }}>🪙 MCX Commodities</span>
               <span style={{ 
-                padding: '3px 8px', 
+                padding: '2px 6px', 
                 borderRadius: '4px', 
-                fontSize: '11px', 
+                fontSize: '10px', 
                 fontWeight: '700',
                 background: marketStatus?.commodity === 'OPEN' ? 'rgba(34,197,94,0.15)' : marketStatus?.commodity === 'CLOSED' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)',
                 color: marketStatus?.commodity === 'OPEN' ? 'var(--color-green)' : marketStatus?.commodity === 'CLOSED' ? 'var(--color-red)' : 'var(--color-blue)',
@@ -221,10 +221,10 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
                 {marketStatus?.commodity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.commodity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (SCHEDULED)'}
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               Standard hours: Mon–Fri, 9:00 AM – 10:50 PM IST.
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
               {['AUTO', 'OPEN', 'CLOSED'].map(mode => (
                 <button
                   key={mode}
@@ -236,9 +236,9 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
                   }}
                   style={{
                     flex: 1,
-                    padding: '8px 4px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    padding: '5px 4px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
                     fontWeight: '600',
                     cursor: 'pointer',
                     background: (marketStatus?.commodity || 'AUTO') === mode 
@@ -256,51 +256,51 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: isMobile ? '10px' : '16px' }}>
-        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Fyers Access Token</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.hasAccessToken ? 'var(--color-green)' : 'var(--color-red)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: isMobile ? '8px' : '10px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>Fyers Access Token</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: status.hasAccessToken ? 'var(--color-green)' : 'var(--color-red)' }}>
             {status.hasAccessToken ? 'Valid & Loaded' : 'Missing / Expired'}
           </div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>WebSocket Connection</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.isFyersConnected ? 'var(--color-green)' : 'var(--color-red)' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>WebSocket Connection</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: status.isFyersConnected ? 'var(--color-green)' : 'var(--color-red)' }}>
             {status.isFyersConnected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Time Since Last Tick</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: status.secondsSinceLastTick < 15 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>Time Since Last Tick</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: status.secondsSinceLastTick < 15 ? 'var(--color-green)' : 'var(--color-yellow)' }}>
             {status.secondsSinceLastTick !== null && status.secondsSinceLastTick !== undefined ? `${status.secondsSinceLastTick.toFixed(1)}s ago` : 'N/A'}
           </div>
         </div>
-        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '8px' }}>Active Subscriptions</div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '4px' }}>Active Subscriptions</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
             {status.subscriptions?.length || 0} symbols
           </div>
         </div>
       </div>
 
       {status.lastDataSocketError && (
-        <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--color-red)', padding: '16px', borderRadius: '8px' }}>
-          <h4 style={{ margin: '0 0 8px 0', color: 'var(--color-red)' }}>Recent WebSocket Error</h4>
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '12px', color: 'var(--color-red-light)' }}>
+        <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--color-red)', padding: '10px 14px', borderRadius: '6px' }}>
+          <h4 style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--color-red)' }}>Recent WebSocket Error</h4>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '11px', color: 'var(--color-red-light)' }}>
             {status.lastDataSocketError}
           </pre>
         </div>
       )}
 
-      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-        <h4 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)' }}>Currently Subscribed Symbols (Live Data)</h4>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: 'var(--text-primary)' }}>Currently Subscribed Symbols (Live Data)</h4>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {status.subscriptions && status.subscriptions.length > 0 ? status.subscriptions.map(sym => (
-            <span key={sym} style={{ background: 'var(--bg-panel)', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', border: '1px solid var(--border-color)' }}>
+            <span key={sym} style={{ background: 'var(--bg-panel)', padding: '3px 6px', borderRadius: '4px', fontSize: '11px', border: '1px solid var(--border-color)' }}>
               {sym}
             </span>
           )) : (
-            <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>No active subscriptions</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>No active subscriptions</span>
           )}
         </div>
       </div>
@@ -491,53 +491,53 @@ function MarketCalendarTab({ isMobile }) {
   });
 
   return (
-    <div style={{ padding: isMobile ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ padding: isMobile ? '8px' : '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {/* Calendar Tab Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
-          <h3 style={{ margin: '0 0 3px 0', fontSize: '17px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-            <Calendar size={20} style={{ color: '#c084fc' }} />
+          <h3 style={{ margin: '0 0 2px 0', fontSize: '15px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
+            <Calendar size={17} style={{ color: '#c084fc' }} />
             Market Trading Calendar & Scheduled Holidays
           </h3>
-          <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)' }}>
             Configure specific dates in advance for NSE/BSE & MCX (Declare holidays, schedule Saturday/Sunday live trading, or enable MCX evening sessions).
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <button
             onClick={handleBulkSeed}
             disabled={holidaySeeding}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '5px',
               background: 'linear-gradient(135deg, #9333ea, #6366f1)',
               color: '#fff',
               border: 'none',
-              borderRadius: '7px',
-              padding: '7px 14px',
-              fontSize: '12px',
+              borderRadius: '6px',
+              padding: '5px 11px',
+              fontSize: '11px',
               fontWeight: '700',
               cursor: holidaySeeding ? 'not-allowed' : 'pointer',
               boxShadow: '0 4px 12px rgba(147, 51, 234, 0.25)',
               transition: 'all 0.15s ease'
             }}
           >
-            <Sparkles size={14} />
+            <Sparkles size={13} />
             {holidaySeeding ? 'Importing...' : '✨ Import 2026 Official Exchange Holidays'}
           </button>
 
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '7px', padding: '2px', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
             <button
               onClick={() => setViewMode('grid')}
               style={{
                 background: viewMode === 'grid' ? 'var(--color-blue)' : 'transparent',
                 color: viewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
                 border: 'none',
-                borderRadius: '5px',
-                padding: '5px 12px',
-                fontSize: '12px',
+                borderRadius: '4px',
+                padding: '4px 9px',
+                fontSize: '11px',
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
@@ -551,9 +551,9 @@ function MarketCalendarTab({ isMobile }) {
                 background: viewMode === 'list' ? 'var(--color-blue)' : 'transparent',
                 color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
                 border: 'none',
-                borderRadius: '5px',
-                padding: '5px 12px',
-                fontSize: '12px',
+                borderRadius: '4px',
+                padding: '4px 9px',
+                fontSize: '11px',
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
@@ -566,56 +566,56 @@ function MarketCalendarTab({ isMobile }) {
       </div>
 
       {viewMode === 'grid' ? (
-        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: isMobile ? '12px' : '16px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--border-color)', padding: isMobile ? '8px' : '10px 14px' }}>
           {/* Month Navigation Controls & Legend */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
                 onClick={prevMonth}
-                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '5px', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
               </button>
-              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', minWidth: '150px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)', minWidth: '130px' }}>
                 {monthNames[month]} {year}
               </h4>
               <button
                 onClick={nextMonth}
-                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '5px', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={14} />
               </button>
               <button
                 onClick={jumpToToday}
-                style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '5px', padding: '3px 8px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}
               >
                 Today
               </button>
             </div>
 
             {/* Legend */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-green)' }} /> Open / Special</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} /> MCX Evening Only</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} /> Closed / Holiday</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} /> Standard</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '10px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--color-green)' }} /> Open / Special</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#eab308' }} /> MCX Evening Only</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--color-red)' }} /> Closed / Holiday</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} /> Standard</span>
             </div>
           </div>
 
           {/* Days of Week Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '4px' }}>
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
-              <div key={d} style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: (i === 0 || i === 6) ? '#f87171' : 'var(--text-secondary)', padding: '4px' }}>
+              <div key={d} style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: (i === 0 || i === 6) ? '#f87171' : 'var(--text-secondary)', padding: '2px' }}>
                 {d}
               </div>
             ))}
           </div>
 
           {/* Calendar Grid Cells */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
             {/* Blank offset boxes */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <div key={`blank-${i}`} style={{ minHeight: isMobile ? '65px' : '82px', background: 'rgba(0,0,0,0.06)', borderRadius: '6px', opacity: 0.15 }} />
+              <div key={`blank-${i}`} style={{ minHeight: isMobile ? '55px' : '65px', background: 'rgba(0,0,0,0.06)', borderRadius: '5px', opacity: 0.15 }} />
             ))}
 
             {/* Days in Month */}
@@ -658,11 +658,11 @@ function MarketCalendarTab({ isMobile }) {
                   key={dateStr}
                   onClick={() => handleOpenEdit(dateStr)}
                   style={{
-                    minHeight: isMobile ? '65px' : '82px',
+                    minHeight: isMobile ? '55px' : '65px',
                     background: cellBg,
                     border: cellBorder,
-                    borderRadius: '6px',
-                    padding: '6px 8px',
+                    borderRadius: '5px',
+                    padding: '4px 6px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -1402,24 +1402,24 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div style={{ padding: isMobile ? '12px 8px' : '24px', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', height: '100%' }}>
+    <div style={{ padding: isMobile ? '8px' : '10px 18px', display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '10px', height: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-          <Shield size={24} style={{ color: 'var(--color-red)' }} />
-          Admin Control Center
-        </h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ fontSize: '17px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, color: '#fff' }}>
+            <Shield size={18} style={{ color: 'var(--color-red)' }} />
+            Admin Control Center
+          </h2>
         
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Fyers Live Status Hint / Badge */}
           <div 
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              fontSize: '12px',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
               fontWeight: '600',
               background: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                 ? 'rgba(34, 197, 94, 0.12)' 
@@ -1450,8 +1450,8 @@ export default function AdminDashboard() {
             }
           >
             <span style={{ 
-              width: '8px', 
-              height: '8px', 
+              width: '7px', 
+              height: '7px', 
               borderRadius: '50%', 
               background: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                 ? 'var(--color-green)' 
@@ -1459,22 +1459,24 @@ export default function AdminDashboard() {
                   ? 'var(--color-yellow)' 
                   : 'var(--color-red)',
               boxShadow: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
-                ? '0 0 8px var(--color-green)'
-                : '0 0 8px var(--color-red)'
+                ? '0 0 6px var(--color-green)'
+                : '0 0 6px var(--color-red)'
             }} />
             {fyersLoading ? (
               <span>Checking Fyers...</span>
             ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && fyersStatus?.secondsSinceLastTick < 30) ? (
-              <span>🟢 Fyers Live ({fyersStatus.secondsSinceLastTick.toFixed(0)}s ago)</span>
+              <span>🟢 Fyers Live ({fyersStatus.secondsSinceLastTick.toFixed(0)}s)</span>
             ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && !isMarketOpenNow) ? (
-              <span>🟢 Fyers Ready (Markets Closed / Weekend)</span>
+              <span>🟢 Fyers Ready</span>
             ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired) ? (
-              <span>🟡 Waiting for Ticks</span>
+              <span>🟡 Waiting Ticks</span>
             ) : (
-              <span>🔴 Token Expired (Login Required)</span>
+              <span>🔴 Token Expired</span>
             )}
           </div>
+        </div>
 
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Quick Headless Auto-Login Button */}
           <button
             className="btn"
@@ -1483,20 +1485,21 @@ export default function AdminDashboard() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '4px',
               background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
               color: '#fff',
               border: '1px solid #3b82f6',
               cursor: autoLoginLoading ? 'not-allowed' : 'pointer',
               fontWeight: '600',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px'
+              padding: '4px 9px',
+              borderRadius: '5px',
+              fontSize: '11px',
+              height: '28px'
             }}
             title="Automatically generates TOTP code and logs into Fyers headlessly"
           >
-            {autoLoginLoading ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
-            {autoLoginLoading ? 'Logging In...' : '⚡ Auto-Login'}
+            {autoLoginLoading ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
+            {autoLoginLoading ? 'Logging In...' : 'Auto-Login'}
           </button>
 
           {/* Auto-Login Settings Modal Trigger */}
@@ -1509,19 +1512,20 @@ export default function AdminDashboard() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '4px',
               background: 'rgba(255,255,255,0.06)',
               color: 'var(--text-primary)',
               border: '1px solid var(--border-color)',
               cursor: 'pointer',
               fontWeight: '600',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              fontSize: '12px'
+              padding: '4px 9px',
+              borderRadius: '5px',
+              fontSize: '11px',
+              height: '28px'
             }}
             title="Configure Fyers Client ID, PIN, and TOTP Key"
           >
-            <Settings size={13} /> Setup
+            <Settings size={11} /> Setup
           </button>
 
           <button
@@ -1544,28 +1548,31 @@ export default function AdminDashboard() {
                 alert('Error connecting Fyers');
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-color)', fontSize: '12px', padding: '6px 12px' }}
-            title="Manual OAuth Web Login (Legacy)"
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-color)', fontSize: '11px', padding: '4px 9px', height: '28px' }}
+            title="Manual OAuth Web Login"
           >
             Connect Web
           </button>
-          <div className="input-group" style={{ width: '220px' }}>
-            <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+
+          <div className="input-group" style={{ width: '150px' }}>
+            <Search size={12} style={{ position: 'absolute', left: '8px', top: '8px', color: 'var(--text-secondary)' }} />
             <input 
               type="text" 
-              placeholder="Search users..." 
+              placeholder="Search..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: '32px' }}
+              style={{ paddingLeft: '24px', paddingRight: '6px', height: '28px', fontSize: '11px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '5px' }}
             />
           </div>
+
           <button 
             className="btn btn-secondary" 
             onClick={loadData}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', height: '28px', fontSize: '11px' }}
           >
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={11} /> Refresh
           </button>
+
           <button
             className="btn btn-secondary"
             onClick={async () => {
@@ -1585,46 +1592,34 @@ export default function AdminDashboard() {
                 alert('Error: ' + e.message);
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '4px 9px', height: '28px', background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', cursor: 'pointer' }}
           >
-            ⚡ Process Due SIPs
+            ⚡ Due SIPs
           </button>
         </div>
       </div>
 
-      {/* Market Session Trading Controls (Switches for Weekend / Holiday / Special Sessions) */}
+      {/* Sleek 1-Line Quick Controls Strip (Market Switches + Live Broadcast) */}
       <div style={{
-        background: 'rgba(255,255,255,0.03)',
+        background: 'rgba(255,255,255,0.02)',
         border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        padding: '12px 18px',
+        borderRadius: '8px',
+        padding: '5px 10px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '16px'
+        gap: '10px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Activity size={20} style={{ color: 'var(--color-blue)' }} />
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Market Session Trading Controls</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Override or schedule market sessions for Equities & Commodities (Special Sessions / Weekend Drills / Holidays)</div>
-          </div>
-        </div>
+        {/* Market Controls Inline */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Activity size={13} style={{ color: 'var(--color-blue)' }} /> SESSIONS:
+          </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           {/* NSE / BSE Equities Switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-panel)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>NSE / BSE EQUITIES</span>
-              <span style={{ 
-                fontSize: '10px', 
-                fontWeight: '700',
-                color: (marketStatus?.equity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.equity === 'CLOSED') ? 'var(--color-red)' : 'var(--color-blue)'
-              }}>
-                {marketStatus?.equity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.equity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (9:15-3:15)'}
-              </span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.35)', padding: '2px 8px', borderRadius: '5px', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>NSE/BSE</span>
             <select
               value={marketStatus?.equity || 'AUTO'}
               disabled={marketUpdating}
@@ -1633,39 +1628,27 @@ export default function AdminDashboard() {
                 setMarketUpdating(true);
                 const res = await updateMarketStatus(val, marketStatus?.commodity || 'AUTO');
                 setMarketUpdating(false);
-                if (!res?.success) {
-                  alert('Failed to update market status: ' + (res?.error || 'Unknown error'));
-                }
+                if (!res?.success) alert('Failed to update: ' + (res?.error || 'Unknown error'));
               }}
               style={{
-                background: 'rgba(0,0,0,0.35)',
-                color: '#fff',
-                border: '1px solid var(--border-color)',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
+                background: 'transparent',
+                color: (marketStatus?.equity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.equity === 'CLOSED') ? 'var(--color-red)' : '#60a5fa',
+                border: 'none',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none'
               }}
             >
-              <option value="AUTO">AUTO (Scheduled Mon-Fri)</option>
-              <option value="OPEN">OPEN (Special / Weekend Session)</option>
-              <option value="CLOSED">CLOSED (Holiday / Halt)</option>
+              <option value="AUTO" style={{ background: '#1e293b', color: '#fff' }}>⚡ AUTO (9:15-3:15)</option>
+              <option value="OPEN" style={{ background: '#1e293b', color: '#22c55e' }}>🟢 OPEN (Special)</option>
+              <option value="CLOSED" style={{ background: '#1e293b', color: '#ef4444' }}>🔴 CLOSED (Halt)</option>
             </select>
           </div>
 
           {/* MCX Commodities Switch */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-panel)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>MCX COMMODITIES</span>
-              <span style={{ 
-                fontSize: '10px', 
-                fontWeight: '700',
-                color: (marketStatus?.commodity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.commodity === 'CLOSED') ? 'var(--color-red)' : 'var(--color-blue)'
-              }}>
-                {marketStatus?.commodity === 'OPEN' ? '🟢 FORCED OPEN' : marketStatus?.commodity === 'CLOSED' ? '🔴 FORCED CLOSED' : '⚡ AUTO (9:00-22:50)'}
-              </span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.35)', padding: '2px 8px', borderRadius: '5px', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-secondary)' }}>MCX</span>
             <select
               value={marketStatus?.commodity || 'AUTO'}
               disabled={marketUpdating}
@@ -1674,81 +1657,72 @@ export default function AdminDashboard() {
                 setMarketUpdating(true);
                 const res = await updateMarketStatus(marketStatus?.equity || 'AUTO', val);
                 setMarketUpdating(false);
-                if (!res?.success) {
-                  alert('Failed to update market status: ' + (res?.error || 'Unknown error'));
-                }
+                if (!res?.success) alert('Failed to update: ' + (res?.error || 'Unknown error'));
               }}
               style={{
-                background: 'rgba(0,0,0,0.35)',
-                color: '#fff',
-                border: '1px solid var(--border-color)',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
+                background: 'transparent',
+                color: (marketStatus?.commodity === 'OPEN') ? 'var(--color-green)' : (marketStatus?.commodity === 'CLOSED') ? 'var(--color-red)' : '#60a5fa',
+                border: 'none',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                outline: 'none'
               }}
             >
-              <option value="AUTO">AUTO (Scheduled Mon-Fri)</option>
-              <option value="OPEN">OPEN (Special / Weekend Session)</option>
-              <option value="CLOSED">CLOSED (Holiday / Halt)</option>
+              <option value="AUTO" style={{ background: '#1e293b', color: '#fff' }}>⚡ AUTO (9:00-22:50)</option>
+              <option value="OPEN" style={{ background: '#1e293b', color: '#22c55e' }}>🟢 OPEN (Special)</option>
+              <option value="CLOSED" style={{ background: '#1e293b', color: '#ef4444' }}>🔴 CLOSED (Halt)</option>
             </select>
           </div>
 
-          {/* Calendar Management Button */}
           <button
             onClick={() => setActiveTab('calendar')}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '4px',
               background: 'rgba(139, 92, 246, 0.15)',
               color: '#c084fc',
               border: '1px solid rgba(139, 92, 246, 0.4)',
-              borderRadius: '8px',
-              padding: '8px 14px',
-              fontSize: '12px',
+              borderRadius: '5px',
+              padding: '2px 8px',
+              fontSize: '10px',
               fontWeight: '700',
               cursor: 'pointer',
-              whiteSpace: 'nowrap'
+              height: '24px'
             }}
           >
-            <Calendar size={15} />
-            📅 Manage Calendar
+            <Calendar size={11} /> Calendar
           </button>
         </div>
-      </div>
 
-      {/* Platform Announcement Broadcast Bar */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '280px' }}>
-          <span style={{ fontSize: '16px' }}>📢</span>
+        {/* Live Announcement Broadcast Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, maxWidth: isMobile ? '100%' : '520px' }}>
+          <span style={{ fontSize: '13px' }}>📢</span>
           <input
             type="text"
-            placeholder="Broadcast a live announcement banner to all active traders..."
+            placeholder="Live announcement banner to traders..."
             value={announcementInput}
             onChange={(e) => setAnnouncementInput(e.target.value)}
-            style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 12px', color: '#fff', fontSize: '12px' }}
+            style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '5px', padding: '3px 8px', color: '#fff', fontSize: '11px', height: '24px' }}
           />
           <select
             value={announcementType}
             onChange={(e) => setAnnouncementType(e.target.value)}
-            style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', color: '#fff', fontSize: '12px' }}
+            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '5px', padding: '2px 4px', color: '#fff', fontSize: '11px', height: '24px' }}
           >
-            <option value="info">Info (Blue)</option>
-            <option value="warning">Warning (Orange)</option>
-            <option value="alert">Alert (Red)</option>
+            <option value="info">Info</option>
+            <option value="warning">Warn</option>
+            <option value="alert">Alert</option>
           </select>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             className="btn btn-primary"
             onClick={async () => {
               if (!announcementInput.trim()) return;
               await setAdminAnnouncement(announcementInput, announcementType);
-              alert('Live announcement broadcasted to all users!');
+              alert('Live announcement broadcasted!');
             }}
-            style={{ padding: '6px 14px', fontSize: '12px', background: 'var(--color-blue)', color: '#fff', cursor: 'pointer' }}
+            style={{ padding: '2px 10px', fontSize: '11px', background: 'var(--color-blue)', color: '#fff', cursor: 'pointer', height: '24px', borderRadius: '5px' }}
           >
             Broadcast
           </button>
@@ -1758,18 +1732,18 @@ export default function AdminDashboard() {
               onClick={async () => {
                 await setAdminAnnouncement('', 'info');
                 setAnnouncementInput('');
-                alert('Announcement banner cleared!');
+                alert('Banner cleared!');
               }}
-              style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer' }}
+              style={{ padding: '2px 6px', fontSize: '10px', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', height: '24px', borderRadius: '5px' }}
             >
-              Clear Banner
+              Clear
             </button>
           )}
         </div>
       </div>
 
       {/* Tabs Navigation Bar (Full Width) */}
-      <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', overflowX: 'auto' }} className="scrollbar-hide">
+      <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '2px', overflowX: 'auto' }} className="scrollbar-hide">
         <button 
           onClick={() => setActiveTab('system')} 
           style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -2014,37 +1988,37 @@ export default function AdminDashboard() {
             ) : <div style={{ color: 'var(--text-secondary)' }}>No analytics data available.</div>}
           </div>
         ) : activeTab === 'orders' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Type</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Qty @ Price</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Status</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Date</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Client</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Symbol</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>Type</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Qty @ Price</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
               </tr>
             </thead>
             <tbody>
               {(!orders || orders.length === 0) ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders found</td>
+                  <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders found</td>
                 </tr>
               ) : (
                 orders.map(o => (
-                  <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
-                    <td style={{ padding: '16px', fontWeight: '600' }}>{o.symbol}</td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '7px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
+                    <td style={{ padding: '7px 12px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
+                    <td style={{ padding: '7px 12px', fontWeight: '600' }}>{o.symbol}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center' }}>
                       <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)' }}>{o.side}</span> {o.type}
                     </td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>{o.quantity} @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                    <td style={{ padding: '7px 12px', textAlign: 'right' }}>{o.quantity} @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center' }}>
                       <span style={{ 
                         color: o.status === 'EXECUTED' ? 'var(--color-green-light)' : o.status === 'REJECTED' ? 'var(--color-red-light)' : 'var(--color-yellow)',
                         background: o.status === 'EXECUTED' ? 'rgba(34,197,94,0.1)' : o.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
-                        padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600'
+                        padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700'
                       }}>{o.status}</span>
                     </td>
                   </tr>
@@ -2054,7 +2028,7 @@ export default function AdminDashboard() {
           </table>
         ) : activeTab === 'positions' ? (
           <>
-            <div style={{ padding: '16px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ padding: '8px 14px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)' }}>
               <button
                 onClick={async () => {
                   if (window.confirm('⚠️ WARNING: This will immediately close ALL open positions for ALL users at MARKET price. Are you sure you want to execute a Master Square-Off?')) {
@@ -2070,46 +2044,47 @@ export default function AdminDashboard() {
                 style={{
                   background: 'var(--color-red)',
                   color: '#fff',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '5px',
                   fontWeight: 'bold',
+                  fontSize: '11px',
                   border: 'none',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
+                  gap: '6px'
                 }}
               >
                 🚨 MASTER SQUARE-OFF (ALL USERS)
               </button>
             </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Symbol</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Qty</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg Price</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Client</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Symbol</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Qty</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Avg Price</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {(!positions || positions.length === 0) ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active positions found</td>
+                  <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active positions found</td>
                 </tr>
               ) : (
                 positions.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</div></td>
-                    <td style={{ padding: '16px', fontWeight: '600' }}>{p.symbol}</td>
-                    <td style={{ padding: '16px', textAlign: 'right', color: p.quantity > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>{p.quantity}</td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(p.average_price || 0).toFixed(2)}</td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                  <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '7px 12px' }}><div style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</div></td>
+                    <td style={{ padding: '7px 12px', fontWeight: '600' }}>{p.symbol}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', color: p.quantity > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>{p.quantity}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right' }}>₹{Number(p.average_price || 0).toFixed(2)}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center' }}>
                       <button 
                         onClick={() => handleForceClose(p.id)}
                         className="btn"
-                        style={{ padding: '4px 8px', fontSize: '11px', background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)' }}
+                        style={{ padding: '3px 7px', fontSize: '10px', background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)' }}
                       >
                         Force Close
                       </button>
@@ -2121,31 +2096,31 @@ export default function AdminDashboard() {
           </table>
           </>
         ) : activeTab === 'ledger' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Type</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Description</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Date</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Client</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Type</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Description</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
               </tr>
             </thead>
             <tbody>
               {(!ledger || ledger.length === 0) ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No ledger entries found</td>
+                  <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No ledger entries found</td>
                 </tr>
               ) : (
                 ledger.map(l => (
-                  <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
-                    <td style={{ padding: '16px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={{ background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
+                  <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '7px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
+                    <td style={{ padding: '7px 12px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
+                    <td style={{ padding: '7px 12px' }}>
+                      <span style={{ background: 'var(--bg-hover)', padding: '2px 5px', borderRadius: '4px', fontSize: '10px' }}>{l.type}</span>
                     </td>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{l.description}</td>
-                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                    <td style={{ padding: '7px 12px', color: 'var(--text-secondary)' }}>{l.description}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
                       {l.amount >= 0 ? '+' : ''}₹{Number(l.amount || 0).toFixed(2)}
                     </td>
                   </tr>
@@ -2155,20 +2130,20 @@ export default function AdminDashboard() {
           </table>
         ) : activeTab === 'users' ? (
           <>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Contact</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Margin Balance</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>KYC Status</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Actions</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Client</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Contact</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Margin Balance</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>KYC Status</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     No users found
                   </td>
                 </tr>
@@ -2178,16 +2153,16 @@ export default function AdminDashboard() {
                   const hasPartialKyc = Boolean(u.kyc_pan_url || u.kyc_aadhar_url);
                   
                   return (
-                    <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: u.is_admin ? 'var(--color-red)' : 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>
+                    <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '7px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: u.is_admin ? 'var(--color-red)' : 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold' }}>
                             {(u.username || 'U').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                               {u.username || 'Unknown User'} 
-                              {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '2px 4px', borderRadius: '4px', marginLeft: '6px' }}>ADMIN</span>}
+                              {u.is_admin && <span style={{ fontSize: '9px', background: 'var(--color-red)', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>ADMIN</span>}
                               {u.shared_ip_count > 1 && (
                                 <span 
                                   title={`Multi-Account Risk! ${u.shared_ip_count} accounts on this IP (${u.shared_users?.join(', ') || ''})`}
@@ -2195,63 +2170,49 @@ export default function AdminDashboard() {
                                     background: 'rgba(239, 68, 68, 0.15)', 
                                     color: '#ef4444', 
                                     border: '1px solid rgba(239, 68, 68, 0.3)', 
-                                    padding: '2px 6px', 
-                                    borderRadius: '4px', 
-                                    fontSize: '10px', 
+                                    padding: '1px 5px', 
+                                    borderRadius: '3px', 
+                                    fontSize: '9px', 
                                     fontWeight: '700',
                                     cursor: 'help' 
                                   }}
                                 >
-                                  ⚠️ ${u.shared_ip_count} ACCOUNTS ON SAME IP
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                              {u.client_id || u.id}
-                              {u.last_ip && <span style={{ marginLeft: '8px', opacity: 0.7, color: '#93c5fd' }}>• IP: {u.last_ip}</span>}
-                            </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-                              <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                📱 {u.device_model || 'Desktop PC'} {u.os_name ? `(${u.os_name})` : ''}
-                              </span>
-                              {(u.city || u.state) && (
-                                <span style={{ fontSize: '10px', background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                  📍 {u.city || ''}{u.city && u.state ? ', ' : ''}{u.state || ''}
+                                  ⚠️ {u.shared_ip_count} ACCOUNTS
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '7px 12px', color: 'var(--text-secondary)' }}>
                         <div>{u.email}</div>
-                        <div style={{ fontSize: '11px' }}>{u.phone || 'No phone'}</div>
+                        <div style={{ fontSize: '10px' }}>{u.phone || 'No phone'}</div>
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>
+                      <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600' }}>
                         ₹{Number(u.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                      <td style={{ padding: '7px 12px', textAlign: 'center' }}>
                         {hasKyc ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-green-light)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
-                            <CheckCircle size={12} /> Verified
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-green-light)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
+                            <CheckCircle size={10} /> Verified
                           </div>
                         ) : hasPartialKyc ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
-                            <Clock size={12} /> Pending
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
+                            <Clock size={10} /> Pending
                           </div>
                         ) : (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
                             Missing
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      <td style={{ padding: '7px 12px' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
                           <button
                             style={{
-                              padding: '6px 10px',
+                              padding: '4px 8px',
                               borderRadius: '4px',
-                              fontSize: '11px',
+                              fontSize: '10px',
                               fontWeight: '600',
                               cursor: 'pointer',
                               background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
@@ -2274,7 +2235,7 @@ export default function AdminDashboard() {
                           {u.last_ip && (
                             <button
                               style={{
-                                padding: '6px 8px',
+                                padding: '4px 6px',
                                 borderRadius: '4px',
                                 fontSize: '10px',
                                 fontWeight: '700',
@@ -2296,7 +2257,7 @@ export default function AdminDashboard() {
                           )}
                           <button 
                             className="btn btn-primary" 
-                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                            style={{ padding: '4px 9px', fontSize: '11px' }}
                             onClick={() => { 
                               setSelectedUser(u); 
                               setNewBalance(u.balance); 
@@ -2306,7 +2267,7 @@ export default function AdminDashboard() {
                               setNewPhone(u.phone || '');
                             }}
                           >
-                            Manage Client
+                            Manage
                           </button>
                         </div>
                       </td>
@@ -2316,16 +2277,16 @@ export default function AdminDashboard() {
               )}
             </tbody>
           </table>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
               Page {page} of {totalPages}
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button 
                 className="btn btn-outline" 
                 onClick={() => setPage(p => Math.max(1, p - 1))} 
                 disabled={page === 1}
-                style={{ padding: '6px 12px', fontSize: '12px' }}
+                style={{ padding: '4px 10px', fontSize: '11px' }}
               >
                 Previous
               </button>
@@ -2333,7 +2294,7 @@ export default function AdminDashboard() {
                 className="btn btn-outline" 
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
                 disabled={page >= totalPages}
-                style={{ padding: '6px 12px', fontSize: '12px' }}
+                style={{ padding: '4px 10px', fontSize: '11px' }}
               >
                 Next
               </button>
@@ -2341,28 +2302,28 @@ export default function AdminDashboard() {
           </div>
           </>
         ) : activeTab === 'withdrawals' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Date</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Client</th>
-                <th style={{ padding: '16px', fontWeight: '500' }}>Bank / UPI Details</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Status</th>
-                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Date</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Client</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600' }}>Bank / UPI Details</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
+                <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {(!withdrawals || withdrawals.length === 0) ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>No withdrawal requests found</td>
+                  <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No withdrawal requests found</td>
                 </tr>
               ) : (
                 withdrawals.map(w => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '16px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td style={{ padding: '7px 12px', fontSize: '11px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                    <td style={{ padding: '7px 12px' }}>
+                      <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                         {w.username}
                         {w.shared_ip_count > 1 && (
                           <span 
@@ -2371,44 +2332,44 @@ export default function AdminDashboard() {
                               background: 'rgba(239, 68, 68, 0.15)', 
                               color: '#ef4444', 
                               border: '1px solid rgba(239, 68, 68, 0.3)', 
-                              padding: '2px 6px', 
-                              borderRadius: '4px', 
-                              fontSize: '10px', 
+                              padding: '1px 5px', 
+                              borderRadius: '3px', 
+                              fontSize: '9px', 
                               fontWeight: '700',
                               cursor: 'help' 
                             }}
                           >
-                            ⚠️ {w.shared_ip_count} ACCOUNTS ON SAME IP
+                            ⚠️ {w.shared_ip_count} ON IP
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{w.phone}</div>
-                      {w.last_ip && <div style={{ fontSize: '10px', color: 'var(--text-secondary)', opacity: 0.6 }}>IP: {w.last_ip}</div>}
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{w.phone}</div>
+                      {w.last_ip && <div style={{ fontSize: '9px', color: 'var(--text-secondary)', opacity: 0.6 }}>IP: {w.last_ip}</div>}
                     </td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>UPI: <span style={{color: '#fff'}}>{w.upi_id || 'N/A'}</span></div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>A/C: <span style={{color: '#fff'}}>{w.bank_account_no || 'N/A'}</span></div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>IFSC: <span style={{color: '#fff'}}>{w.bank_ifsc || 'N/A'}</span></div>
+                    <td style={{ padding: '7px 12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>UPI: <span style={{color: '#fff'}}>{w.upi_id || 'N/A'}</span></div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>A/C: <span style={{color: '#fff'}}>{w.bank_account_no || 'N/A'}</span></div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>IFSC: <span style={{color: '#fff'}}>{w.bank_ifsc || 'N/A'}</span></div>
                     </td>
-                    <td style={{ padding: '16px', textAlign: 'right', fontWeight: '600' }}>₹{parseFloat(w.amount).toFixed(2)}</td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600' }}>₹{parseFloat(w.amount).toFixed(2)}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center' }}>
                       <span style={{
                         color: w.status === 'CREDITED' ? 'var(--color-green-light)' : w.status === 'REJECTED' ? 'var(--color-red-light)' : w.status === 'PROCESSING' ? 'var(--color-blue)' : 'var(--color-yellow)',
                         background: w.status === 'CREDITED' ? 'rgba(34,197,94,0.1)' : w.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : w.status === 'PROCESSING' ? 'rgba(59,130,246,0.1)' : 'rgba(234,179,8,0.1)',
-                        padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600'
+                        padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700'
                       }}>{w.status}</span>
                     </td>
-                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                    <td style={{ padding: '7px 12px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         {w.status === 'PENDING' && (
                           <>
-                            <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={async () => {
+                            <button className="btn btn-primary" style={{ padding: '3px 7px', fontSize: '10px' }} onClick={async () => {
                               if(window.confirm('Approve this withdrawal? User will see "Processing".')) {
                                 await processAdminWithdrawal(w.id, 'PROCESSING');
                                 loadData();
                               }
                             }}>Approve</button>
-                            <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '11px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }} onClick={async () => {
+                            <button className="btn btn-outline" style={{ padding: '3px 7px', fontSize: '10px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }} onClick={async () => {
                               if(window.confirm('Reject this withdrawal? Amount will return to user.')) {
                                 await processAdminWithdrawal(w.id, 'REJECTED');
                                 loadData();
@@ -2417,7 +2378,7 @@ export default function AdminDashboard() {
                           </>
                         )}
                         {w.status === 'PROCESSING' && (
-                          <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--color-green)' }} onClick={async () => {
+                          <button className="btn btn-primary" style={{ padding: '3px 7px', fontSize: '10px', background: 'var(--color-green)' }} onClick={async () => {
                             if(window.confirm('Mark as Credited? This means you have successfully transferred the money.')) {
                               await processAdminWithdrawal(w.id, 'CREDITED');
                               loadData();
@@ -2432,15 +2393,15 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         ) : activeTab === 'telemetry' ? (
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* TOP CONTROLS & TIMEFRAME SELECTOR */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               
-              {/* Timeframe Buttons / Dropdown */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <Clock size={16} color="var(--color-blue)" />
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Time Window:</span>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {/* Timeframe Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <Clock size={14} color="var(--color-blue)" />
+                <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)' }}>Window:</span>
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                   {[
                     { label: '1m', val: '1m' },
                     { label: '5m', val: '5m' },
@@ -2454,7 +2415,7 @@ export default function AdminDashboard() {
                     { label: '8h', val: '8h' },
                     { label: '12h', val: '12h' },
                     { label: '24h', val: '24h' },
-                    { label: 'All Time', val: 'all' }
+                    { label: 'All', val: 'all' }
                   ].map(tf => (
                     <button
                       key={tf.val}
@@ -2463,10 +2424,10 @@ export default function AdminDashboard() {
                         fetchAdminTelemetry?.(tf.val);
                       }}
                       style={{
-                        padding: '4px 10px',
-                        fontSize: '12px',
+                        padding: '2px 7px',
+                        fontSize: '11px',
                         fontWeight: '600',
-                        borderRadius: '6px',
+                        borderRadius: '4px',
                         border: '1px solid',
                         borderColor: telemetryTimeframe === tf.val ? 'var(--color-blue)' : 'var(--border-color)',
                         background: telemetryTimeframe === tf.val ? 'rgba(59,130,246,0.2)' : 'transparent',
@@ -2481,17 +2442,17 @@ export default function AdminDashboard() {
               </div>
 
               {/* Action Buttons: Live Toggle, CSV Export, Reset Metrics */}
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {/* Live Polling Toggle */}
                 <button
                   onClick={() => setIsLiveTelemetry(!isLiveTelemetry)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
                     fontWeight: '600',
                     border: '1px solid',
                     borderColor: isLiveTelemetry ? 'var(--color-green)' : 'var(--border-color)',
@@ -2502,12 +2463,12 @@ export default function AdminDashboard() {
                 >
                   {isLiveTelemetry ? (
                     <>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-green)', display: 'inline-block', boxShadow: '0 0 8px var(--color-green)' }}></span>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--color-green)', display: 'inline-block', boxShadow: '0 0 6px var(--color-green)' }}></span>
                       LIVE (5s)
                     </>
                   ) : (
                     <>
-                      <Pause size={12} /> PAUSED
+                      <Pause size={10} /> PAUSED
                     </>
                   )}
                 </button>
@@ -2537,10 +2498,10 @@ export default function AdminDashboard() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
                     fontWeight: '600',
                     border: '1px solid var(--border-color)',
                     background: 'var(--bg-panel)',
@@ -2548,7 +2509,7 @@ export default function AdminDashboard() {
                     cursor: 'pointer'
                   }}
                 >
-                  <Download size={13} /> Export CSV
+                  <Download size={11} /> CSV
                 </button>
 
                 {/* Reset Metrics */}
@@ -2567,10 +2528,10 @@ export default function AdminDashboard() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    borderRadius: '5px',
+                    fontSize: '11px',
                     fontWeight: '600',
                     border: '1px solid rgba(239,68,68,0.3)',
                     background: 'rgba(239,68,68,0.1)',
@@ -2578,7 +2539,7 @@ export default function AdminDashboard() {
                     cursor: 'pointer'
                   }}
                 >
-                  <Trash2 size={13} /> Reset
+                  <Trash2 size={11} /> Reset
                 </button>
               </div>
             </div>
@@ -2595,59 +2556,59 @@ export default function AdminDashboard() {
                 : (totalBandwidth / 1024).toFixed(2) + ' KB';
 
               return (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <HardDrive size={14} color="var(--color-blue)" /> Total Bandwidth ({telemetryTimeframe})
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <HardDrive size={13} color="var(--color-blue)" /> Bandwidth ({telemetryTimeframe})
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)' }}>{formattedBw}</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{formattedBw}</div>
                   </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Activity size={14} color="var(--color-blue)" /> Total API Hits ({telemetryTimeframe})
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Activity size={13} color="var(--color-blue)" /> API Hits ({telemetryTimeframe})
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)' }}>{totalCalls.toLocaleString()}</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>{totalCalls.toLocaleString()}</div>
                   </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Zap size={14} color={parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green)'} /> Avg Route Latency
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Zap size={13} color={parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green)'} /> Avg Route Latency
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green-light)' }}>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green-light)' }}>
                       {avgLat} ms
                     </div>
                   </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Users size={14} color="var(--color-blue)" /> Tracked Active Users
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Users size={13} color="var(--color-blue)" /> Tracked Users
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--color-primary)' }}>{userCount} Users</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--color-primary)' }}>{userCount} Users</div>
                   </div>
                 </div>
               );
             })()}
 
             {/* TABLES GRID */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '16px' : '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '10px' : '14px' }}>
               {/* API APM TABLE */}
-              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 16px 0' }}>
-                  <Activity size={16} color="var(--color-blue)" /> API Performance (APM)
+              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 12px 0' }}>
+                  <Activity size={14} color="var(--color-blue)" /> API Performance (APM)
                 </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '12px 16px' }}>Route</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Hits</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Avg Latency</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Bandwidth</th>
+                      <th style={{ padding: '7px 12px' }}>Route</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>Hits</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>Avg Latency</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>Bandwidth</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(!adminTelemetry?.api || adminTelemetry.api.length === 0) ? (
-                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
+                      <tr><td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
                     ) : (
                       [...(adminTelemetry.api || [])].sort((a,b) => b.totalTime - a.totalTime).map(row => {
                         const avgLatency = row.count > 0 ? (row.totalTime / row.count).toFixed(2) : 0;
@@ -2656,13 +2617,13 @@ export default function AdminDashboard() {
                         
                         return (
                           <tr key={row.route} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '12px 16px', fontFamily: 'monospace' }}>{row.route}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600' }}>{row.count.toLocaleString()}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <td style={{ padding: '7px 12px', fontFamily: 'monospace' }}>{row.route}</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600' }}>{row.count.toLocaleString()}</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right' }}>
                               <span style={{
-                                padding: '3px 8px',
+                                padding: '2px 6px',
                                 borderRadius: '4px',
-                                fontSize: '11px',
+                                fontSize: '10px',
                                 fontWeight: '700',
                                 background: latNum > 500 ? 'rgba(239,68,68,0.15)' : latNum > 100 ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
                                 color: latNum > 500 ? 'var(--color-red-light)' : latNum > 100 ? 'var(--color-yellow)' : 'var(--color-green-light)'
@@ -2670,7 +2631,7 @@ export default function AdminDashboard() {
                                 {avgLatency} ms
                               </span>
                             </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>{sizeKb} KB</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right' }}>{sizeKb} KB</td>
                           </tr>
                         );
                       })
@@ -2680,31 +2641,31 @@ export default function AdminDashboard() {
               </div>
 
               {/* USER RESOURCE TABLE */}
-              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 16px 0' }}>
-                  <Users size={16} color="var(--color-blue)" /> Top Resource Users
+              <div className="card" style={{ overflowX: 'auto', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 12px 0' }}>
+                  <Users size={14} color="var(--color-blue)" /> Top Resource Users
                 </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '12px 16px' }}>User</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Live Market Time</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>API Calls</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Bandwidth</th>
+                      <th style={{ padding: '7px 12px' }}>User</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>Market Time</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>API Calls</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'right' }}>Bandwidth</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(!adminTelemetry?.users || adminTelemetry.users.length === 0) ? (
-                      <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
+                      <tr><td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>No telemetry collected for {telemetryTimeframe}</td></tr>
                     ) : (
                       [...(adminTelemetry.users || [])].sort((a,b) => b.apiBytes - a.apiBytes).map(u => {
                         const sizeMb = (u.apiBytes / (1024 * 1024)).toFixed(3);
                         return (
                           <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{u.username}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-blue)' }}>{sizeMb} MB</td>
+                            <td style={{ padding: '7px 12px', fontWeight: 'bold' }}>{u.username}</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right' }}>{u.wsMinutes} mins</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: '600' }}>{u.apiCalls.toLocaleString()}</td>
+                            <td style={{ padding: '7px 12px', textAlign: 'right', color: 'var(--color-blue)' }}>{sizeMb} MB</td>
                           </tr>
                         );
                       })
