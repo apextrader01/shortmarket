@@ -681,27 +681,25 @@ export default function AdminDashboard() {
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: '600',
-              background: fyersLoading 
-                ? 'rgba(255,255,255,0.05)' 
-                : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
-                  ? 'rgba(34, 197, 94, 0.12)' 
-                  : fyersStatus?.hasAccessToken
-                    ? 'rgba(234, 179, 8, 0.12)'
-                    : 'rgba(239, 68, 68, 0.15)',
+              background: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
+                ? 'rgba(34, 197, 94, 0.12)' 
+                : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired)
+                  ? 'rgba(234, 179, 8, 0.12)'
+                  : 'rgba(239, 68, 68, 0.15)',
               border: `1px solid ${
                 fyersLoading 
                   ? 'var(--border-color)' 
-                  : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                  : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                     ? 'rgba(34, 197, 94, 0.4)' 
-                    : fyersStatus?.hasAccessToken
+                    : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired)
                       ? 'rgba(234, 179, 8, 0.4)'
                       : 'rgba(239, 68, 68, 0.5)'
               }`,
               color: fyersLoading 
                 ? 'var(--text-secondary)' 
-                : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+                : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                   ? 'var(--color-green)' 
-                  : fyersStatus?.hasAccessToken
+                  : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired)
                     ? 'var(--color-yellow)'
                     : 'var(--color-red)'
             }}
@@ -715,21 +713,23 @@ export default function AdminDashboard() {
               width: '8px', 
               height: '8px', 
               borderRadius: '50%', 
-              background: (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+              background: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                 ? 'var(--color-green)' 
-                : fyersStatus?.hasAccessToken 
+                : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired)
                   ? 'var(--color-yellow)' 
                   : 'var(--color-red)',
-              boxShadow: (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30)
+              boxShadow: (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && (fyersStatus?.secondsSinceLastTick < 30 || !isMarketOpenNow))
                 ? '0 0 8px var(--color-green)'
                 : '0 0 8px var(--color-red)'
             }} />
             {fyersLoading ? (
               <span>Checking Fyers...</span>
-            ) : (fyersStatus?.hasAccessToken && fyersStatus?.isFyersConnected && fyersStatus?.secondsSinceLastTick < 30) ? (
+            ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && fyersStatus?.secondsSinceLastTick < 30) ? (
               <span>🟢 Fyers Live ({fyersStatus.secondsSinceLastTick.toFixed(0)}s ago)</span>
-            ) : fyersStatus?.hasAccessToken ? (
-              <span>🟡 Fyers Stalled ({fyersStatus?.secondsSinceLastTick ? fyersStatus.secondsSinceLastTick.toFixed(0) + 's' : 'Waiting'})</span>
+            ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired && !isMarketOpenNow) ? (
+              <span>🟢 Fyers Ready (Markets Closed / Weekend)</span>
+            ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired) ? (
+              <span>🟡 Waiting for Ticks</span>
             ) : (
               <span>🔴 Token Expired (Login Required)</span>
             )}
