@@ -374,7 +374,7 @@ export function BiometricSettingsSection({ user }) {
             <div>
               <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
               <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
-                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Hardware unavailable')}
+                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Tap below to link Biometrics')}
               </div>
             </div>
           </div>
