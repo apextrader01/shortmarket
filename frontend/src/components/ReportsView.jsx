@@ -1170,16 +1170,29 @@ const DownloadReports = () => {
     prices: state.prices
   })));
 
-  const [activeModal, setActiveModal] = useState(null); // 'tax_pnl' | 'pnl_summary' | 'trades_charges' | 'ledger' | 'contract_note' | 'dp_holdings'
-  const [selectedPeriod, setSelectedPeriod] = useState('FY 2025-26');
+  const [activeCard, setActiveCard] = useState('tax_pnl');
+  const [selectedPeriods, setSelectedPeriods] = useState({
+    tax_pnl: 'FY 2025-26',
+    pnl_summary: 'FY 2025-26',
+    trades_charges: 'FY 2025-26',
+    ledger: 'FY 2025-26'
+  });
   const [contractDate, setContractDate] = useState(() => getISTDateString(new Date()));
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  const [customDates, setCustomDates] = useState({
+    tax_pnl: { start: '', end: '' },
+    pnl_summary: { start: '', end: '' },
+    trades_charges: { start: '', end: '' },
+    ledger: { start: '', end: '' }
+  });
   const [ledgerData, setLedgerData] = useState([]);
   const [ordersData, setOrdersData] = useState([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
-  // Pre-fetch fresh orders and ledger data on mount
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   useEffect(() => {
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     
@@ -1201,284 +1214,391 @@ const DownloadReports = () => {
   const effectiveOrders = ordersData.length > 0 ? ordersData : (orders || []);
   const effectiveLedger = ledgerData.length > 0 ? ledgerData : [];
 
-  const reportConfigs = {
-    tax_pnl: {
+  const handleDownloadAction = (reportId, format, reportTitle) => {
+    const period = selectedPeriods[reportId] || 'FY 2025-26';
+    const cDates = customDates[reportId] || { start: '', end: '' };
+
+    try {
+      if (reportId === 'tax_pnl') {
+        generateTaxPnLReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
+      } else if (reportId === 'pnl_summary') {
+        generatePnLSummaryReport(effectiveOrders, positions, user, period, format, cDates.start, cDates.end);
+      } else if (reportId === 'trades_charges') {
+        generateTradesAndChargesReport(effectiveOrders, user, period, format, cDates.start, cDates.end);
+      } else if (reportId === 'ledger') {
+        generateLedgerReport(effectiveLedger, user, period, format, cDates.start, cDates.end);
+      } else if (reportId === 'contract_note') {
+        generateContractNoteReport(effectiveOrders, user, contractDate, format);
+      } else if (reportId === 'dp_holdings') {
+        generateDPHoldingReport(holdings, prices, user, format);
+      }
+
+      showToast(`✅ ${reportTitle} (${format.toUpperCase()}) triggered successfully!`);
+    } catch (err) {
+      console.error('Download error:', err);
+      alert(`Could not generate statement: ${err.message || 'Unknown error'}`);
+    }
+  };
+
+  const periodOptions = ['Today', 'This Week', 'This Month', 'FY 2025-26', 'FY 2024-25', 'All Time', 'Custom'];
+
+  const reportsList = [
+    {
+      id: 'tax_pnl',
       title: 'Tax P&L Statement',
-      desc: 'Scripwise Taxable Profit & Loss with Buy/Sell values, turnover, and STT classification.',
+      desc: 'Scripwise Taxable Profit & Loss with Buy/Sell values, turnover, and STT schedule.',
       icon: FileDown,
       color: '#3b82f6',
-      handler: (fmt) => generateTaxPnLReport(effectiveOrders, positions, user, selectedPeriod, fmt, customStart, customEnd)
+      badge: 'Income Tax Ready'
     },
-    pnl_summary: {
-      title: 'Segmentwise P&L Summary',
-      desc: 'Comprehensive overview of Gross P&L, Regulatory Charges, and Net Realized P&L across all trading segments.',
+    {
+      id: 'pnl_summary',
+      title: 'P & L Summary Statement',
+      desc: 'Segmentwise realized/unrealized P&L, gross turnover, and total regulatory charges.',
       icon: PieChart,
       color: '#10b981',
-      handler: (fmt) => generatePnLSummaryReport(effectiveOrders, positions, user, selectedPeriod, fmt, customStart, customEnd)
+      badge: 'Segment Breakdown'
     },
-    trades_charges: {
-      title: 'Trades & Regulatory Charges',
+    {
+      id: 'trades_charges',
+      title: 'Trades and Regulatory Charges',
       desc: 'Tradewise charges breakdown including Brokerage, STT/CTT, Exchange Txn Fees, GST, and Stamp Duty.',
       icon: Receipt,
       color: '#f59e0b',
-      handler: (fmt) => generateTradesAndChargesReport(effectiveOrders, user, selectedPeriod, fmt, customStart, customEnd)
+      badge: 'Statutory Taxes'
     },
-    ledger: {
+    {
+      id: 'ledger',
       title: 'Financial Ledger Statement',
-      desc: 'Daywise debit/credit transactions, deposit/withdrawal logs, and running available account balance.',
+      desc: 'Daywise debits, credits, fund deposits, withdrawals, and closing ledger balance.',
       icon: Layers,
       color: '#6366f1',
-      handler: (fmt) => generateLedgerReport(effectiveLedger, user, selectedPeriod, fmt, customStart, customEnd)
+      badge: 'Cash Flow'
     },
-    contract_note: {
+    {
+      id: 'contract_note',
       title: 'Electronic Contract Note (ECN)',
-      desc: 'Official daily broker contract note with trade execution times, order IDs, tax schedules, and net settlement pay-in/pay-out.',
+      desc: 'Official daily broker contract note with trade execution times, order IDs, and net settlement pay-in/pay-out.',
       icon: FileText,
       color: '#ec4899',
-      isContractNote: true,
-      handler: (fmt) => generateContractNoteReport(effectiveOrders, user, contractDate, fmt)
+      badge: 'Daily SEBI Note',
+      isContractNote: true
     },
-    dp_holdings: {
-      title: 'DP Holding & Portfolio Statement',
+    {
+      id: 'dp_holdings',
+      title: 'DP & Holding Statement',
       desc: 'Complete Demat holding valuation statement with ISIN, buy average, live market prices, and unrealized gain/loss.',
       icon: Briefcase,
       color: '#8b5cf6',
-      isHolding: true,
-      handler: (fmt) => generateDPHoldingReport(holdings, prices, user, fmt)
+      badge: 'Demat Valuation',
+      isHolding: true
     }
-  };
-
-  const Card = ({ id, icon: Icon, title, desc, color }) => (
-    <div 
-      className="glass-panel hoverable" 
-      onClick={() => setActiveModal(id)} 
-      style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', borderRadius: '12px', cursor: 'pointer', transition: 'transform 0.2s, border-color 0.2s' }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-        <div style={{ background: 'var(--bg-hover)', padding: '12px', borderRadius: '50%', color: color }}>
-          <Icon size={24} />
-        </div>
-        <div>
-          <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: '#fff' }}>{title}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{desc}</div>
-        </div>
-      </div>
-      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-blue-light)', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <Download size={13} /> CONFIGURE & DOWNLOAD
-      </div>
-    </div>
-  );
-
-  const currentCfg = activeModal ? reportConfigs[activeModal] : null;
-
-  // Calculate live preview metrics
-  const getRecordPreviewText = () => {
-    if (!currentCfg) return '';
-    if (currentCfg.isHolding) {
-      return `📊 Valuation for ${holdings?.length || 0} Demat holding(s) as on today.`;
-    }
-    if (currentCfg.isContractNote) {
-      const matching = (effectiveOrders || []).filter(o => {
-        const isDone = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-        return isDone && getISTDateString(o.created_at) === contractDate;
-      });
-      return matching.length > 0 
-        ? `✅ Found ${matching.length} executed trade(s) on ${contractDate}.`
-        : `ℹ️ No trades on ${contractDate} (Will generate statement with zero records).`;
-    }
-    if (activeModal === 'ledger') {
-      const matching = filterRecordsByPeriod(effectiveLedger, selectedPeriod, customStart, customEnd);
-      return `📊 Found ${matching.length} ledger entry(s) in selected period.`;
-    }
-    const matching = filterRecordsByPeriod(effectiveOrders, selectedPeriod, customStart, customEnd).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
-    return `📊 Found ${matching.length} executed trade(s) in selected period.`;
-  };
-
-  // Direct download - called synchronously on button click, no async, no state dependencies
-  const doDownload = (fmt) => {
-    const modal = activeModal;
-    const cfg = reportConfigs[modal];
-    if (!cfg) { alert('No report selected. Please close and try again.'); return; }
-    try {
-      cfg.handler(fmt);
-      if (fmt === 'excel' || fmt === 'html') setTimeout(() => setActiveModal(null), 500);
-    } catch (err) {
-      alert('Error generating report: ' + (err.message || String(err)));
-    }
-  };
+  ];
 
   return (
-    <div>
-      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-        Select a statement category to configure date ranges and download official Excel or PDF reports:
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-        <Card id="tax_pnl" icon={FileDown} title="Tax P&L" desc="Scripwise Taxable P&L with capital gains, turnover, and STT schedule." color="#3b82f6" />
-        <Card id="pnl_summary" icon={PieChart} title="P & L Summary" desc="Entire realized and unrealized P&L broken down by segment." color="#10b981" />
-        <Card id="trades_charges" icon={Receipt} title="Trades and Charges" desc="Tradewise charges, taxes, exchange fees, and STT breakdown." color="#f59e0b" />
-        <Card id="ledger" icon={Layers} title="Statement - Ledger" desc="Daywise Debits, Credits, deposits, withdrawals, and Net Balances." color="#6366f1" />
-        <Card id="contract_note" icon={FileText} title="Electronic Contract Note" desc="Daily SEBI-standard Contract Note with trade order IDs and pay-in/pay-out." color="#ec4899" />
-        <Card id="dp_holdings" icon={Briefcase} title="DP & Holding Statement" desc="Scripwise Demat portfolio holding valuation with ISIN and LTP." color="#8b5cf6" />
-      </div>
-
-      {/* Report Generator Modal */}
-      {activeModal && currentCfg && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Visual Toast Notification */}
+      {toastMessage && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', backdropFilter: 'blur(4px)'
+          position: 'fixed',
+          top: '70px',
+          right: '24px',
+          background: 'rgba(15, 23, 42, 0.95)',
+          border: '1px solid rgba(59, 130, 246, 0.5)',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '10px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          zIndex: 99999,
+          fontSize: '13px',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeIn 0.2s ease-in-out'
         }}>
-          <div style={{
-            background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '14px',
-            width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-            display: 'flex', flexDirection: 'column', gap: '18px'
-          }}>
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'rgba(59,130,246,0.15)', padding: '10px', borderRadius: '8px', color: currentCfg.color }}>
-                  <currentCfg.icon size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#fff', margin: 0 }}>{currentCfg.title}</h3>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Client ID: {user?.client_id || user?.id || 'SE000001'}</div>
-                </div>
-              </div>
-              <button 
-                onClick={() => setActiveModal(null)} 
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-              {currentCfg.desc}
-            </div>
-
-            {/* Date Configuration */}
-            {currentCfg.isContractNote ? (
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#fff', display: 'block', marginBottom: '8px' }}>
-                  Select Trade Date:
-                </label>
-                <input 
-                  type="date" 
-                  value={contractDate} 
-                  onChange={(e) => setContractDate(e.target.value)} 
-                  style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: '#fff', padding: '10px 12px', borderRadius: '8px', fontSize: '13px', colorScheme: 'dark', outline: 'none' }} 
-                />
-              </div>
-            ) : !currentCfg.isHolding ? (
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: '600', color: '#fff', display: 'block', marginBottom: '8px' }}>
-                  Select Statement Period:
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '10px' }}>
-                  {['Today', 'This Week', 'This Month', 'FY 2025-26', 'FY 2024-25', 'All Time'].map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setSelectedPeriod(p)}
-                      style={{
-                        padding: '8px 10px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '600',
-                        border: selectedPeriod === p ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                        background: selectedPeriod === p ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                        color: selectedPeriod === p ? '#60a5fa' : 'var(--text-secondary)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPeriod('Custom')}
-                    style={{
-                      width: '100%', padding: '7px 12px', borderRadius: '6px', fontSize: '11.5px', fontWeight: '600',
-                      border: selectedPeriod === 'Custom' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      background: selectedPeriod === 'Custom' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                      color: selectedPeriod === 'Custom' ? '#60a5fa' : 'var(--text-secondary)',
-                      cursor: 'pointer', marginBottom: '8px'
-                    }}
-                  >
-                    <Calendar size={12} style={{ display: 'inline', marginRight: '6px' }} /> Custom Date Range
-                  </button>
-
-                  {selectedPeriod === 'Custom' && (
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ flex: 1, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: '#fff', padding: '6px 8px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }} />
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
-                      <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ flex: 1, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: '#fff', padding: '6px 8px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Live Record Preview Notice */}
-            <div style={{ background: 'rgba(59,130,246,0.08)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '11.5px', color: '#93c5fd' }}>
-              {getRecordPreviewText()}
-            </div>
-
-            {/* Action Buttons — direct calls, no disabled state */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '6px' }}>
-              <button
-                type="button"
-                onClick={() => doDownload('excel')}
-                style={{
-                  background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)',
-                  color: '#60a5fa', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-                }}
-              >
-                <Download size={14} /> Excel (.csv)
-              </button>
-              <button
-                type="button"
-                onClick={() => doDownload('html')}
-                style={{
-                  background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)',
-                  color: '#34d399', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-                }}
-              >
-                <Download size={14} /> HTML File
-              </button>
-              <button
-                type="button"
-                onClick={() => doDownload('pdf')}
-                style={{
-                  background: 'var(--color-blue)', border: 'none',
-                  color: '#fff', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  boxShadow: '0 4px 12px rgba(37,99,235,0.4)'
-                }}
-              >
-                <FileText size={14} /> Print / PDF
-              </button>
-            </div>
-
-            {/* Close row */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                style={{
-                  background: 'transparent', border: '1px solid var(--border-color)',
-                  color: 'var(--text-secondary)', padding: '6px 20px', borderRadius: '6px',
-                  fontSize: '11.5px', fontWeight: '600', cursor: 'pointer'
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          <span>{toastMessage}</span>
         </div>
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>Official Trading Statements & Tax Reports</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            Instant client-side generation in Excel (.csv), HTML, or printable PDF format
+          </div>
+        </div>
+        <div style={{ fontSize: '11px', background: 'rgba(59,130,246,0.1)', color: '#60a5fa', padding: '6px 12px', borderRadius: '20px', border: '1px solid rgba(59,130,246,0.2)', fontWeight: '600' }}>
+          Client: {user?.client_id || user?.id || 'SE000001'}
+        </div>
+      </div>
+
+      {/* Accordion Cards Grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {reportsList.map((item) => {
+          const isOpen = activeCard === item.id;
+          const currentPeriod = selectedPeriods[item.id] || 'FY 2025-26';
+          const cDateObj = customDates[item.id] || { start: '', end: '' };
+          const IconComponent = item.icon;
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                borderRadius: '12px',
+                border: isOpen ? `1px solid ${item.color}66` : '1px solid rgba(255,255,255,0.08)',
+                background: isOpen ? 'rgba(30, 41, 59, 0.45)' : 'rgba(15, 23, 42, 0.35)',
+                boxShadow: isOpen ? `0 8px 24px rgba(0,0,0,0.3)` : 'none',
+                transition: 'all 0.2s ease-in-out',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Card Header Row */}
+              <div
+                onClick={() => setActiveCard(isOpen ? null : item.id)}
+                style={{
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  background: isOpen ? `linear-gradient(90deg, ${item.color}15, transparent)` : 'transparent'
+                }}
+              >
+                <div style={{
+                  background: `${item.color}20`,
+                  color: item.color,
+                  padding: '10px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <IconComponent size={22} />
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>{item.title}</span>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      background: `${item.color}18`,
+                      color: item.color,
+                      border: `1px solid ${item.color}40`,
+                      textTransform: 'uppercase'
+                    }}>
+                      {item.badge}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', lineHeight: '1.4' }}>
+                    {item.desc}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  {!item.isHolding && !item.isContractNote && (
+                    <span style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '6px', fontWeight: '600' }} className="hide-on-mobile">
+                      {currentPeriod}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    style={{
+                      background: isOpen ? `${item.color}25` : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${isOpen ? item.color : 'rgba(255,255,255,0.1)'}`,
+                      color: isOpen ? item.color : 'var(--text-primary)',
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isOpen ? '▲ HIDE' : '▼ CONFIGURE'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Expand Body */}
+              {isOpen && (
+                <div style={{
+                  padding: '16px 20px 20px 20px',
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(10, 15, 29, 0.4)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px'
+                }}>
+                  {/* Period Selection Controls */}
+                  {!item.isHolding && !item.isContractNote && (
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '8px' }}>
+                        Select Statement Time Range:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {periodOptions.map((p) => {
+                          const isSel = currentPeriod === p;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPeriods(prev => ({ ...prev, [item.id]: p }));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '11.5px',
+                                fontWeight: '600',
+                                border: isSel ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.1)',
+                                background: isSel ? `${item.color}25` : 'rgba(255,255,255,0.04)',
+                                color: isSel ? item.color : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {currentPeriod === 'Custom' && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px', maxWidth: '400px' }}>
+                          <input
+                            type="date"
+                            value={cDateObj.start || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomDates(prev => ({ ...prev, [item.id]: { ...prev[item.id], start: val } }));
+                            }}
+                            style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }}
+                          />
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>to</span>
+                          <input
+                            type="date"
+                            value={cDateObj.end || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomDates(prev => ({ ...prev, [item.id]: { ...prev[item.id], end: val } }));
+                            }}
+                            style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', colorScheme: 'dark' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Contract Note Trade Date */}
+                  {item.isContractNote && (
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '8px' }}>
+                        Select Trade Execution Date:
+                      </div>
+                      <input
+                        type="date"
+                        value={contractDate}
+                        onChange={(e) => setContractDate(e.target.value)}
+                        style={{ background: '#1e293b', border: '1px solid #334155', color: '#fff', padding: '8px 12px', borderRadius: '8px', fontSize: '12.5px', colorScheme: 'dark', width: '220px' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* DP Holding snapshot info */}
+                  {item.isHolding && (
+                    <div style={{ fontSize: '12px', color: '#94a3b8', background: 'rgba(139,92,246,0.08)', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      📊 Current Demat portfolio snapshot as on today — <strong>{holdings?.length || 0} holding(s)</strong> with real-time LTP valuation.
+                    </div>
+                  )}
+
+                  {/* Action Download Buttons Row */}
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', paddingTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadAction(item.id, 'excel', item.title);
+                      }}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.14)',
+                        border: '1px solid rgba(59, 130, 246, 0.4)',
+                        color: '#60a5fa',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <Download size={14} /> Download Excel (.csv)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadAction(item.id, 'html', item.title);
+                      }}
+                      style={{
+                        background: 'rgba(16, 185, 129, 0.14)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        color: '#34d399',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <Download size={14} /> Download HTML File
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadAction(item.id, 'pdf', item.title);
+                      }}
+                      style={{
+                        background: item.color,
+                        border: 'none',
+                        color: '#fff',
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: `0 4px 14px ${item.color}55`,
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <FileText size={14} /> Print / Save as PDF
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
