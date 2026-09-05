@@ -949,15 +949,15 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminWithdrawals: async () => {
+  fetchAdminWithdrawals: async (page = 1, limit = 50, search = '') => {
     try {
-      const res = await fetch(`${API}/api/admin/withdrawals`, { credentials: 'include' });
+      const res = await fetch(`${API}/api/admin/withdrawals?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
       const data = await res.json();
-      if (res.ok) return data.withdrawals;
-      return [];
+      if (res.ok) return { success: true, ...data };
+      return { success: false, withdrawals: [], total: 0, totalPages: 1 };
     } catch (e) {
       console.error(e);
-      return [];
+      return { success: false, withdrawals: [], total: 0, totalPages: 1 };
     }
   },
 
@@ -1167,11 +1167,9 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminOrders: async () => {
-    
-    
+  fetchAdminOrders: async (page = 1, limit = 50, search = '') => {
     try {
-      const res = await fetch(`${API}/api/admin/orders`, { credentials: 'include' });
+      const res = await fetch(`${API}/api/admin/orders?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1180,8 +1178,6 @@ export const useStore = create(persist((set, get) => ({
   },
 
   fetchAdminPositions: async () => {
-    
-    
     try {
       const res = await fetch(`${API}/api/admin/positions`, { credentials: 'include' });
       const data = await res.json();
@@ -1219,11 +1215,9 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminLedger: async () => {
-    
-    
+  fetchAdminLedger: async (page = 1, limit = 50, search = '') => {
     try {
-      const res = await fetch(`${API}/api/admin/ledger`, { credentials: 'include' });
+      const res = await fetch(`${API}/api/admin/ledger?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1355,15 +1349,12 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchDepositRequests: async () => {
-    
-    
+  fetchDepositRequests: async (page = 1, limit = 50, search = '') => {
     try {
-      const res = await fetch(`${API}/api/admin/deposits`, { credentials: 'include'
-      });
+      const res = await fetch(`${API}/api/admin/deposits?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        return { success: true, deposits: data.deposits };
+        return { success: true, ...data };
       }
       return { success: false, error: 'Unauthorized' };
     } catch (err) {

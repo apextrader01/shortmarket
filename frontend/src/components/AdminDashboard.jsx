@@ -1252,13 +1252,30 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [deposits, setDeposits] = useState([]);
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
-  
+
   const [orders, setOrders] = useState([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersTotalPages, setOrdersTotalPages] = useState(1);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+
   const [positions, setPositions] = useState([]);
+
   const [ledger, setLedger] = useState([]);
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [ledgerTotalPages, setLedgerTotalPages] = useState(1);
+  const [ledgerTotal, setLedgerTotal] = useState(0);
+
+  const [deposits, setDeposits] = useState([]);
+  const [depositsPage, setDepositsPage] = useState(1);
+  const [depositsTotalPages, setDepositsTotalPages] = useState(1);
+  const [depositsTotal, setDepositsTotal] = useState(0);
+
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawalsPage, setWithdrawalsPage] = useState(1);
+  const [withdrawalsTotalPages, setWithdrawalsTotalPages] = useState(1);
+  const [withdrawalsTotal, setWithdrawalsTotal] = useState(0);
+
+  const [analytics, setAnalytics] = useState(null);
 
   // Client Management Filters & Sorting
   const [clientSearch, setClientSearch] = useState('');
@@ -1493,16 +1510,52 @@ export default function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
   
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(search);
+      setDebouncedClientSearch(clientSearch || search);
       setPage(1); // reset to page 1 on search
-    }, 500);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [clientSearch, search]);
+
+  const [debouncedOrderSearch, setDebouncedOrderSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedOrderSearch(orderSearch);
+      setOrdersPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [orderSearch]);
+
+  const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLedgerSearch(ledgerSearch);
+      setLedgerPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [ledgerSearch]);
+
+  const [debouncedDepositSearch, setDebouncedDepositSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedDepositSearch(depositSearch);
+      setDepositsPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [depositSearch]);
+
+  const [debouncedWithdrawalSearch, setDebouncedWithdrawalSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedWithdrawalSearch(withdrawalSearch);
+      setWithdrawalsPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [withdrawalSearch]);
 
   // Live 5-second polling for Resource Telemetry tab
   useEffect(() => {
@@ -1526,7 +1579,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const res = await fetchAdminUsers?.(page, 50, debouncedSearch);
+        const res = await fetchAdminUsers?.(page, 50, debouncedClientSearch);
         if (res?.success) {
           setUsers(res.users || []);
           setTotalPages(res.totalPages || 1);
@@ -1536,23 +1589,39 @@ export default function AdminDashboard() {
       } else if (activeTab === 'telemetry') {
         await fetchAdminTelemetry?.(telemetryTimeframe);
       } else if (activeTab === 'withdrawals') {
-      const data = await fetchAdminWithdrawals();
-      setWithdrawals(data);
-    } else if (activeTab === 'deposits') {
-        const res = await fetchDepositRequests?.();
-        if (res?.success) setDeposits(res.deposits || []);
+        const res = await fetchAdminWithdrawals?.(withdrawalsPage, 50, debouncedWithdrawalSearch);
+        if (res?.success) {
+          setWithdrawals(res.withdrawals || []);
+          setWithdrawalsTotalPages(res.totalPages || 1);
+          setWithdrawalsTotal(res.total || (res.withdrawals || []).length);
+        }
+      } else if (activeTab === 'deposits') {
+        const res = await fetchDepositRequests?.(depositsPage, 50, debouncedDepositSearch);
+        if (res?.success) {
+          setDeposits(res.deposits || []);
+          setDepositsTotalPages(res.totalPages || 1);
+          setDepositsTotal(res.total || (res.deposits || []).length);
+        }
       } else if (activeTab === 'analytics') {
         const res = await fetchAdminAnalytics?.();
         if (res?.success) setAnalytics(res.data);
       } else if (activeTab === 'orders') {
-        const res = await fetchAdminOrders?.();
-        if (res?.success) setOrders(res.orders || []);
+        const res = await fetchAdminOrders?.(ordersPage, 50, debouncedOrderSearch);
+        if (res?.success) {
+          setOrders(res.orders || []);
+          setOrdersTotalPages(res.totalPages || 1);
+          setOrdersTotal(res.total || (res.orders || []).length);
+        }
       } else if (activeTab === 'positions') {
         const res = await fetchAdminPositions?.();
         if (res?.success) setPositions(res.positions || []);
       } else if (activeTab === 'ledger') {
-        const res = await fetchAdminLedger?.();
-        if (res?.success) setLedger(res.ledger || []);
+        const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch);
+        if (res?.success) {
+          setLedger(res.ledger || []);
+          setLedgerTotalPages(res.totalPages || 1);
+          setLedgerTotal(res.total || (res.ledger || []).length);
+        }
       }
     } catch (err) {
       console.error("Error loading admin data:", err);
@@ -1563,7 +1632,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadData();
-  }, [activeTab, page, debouncedSearch]);
+  }, [
+    activeTab, 
+    page, debouncedClientSearch,
+    ordersPage, debouncedOrderSearch,
+    ledgerPage, debouncedLedgerSearch,
+    depositsPage, debouncedDepositSearch,
+    withdrawalsPage, debouncedWithdrawalSearch
+  ]);
 
   const handleUpdateSubscription = async (e) => {
     e.preventDefault();
@@ -2284,7 +2360,7 @@ export default function AdminDashboard() {
                   <Activity size={13} color="var(--color-blue)" />
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Order Flow</span>
                   <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    {filteredOrders.length} / {orders.length}
+                    {ordersTotal > 0 ? `${filteredOrders.length} shown / ${ordersTotal} total (Page ${ordersPage} of ${ordersTotalPages})` : `${filteredOrders.length} Orders`}
                   </span>
                 </div>
 
@@ -2420,6 +2496,29 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {ordersPage} of {ordersTotalPages} ({ordersTotal || orders.length} orders)
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setOrdersPage(p => Math.max(1, p - 1))} 
+                  disabled={ordersPage === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setOrdersPage(p => Math.min(ordersTotalPages, p + 1))} 
+                  disabled={ordersPage >= ordersTotalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'positions' ? (
           <div>
@@ -2592,7 +2691,7 @@ export default function AdminDashboard() {
                   <Activity size={13} color="var(--color-blue)" />
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Platform Ledger</span>
                   <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    {filteredLedger.length} / {ledger.length}
+                    {ledgerTotal > 0 ? `${filteredLedger.length} shown / ${ledgerTotal} total (Page ${ledgerPage} of ${ledgerTotalPages})` : `${filteredLedger.length} Entries`}
                   </span>
                 </div>
 
@@ -2718,6 +2817,29 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {ledgerPage} of {ledgerTotalPages} ({ledgerTotal || ledger.length} entries)
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setLedgerPage(p => Math.max(1, p - 1))} 
+                  disabled={ledgerPage === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setLedgerPage(p => Math.min(ledgerTotalPages, p + 1))} 
+                  disabled={ledgerPage >= ledgerTotalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'users' ? (
           <div>
@@ -3007,7 +3129,7 @@ export default function AdminDashboard() {
                   <CreditCard size={13} color="var(--color-blue)" />
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Withdrawal Requests</span>
                   <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    {filteredWithdrawals.length} / {withdrawals.length}
+                    {withdrawalsTotal > 0 ? `${filteredWithdrawals.length} shown / ${withdrawalsTotal} total (Page ${withdrawalsPage} of ${withdrawalsTotalPages})` : `${filteredWithdrawals.length} Requests`}
                   </span>
                   {(() => {
                     const pendingTotal = (withdrawals || []).filter(w => w.status === 'PENDING').reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
@@ -3200,6 +3322,29 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {withdrawalsPage} of {withdrawalsTotalPages} ({withdrawalsTotal || withdrawals.length} requests)
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setWithdrawalsPage(p => Math.max(1, p - 1))} 
+                  disabled={withdrawalsPage === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setWithdrawalsPage(p => Math.min(withdrawalsTotalPages, p + 1))} 
+                  disabled={withdrawalsPage >= withdrawalsTotalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'telemetry' ? (
           <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3806,7 +3951,7 @@ export default function AdminDashboard() {
                   <CreditCard size={13} color="var(--color-blue)" />
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Deposit Requests</span>
                   <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    {filteredDeposits.length} / {deposits.length}
+                    {depositsTotal > 0 ? `${filteredDeposits.length} shown / ${depositsTotal} total (Page ${depositsPage} of ${depositsTotalPages})` : `${filteredDeposits.length} Requests`}
                   </span>
                   {deposits.filter(d => d.status === 'PENDING').length > 0 && (
                     <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '3px', background: 'rgba(234,179,8,0.15)', color: 'var(--color-yellow)', fontWeight: '700' }}>
@@ -3954,6 +4099,29 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {depositsPage} of {depositsTotalPages} ({depositsTotal || deposits.length} requests)
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setDepositsPage(p => Math.max(1, p - 1))} 
+                  disabled={depositsPage === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setDepositsPage(p => Math.min(depositsTotalPages, p + 1))} 
+                  disabled={depositsPage >= depositsTotalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

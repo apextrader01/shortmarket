@@ -1433,12 +1433,44 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
-    const deposits = await db('deposit_requests')
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let query = db('deposit_requests')
       .join('users', 'deposit_requests.user_id', 'users.id')
-      .select('deposit_requests.*', 'users.username', 'users.email', 'users.client_id')
-      .orderBy('deposit_requests.created_at', 'desc');
+      .select('deposit_requests.*', 'users.username', 'users.email', 'users.client_id');
+
+    let countQuery = db('deposit_requests')
+      .join('users', 'deposit_requests.user_id', 'users.id');
+
+    if (search) {
+      const s = `%${search}%`;
+      query = query.where(function() {
+        this.where('users.username', 'ilike', s)
+            .orWhere('users.email', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhereRaw('CAST(deposit_requests.amount AS TEXT) ilike ?', [s]);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('users.username', 'ilike', s)
+            .orWhere('users.email', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhereRaw('CAST(deposit_requests.amount AS TEXT) ilike ?', [s]);
+      });
+    }
+
+    const [countResult] = await countQuery.count('deposit_requests.id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const deposits = await query
+      .orderBy('deposit_requests.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
       
-    res.json({ success: true, deposits });
+    res.json({ success: true, deposits, total, page, totalPages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1544,12 +1576,44 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
     
-    const orders = await db('orders')
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let query = db('orders')
       .join('users', 'orders.user_id', '=', 'users.id')
-      .select('orders.*', 'users.username', 'users.email', 'users.client_id')
+      .select('orders.*', 'users.username', 'users.email', 'users.client_id');
+    
+    let countQuery = db('orders')
+      .join('users', 'orders.user_id', '=', 'users.id');
+
+    if (search) {
+      const s = `%${search}%`;
+      query = query.where(function() {
+        this.where('orders.symbol', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('orders.symbol', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhereRaw('CAST(orders.id AS TEXT) ilike ?', [s]);
+      });
+    }
+
+    const [countResult] = await countQuery.count('orders.id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const orders = await query
       .orderBy('orders.created_at', 'desc')
-      .limit(100);
-    res.json({ success: true, orders });
+      .limit(limit)
+      .offset(offset);
+
+    res.json({ success: true, orders, total, page, totalPages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1576,12 +1640,44 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
     
-    const ledger = await db('ledger')
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let query = db('ledger')
       .join('users', 'ledger.user_id', '=', 'users.id')
-      .select('ledger.*', 'users.username', 'users.email', 'users.client_id')
+      .select('ledger.*', 'users.username', 'users.email', 'users.client_id');
+
+    let countQuery = db('ledger')
+      .join('users', 'ledger.user_id', '=', 'users.id');
+
+    if (search) {
+      const s = `%${search}%`;
+      query = query.where(function() {
+        this.where('ledger.description', 'ilike', s)
+            .orWhere('ledger.type', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('ledger.description', 'ilike', s)
+            .orWhere('ledger.type', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s);
+      });
+    }
+
+    const [countResult] = await countQuery.count('ledger.id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const ledger = await query
       .orderBy('ledger.created_at', 'desc')
-      .limit(100);
-    res.json({ success: true, ledger });
+      .limit(limit)
+      .offset(offset);
+
+    res.json({ success: true, ledger, total, page, totalPages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -4440,7 +4536,12 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
 
-    const withdrawals = await db('reward_withdrawals')
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    let query = db('reward_withdrawals')
       .join('users', 'reward_withdrawals.user_id', 'users.id')
       .select(
         'reward_withdrawals.*', 
@@ -4453,8 +4554,39 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
         'users.bank_ifsc',
         'users.last_ip',
         'users.registration_ip'
-      )
-      .orderBy('reward_withdrawals.created_at', 'desc');
+      );
+
+    let countQuery = db('reward_withdrawals')
+      .join('users', 'reward_withdrawals.user_id', 'users.id');
+
+    if (search) {
+      const s = `%${search}%`;
+      query = query.where(function() {
+        this.where('users.username', 'ilike', s)
+            .orWhere('users.phone', 'ilike', s)
+            .orWhere('users.upi_id', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhere('users.bank_account_no', 'ilike', s)
+            .orWhereRaw('CAST(reward_withdrawals.amount AS TEXT) ilike ?', [s]);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('users.username', 'ilike', s)
+            .orWhere('users.phone', 'ilike', s)
+            .orWhere('users.upi_id', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s)
+            .orWhere('users.bank_account_no', 'ilike', s)
+            .orWhereRaw('CAST(reward_withdrawals.amount AS TEXT) ilike ?', [s]);
+      });
+    }
+
+    const [countResult] = await countQuery.count('reward_withdrawals.id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const withdrawals = await query
+      .orderBy('reward_withdrawals.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
 
     // Group users by IP to detect multi-account fraud
     const ipCounts = await db('users')
@@ -4491,7 +4623,7 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json({ success: true, withdrawals: enhanced });
+    res.json({ success: true, withdrawals: enhanced, total, page, totalPages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
