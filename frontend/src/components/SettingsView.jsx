@@ -277,7 +277,15 @@ export function BiometricSettingsSection({ user }) {
         setStatusMsg({ type: 'success', text: '✅ Face ID / Fingerprint enabled successfully!' });
       }
     } catch (err) {
-      setStatusMsg({ type: 'error', text: 'Biometric setup failed or cancelled: ' + (err.message || String(err)) });
+      const isBrowserLimitation = String(err.message || '').includes('browser') || String(err.message || '').includes('supported');
+      if (isBrowserLimitation) {
+        setStatusMsg({ 
+          type: 'error', 
+          text: '💡 Web biometrics requires Google Chrome / Safari. Your 4-Digit PIN is active and protects your account!' 
+        });
+      } else {
+        setStatusMsg({ type: 'error', text: 'Biometric setup: ' + (err.message || String(err)) });
+      }
     }
   };
 
