@@ -1349,9 +1349,14 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
 app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
-    if (!caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const targetUserId = req.params.id;
+    const targetUser = await db('users').where({ id: targetUserId }).first();
+    if (targetUser && targetUser.is_admin) {
+      return res.status(403).json({ error: 'Cannot reset an admin account' });
+    }
+
     await db.transaction(async (trx) => {
       await trx('orders').where({ user_id: targetUserId }).del();
       await trx('positions').where({ user_id: targetUserId }).del();
@@ -1372,9 +1377,10 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
 
     const targetUserId = req.params.id;
 
-    // Prevent admin from deleting themselves
-    if (String(targetUserId) === String(req.user.id)) {
-      return res.status(400).json({ error: 'Cannot delete your own admin account.' });
+    // Prevent deleting any admin account
+    const targetUser = await db('users').where({ id: targetUserId }).first();
+    if (targetUser && targetUser.is_admin) {
+      return res.status(403).json({ error: 'Cannot delete an admin account.' });
     }
 
     await db.transaction(async (trx) => {
@@ -4864,6 +4870,18 @@ app.post('/api/admin/ban', authenticateToken, async (req, res) => {
 
     const upperType = type.toUpperCase();
     const cleanValue = value.trim();
+
+    if (upperType === 'USER') {
+      const target = await db('users').where({ id: cleanValue }).orWhere({ username: cleanValue }).first();
+      if (target && target.is_admin) {
+        return res.status(403).json({ error: 'Cannot ban an admin account' });
+      }
+    } else if (upperType === 'PHONE') {
+      const target = await db('users').where({ phone: cleanValue }).first();
+      if (target && target.is_admin) {
+        return res.status(403).json({ error: 'Cannot ban phone number associated with an admin account' });
+      }
+    }
 
     const existing = await db('banned_entities').where({ type: upperType, value: cleanValue }).first();
     if (!existing) {
