@@ -2870,52 +2870,56 @@ export default function AdminDashboard() {
                         </td>
                         <td style={{ padding: '6px 12px' }}>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <button
-                              style={{
-                                padding: '2px 6px',
-                                borderRadius: '3px',
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                                color: u.is_banned ? '#22c55e' : '#ef4444',
-                                border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
-                              }}
-                              onClick={async () => {
-                                if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
-                                  try {
-                                    await toggleUserBan(u.id);
-                                    loadData();
-                                  } catch(e) {
-                                    alert(e.message);
-                                  }
-                                }
-                              }}
-                            >
-                              {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
-                            </button>
-                            {u.last_ip && (
-                              <button
-                                style={{
-                                  padding: '2px 5px',
-                                  borderRadius: '3px',
-                                  fontSize: '9px',
-                                  fontWeight: '700',
-                                  cursor: 'pointer',
-                                  background: 'rgba(239,68,68,0.1)',
-                                  color: '#ef4444',
-                                  border: '1px solid rgba(239,68,68,0.3)'
-                                }}
-                                onClick={async () => {
-                                  if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
-                                    const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
-                                    alert(res.message || `IP ${u.last_ip} has been banned!`);
-                                    loadData();
-                                  }
-                                }}
-                              >
-                                Ban IP
-                              </button>
+                            {!u.is_admin && (
+                              <>
+                                <button
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '3px',
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                    color: u.is_banned ? '#22c55e' : '#ef4444',
+                                    border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
+                                  }}
+                                  onClick={async () => {
+                                    if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
+                                      try {
+                                        await toggleUserBan(u.id);
+                                        loadData();
+                                      } catch(e) {
+                                        alert(e.message);
+                                      }
+                                    }
+                                  }}
+                                >
+                                  {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
+                                </button>
+                                {u.last_ip && (
+                                  <button
+                                    style={{
+                                      padding: '2px 5px',
+                                      borderRadius: '3px',
+                                      fontSize: '9px',
+                                      fontWeight: '700',
+                                      cursor: 'pointer',
+                                      background: 'rgba(239,68,68,0.1)',
+                                      color: '#ef4444',
+                                      border: '1px solid rgba(239,68,68,0.3)'
+                                    }}
+                                    onClick={async () => {
+                                      if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
+                                        const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
+                                        alert(res.message || `IP ${u.last_ip} has been banned!`);
+                                        loadData();
+                                      }
+                                    }}
+                                  >
+                                    Ban IP
+                                  </button>
+                                )}
+                              </>
                             )}
                             <button 
                               className="btn btn-primary" 
