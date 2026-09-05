@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag } from 'lucide-react';
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
@@ -129,12 +129,46 @@ export default function BasketModal() {
     
     if (status === 'OPEN') return false;
     if (status === 'CLOSED') {
-      blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked CLOSED / Holiday.`;
+      blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked CLOSED / Holiday by Administrator.`;
       return true;
     }
     
-    // AUTO mode: Check weekend & normal hours
-    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    // 1. Check Date-Specific Calendar Override
+    const now = new Date();
+    const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const y = istTime.getFullYear();
+    const m = String(istTime.getMonth() + 1).padStart(2, '0');
+    const d = String(istTime.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+
+    const calRule = (marketCalendar || []).find(r => r.date === todayStr);
+    if (calRule) {
+      const segStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
+      const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
+      
+      if (segStatus === 'CLOSED') {
+        blockedMarketReason = `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`;
+        return true;
+      }
+      
+      if (segStatus === 'OPEN') {
+        const startTimeStr = isCommodity ? (calRule.commodity_start_time || '09:00') : (calRule.equity_start_time || '09:15');
+        const endTimeStr = isCommodity ? (calRule.commodity_end_time || '23:30') : (calRule.equity_end_time || '15:30');
+        const [sH, sM] = startTimeStr.split(':').map(Number);
+        const [eH, eM] = endTimeStr.split(':').map(Number);
+        const curMins = istTime.getHours() * 60 + istTime.getMinutes();
+        const startMins = sH * 60 + (sM || 0);
+        const endMins = eH * 60 + (eM || 0);
+        
+        if (curMins < startMins || curMins >= endMins) {
+          blockedMarketReason = `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`;
+          return true;
+        }
+        return false;
+      }
+    }
+
+    // 2. AUTO mode: Check weekend & normal hours
     const day = istTime.getDay();
     if (day === 0 || day === 6) {
       blockedMarketReason = 'Markets are closed on weekends (Saturday & Sunday).';

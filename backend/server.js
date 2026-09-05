@@ -102,7 +102,9 @@ function isCommodityContract(sym) {
 }
 
 // Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
+// Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
 const marketStatusCache = { equity: 'AUTO', commodity: 'AUTO' };
+const marketCalendarCache = new Map();
 
 async function loadMarketStatusFromDb() {
   try {
@@ -116,20 +118,73 @@ async function loadMarketStatusFromDb() {
 }
 loadMarketStatusFromDb();
 
+async function loadMarketCalendarFromDb() {
+  try {
+    const rows = await db('market_calendar').select('*');
+    marketCalendarCache.clear();
+    rows.forEach(r => {
+      marketCalendarCache.set(r.date, r);
+    });
+    console.log(`📅 Loaded ${marketCalendarCache.size} rules into Market Calendar Cache`);
+  } catch (e) {
+    console.warn('loadMarketCalendarFromDb warning:', e.message);
+  }
+}
+loadMarketCalendarFromDb();
+
 function isSegmentMarketOpen(isCommodity) {
-  const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
-  if (status === 'OPEN') return { open: true };
-  if (status === 'CLOSED') {
+  const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
+  if (globalStatus === 'OPEN') return { open: true };
+  if (globalStatus === 'CLOSED') {
     return { open: false, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
   }
   
-  // AUTO: evaluate regular exchange trading schedule
+  // Evaluate date in Asia/Kolkata (IST)
   const now = new Date();
   const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  const year = istTime.getUTCFullYear();
+  const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+  const dateNum = String(istTime.getUTCDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${dateNum}`;
   const day = istTime.getUTCDay(); // 0 = Sun, 6 = Sat
   const hours = istTime.getUTCHours();
   const minutes = istTime.getUTCMinutes();
-  
+  const currentMinutes = hours * 60 + minutes;
+
+  // 1. Check Date-Specific Calendar Override
+  const calRule = marketCalendarCache.get(todayStr);
+  if (calRule) {
+    const segmentStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
+    const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
+
+    if (segmentStatus === 'CLOSED') {
+      return {
+        open: false,
+        reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`
+      };
+    }
+
+    if (segmentStatus === 'OPEN') {
+      // Special trading session (e.g., Saturday special session, Muhurat trading, or MCX evening session)
+      const startTimeStr = isCommodity ? (calRule.commodity_start_time || '09:00') : (calRule.equity_start_time || '09:15');
+      const endTimeStr = isCommodity ? (calRule.commodity_end_time || '23:30') : (calRule.equity_end_time || '15:30');
+
+      const [sH, sM] = startTimeStr.split(':').map(Number);
+      const [eH, eM] = endTimeStr.split(':').map(Number);
+      const startMins = sH * 60 + (sM || 0);
+      const endMins = eH * 60 + (eM || 0);
+
+      if (currentMinutes < startMins || currentMinutes >= endMins) {
+        return {
+          open: false,
+          reason: `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`
+        };
+      }
+      return { open: true };
+    }
+  }
+
+  // 2. Default Schedule (Mon-Fri)
   if (day === 0 || day === 6) {
     return { open: false, reason: 'Markets are closed on weekends (Saturday & Sunday). Regular trading resumes on Monday.' };
   }
@@ -160,7 +215,7 @@ const io = new Server(server, {
   adapter: createAdapter(adapterPubClient, adapterSubClient)
 });
 
-// Listen for Fyers token updates & Market Status updates on all cluster nodes
+// Listen for Fyers token updates, Market Status updates & Calendar updates on all cluster nodes
 const { subClient: globalSubClient } = require('./services/redisClient');
 if (globalSubClient) {
     const setupClusterSync = () => {
@@ -181,6 +236,13 @@ if (globalSubClient) {
                     equity: marketStatusCache.equity,
                     commodity: marketStatusCache.commodity
                 });
+            } catch(e) {}
+        }).catch(() => {});
+
+        globalSubClient.subscribe('market_calendar_updated', () => {
+            try {
+                loadMarketCalendarFromDb();
+                io.emit('market_calendar_updated');
             } catch(e) {}
         }).catch(() => {});
     };
@@ -1539,6 +1601,197 @@ app.post('/api/admin/market-status', authenticateToken, async (req, res) => {
       equity: marketStatusCache.equity,
       commodity: marketStatusCache.commodity
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── MARKET CALENDAR ENDPOINTS ──────────────────────────────────────────
+
+const OFFICIAL_2026_HOLIDAYS = [
+  { date: '2026-01-26', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Republic Day' },
+  { date: '2026-02-18', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Mahashivratri (MCX Evening Session Open)' },
+  { date: '2026-03-03', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Holi (MCX Evening Session Open)' },
+  { date: '2026-03-27', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Id-Ul-Fitr / Ramzan Id (MCX Evening Session Open)' },
+  { date: '2026-04-03', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Good Friday' },
+  { date: '2026-04-14', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Dr. Ambedkar Jayanti (MCX Evening Session Open)' },
+  { date: '2026-05-01', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Maharashtra Day (MCX Evening Session Open)' },
+  { date: '2026-05-27', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Bakri Id (MCX Evening Session Open)' },
+  { date: '2026-06-25', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Muharram (MCX Evening Session Open)' },
+  { date: '2026-08-15', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Independence Day' },
+  { date: '2026-10-02', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Mahatma Gandhi Jayanti' },
+  { date: '2026-10-20', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Dussehra (MCX Evening Session Open)' },
+  { date: '2026-11-08', equity_status: 'OPEN', commodity_status: 'OPEN', equity_start_time: '18:15', equity_end_time: '19:15', commodity_start_time: '18:15', commodity_end_time: '19:15', reason: 'Diwali Laxmi Pujan (Muhurat Trading 6:15 PM - 7:15 PM)' },
+  { date: '2026-11-10', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Diwali Balipratipada (MCX Evening Session Open)' },
+  { date: '2026-11-24', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Gurunanak Jayanti (MCX Evening Session Open)' },
+  { date: '2026-12-25', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Christmas' }
+];
+
+app.get('/api/market-calendar', async (req, res) => {
+  try {
+    const { month } = req.query; // optional 'YYYY-MM'
+    let query = db('market_calendar').select('*').orderBy('date', 'asc');
+    if (month && /^[0-9]{4}-[0-9]{2}$/.test(month)) {
+      query = query.whereRaw('date LIKE ?', [`${month}%`]);
+    }
+    const rows = await query;
+    res.json({ success: true, calendar: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/market-calendar/today', (req, res) => {
+  try {
+    const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const year = istTime.getUTCFullYear();
+    const month = String(istTime.getUTCMonth() + 1).padStart(2, '0');
+    const dateNum = String(istTime.getUTCDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${dateNum}`;
+
+    const equityCheck = isSegmentMarketOpen(false);
+    const commodityCheck = isSegmentMarketOpen(true);
+    const todayRule = marketCalendarCache.get(todayStr) || null;
+
+    res.json({
+      success: true,
+      today: todayStr,
+      equity: {
+        open: equityCheck.open,
+        reason: equityCheck.reason || null,
+        globalStatus: marketStatusCache.equity,
+        rule: todayRule ? todayRule.equity_status : 'DEFAULT'
+      },
+      commodity: {
+        open: commodityCheck.open,
+        reason: commodityCheck.reason || null,
+        globalStatus: marketStatusCache.commodity,
+        rule: todayRule ? todayRule.commodity_status : 'DEFAULT'
+      },
+      todayRule
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/market-calendar', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const {
+      date,
+      equity_status = 'DEFAULT',
+      commodity_status = 'DEFAULT',
+      equity_start_time = null,
+      equity_end_time = null,
+      commodity_start_time = null,
+      commodity_end_time = null,
+      reason = ''
+    } = req.body;
+
+    if (!date || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date)) {
+      return res.status(400).json({ error: 'Invalid date format. Expected YYYY-MM-DD' });
+    }
+
+    const payload = {
+      date,
+      equity_status,
+      commodity_status,
+      equity_start_time: equity_start_time || null,
+      equity_end_time: equity_end_time || null,
+      commodity_start_time: commodity_start_time || null,
+      commodity_end_time: commodity_end_time || null,
+      reason: reason || null,
+      updated_at: new Date()
+    };
+
+    await db('market_calendar')
+      .insert(payload)
+      .onConflict('date')
+      .merge();
+
+    await loadMarketCalendarFromDb();
+
+    // Broadcast across Redis cluster & Socket.IO
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) {
+        pubClient.publish('market_calendar_updated', JSON.stringify({ date })).catch(() => {});
+      }
+    } catch(e) {}
+
+    try {
+      io.emit('market_calendar_updated', { date, ...payload });
+    } catch(e) {}
+
+    console.log(`[Admin] Saved Market Calendar rule for ${date}: Equity=${equity_status}, MCX=${commodity_status} (${reason})`);
+    res.json({ success: true, entry: payload });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/admin/market-calendar/:date', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    const { date } = req.params;
+    await db('market_calendar').where({ date }).del();
+    await loadMarketCalendarFromDb();
+
+    // Broadcast across Redis cluster & Socket.IO
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) {
+        pubClient.publish('market_calendar_updated', JSON.stringify({ date, deleted: true })).catch(() => {});
+      }
+    } catch(e) {}
+
+    try {
+      io.emit('market_calendar_updated', { date, deleted: true });
+    } catch(e) {}
+
+    console.log(`[Admin] Reset Market Calendar rule for ${date} to DEFAULT`);
+    res.json({ success: true, date });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/market-calendar/bulk-holidays', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+
+    for (const h of OFFICIAL_2026_HOLIDAYS) {
+      await db('market_calendar')
+        .insert({
+          ...h,
+          updated_at: new Date()
+        })
+        .onConflict('date')
+        .merge();
+    }
+
+    await loadMarketCalendarFromDb();
+
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) {
+        pubClient.publish('market_calendar_updated', JSON.stringify({ bulk: true })).catch(() => {});
+      }
+    } catch(e) {}
+
+    try {
+      io.emit('market_calendar_updated', { bulk: true });
+    } catch(e) {}
+
+    console.log(`[Admin] Seeded ${OFFICIAL_2026_HOLIDAYS.length} official 2026 stock market holidays`);
+    res.json({ success: true, count: OFFICIAL_2026_HOLIDAYS.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

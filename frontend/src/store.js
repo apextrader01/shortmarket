@@ -558,6 +558,12 @@ export const useStore = create(persist((set, get) => ({
       set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
     });
 
+    socket.off('market_calendar_updated');
+    socket.on('market_calendar_updated', () => {
+      get().fetchMarketCalendar();
+      get().fetchTodayMarketSchedule();
+    });
+
     const onConnect = () => {
       set({ isConnected: true });
       const currentUser = get().user;
@@ -565,6 +571,8 @@ export const useStore = create(persist((set, get) => ({
         socket.emit('register_user', currentUser.id);
       }
       get().fetchMarketStatus();
+      get().fetchMarketCalendar();
+      get().fetchTodayMarketSchedule();
       // Force a fresh REST price fetch on every socket connect/reconnect
       get().refreshPrices(true);
       
@@ -1612,6 +1620,102 @@ export const useStore = create(persist((set, get) => ({
         return { success: true };
       }
       return { success: false, error: data?.error || 'Failed to update market status' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Market Calendar & Scheduled Holidays ───────────────────────────────────
+  marketCalendar: [],
+  todayMarketSchedule: null,
+
+  fetchMarketCalendar: async (month) => {
+    try {
+      const url = month ? `${API}/api/market-calendar?month=${month}` : `${API}/api/market-calendar`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketCalendar: data.calendar || [] });
+        return data.calendar || [];
+      }
+    } catch (e) {
+      console.error('fetchMarketCalendar error', e);
+    }
+    return [];
+  },
+
+  fetchTodayMarketSchedule: async () => {
+    try {
+      const res = await fetch(`${API}/api/market-calendar/today`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ todayMarketSchedule: data });
+        return data;
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  saveMarketCalendarDate: async (entry) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(entry)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to save calendar rule' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  deleteMarketCalendarDate: async (date) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar/${date}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to delete calendar rule' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  seedMarketHolidays: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar/bulk-holidays`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true, count: data.count };
+      }
+      return { success: false, error: data?.error || 'Failed to seed holidays' };
     } catch (e) {
       return { success: false, error: e.message };
     }

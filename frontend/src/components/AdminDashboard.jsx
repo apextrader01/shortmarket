@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 
 const isMarketHours = () => {
@@ -304,6 +304,717 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function MarketCalendarTab({ isMobile }) {
+  const { marketCalendar, fetchMarketCalendar, saveMarketCalendarDate, deleteMarketCalendarDate, seedMarketHolidays } = useStore();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDateStr, setSelectedDateStr] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('grid');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [holidaySeeding, setHolidaySeeding] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    date: '',
+    equity_status: 'DEFAULT',
+    commodity_status: 'DEFAULT',
+    equity_start_time: '09:15',
+    equity_end_time: '15:30',
+    commodity_start_time: '09:00',
+    commodity_end_time: '23:30',
+    reason: ''
+  });
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  useEffect(() => {
+    fetchMarketCalendar?.();
+  }, [monthStr]);
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const jumpToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const calendarMap = React.useMemo(() => {
+    const map = {};
+    (marketCalendar || []).forEach(rule => {
+      map[rule.date] = rule;
+    });
+    return map;
+  }, [marketCalendar]);
+
+  const today = new Date();
+  const istToday = new Date(today.getTime() + (5.5 * 60 * 60 * 1000));
+  const todayStr = `${istToday.getUTCFullYear()}-${String(istToday.getUTCMonth() + 1).padStart(2, '0')}-${String(istToday.getUTCDate()).padStart(2, '0')}`;
+
+  const handleOpenEdit = (dateStr) => {
+    const existing = calendarMap[dateStr];
+    if (existing) {
+      setEditForm({
+        date: dateStr,
+        equity_status: existing.equity_status || 'DEFAULT',
+        commodity_status: existing.commodity_status || 'DEFAULT',
+        equity_start_time: existing.equity_start_time || '09:15',
+        equity_end_time: existing.equity_end_time || '15:30',
+        commodity_start_time: existing.commodity_start_time || '09:00',
+        commodity_end_time: existing.commodity_end_time || '23:30',
+        reason: existing.reason || ''
+      });
+    } else {
+      setEditForm({
+        date: dateStr,
+        equity_status: 'DEFAULT',
+        commodity_status: 'DEFAULT',
+        equity_start_time: '09:15',
+        equity_end_time: '15:30',
+        commodity_start_time: '09:00',
+        commodity_end_time: '23:30',
+        reason: ''
+      });
+    }
+    setSelectedDateStr(dateStr);
+    setEditModalOpen(true);
+  };
+
+  const handleSaveRule = async (e) => {
+    if (e) e.preventDefault();
+    setActionLoading(true);
+    const res = await saveMarketCalendarDate(editForm);
+    setActionLoading(false);
+    if (res.success) {
+      setEditModalOpen(false);
+    } else {
+      alert('Error saving calendar rule: ' + (res.error || 'Unknown error'));
+    }
+  };
+
+  const handleDeleteRule = async () => {
+    if (!selectedDateStr) return;
+    if (!window.confirm(`Reset ${selectedDateStr} back to Default Auto schedule?`)) return;
+    setActionLoading(true);
+    const res = await deleteMarketCalendarDate(selectedDateStr);
+    setActionLoading(false);
+    if (res.success) {
+      setEditModalOpen(false);
+    } else {
+      alert('Error deleting calendar rule: ' + (res.error || 'Unknown error'));
+    }
+  };
+
+  const handleBulkSeed = async () => {
+    if (!window.confirm('Import the official 2026 Indian Stock Market Holidays list (NSE/BSE + MCX evening sessions)? This will pre-fill all 16 official exchange holidays.')) return;
+    setHolidaySeeding(true);
+    const res = await seedMarketHolidays();
+    setHolidaySeeding(false);
+    if (res.success) {
+      alert(`✅ Successfully imported ${res.count || 16} official Indian market holidays for 2026!`);
+    } else {
+      alert('Error importing holidays: ' + (res.error || 'Unknown error'));
+    }
+  };
+
+  const applyPreset = (type) => {
+    if (type === 'HOLIDAY_ALL') {
+      setEditForm(prev => ({
+        ...prev,
+        equity_status: 'CLOSED',
+        commodity_status: 'CLOSED',
+        reason: prev.reason || 'Market Holiday'
+      }));
+    } else if (type === 'MCX_EVENING_ONLY') {
+      setEditForm(prev => ({
+        ...prev,
+        equity_status: 'CLOSED',
+        commodity_status: 'OPEN',
+        commodity_start_time: '17:00',
+        commodity_end_time: '23:30',
+        reason: prev.reason || 'Holiday - MCX Evening Session Open (5:00 PM - 11:30 PM)'
+      }));
+    } else if (type === 'MUHURAT') {
+      setEditForm(prev => ({
+        ...prev,
+        equity_status: 'OPEN',
+        commodity_status: 'OPEN',
+        equity_start_time: '18:15',
+        equity_end_time: '19:15',
+        commodity_start_time: '18:15',
+        commodity_end_time: '19:15',
+        reason: prev.reason || 'Diwali Muhurat Trading Session (6:15 PM - 7:15 PM)'
+      }));
+    } else if (type === 'WEEKEND_SPECIAL') {
+      setEditForm(prev => ({
+        ...prev,
+        equity_status: 'OPEN',
+        commodity_status: 'OPEN',
+        equity_start_time: '09:15',
+        equity_end_time: '15:30',
+        commodity_start_time: '09:00',
+        commodity_end_time: '23:30',
+        reason: prev.reason || 'Special Weekend Live Trading Session'
+      }));
+    } else if (type === 'RESET_DEFAULT') {
+      setEditForm(prev => ({
+        ...prev,
+        equity_status: 'DEFAULT',
+        commodity_status: 'DEFAULT',
+        reason: ''
+      }));
+    }
+  };
+
+  return (
+    <div style={{ padding: isMobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Calendar Tab Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+        <div>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Calendar size={22} style={{ color: '#c084fc' }} />
+            Market Trading Calendar & Scheduled Holidays
+          </h3>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+            Configure specific dates in advance for NSE/BSE & MCX (Declare holidays, schedule Saturday/Sunday live trading, or enable MCX evening sessions).
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleBulkSeed}
+            disabled={holidaySeeding}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #9333ea, #6366f1)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: holidaySeeding ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+            }}
+          >
+            <Sparkles size={15} />
+            {holidaySeeding ? 'Importing...' : '✨ Import 2026 Official Exchange Holidays'}
+          </button>
+
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '3px', border: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => setViewMode('grid')}
+              style={{
+                background: viewMode === 'grid' ? 'var(--color-blue)' : 'transparent',
+                color: viewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              🗓️ Month Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              style={{
+                background: viewMode === 'list' ? 'var(--color-blue)' : 'transparent',
+                color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              📋 Scheduled Rules ({(marketCalendar || []).length})
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {viewMode === 'grid' ? (
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: isMobile ? '12px' : '20px' }}>
+          {/* Month Navigation Controls */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={prevMonth}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                {monthNames[month]} {year}
+              </h4>
+              <button
+                onClick={nextMonth}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+              >
+                <ChevronRight size={18} />
+              </button>
+              <button
+                onClick={jumpToToday}
+                style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Today
+              </button>
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-green)' }} /> Open / Special Session</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} /> MCX Evening Only</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} /> Market Holiday / Closed</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} /> Default Schedule</span>
+            </div>
+          </div>
+
+          {/* Days of Week Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+              <div key={d} style={{ fontSize: '12px', fontWeight: '700', color: (i === 0 || i === 6) ? '#f87171' : 'var(--text-secondary)', padding: '6px' }}>
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid Cells */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+            {/* Blank offset boxes */}
+            {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+              <div key={`blank-${i}`} style={{ minHeight: isMobile ? '70px' : '95px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', opacity: 0.2 }} />
+            ))}
+
+            {/* Days in Month */}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              const dayOfWeek = new Date(year, month, dayNum).getDay();
+              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+              const isToday = dateStr === todayStr;
+              const rule = calendarMap[dateStr];
+
+              const hasRule = !!rule;
+              const isFullHoliday = rule && rule.equity_status === 'CLOSED' && rule.commodity_status === 'CLOSED';
+              const isEveningOnly = rule && rule.equity_status === 'CLOSED' && rule.commodity_status === 'OPEN';
+              const isSpecialOpen = rule && (rule.equity_status === 'OPEN' || (isWeekend && rule.commodity_status === 'OPEN'));
+
+              let cellBg = 'rgba(0,0,0,0.2)';
+              let cellBorder = '1px solid var(--border-color)';
+
+              if (isFullHoliday) {
+                cellBg = 'rgba(239, 68, 68, 0.08)';
+                cellBorder = '1px solid rgba(239, 68, 68, 0.35)';
+              } else if (isEveningOnly) {
+                cellBg = 'rgba(234, 179, 8, 0.08)';
+                cellBorder = '1px solid rgba(234, 179, 8, 0.35)';
+              } else if (isSpecialOpen) {
+                cellBg = 'rgba(34, 197, 94, 0.08)';
+                cellBorder = '1px solid rgba(34, 197, 94, 0.35)';
+              } else if (isWeekend) {
+                cellBg = 'rgba(255,255,255,0.015)';
+              }
+
+              if (isToday) {
+                cellBorder = '2px solid var(--color-blue)';
+              }
+
+              return (
+                <div
+                  key={dateStr}
+                  onClick={() => handleOpenEdit(dateStr)}
+                  style={{
+                    minHeight: isMobile ? '75px' : '98px',
+                    background: cellBg,
+                    border: cellBorder,
+                    borderRadius: '8px',
+                    padding: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: isToday ? '800' : '700',
+                      color: isToday ? '#fff' : isWeekend ? '#f87171' : 'var(--text-primary)',
+                      background: isToday ? 'var(--color-blue)' : 'transparent',
+                      width: isToday ? '22px' : 'auto',
+                      height: isToday ? '22px' : 'auto',
+                      borderRadius: isToday ? '50%' : '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {dayNum}
+                    </span>
+
+                    {hasRule && (
+                      <span style={{ fontSize: '10px', background: 'rgba(192, 132, 252, 0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                        Custom
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Badges / Status Preview */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
+                    {hasRule ? (
+                      <>
+                        {rule.reason && (
+                          <div style={{ fontSize: '10px', fontWeight: '700', color: isFullHoliday ? '#fca5a5' : isEveningOnly ? '#fde047' : '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rule.reason}>
+                            ⭐ {rule.reason}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: '700',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            background: rule.equity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.25)' : rule.equity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255,255,255,0.1)',
+                            color: rule.equity_status === 'CLOSED' ? 'var(--color-red-light)' : rule.equity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
+                          }}>
+                            NSE: {rule.equity_status}
+                          </span>
+                          <span style={{
+                            fontSize: '9px',
+                            fontWeight: '700',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            background: rule.commodity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.25)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? 'rgba(234, 179, 8, 0.25)' : rule.commodity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255,255,255,0.1)',
+                            color: rule.commodity_status === 'CLOSED' ? 'var(--color-red-light)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? '#fef08a' : rule.commodity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
+                          }}>
+                            MCX: {rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00' ? 'EVENING' : rule.commodity_status}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: '10px', color: isWeekend ? 'rgba(255,255,255,0.25)' : 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        {isWeekend ? '🔒 Weekend' : '⚡ Regular'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* List View of Scheduled Rules */
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>All Configured Calendar Rules & Holidays</h4>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Click any row to modify</span>
+          </div>
+
+          {(marketCalendar || []).length === 0 ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              No custom rules or holidays configured yet. Click "✨ Import 2026 Official Exchange Holidays" or select a date on the month grid.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {(marketCalendar || []).map(rule => {
+                const dt = new Date(rule.date);
+                const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.getDay()];
+                return (
+                  <div
+                    key={rule.date}
+                    onClick={() => handleOpenEdit(rule.date)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      background: 'var(--bg-panel)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      flexWrap: 'wrap',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{rule.date}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{dayName}</span>
+                      </div>
+                      {rule.reason && (
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#c084fc', background: 'rgba(192, 132, 252, 0.1)', padding: '3px 8px', borderRadius: '6px' }}>
+                          ⭐ {rule.reason}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: rule.equity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.2)' : rule.equity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.1)',
+                        color: rule.equity_status === 'CLOSED' ? 'var(--color-red-light)' : rule.equity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
+                      }}>
+                        NSE: {rule.equity_status} {rule.equity_status === 'OPEN' ? `(${rule.equity_start_time || '09:15'}-${rule.equity_end_time || '15:30'})` : ''}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        background: rule.commodity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.2)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? 'rgba(234, 179, 8, 0.2)' : rule.commodity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.1)',
+                        color: rule.commodity_status === 'CLOSED' ? 'var(--color-red-light)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? '#fef08a' : rule.commodity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
+                      }}>
+                        MCX: {rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00' ? 'EVENING (17:00-23:30)' : rule.commodity_status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Date Edit Modal */}
+      {editModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '540px',
+            padding: '24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '18px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={20} style={{ color: 'var(--color-blue)' }} />
+                  Configure Trading Schedule
+                </h3>
+                <div style={{ fontSize: '13px', color: 'var(--color-blue-light)', fontWeight: '600' }}>
+                  📅 {editForm.date} ({new Date(editForm.date).toLocaleDateString('en-US', { weekday: 'long' })})
+                </div>
+              </div>
+              <button
+                onClick={() => setEditModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Quick Preset Buttons */}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                QUICK 1-CLICK PRESETS:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('HOLIDAY_ALL')}
+                  style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  🔴 Full Market Holiday
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('MCX_EVENING_ONLY')}
+                  style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#fef08a', border: '1px solid rgba(234,179,8,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  🌙 MCX Evening Only (5 PM - 11:30 PM)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('MUHURAT')}
+                  style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', border: '1px solid rgba(192,132,252,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  🪔 Diwali Muhurat Session
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('WEEKEND_SPECIAL')}
+                  style={{ background: 'rgba(34, 197, 94, 0.15)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  ⚡ Saturday Live Session
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('RESET_DEFAULT')}
+                  style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  🔄 Auto Default
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveRule} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Reason / Title */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Holiday / Session Name or Reason:
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Diwali Muhurat Trading, Mahashivratri, Special DR Session"
+                  value={editForm.reason}
+                  onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '13px' }}
+                />
+              </div>
+
+              {/* Segment 1: NSE / BSE Equities */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                  📈 NSE / BSE Equities & Derivatives:
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={editForm.equity_status}
+                    onChange={(e) => setEditForm({ ...editForm, equity_status: e.target.value })}
+                    style={{ flex: 1, minWidth: '180px', background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', fontSize: '12px', fontWeight: '600' }}
+                  >
+                    <option value="DEFAULT">DEFAULT (Mon-Fri Scheduled, Weekend Closed)</option>
+                    <option value="OPEN">OPEN (Special Trading Session)</option>
+                    <option value="CLOSED">CLOSED (Market Holiday / Halt)</option>
+                  </select>
+
+                  {editForm.equity_status === 'OPEN' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <input
+                        type="time"
+                        value={editForm.equity_start_time}
+                        onChange={(e) => setEditForm({ ...editForm, equity_start_time: e.target.value })}
+                        style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px' }}
+                      />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>to</span>
+                      <input
+                        type="time"
+                        value={editForm.equity_end_time}
+                        onChange={(e) => setEditForm({ ...editForm, equity_end_time: e.target.value })}
+                        style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Segment 2: MCX Commodities */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                  🛢️ MCX Commodities:
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={editForm.commodity_status}
+                    onChange={(e) => setEditForm({ ...editForm, commodity_status: e.target.value })}
+                    style={{ flex: 1, minWidth: '180px', background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', fontSize: '12px', fontWeight: '600' }}
+                  >
+                    <option value="DEFAULT">DEFAULT (Mon-Fri Scheduled, Weekend Closed)</option>
+                    <option value="OPEN">OPEN (Active Session / Custom Hours)</option>
+                    <option value="CLOSED">CLOSED (Market Holiday / Halt)</option>
+                  </select>
+
+                  {editForm.commodity_status === 'OPEN' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <input
+                        type="time"
+                        value={editForm.commodity_start_time}
+                        onChange={(e) => setEditForm({ ...editForm, commodity_start_time: e.target.value })}
+                        style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px' }}
+                      />
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>to</span>
+                      <input
+                        type="time"
+                        value={editForm.commodity_end_time}
+                        onChange={(e) => setEditForm({ ...editForm, commodity_end_time: e.target.value })}
+                        style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 8px', fontSize: '12px' }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px' }}>
+                {calendarMap[editForm.date] ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteRule}
+                    disabled={actionLoading}
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Reset to Default
+                  </button>
+                ) : <div />}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditModalOpen(false)}
+                    style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border-color)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionLoading}
+                    style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: actionLoading ? 'not-allowed' : 'pointer' }}
+                  >
+                    {actionLoading ? 'Saving...' : '💾 Save Schedule Rule'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -955,6 +1666,28 @@ export default function AdminDashboard() {
               <option value="CLOSED">CLOSED (Holiday / Halt)</option>
             </select>
           </div>
+
+          {/* Calendar Management Button */}
+          <button
+            onClick={() => setActiveTab('calendar')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(139, 92, 246, 0.15)',
+              color: '#c084fc',
+              border: '1px solid rgba(139, 92, 246, 0.4)',
+              borderRadius: '8px',
+              padding: '8px 14px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Calendar size={15} />
+            📅 Manage Calendar
+          </button>
         </div>
       </div>
 
@@ -1014,6 +1747,12 @@ export default function AdminDashboard() {
           style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'system' ? '2px solid var(--color-blue)' : '2px solid transparent', color: activeTab === 'system' ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: activeTab === 'system' ? '600' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           System Status
+        </button>
+        <button 
+          onClick={() => setActiveTab('calendar')} 
+          style={{ background: 'none', border: 'none', padding: '8px 0', borderBottom: activeTab === 'calendar' ? '2px solid #8b5cf6' : '2px solid transparent', color: activeTab === 'calendar' ? '#c084fc' : 'var(--text-secondary)', fontWeight: activeTab === 'calendar' ? '700' : '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          📅 Trading Calendar
         </button>
         <button 
           onClick={() => setActiveTab('analytics')}
@@ -1210,6 +1949,8 @@ export default function AdminDashboard() {
             onTriggerAutoLogin={handleTriggerAutoLogin}
             autoLoginLoading={autoLoginLoading}
           />
+        ) : activeTab === 'calendar' ? (
+          <MarketCalendarTab isMobile={isMobile} />
         ) : activeTab === 'analytics' ? (
           <div style={{ padding: '24px' }}>
             {analytics ? (

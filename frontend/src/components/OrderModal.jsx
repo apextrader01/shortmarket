@@ -185,8 +185,49 @@ export default function OrderModal() {
         reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked as CLOSED / Holiday by Administrator.` 
       };
     }
-    // AUTO mode: Check weekend & normal hours
-    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+
+    // 1. Check Date-Specific Calendar Override
+    const now = new Date();
+    const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const y = istTime.getFullYear();
+    const m = String(istTime.getMonth() + 1).padStart(2, '0');
+    const d = String(istTime.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+    
+    const calRule = (marketCalendar || []).find(r => r.date === todayStr);
+    if (calRule) {
+      const segStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
+      const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
+      
+      if (segStatus === 'CLOSED') {
+        return {
+          open: false,
+          mode: 'CLOSED',
+          reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`
+        };
+      }
+      
+      if (segStatus === 'OPEN') {
+        const startTimeStr = isCommodity ? (calRule.commodity_start_time || '09:00') : (calRule.equity_start_time || '09:15');
+        const endTimeStr = isCommodity ? (calRule.commodity_end_time || '23:30') : (calRule.equity_end_time || '15:30');
+        const [sH, sM] = startTimeStr.split(':').map(Number);
+        const [eH, eM] = endTimeStr.split(':').map(Number);
+        const curMins = istTime.getHours() * 60 + istTime.getMinutes();
+        const startMins = sH * 60 + (sM || 0);
+        const endMins = eH * 60 + (eM || 0);
+        
+        if (curMins < startMins || curMins >= endMins) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            reason: `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`
+          };
+        }
+        return { open: true, mode: 'OPEN' };
+      }
+    }
+
+    // 2. AUTO mode: Check weekend & normal hours
     const day = istTime.getDay(); // 0 = Sun, 6 = Sat
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();

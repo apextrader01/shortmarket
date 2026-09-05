@@ -557,11 +557,25 @@ async function ensureCriticalColumns() {
       await db('system_settings').insert({ key: 'equity_market_status', value: 'AUTO' });
     }
     const hasMcx = await db('system_settings').where({ key: 'commodity_market_status' }).first();
-    if (!hasMcx) {
-      await db('system_settings').insert({ key: 'commodity_market_status', value: 'AUTO' });
-    }
+    // Market Calendar Table (for scheduled trading days, holidays, special sessions, custom hours)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS market_calendar (
+        id SERIAL PRIMARY KEY,
+        date VARCHAR(10) NOT NULL UNIQUE,
+        equity_status VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+        commodity_status VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+        equity_start_time VARCHAR(10),
+        equity_end_time VARCHAR(10),
+        commodity_start_time VARCHAR(10),
+        commodity_end_time VARCHAR(10),
+        reason VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_market_calendar_date ON market_calendar(date)');
 
-    console.log('✅ Critical columns, indexes, and system_settings verified on tables');
+    console.log('✅ Critical columns, indexes, system_settings, and market_calendar verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }
