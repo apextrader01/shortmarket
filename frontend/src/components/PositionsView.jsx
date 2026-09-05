@@ -267,74 +267,115 @@ export default function PositionsView() {
   };
 
   return (
-    <div style={{ padding: isMobile ? '12px 12px 80px 12px' : '24px', paddingBottom: '100px', width: '100%', boxSizing: 'border-box', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '12px' : '24px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', margin: 0 }}>Positions</h2>
-          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px' }}>
+    <div style={{ padding: isMobile ? '12px 12px 40px 12px' : '20px', width: '100%', boxSizing: 'border-box', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+      {/* Top Header Bar with Tabs, Live MTM Widget, and Exit Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '12px' : '20px', flexWrap: 'wrap', gap: '12px' }}>
+        {/* Left: Title & Sub-tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', margin: 0, color: '#fff' }}>Positions</h2>
+          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '8px', padding: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <button
               onClick={() => setViewMode('OPEN')}
-              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               OPEN
             </button>
             <button
               onClick={() => setViewMode('HOLDINGS')}
-              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               HOLDINGS
             </button>
             <button
               onClick={() => setViewMode('CLOSED')}
-              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-primary)', border: 'none', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: isMobile ? '11px' : '13px', fontWeight: '600' }}
+              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               CLOSED
             </button>
           </div>
         </div>
-        {viewMode === 'OPEN' && flatPositions.length > 0 && (
-          <button
-            onClick={exitAllPositions}
-            style={{
-              background: 'var(--color-red-light)', color: '#fff', border: 'none',
-              padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '4px', fontSize: isMobile ? '11px' : '12px', fontWeight: 'bold', cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-              width: isMobile ? '100%' : 'auto'
-            }}
-          >
-            EXIT ALL POSITIONS
-          </button>
-        )}
-        {viewMode === 'HOLDINGS' && flatPositions.length > 0 && (
-          <button
-            onClick={async () => {
-              if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
-              try {
-                const res = await fetch(`${API}/api/holdings/exit-all`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (res.ok) {
-                  alert(data.message || 'Successfully exited all holdings!');
-                  useStore.getState().fetchUserData();
-                } else {
-                  alert(data.error || 'Failed to exit holdings');
+
+        {/* Center/Middle: TOTAL PORTFOLIO MTM Widget */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+          border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+          padding: isMobile ? '6px 12px' : '6px 18px',
+          borderRadius: '10px',
+          boxShadow: `0 4px 16px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Activity size={18} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', lineHeight: 1.1 }}>
+                TOTAL PORTFOLIO MTM
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.1 }}>
+                Live market ticks
+              </div>
+            </div>
+          </div>
+          <div style={{
+            fontSize: isMobile ? '15px' : '18px',
+            fontWeight: '900',
+            letterSpacing: '-0.3px',
+            color: globalMTM >= 0 ? '#10B981' : '#EF4444',
+            marginLeft: '4px'
+          }}>
+            {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+
+        {/* Right: Exit Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {viewMode === 'OPEN' && flatPositions.length > 0 && (
+            <button
+              onClick={exitAllPositions}
+              style={{
+                background: 'var(--color-red-light)', color: '#fff', border: 'none',
+                padding: isMobile ? '7px 14px' : '8px 18px', borderRadius: '6px', fontSize: isMobile ? '11px' : '12px', fontWeight: '800', cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                width: isMobile ? '100%' : 'auto',
+                transition: 'all 0.15s'
+              }}
+            >
+              EXIT ALL POSITIONS ⚡
+            </button>
+          )}
+          {viewMode === 'HOLDINGS' && flatPositions.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
+                try {
+                  const res = await fetch(`${API}/api/holdings/exit-all`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(data.message || 'Successfully exited all holdings!');
+                    useStore.getState().fetchUserData();
+                  } else {
+                    alert(data.error || 'Failed to exit holdings');
+                  }
+                } catch (e) {
+                  alert('Error exiting holdings: ' + e.message);
                 }
-              } catch (e) {
-                alert('Error exiting holdings: ' + e.message);
-              }
-            }}
-            style={{
-              background: 'var(--color-red-light)', color: '#fff', border: 'none',
-              padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '4px', fontSize: isMobile ? '11px' : '12px', fontWeight: 'bold', cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-              width: isMobile ? '100%' : 'auto'
-            }}
-          >
-            EXIT ALL HOLDINGS ⚡
-          </button>
-        )}
+              }}
+              style={{
+                background: 'var(--color-red-light)', color: '#fff', border: 'none',
+                padding: isMobile ? '7px 14px' : '8px 18px', borderRadius: '6px', fontSize: isMobile ? '11px' : '12px', fontWeight: '800', cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+                width: isMobile ? '100%' : 'auto',
+                transition: 'all 0.15s'
+              }}
+            >
+              EXIT ALL HOLDINGS ⚡
+            </button>
+          )}
+        </div>
       </div>
       
       {flatPositions.length === 0 ? (
@@ -592,33 +633,7 @@ export default function PositionsView() {
         </>
       )}
 
-      {/* Global MTM Banner (Only on desktop to avoid covering mobile bottom nav) */}
-        {!isMobile && (
-          <div style={{
-            position: 'fixed', bottom: '24px', right: '24px', 
-            background: 'var(--bg-panel)',
-            backdropFilter: 'blur(16px)', 
-            border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-            boxShadow: `0 12px 40px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
-            borderRadius: '16px',
-            padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '32px',
-            zIndex: 50, transition: 'all 0.3s ease'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Activity size={24} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Total Portfolio MTM</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Live market ticks</div>
-              </div>
-            </div>
-            <div style={{ 
-              fontSize: '28px', fontWeight: '900', letterSpacing: '-0.5px',
-              color: globalMTM >= 0 ? '#10B981' : '#EF4444' 
-            }}>
-              {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-        )}
+
 
       {/* Partial Exit Modal */}
       {partialExitPos && (
