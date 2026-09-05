@@ -1427,18 +1427,30 @@ const DownloadReports = () => {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '6px' }}>
               <button
                 type="button"
                 disabled={isGenerating}
                 onClick={() => handleDownload('excel')}
                 style={{
-                  background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)',
-                  color: '#60a5fa', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)',
+                  color: '#60a5fa', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
-                <Download size={15} /> {isGenerating ? 'Generating...' : 'Download Excel'}
+                <Download size={14} /> Excel (.csv)
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={() => handleDownload('html')}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)',
+                  color: '#34d399', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                <Download size={14} /> HTML File
               </button>
               <button
                 type="button"
@@ -1446,12 +1458,12 @@ const DownloadReports = () => {
                 onClick={() => handleDownload('pdf')}
                 style={{
                   background: 'var(--color-blue)', border: 'none',
-                  color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  color: '#fff', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   boxShadow: '0 4px 12px rgba(37,99,235,0.4)'
                 }}
               >
-                <FileText size={15} /> {isGenerating ? 'Generating...' : 'Print / Save PDF'}
+                <FileText size={14} /> Print / PDF
               </button>
             </div>
           </div>

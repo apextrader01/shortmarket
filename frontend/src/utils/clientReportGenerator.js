@@ -1,5 +1,5 @@
 // frontend/src/utils/clientReportGenerator.js
-// Ultra-fast, popup-proof Financial Reports & Statements Generator (Excel + PDF)
+// Ultra-fast, popup-proof Financial Reports & Statements Generator (Excel + PDF + HTML)
 
 /**
  * Escape CSV string values properly
@@ -37,7 +37,7 @@ export function filterRecordsByPeriod(records = [], period = 'All Time', customS
 
   return records.filter(item => {
     const rawDate = item[dateField] || item.createdAt || item.date || item.timestamp;
-    if (!rawDate) return true; // Include if date missing to prevent silent drops
+    if (!rawDate) return true;
     const itemDate = new Date(rawDate);
     if (isNaN(itemDate.getTime())) return true;
     const itemIST = getISTDateString(itemDate);
@@ -102,28 +102,27 @@ export function calculateIndianCharges(order) {
   // STT / CTT
   let stt = 0;
   if (isDelivery) {
-    stt = tradeValue * 0.001; // 0.1% on buy and sell
+    stt = tradeValue * 0.001;
   } else if (isOption) {
-    stt = isSell ? tradeValue * 0.000625 : 0; // 0.0625% on sell
+    stt = isSell ? tradeValue * 0.000625 : 0;
   } else if (isFuture) {
-    stt = isSell ? tradeValue * 0.000125 : 0; // 0.0125% on sell
+    stt = isSell ? tradeValue * 0.000125 : 0;
   } else if (isMCX) {
-    stt = isSell ? tradeValue * 0.0001 : 0; // 0.01% CTT on sell
+    stt = isSell ? tradeValue * 0.0001 : 0;
   } else {
-    // Equity Intraday
-    stt = isSell ? tradeValue * 0.00025 : 0; // 0.025% on sell
+    stt = isSell ? tradeValue * 0.00025 : 0;
   }
 
   // Exchange Txn Charges
   let exchangeFee = 0;
   if (isOption) {
-    exchangeFee = tradeValue * 0.0005; // 0.05% on premium
+    exchangeFee = tradeValue * 0.0005;
   } else if (isFuture) {
-    exchangeFee = tradeValue * 0.000019; // 0.0019%
+    exchangeFee = tradeValue * 0.000019;
   } else if (isMCX) {
-    exchangeFee = tradeValue * 0.000021; // 0.0021%
+    exchangeFee = tradeValue * 0.000021;
   } else {
-    exchangeFee = tradeValue * 0.0000345; // 0.00345%
+    exchangeFee = tradeValue * 0.0000345;
   }
 
   // SEBI Charges: ₹10 per crore (0.000001)
@@ -141,7 +140,6 @@ export function calculateIndianCharges(order) {
 
   // GST: 18% on (Brokerage + Exchange + SEBI)
   const gst = (brokerage + exchangeFee + sebiFee) * 0.18;
-
   const totalCharges = brokerage + stt + exchangeFee + sebiFee + stampDuty + gst;
 
   return {
@@ -172,16 +170,37 @@ export function triggerCsvDownload(csvRows, filename) {
     setTimeout(() => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    }, 100);
+    }, 150);
   } catch (err) {
     console.error('CSV Download failed:', err);
   }
 }
 
 /**
- * Prints a clean, branded PDF without popup blocker issues (via hidden iframe)
+ * Downloads a standalone offline HTML statement
  */
-export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
+export function triggerHtmlDownload(htmlContent, filename) {
+  try {
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.html`);
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 150);
+  } catch (err) {
+    console.error('HTML Download failed:', err);
+  }
+}
+
+/**
+ * Builds standard styled HTML document for statements
+ */
+export function buildReportHtml(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
   const generatedDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   const clientName = clientMeta.username || clientMeta.name || 'Valued Trader';
   const clientId = clientMeta.client_id || (clientMeta.id ? `SE${String(clientMeta.id).padStart(6, '0')}` : 'SE000001');
@@ -194,7 +213,7 @@ export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], table
     </div>
   `).join('');
 
-  const fullHtml = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -249,45 +268,67 @@ export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], table
   </div>
 </body>
 </html>`;
+}
+
+/**
+ * Prints a clean, branded PDF (Always destroys stale frames and creates a fresh Blob frame)
+ */
+export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
+  const fullHtml = buildReportHtml(title, clientMeta, summaryCards, tablesHtml);
 
   try {
-    // Hidden IFrame print method avoids popup blocker
-    let iframe = document.getElementById('__report_print_frame__');
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.id = '__report_print_frame__';
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      document.body.appendChild(iframe);
-    }
+    // 1. Remove all old print frames from DOM to prevent browser print queue lock
+    const oldFrames = document.querySelectorAll('iframe[data-report-print]');
+    oldFrames.forEach(f => f.remove());
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(fullHtml);
-    doc.close();
+    // 2. Create fresh isolated iframe
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('data-report-print', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '1000px';
+    iframe.style.height = '1000px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = 'none';
+    iframe.style.zIndex = '-9999';
+    document.body.appendChild(iframe);
 
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (err) {
-        console.warn('Iframe print error, trying popup window:', err);
-        const w = window.open('', '_blank');
-        if (w) {
-          w.document.open();
-          w.document.write(fullHtml);
-          w.document.close();
-          w.focus();
-          w.print();
+    // 3. Blob URL avoids cross-origin and document write locks
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (err) {
+          console.warn('Iframe print failed, falling back to popup window / HTML download:', err);
+          const w = window.open('', '_blank');
+          if (w) {
+            w.document.open();
+            w.document.write(fullHtml);
+            w.document.close();
+            w.focus();
+            w.print();
+          } else {
+            triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
+          }
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+          setTimeout(() => {
+            try { iframe.remove(); } catch (_) {}
+          }, 5000);
         }
-      }
-    }, 200);
+      }, 150);
+    };
+
+    iframe.src = blobUrl;
   } catch (e) {
-    console.error('Print generation failed:', e);
+    console.error('Print generation failed, downloading HTML file:', e);
+    triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
   }
 }
 
@@ -370,6 +411,54 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
     }
 
     triggerCsvDownload(rows, `Tax_PnL_${displayPeriod.replace(/\s+/g, '_')}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Total Turnover', value: `₹${totalTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Gross Realized P&L', value: `${totalGrossPnl >= 0 ? '+' : ''}₹${totalGrossPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalGrossPnl >= 0 ? '#16a34a' : '#dc2626' },
+      { label: 'Taxes & Charges', value: `₹${totalCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#dc2626' },
+      { label: 'Net Taxable P&L', value: `${totalNetTaxable >= 0 ? '+' : ''}₹${totalNetTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalNetTaxable >= 0 ? '#16a34a' : '#dc2626' }
+    ];
+
+    const tableRows = scripList.map(s => {
+      const net = s.realizedPnl - s.charges;
+      return `
+        <tr>
+          <td><strong>${s.symbol}</strong></td>
+          <td>${s.segment}</td>
+          <td class="text-right">${s.buyQty}</td>
+          <td class="text-right">₹${s.buyVal.toFixed(2)}</td>
+          <td class="text-right">${s.sellQty}</td>
+          <td class="text-right">₹${s.sellVal.toFixed(2)}</td>
+          <td class="text-right ${s.realizedPnl >= 0 ? 'text-green' : 'text-red'}">${s.realizedPnl >= 0 ? '+' : ''}₹${s.realizedPnl.toFixed(2)}</td>
+          <td class="text-right">₹${s.charges.toFixed(2)}</td>
+          <td class="text-right ${net >= 0 ? 'text-green' : 'text-red'}">${net >= 0 ? '+' : ''}₹${net.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Scrip Symbol</th>
+            <th>Segment</th>
+            <th class="text-right">Buy Qty</th>
+            <th class="text-right">Buy Value</th>
+            <th class="text-right">Sell Qty</th>
+            <th class="text-right">Sell Value</th>
+            <th class="text-right">Gross Realized P&L</th>
+            <th class="text-right">Taxes & Charges</th>
+            <th class="text-right">Net Taxable P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.length ? tableRows : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No trades recorded in this period.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildReportHtml('Scripwise Tax P&L Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `Tax_PnL_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Turnover', value: `₹${totalTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
@@ -477,6 +566,47 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
     });
 
     triggerCsvDownload(rows, `PnL_Summary_${displayPeriod.replace(/\s+/g, '_')}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Total Realized Gross P&L', value: `${totalGross >= 0 ? '+' : ''}₹${totalGross.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalGross >= 0 ? '#16a34a' : '#dc2626' },
+      { label: 'Total Regulatory Charges', value: `₹${totalCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#dc2626' },
+      { label: 'Net Realized Profit / Loss', value: `${totalNet >= 0 ? '+' : ''}₹${totalNet.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalNet >= 0 ? '#16a34a' : '#dc2626' }
+    ];
+
+    const tableRows = Object.entries(segments).map(([segName, data]) => {
+      const net = data.grossPnl - data.charges;
+      return `
+        <tr>
+          <td><strong>${segName}</strong></td>
+          <td class="text-right">${data.trades}</td>
+          <td class="text-right">₹${data.turnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right ${data.grossPnl >= 0 ? 'text-green' : 'text-red'}">${data.grossPnl >= 0 ? '+' : ''}₹${data.grossPnl.toFixed(2)}</td>
+          <td class="text-right">₹${data.charges.toFixed(2)}</td>
+          <td class="text-right ${net >= 0 ? 'text-green' : 'text-red'}">${net >= 0 ? '+' : ''}₹${net.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Trading Segment</th>
+            <th class="text-right">Total Trades</th>
+            <th class="text-right">Turnover</th>
+            <th class="text-right">Gross P&L</th>
+            <th class="text-right">Charges</th>
+            <th class="text-right">Net Realized P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildReportHtml('Segmentwise P&L Summary Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `PnL_Summary_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Realized Gross P&L', value: `${totalGross >= 0 ? '+' : ''}₹${totalGross.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalGross >= 0 ? '#16a34a' : '#dc2626' },
@@ -586,6 +716,50 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
     }
 
     triggerCsvDownload(rows, `Trades_and_Charges_${displayPeriod.replace(/\s+/g, '_')}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Total Executed Trades', value: `${executed.length}` },
+      { label: 'Total Brokerage', value: `₹${grandBrokerage.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Total STT / CTT', value: `₹${grandSTT.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Total GST (18%)', value: `₹${grandGST.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Grand Total Charges', value: `₹${grandTotalCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#dc2626' }
+    ];
+
+    const tableRows = tradeRows.map(t => `
+      <tr>
+        <td>${t.date}</td>
+        <td><strong style="color: ${t.side === 'BUY' ? '#2563eb' : '#dc2626'};">${t.side}</strong> ${t.symbol}</td>
+        <td class="text-right">${t.qty} @ ₹${t.price.toFixed(2)}</td>
+        <td class="text-right">₹${t.tradeValue.toFixed(2)}</td>
+        <td class="text-right">₹${t.brokerage.toFixed(2)}</td>
+        <td class="text-right">₹${t.stt.toFixed(2)}</td>
+        <td class="text-right">₹${t.gst.toFixed(2)}</td>
+        <td class="text-right"><strong>₹${t.totalCharges.toFixed(2)}</strong></td>
+      </tr>
+    `).join('');
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Trade Details</th>
+            <th class="text-right">Quantity & Price</th>
+            <th class="text-right">Trade Value</th>
+            <th class="text-right">Brokerage</th>
+            <th class="text-right">STT / CTT</th>
+            <th class="text-right">GST</th>
+            <th class="text-right">Total Charges</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.length ? tableRows : '<tr><td colspan="8" style="text-align:center; padding: 20px;">No trades recorded in this period.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildReportHtml('Trades & Regulatory Charges Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `Trades_and_Charges_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Executed Trades', value: `${executed.length}` },
@@ -677,6 +851,47 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
     }
 
     triggerCsvDownload(rows, `Ledger_Statement_${displayPeriod.replace(/\s+/g, '_')}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Total Deposits & Credits', value: `+₹${totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#16a34a' },
+      { label: 'Total Withdrawals & Debits', value: `-₹${totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#dc2626' },
+      { label: 'Closing Available Balance', value: `₹${closingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#2563eb' }
+    ];
+
+    const tableRows = ledgerWithBalance.map(l => {
+      const amt = Number(l.amount) || 0;
+      return `
+        <tr>
+          <td>${new Date(l.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+          <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9.5px;">${String(l.type || '').replace('_', ' ')}</span></td>
+          <td>${l.description || l.type}</td>
+          <td class="text-right text-green">${amt > 0 ? `₹${amt.toFixed(2)}` : '-'}</td>
+          <td class="text-right text-red">${amt < 0 ? `₹${Math.abs(amt).toFixed(2)}` : '-'}</td>
+          <td class="text-right" style="font-weight: 700; color: #1e3a8a;">₹${Number(l.running_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Type</th>
+            <th>Narration / Description</th>
+            <th class="text-right">Credit (+)</th>
+            <th class="text-right">Debit (-)</th>
+            <th class="text-right">Available Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.length ? tableRows : '<tr><td colspan="6" style="text-align:center; padding: 20px;">No transactions recorded in ledger for this period.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildReportHtml('Financial Ledger Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `Ledger_Statement_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Deposits & Credits', value: `+₹${totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#16a34a' },
@@ -792,6 +1007,67 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
     }
 
     triggerCsvDownload(rows, `Contract_Note_${tradeDate}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Contract Note Number', value: cnNumber },
+      { label: 'Total Trade Turnover', value: `₹${(totalBuyVal + totalSellVal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Total Taxes & Levies', value: `₹${totalTaxes.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#dc2626' },
+      { label: 'Net Settlement (Pay-in/Pay-out)', value: `${netSettlement >= 0 ? '+' : ''}₹${netSettlement.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: netSettlement >= 0 ? '#16a34a' : '#dc2626' }
+    ];
+
+    const tableRows = tradeItems.map(t => `
+      <tr>
+        <td>${t.orderNo}</td>
+        <td>${t.tradeTime}</td>
+        <td><strong>${t.symbol}</strong></td>
+        <td><strong style="color: ${t.side === 'BUY' ? '#2563eb' : '#dc2626'};">${t.side}</strong></td>
+        <td class="text-right">${t.qty}</td>
+        <td class="text-right">₹${t.price.toFixed(2)}</td>
+        <td class="text-right">₹${t.tradeValue.toFixed(2)}</td>
+        <td class="text-right">₹${t.brokerage.toFixed(2)}</td>
+        <td class="text-right"><strong>₹${t.netTotal.toFixed(2)}</strong></td>
+      </tr>
+    `).join('');
+
+    const chargesBreakdownTable = `
+      <div style="margin-top: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px;">
+        <div style="font-weight: 700; margin-bottom: 8px; font-size: 11px; color: #1e293b;">Regulatory Tax & Charges Schedule</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 10.5px;">
+          <div>Brokerage: <strong>₹${totalBrokerage.toFixed(2)}</strong></div>
+          <div>STT / CTT: <strong>₹${totalSTT.toFixed(2)}</strong></div>
+          <div>Exchange Txn Fee: <strong>₹${totalExchange.toFixed(2)}</strong></div>
+          <div>GST (18%): <strong>₹${totalGST.toFixed(2)}</strong></div>
+          <div>SEBI Turnover Fee: <strong>₹${totalSEBI.toFixed(2)}</strong></div>
+          <div>Stamp Duty: <strong>₹${totalStamp.toFixed(2)}</strong></div>
+          <div>Total Levies: <strong style="color: #dc2626;">₹${totalTaxes.toFixed(2)}</strong></div>
+        </div>
+      </div>
+    `;
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>Order No</th>
+            <th>Trade Time</th>
+            <th>Symbol / Contract</th>
+            <th>Side</th>
+            <th class="text-right">Quantity</th>
+            <th class="text-right">Gross Price</th>
+            <th class="text-right">Trade Value</th>
+            <th class="text-right">Brokerage</th>
+            <th class="text-right">Net Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.length ? tableRows : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No trades executed on ' + tradeDate + '.</td></tr>'}
+        </tbody>
+      </table>
+      ${chargesBreakdownTable}
+    `;
+
+    const html = buildReportHtml(`Contract Note - ${tradeDate}`, { ...user, period: `Trade Date: ${tradeDate}` }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `Contract_Note_${tradeDate}`);
   } else {
     const summaryCards = [
       { label: 'Contract Note Number', value: cnNumber },
@@ -921,6 +1197,50 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
     }
 
     triggerCsvDownload(rows, `DP_Holdings_Valuation_${new Date().toISOString().slice(0, 10)}`);
+  } else if (format === 'html') {
+    const summaryCards = [
+      { label: 'Total Invested Value', value: `₹${totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+      { label: 'Current Portfolio Value', value: `₹${totalCurrentVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#2563eb' },
+      { label: 'Total Unrealized P&L', value: `${totalUnrealizedPnl >= 0 ? '+' : ''}₹${totalUnrealizedPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${totalReturnPct}%)`, color: totalUnrealizedPnl >= 0 ? '#16a34a' : '#dc2626' }
+    ];
+
+    const tableRows = holdingRows.map(h => `
+      <tr>
+        <td><span style="font-family: monospace; font-size: 10px; color: #64748b;">${h.isin}</span></td>
+        <td><strong>${h.symbol}</strong></td>
+        <td class="text-right">${h.qty}</td>
+        <td class="text-right">₹${h.avgPrice.toFixed(2)}</td>
+        <td class="text-right">₹${h.cmp.toFixed(2)}</td>
+        <td class="text-right">₹${h.invested.toFixed(2)}</td>
+        <td class="text-right">₹${h.currentVal.toFixed(2)}</td>
+        <td class="text-right ${h.pnl >= 0 ? 'text-green' : 'text-red'}">${h.pnl >= 0 ? '+' : ''}₹${h.pnl.toFixed(2)}</td>
+        <td class="text-right ${h.pnl >= 0 ? 'text-green' : 'text-red'}">${h.pnl >= 0 ? '+' : ''}${h.pnlPct}%</td>
+      </tr>
+    `).join('');
+
+    const tablesHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>ISIN</th>
+            <th>Scrip Symbol</th>
+            <th class="text-right">Qty</th>
+            <th class="text-right">Buy Avg</th>
+            <th class="text-right">LTP / CMP</th>
+            <th class="text-right">Invested Value</th>
+            <th class="text-right">Current Value</th>
+            <th class="text-right">Unrealized P&L</th>
+            <th class="text-right">Return %</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows.length ? tableRows : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No Demat holdings found in portfolio.</td></tr>'}
+        </tbody>
+      </table>
+    `;
+
+    const html = buildReportHtml('DP Holdings & Demat Valuation Statement', { ...user, period: `As on ${asOfDate}` }, summaryCards, tablesHtml);
+    triggerHtmlDownload(html, `DP_Holdings_Valuation_${new Date().toISOString().slice(0, 10)}`);
   } else {
     const summaryCards = [
       { label: 'Total Invested Value', value: `₹${totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
