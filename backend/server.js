@@ -86,20 +86,73 @@ const app = express();
 app.set('trust proxy', true);
 const server = http.createServer(app);
 
-function getClientIp(req) {
+// Cleanup legacy invalid telemetry placeholders on startup
+(async function cleanInvalidTelemetry() {
+  try {
+    await db('users')
+      .where('city', 'Local Network')
+      .orWhere('city', 'Local')
+      .update({ city: '' });
+    await db('users')
+      .where('state', 'Local')
+      .update({ state: '' });
+  } catch (e) {}
+})();
+
+function isValidPublicIp(ip) {
+  if (!ip || typeof ip !== 'string') return false;
+  const clean = ip.replace(/^::ffff:/, '').trim();
+  if (!clean || clean === '::1' || clean === '127.0.0.1' || clean === 'localhost') return false;
+  if (clean.startsWith('10.') || clean.startsWith('192.168.') || clean.startsWith('169.254.')) return false;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(clean)) return false;
+  if (clean.startsWith('fc') || clean.startsWith('fd') || clean.startsWith('fe80')) return false;
+  const ipv4Pattern = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  const ipv6Pattern = /^[0-9a-fA-F:]+$/;
+  return ipv4Pattern.test(clean) || ipv6Pattern.test(clean);
+}
+
+function getClientIp(req, optionalBodyIp) {
+  // 1. Direct header sent by frontend client
+  const customHeader = req.headers['x-client-public-ip'];
+  if (isValidPublicIp(customHeader)) {
+    return customHeader.trim().replace(/^::ffff:/, '');
+  }
+
+  // 2. Body IP sent by frontend in login / register / telemetry
+  if (isValidPublicIp(optionalBodyIp)) {
+    return optionalBodyIp.trim().replace(/^::ffff:/, '');
+  }
+  if (isValidPublicIp(req.body?.client_ip)) {
+    return req.body.client_ip.trim().replace(/^::ffff:/, '');
+  }
+
+  // 3. Proxy & Cloud Provider Headers
+  const cfIp = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'];
+  if (isValidPublicIp(cfIp)) {
+    return cfIp.trim().replace(/^::ffff:/, '');
+  }
+
   const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    const first = forwarded.split(',')[0].trim();
-    if (first && first !== '::1' && first !== '127.0.0.1' && !first.startsWith('127.')) {
-      return first.replace(/^::ffff:/, '');
+  if (forwarded && typeof forwarded === 'string') {
+    const ips = forwarded.split(',').map(s => s.trim().replace(/^::ffff:/, ''));
+    for (const ip of ips) {
+      if (isValidPublicIp(ip)) return ip;
     }
   }
-  const realIp = req.headers['x-real-ip'] || req.headers['cf-connecting-ip'] || req.headers['x-client-ip'];
-  if (realIp && realIp !== '::1' && realIp !== '127.0.0.1') {
+
+  const realIp = req.headers['x-real-ip'] || req.headers['x-client-ip'] || req.headers['x-cluster-client-ip'];
+  if (isValidPublicIp(realIp)) {
     return realIp.trim().replace(/^::ffff:/, '');
   }
+
+  // 4. Raw connection address
   const raw = req.ip || req.socket?.remoteAddress || '';
-  return raw.replace(/^::ffff:/, '') || '127.0.0.1';
+  const cleanRaw = raw.replace(/^::ffff:/, '').trim();
+  if (isValidPublicIp(cleanRaw)) {
+    return cleanRaw;
+  }
+
+  return cleanRaw || '127.0.0.1';
 }
 const priceCache = {};
 
@@ -537,7 +590,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
-    const clientIp = getClientIp(req);
+    const clientIp = getClientIp(req, req.body?.client_ip);
     
     // Check if IP or Phone is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -548,13 +601,16 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
     const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
-    const { city, state } = parseIpLocation(clientIp);
+    let { city, state } = parseIpLocation(clientIp);
+    if (!city && req.body?.client_city) city = req.body.client_city;
+    if (!state && req.body?.client_state) state = req.body.client_state;
 
     const [id] = await db('users').insert({ 
       username, email, phone, password_hash, watchlists: defaultWatchlist,
       registration_ip: clientIp, last_ip: clientIp,
       device_model: deviceModel, os_name: osName, browser_name: browserName,
-      city: city, state: state
+      city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
+      state: (state && state !== 'Local') ? state : ''
     }).returning('id');
     
     // Some db engines return an object from returning(), handle both
@@ -628,7 +684,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
-    const clientIp = getClientIp(req);
+    const clientIp = getClientIp(req, req.body?.client_ip);
     
     // Check if IP or Account is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -639,16 +695,26 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 
     const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
-    const { city, state } = parseIpLocation(clientIp);
+    let { city, state } = parseIpLocation(clientIp);
+    if (!city && req.body?.client_city) city = req.body.client_city;
+    if (!state && req.body?.client_state) state = req.body.client_state;
 
-    await db('users').where({ id: user.id }).update({
-      last_ip: clientIp,
+    const updateFields = {
       device_model: deviceModel,
       os_name: osName,
-      browser_name: browserName,
-      city: city,
-      state: state
-    }).catch(e => console.error('Failed to update user login meta:', e));
+      browser_name: browserName
+    };
+    if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+      updateFields.last_ip = clientIp;
+    }
+    if (city && city !== 'Local Network' && city !== 'Local') {
+      updateFields.city = city;
+    }
+    if (state && state !== 'Local') {
+      updateFields.state = state;
+    }
+
+    await db('users').where({ id: user.id }).update(updateFields).catch(e => console.error('Failed to update user login meta:', e));
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
@@ -666,6 +732,39 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       return res.status(500).json({ error: 'Database not connected. Please add a PostgreSQL database in Railway.' });
     }
     res.status(500).json({ error: errorMsg || 'Unknown error occurred during login' });
+  }
+});
+
+// Active Client Telemetry Sync (Instant location and device fingerprinting)
+app.post('/api/user/telemetry', authenticateToken, async (req, res) => {
+  try {
+    const clientIp = getClientIp(req, req.body?.client_ip);
+    const userAgent = req.headers['user-agent'] || '';
+    const { deviceModel, osName, browserName } = parseDeviceDetails(userAgent);
+    
+    let { city, state } = parseIpLocation(clientIp);
+    if (!city && req.body?.city) city = req.body.city;
+    if (!state && req.body?.state) state = req.body.state;
+
+    const updateFields = {
+      device_model: deviceModel,
+      os_name: osName,
+      browser_name: browserName
+    };
+    if (clientIp && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+      updateFields.last_ip = clientIp;
+    }
+    if (city && city !== 'Local Network' && city !== 'Local') {
+      updateFields.city = city;
+    }
+    if (state && state !== 'Local') {
+      updateFields.state = state;
+    }
+
+    await db('users').where({ id: req.user.id }).update(updateFields);
+    res.json({ success: true, ip: clientIp, city: updateFields.city, state: updateFields.state, device: deviceModel });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1348,12 +1447,12 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const enhancedUsers = [];
     for (const u of rawUsers) {
       const ip = u.last_ip || u.registration_ip;
-      let detectedCity = u.ip_city || '';
-      let detectedState = u.ip_state || '';
-      if ((!detectedCity || !detectedState) && ip && ip !== '::1' && ip !== '127.0.0.1') {
+      let detectedCity = (u.ip_city && u.ip_city !== 'Local Network' && u.ip_city !== 'Local') ? u.ip_city : '';
+      let detectedState = (u.ip_state && u.ip_state !== 'Local') ? u.ip_state : '';
+      if ((!detectedCity || !detectedState) && ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.')) {
         const geo = parseIpLocation(ip);
-        if (geo.city) detectedCity = geo.city;
-        if (geo.state) detectedState = geo.state;
+        if (geo.city && geo.city !== 'Local Network') detectedCity = geo.city;
+        if (geo.state && geo.state !== 'Local') detectedState = geo.state;
       }
       const sharedCount = ip ? (ipMap[ip] || 1) : 1;
       let sharedUsers = [];

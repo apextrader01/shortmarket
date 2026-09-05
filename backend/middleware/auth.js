@@ -27,21 +27,34 @@ function authenticateToken(req, res, next) {
 
     // Opportunistically record real IP & device info if missing or on change
     try {
+      const customIp = req.headers['x-client-public-ip'];
+      const realIpHeader = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'] || req.headers['x-real-ip'] || req.headers['x-client-ip'];
       const forwarded = req.headers['x-forwarded-for'];
-      const realIpHeader = req.headers['x-real-ip'] || req.headers['cf-connecting-ip'] || req.headers['x-client-ip'];
       let clientIp = '';
-      if (forwarded) {
-        const first = forwarded.split(',')[0].trim();
-        if (first && first !== '::1' && first !== '127.0.0.1' && !first.startsWith('127.')) {
-          clientIp = first.replace(/^::ffff:/, '');
-        }
-      }
-      if (!clientIp && realIpHeader && realIpHeader !== '::1' && realIpHeader !== '127.0.0.1') {
+
+      const isValidPublic = (ip) => {
+        if (!ip || typeof ip !== 'string') return false;
+        const clean = ip.replace(/^::ffff:/, '').trim();
+        if (!clean || clean === '::1' || clean === '127.0.0.1' || clean === 'localhost') return false;
+        if (clean.startsWith('10.') || clean.startsWith('192.168.') || clean.startsWith('169.254.')) return false;
+        if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(clean)) return false;
+        if (clean.startsWith('fc') || clean.startsWith('fd') || clean.startsWith('fe80')) return false;
+        return true;
+      };
+
+      if (isValidPublic(customIp)) {
+        clientIp = customIp.trim().replace(/^::ffff:/, '');
+      } else if (isValidPublic(realIpHeader)) {
         clientIp = realIpHeader.trim().replace(/^::ffff:/, '');
+      } else if (forwarded && typeof forwarded === 'string') {
+        const ips = forwarded.split(',').map(s => s.trim().replace(/^::ffff:/, ''));
+        for (const ip of ips) {
+          if (isValidPublic(ip)) { clientIp = ip; break; }
+        }
       }
       if (!clientIp) {
         const raw = req.ip || req.socket?.remoteAddress || '';
-        clientIp = raw.replace(/^::ffff:/, '');
+        clientIp = raw.replace(/^::ffff:/, '').trim();
       }
 
       if (clientIp && clientIp !== '::1' && clientIp !== '127.0.0.1' && user.id) {
@@ -49,21 +62,24 @@ function authenticateToken(req, res, next) {
         const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
         const { city, state } = parseIpLocation(clientIp);
 
+        const updateData = {
+          last_ip: clientIp,
+          device_model: deviceModel,
+          os_name: osName,
+          browser_name: browserName
+        };
+        if (city && city !== 'Local Network' && city !== 'Local') updateData.city = city;
+        if (state && state !== 'Local') updateData.state = state;
+
         db('users').where({ id: user.id })
           .where(function() {
             this.whereNull('last_ip')
                 .orWhere('last_ip', '')
                 .orWhere('last_ip', '::1')
-                .orWhere('last_ip', '127.0.0.1');
+                .orWhere('last_ip', '127.0.0.1')
+                .orWhere('last_ip', '!=', clientIp);
           })
-          .update({
-            last_ip: clientIp,
-            device_model: deviceModel,
-            os_name: osName,
-            browser_name: browserName,
-            city: city,
-            state: state
-          })
+          .update(updateData)
           .catch(() => {});
       }
     } catch (e) {

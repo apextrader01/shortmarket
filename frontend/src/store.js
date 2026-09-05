@@ -2,25 +2,30 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 import { getInstantLotsize } from './utils/lotsizeHelper';
+import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
   API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
 }
 
-// Global HTTP Fetch Interceptor to support Token-based authentication
-// when third-party cookies are blocked by browser settings (e.g. Incognito or Safari)
+// Global HTTP Fetch Interceptor to support Token-based authentication and real IP propagation
 const originalFetch = window.fetch;
 window.fetch = async function (url, options = {}) {
   const token = localStorage.getItem('token');
+  const clientIp = getCachedPublicIp();
+  const headers = { ...(options.headers || {}) };
+
   // Only add Authorization header when token is a valid non-empty string
-  // (prevents sending 'Bearer null' or 'Bearer undefined' before login)
   if (token && token.length > 10 && typeof url === 'string' && url.includes('/api/')) {
-    options.headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    };
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  // Inject client public IP header for accurate GeoIP & device security audit
+  if (clientIp && typeof url === 'string' && url.includes('/api/')) {
+    headers['X-Client-Public-IP'] = clientIp;
+  }
+
+  options.headers = headers;
   return originalFetch(url, options);
 };
 
@@ -127,8 +132,16 @@ export const useStore = create(persist((set, get) => ({
   login: async (email, password) => {
     try {
       set({ authError: null });
+      const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
+      const payload = {
+        email,
+        password,
+        client_ip: publicInfo?.ip || undefined,
+        client_city: publicInfo?.city || undefined,
+        client_state: publicInfo?.state || undefined
+      };
       const res  = await fetch(`${API}/api/auth/login`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -136,10 +149,10 @@ export const useStore = create(persist((set, get) => ({
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
-          
           watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
         });
         get().fetchUserData();
+        syncClientTelemetry(API, true);
       } else {
         set({ authError: data.error });
       }
@@ -151,8 +164,19 @@ export const useStore = create(persist((set, get) => ({
   register: async (username, email, phone, password) => {
     try {
       set({ authError: null });
+      const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
+      const payload = {
+        username,
+        email,
+        phone,
+        password,
+        referral_code: localStorage.getItem('referral_code'),
+        client_ip: publicInfo?.ip || undefined,
+        client_city: publicInfo?.city || undefined,
+        client_state: publicInfo?.state || undefined
+      };
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, phone, password, referral_code: localStorage.getItem('referral_code') }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -160,10 +184,10 @@ export const useStore = create(persist((set, get) => ({
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
-          
           watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
         });
         get().fetchUserData();
+        syncClientTelemetry(API, true);
       } else {
         set({ authError: data.error });
       }
@@ -672,9 +696,8 @@ export const useStore = create(persist((set, get) => ({
 
   // ── User Data ────────────────────────────────────────────────────────────────
   fetchUserData: async () => {
-    
-    
     try {
+      syncClientTelemetry(API);
       const headers = {  };
       const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
         fetch(`${API}/api/positions`, { credentials: 'include', headers }),

@@ -4734,11 +4734,22 @@ export default function AdminDashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Device Model:</span> <strong style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.device_model || 'Desktop PC'}</strong></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>OS & Browser:</span> <span style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.os_name || 'Windows'} ({selectedUser.browser_name || 'Chrome'})</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Detected IP Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>{selectedUser.ip_city ? `${selectedUser.ip_city}${selectedUser.ip_state ? `, ${selectedUser.ip_state}` : ''}` : (selectedUser.ip_state ? `${selectedUser.ip_state}, India` : (selectedUser.last_ip && selectedUser.last_ip !== '::1' && selectedUser.last_ip !== '127.0.0.1' ? 'India' : 'Localhost / Network'))}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px', fontFamily: 'monospace' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Detected IP Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>
+                    {(() => {
+                      const city = (selectedUser.ip_city && selectedUser.ip_city !== 'Local Network' && selectedUser.ip_city !== 'Local') ? selectedUser.ip_city : '';
+                      const state = (selectedUser.ip_state && selectedUser.ip_state !== 'Local') ? selectedUser.ip_state : '';
+                      const ip = selectedUser.last_ip || selectedUser.registration_ip;
+                      if (city && state) return `${city}, ${state}`;
+                      if (city) return `${city}, India`;
+                      if (state) return `${state}, India`;
+                      if (ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('192.168.') && !ip.startsWith('10.')) return 'India';
+                      return 'Localhost / Network';
+                    })()}
+                  </span></div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  {selectedUser.last_ip && (
+                  {selectedUser.last_ip && selectedUser.last_ip !== '::1' && selectedUser.last_ip !== '127.0.0.1' && (
                     <button
                       type="button"
                       onClick={async () => {
