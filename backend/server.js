@@ -4008,8 +4008,9 @@ app.post('/api/fyers/verify', async (req, res) => {
 });
 
 app.get('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
-  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
   try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const { getFyersCredentials } = require('./services/fyersAutoLogin');
     const creds = await getFyersCredentials();
     res.json({
@@ -4026,9 +4027,10 @@ app.get('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => {
-  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
-  const { fyers_user_id, fyers_pin, fyers_totp_key } = req.body;
   try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const { fyers_user_id, fyers_pin, fyers_totp_key } = req.body;
     if (fyers_user_id) {
       await db('system_settings').insert({ key: 'fyers_user_id', value: fyers_user_id.trim(), updated_at: new Date() }).onConflict('key').merge();
     }
@@ -4049,8 +4051,9 @@ app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => 
 });
 
 app.post('/api/admin/fyers/auto-login', authenticateToken, async (req, res) => {
-  if (!req.user.isAdmin) return res.status(403).json({ error: 'Admin access required' });
   try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
     const result = await performFyersAutoLogin();
     res.json(result);
