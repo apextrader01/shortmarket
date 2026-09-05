@@ -5,7 +5,16 @@ import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus } = useStore(useShallow(state => ({ orderModal: state.orderModal, closeOrderModal: state.closeOrderModal, user: state.user, restrictedStocks: state.restrictedStocks, openMarketDepthModal: state.openMarketDepthModal, marketDepthModal: state.marketDepthModal, marketStatus: state.marketStatus })));
+  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
+    orderModal: state.orderModal, 
+    closeOrderModal: state.closeOrderModal, 
+    user: state.user, 
+    restrictedStocks: state.restrictedStocks, 
+    openMarketDepthModal: state.openMarketDepthModal, 
+    marketDepthModal: state.marketDepthModal, 
+    marketStatus: state.marketStatus,
+    marketCalendar: state.marketCalendar 
+  })));
   const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
