@@ -2543,7 +2543,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* TOP 4 KPI SUMMARY CARDS */}
+            {/* INFRASTRUCTURE HARDWARE & CLOUD COST KPI CARDS */}
             {(() => {
               const totalBandwidth = (adminTelemetry?.api || []).reduce((acc, r) => acc + (r.totalBytes || 0), 0);
               const totalCalls = (adminTelemetry?.api || []).reduce((acc, r) => acc + (r.count || 0), 0);
@@ -2553,37 +2553,115 @@ export default function AdminDashboard() {
               const formattedBw = totalBandwidth > 1048576 
                 ? (totalBandwidth / 1048576).toFixed(2) + ' MB'
                 : (totalBandwidth / 1024).toFixed(2) + ' KB';
+              const bandwidthGB = totalBandwidth / (1024 * 1024 * 1024);
+              const estimatedCostINR = (bandwidthGB * 10.00).toFixed(2);
+              const estimatedCostUSD = (bandwidthGB * 0.12).toFixed(2);
+              const sys = adminTelemetry?.system;
 
               return (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <HardDrive size={12} color="var(--color-blue)" /> Bandwidth ({telemetryTimeframe})
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Row 1: Host VM Hardware & Capacity */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                    {/* Host RAM */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <HardDrive size={12} color="var(--color-blue)" /> Host VM RAM
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(sys?.ram?.pct || 0) > 85 ? 'var(--color-red)' : parseFloat(sys?.ram?.pct || 0) > 70 ? 'var(--color-yellow)' : 'var(--text-primary)' }}>
+                        {sys?.ram ? `${sys.ram.usedGB} / ${sys.ram.totalGB} GB` : 'Monitoring...'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {sys?.ram ? `${sys.ram.pct}% utilized` : 'Collecting...'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>{formattedBw}</div>
+
+                    {/* Host CPU */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Zap size={12} color="var(--color-green)" /> Host CPU ({sys?.cpu?.cores || 1} vCPUs)
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(sys?.cpu?.loadPct || 0) > 80 ? 'var(--color-red)' : 'var(--color-green-light)' }}>
+                        {sys?.cpu ? `${sys.cpu.loadPct}% Load` : 'Active'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {sys?.cpu?.loadAvg ? `Load 1m: ${sys.cpu.loadAvg[0]}` : 'Idle'}
+                      </div>
+                    </div>
+
+                    {/* Disk Storage */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <HardDrive size={12} color="var(--color-blue)" /> VM Disk Storage
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {sys?.disk ? `${sys.disk.usedGB} / ${sys.disk.totalGB} GB` : 'Storage Active'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {sys?.disk ? `${sys.disk.pct}% used (${sys.disk.freeGB} GB free)` : 'Persistent Disk'}
+                      </div>
+                    </div>
+
+                    {/* Server Uptime & Node RSS */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Clock size={12} color="var(--color-blue)" /> Server Uptime
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {sys?.uptime || 'Online'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {sys?.process?.rssMB ? `Node RSS: ${sys.process.rssMB} MB` : 'Cluster Online'}
+                      </div>
+                    </div>
                   </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Activity size={12} color="var(--color-blue)" /> API Hits ({telemetryTimeframe})
+                  {/* Row 2: Cloud Traffic & Estimated Cost Drivers */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                    {/* Network Egress */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <HardDrive size={12} color="var(--color-blue)" /> Egress Bandwidth ({telemetryTimeframe})
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{formattedBw}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {bandwidthGB.toFixed(3)} GB egress
+                      </div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>{totalCalls.toLocaleString()}</div>
-                  </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Zap size={12} color={parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green)'} /> Avg Route Latency
+                    {/* Estimated GCP Egress Cost */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <TrendingUp size={12} color="var(--color-green)" /> Est. GCP Egress Cost
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-green-light)' }}>
+                        ₹ {estimatedCostINR}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        ${estimatedCostUSD} (@ $0.12/GB standard)
+                      </div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green-light)' }}>
-                      {avgLat} ms
-                    </div>
-                  </div>
 
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Users size={12} color="var(--color-blue)" /> Tracked Users
+                    {/* API Hits & Avg Latency */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Activity size={12} color="var(--color-blue)" /> Total API Hits ({telemetryTimeframe})
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{totalCalls.toLocaleString()}</div>
+                      <div style={{ fontSize: '10px', color: parseFloat(avgLat) > 200 ? 'var(--color-red)' : 'var(--color-green-light)', marginTop: '2px' }}>
+                        Avg Latency: {avgLat} ms
+                      </div>
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--color-primary)' }}>{userCount} Users</div>
+
+                    {/* Tracked Users */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Users size={12} color="var(--color-blue)" /> Tracked Users
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-primary)' }}>{userCount} Users</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Monitored in Redis
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

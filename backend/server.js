@@ -1048,14 +1048,72 @@ app.post('/api/admin/users/:id/toggle_ban', authenticateToken, async (req, res) 
 });
 
 
+function getSystemTelemetry() {
+    const os = require('os');
+    const fs = require('fs');
+    const totalRam = os.totalmem();
+    const freeRam = os.freemem();
+    const usedRam = totalRam - freeRam;
+    const ramPct = ((usedRam / totalRam) * 100).toFixed(1);
+    
+    let diskStats = null;
+    try {
+        if (typeof fs.statfsSync === 'function') {
+            const stat = fs.statfsSync('.');
+            const totalDisk = stat.bsize * stat.blocks;
+            const freeDisk = stat.bsize * stat.bfree;
+            const usedDisk = totalDisk - freeDisk;
+            diskStats = {
+                totalGB: (totalDisk / 1073741824).toFixed(1),
+                usedGB: (usedDisk / 1073741824).toFixed(1),
+                freeGB: (freeDisk / 1073741824).toFixed(1),
+                pct: ((usedDisk / totalDisk) * 100).toFixed(1)
+            };
+        }
+    } catch(e) {}
+
+    const cpus = os.cpus() || [];
+    const loadAvg = os.loadavg() || [0, 0, 0];
+    const cpuLoad1m = ((loadAvg[0] / Math.max(1, cpus.length)) * 100).toFixed(1);
+    const procMem = process.memoryUsage();
+    const uptimeSec = os.uptime();
+    const days = Math.floor(uptimeSec / 86400);
+    const hrs = Math.floor((uptimeSec % 86400) / 3600);
+    const mins = Math.floor((uptimeSec % 3600) / 60);
+
+    return {
+        ram: {
+            totalGB: (totalRam / 1073741824).toFixed(2),
+            usedGB: (usedRam / 1073741824).toFixed(2),
+            freeGB: (freeRam / 1073741824).toFixed(2),
+            pct: ramPct
+        },
+        cpu: {
+            cores: cpus.length,
+            model: cpus[0]?.model || 'Cloud vCPU',
+            loadAvg: loadAvg.map(l => l.toFixed(2)),
+            loadPct: Math.min(100, Math.max(0, parseFloat(cpuLoad1m)))
+        },
+        process: {
+            rssMB: (procMem.rss / 1048576).toFixed(1),
+            heapUsedMB: (procMem.heapUsed / 1048576).toFixed(1),
+            heapTotalMB: (procMem.heapTotal / 1048576).toFixed(1)
+        },
+        disk: diskStats,
+        uptime: `${days > 0 ? `${days}d ` : ''}${hrs}h ${mins}m`,
+        platform: `${os.platform()} (${os.arch()})`
+    };
+}
+
 app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
     try {
         const caller = await db('users').where({ id: req.user.id }).first();
         if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
         const { generalClient } = require('./services/redisClient');
-        if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [] });
+        if (!generalClient || !generalClient.isReady) return res.json({ api: [], users: [], system: getSystemTelemetry() });
 
+        const system = getSystemTelemetry();
         const tf = req.query.timeframe || 'all';
         let minutes = 0;
         const match = tf.match(/^(\d+)([mh])$/);
@@ -1093,7 +1151,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                     wsMinutes: parseInt(data.ws_minutes || 0)
                 });
             }
-            return res.json({ api: apiStats, users: userStats, timeframe: 'all' });
+            return res.json({ api: apiStats, users: userStats, system, timeframe: 'all' });
         } else {
             // Timeframe / Minute-Bucket Aggregation
             const now = Date.now();
@@ -1149,7 +1207,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 });
             }
 
-            return res.json({ api: apiStats, users: userStats, timeframe: tf });
+            return res.json({ api: apiStats, users: userStats, system, timeframe: tf });
         }
     } catch (err) {
         console.error(err);
