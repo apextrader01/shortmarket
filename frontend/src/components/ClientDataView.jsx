@@ -3,9 +3,9 @@ import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound } from 'lucide-react';
 import ReferralsView from './ReferralsView';
-import SettingsView from './SettingsView';
+import SettingsView, { BiometricSettingsSection } from './SettingsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
@@ -644,7 +644,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
@@ -652,6 +652,19 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               <div onClick={() => setOneClickMode(!!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
                 <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
+            </div>
+
+            {/* 🔐 Biometric & 4-Digit PIN Security */}
+            <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Fingerprint size={16} color="var(--color-blue-light)" /> Quick App Unlock (4-Digit PIN & Biometrics)
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Set a 4-digit PIN or enable Face ID / Fingerprint to quickly unlock Short Edge on mobile and desktop without typing your full password.
+                </div>
+              </div>
+              <BiometricSettingsSection user={user} />
             </div>
           </div>
         </div>

@@ -207,7 +207,7 @@ export default function SettingsView() {
   );
 }
 
-function BiometricSettingsSection({ user }) {
+export function BiometricSettingsSection({ user }) {
   const userId = user?.id || 'default';
   const [pinEnabled, setPinEnabled] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
