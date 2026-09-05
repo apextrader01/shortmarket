@@ -463,17 +463,6 @@ function MarketCalendarTab({ isMobile }) {
         commodity_end_time: '19:15',
         reason: prev.reason || 'Diwali Muhurat Trading Session (6:15 PM - 7:15 PM)'
       }));
-    } else if (type === 'BUDGET_DAY') {
-      setEditForm(prev => ({
-        ...prev,
-        equity_status: 'OPEN',
-        commodity_status: 'OPEN',
-        equity_start_time: '09:15',
-        equity_end_time: '15:30',
-        commodity_start_time: '09:00',
-        commodity_end_time: '23:30',
-        reason: prev.reason || 'Union Budget Day (Special Live Trading Session)'
-      }));
     } else if (type === 'WEEKEND_SPECIAL') {
       setEditForm(prev => ({
         ...prev,
@@ -915,13 +904,6 @@ function MarketCalendarTab({ isMobile }) {
                   style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', border: '1px solid rgba(192,132,252,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   🪔 Diwali Muhurat Session
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyPreset('BUDGET_DAY')}
-                  style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  📊 Union Budget Day Live Session
                 </button>
                 <button
                   type="button"

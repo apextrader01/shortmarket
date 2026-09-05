@@ -1610,7 +1610,6 @@ app.post('/api/admin/market-status', authenticateToken, async (req, res) => {
 
 const OFFICIAL_2026_HOLIDAYS = [
   { date: '2026-01-26', equity_status: 'CLOSED', commodity_status: 'CLOSED', reason: 'Republic Day' },
-  { date: '2026-02-01', equity_status: 'OPEN', commodity_status: 'OPEN', equity_start_time: '09:15', equity_end_time: '15:30', commodity_start_time: '09:00', commodity_end_time: '23:30', reason: 'Union Budget Day (Special Live Trading Session)' },
   { date: '2026-02-18', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Mahashivratri (MCX Evening Session Open)' },
   { date: '2026-03-03', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Holi (MCX Evening Session Open)' },
   { date: '2026-03-27', equity_status: 'CLOSED', commodity_status: 'OPEN', commodity_start_time: '17:00', commodity_end_time: '23:30', reason: 'Id-Ul-Fitr / Ramzan Id (MCX Evening Session Open)' },
