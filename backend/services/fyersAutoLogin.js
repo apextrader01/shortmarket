@@ -1,4 +1,4 @@
-﻿const crypto = require('crypto');
+const crypto = require('crypto');
 const db = require('../database/db').default || require('../database/db');
 const fs = require('fs');
 const path = require('path');
@@ -115,7 +115,7 @@ async function performFyersAutoLogin(retryCount = 0) {
             })
         });
         const pinData = await pinRes.json();
-        const dataToken = pinData?.data?.token;
+        const dataToken = pinData?.data?.access_token || pinData?.data?.token || pinData?.access_token || pinData?.token;
         if (!dataToken) {
             throw new Error(`Step 3 (Verify PIN) failed: ${pinData.message || JSON.stringify(pinData)}`);
         }
@@ -142,14 +142,15 @@ async function performFyersAutoLogin(retryCount = 0) {
             })
         });
         const authData = await authRes.json();
-        if (!authData.Url) {
+        const authUrl = authData.Url || authData.url || authData.data?.url || authData.data?.Url;
+        if (!authUrl) {
             throw new Error(`Step 4 (Generate Auth Code) failed: ${authData.message || JSON.stringify(authData)}`);
         }
 
-        const urlObj = new URL(authData.Url);
+        const urlObj = new URL(authUrl);
         const authCode = urlObj.searchParams.get('auth_code');
         if (!authCode) {
-            throw new Error(`Could not extract auth_code from Fyers URL: ${authData.Url}`);
+            throw new Error(`Could not extract auth_code from Fyers URL: ${authUrl}`);
         }
 
         // Step 5: Exchange Auth Code for Access Token
