@@ -136,7 +136,7 @@ function isSegmentMarketOpen(isCommodity) {
   const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
   if (globalStatus === 'OPEN') return { open: true };
   if (globalStatus === 'CLOSED') {
-    return { open: false, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
+    return { open: false, isTotalBlock: true, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
   }
   
   // Evaluate date in Asia/Kolkata (IST)
@@ -160,6 +160,7 @@ function isSegmentMarketOpen(isCommodity) {
     if (segmentStatus === 'CLOSED') {
       return {
         open: false,
+        isTotalBlock: true,
         reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`
       };
     }
@@ -177,6 +178,7 @@ function isSegmentMarketOpen(isCommodity) {
       if (currentMinutes < startMins || currentMinutes >= endMins) {
         return {
           open: false,
+          isTotalBlock: true,
           reason: `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`
         };
       }
@@ -186,7 +188,7 @@ function isSegmentMarketOpen(isCommodity) {
 
   // 2. Default Schedule (Mon-Fri)
   if (day === 0 || day === 6) {
-    return { open: false, reason: 'Markets are closed on weekends (Saturday & Sunday). Regular trading resumes on Monday.' };
+    return { open: false, isTotalBlock: true, reason: 'Markets are closed on weekends (Saturday & Sunday). Regular trading resumes on Monday.' };
   }
   
   if (!isCommodity) {
@@ -194,14 +196,14 @@ function isSegmentMarketOpen(isCommodity) {
     const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
     const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
     if (isBeforeOpen || isAfterClose) {
-      return { open: false, reason: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST on trading days.' };
+      return { open: false, isTotalBlock: false, reason: 'Intraday/BO/CO trading for Equities is only allowed between 9:15 AM and 3:15 PM IST on trading days.' };
     }
   } else {
     // Commodities: 9:00 AM to 10:50 PM for Intraday/BO/CO
     const isBeforeOpen = hours < 9;
     const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
     if (isBeforeOpen || isAfterClose) {
-      return { open: false, reason: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST on trading days.' };
+      return { open: false, isTotalBlock: false, reason: 'Intraday/BO/CO trading for Commodities is only allowed between 9:00 AM and 10:50 PM IST on trading days.' };
     }
   }
   return { open: true };
@@ -2680,13 +2682,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     
     const marketCheck = isSegmentMarketOpen(isCommodity);
     if (!marketCheck.open) {
-      const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
-      // If Admin has marked the market CLOSED, block ALL new entries (DEL and INT)
-      if (status === 'CLOSED') {
-        return res.status(400).json({ error: marketCheck.reason });
-      }
-      // If market is in AUTO mode, block Intraday/BO/CO orders outside market hours
-      if (isIntradayProduct) {
+      if (marketCheck.isTotalBlock || isIntradayProduct) {
         return res.status(400).json({ error: marketCheck.reason });
       }
     }
@@ -3362,13 +3358,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     
     const marketCheck = isSegmentMarketOpen(isCommodity);
     if (!marketCheck.open) {
-      const status = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
-      // If Admin has marked the market CLOSED, block ALL new entries (DEL and INT)
-      if (status === 'CLOSED') {
-        return res.status(400).json({ error: marketCheck.reason });
-      }
-      // If market is in AUTO mode, block Intraday/BO/CO orders outside market hours
-      if (isIntradayProduct) {
+      if (marketCheck.isTotalBlock || isIntradayProduct) {
         return res.status(400).json({ error: marketCheck.reason });
       }
     }
