@@ -1087,7 +1087,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const dbUser = await db('users').where({ id: userId }).first();
                 userStats.push({
                     userId,
-                    username: dbUser ? dbUser.username : 'Unknown',
+                    username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${userId})`),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
                     wsMinutes: parseInt(data.ws_minutes || 0)
@@ -1142,7 +1142,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const dbUser = await db('users').where({ id: u.userId }).first();
                 userStats.push({
                     userId: u.userId,
-                    username: dbUser ? dbUser.username : 'Unknown',
+                    username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${u.userId})`),
                     apiCalls: u.apiCalls,
                     apiBytes: u.apiBytes,
                     wsMinutes: u.wsMinutes
