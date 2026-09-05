@@ -35,7 +35,7 @@ export default function TradingJournalView({ onBack }) {
   })));
 
   const userId = user?.id || 'default';
-  const storageKey = shortmarket_journal_;
+  const storageKey = `shortmarket_journal_${userId}`;
 
   // Journal entries stored in localStorage: { [tradeId]: { strategy, emotion, notes, rating, updatedAt } }
   const [journalEntries, setJournalEntries] = useState(() => {
