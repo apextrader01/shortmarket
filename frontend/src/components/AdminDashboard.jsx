@@ -1628,10 +1628,6 @@ export default function AdminDashboard() {
 
   const handleResetUser = async () => {
     if (!selectedUser) return;
-    if (selectedUser.is_admin) {
-      alert('System Admin accounts cannot be reset.');
-      return;
-    }
     if (window.confirm(`Are you absolutely sure you want to reset ${selectedUser.username}'s account? This will permanently delete ALL their trades, positions, and reset their balance to ₹10,00,000. This CANNOT be undone.`)) {
       setUpdating(true);
       const res = await adminResetUser(selectedUser.id);
@@ -1648,10 +1644,6 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
-    if (selectedUser.is_admin) {
-      alert('System Admin accounts cannot be deleted.');
-      return;
-    }
     const confirmation = window.prompt(
       `⚠️ PERMANENT DELETE ⚠️\n\nThis will PERMANENTLY delete ${selectedUser.username}'s account and ALL their data (orders, positions, holdings, ledger, deposits).\n\nThis CANNOT be undone!\n\nType the username "${selectedUser.username}" to confirm:`
     );
@@ -2820,7 +2812,6 @@ export default function AdminDashboard() {
                   filteredClients.map(u => {
                     const hasKyc = Boolean(u.kyc_pan_url && u.kyc_aadhar_url);
                     const hasPartialKyc = Boolean(u.kyc_pan_url || u.kyc_aadhar_url);
-                    const isAdminUser = Boolean(u.is_admin === true || u.is_admin === 1 || u.is_admin === '1' || u.role === 'admin');
                     
                     return (
                       <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
@@ -2879,60 +2870,52 @@ export default function AdminDashboard() {
                         </td>
                         <td style={{ padding: '6px 12px' }}>
                           <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            {!isAdminUser ? (
-                              <>
-                                <button
-                                  style={{
-                                    padding: '2px 6px',
-                                    borderRadius: '3px',
-                                    fontSize: '10px',
-                                    fontWeight: '600',
-                                    cursor: 'pointer',
-                                    background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                                    color: u.is_banned ? '#22c55e' : '#ef4444',
-                                    border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
-                                  }}
-                                  onClick={async () => {
-                                    if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
-                                      try {
-                                        await toggleUserBan(u.id);
-                                        loadData();
-                                      } catch(e) {
-                                        alert(e.message);
-                                      }
-                                    }
-                                  }}
-                                >
-                                  {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
-                                </button>
-                                {u.last_ip && (
-                                  <button
-                                    style={{
-                                      padding: '2px 5px',
-                                      borderRadius: '3px',
-                                      fontSize: '9px',
-                                      fontWeight: '700',
-                                      cursor: 'pointer',
-                                      background: 'rgba(239,68,68,0.1)',
-                                      color: '#ef4444',
-                                      border: '1px solid rgba(239,68,68,0.3)'
-                                    }}
-                                    onClick={async () => {
-                                      if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
-                                        const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
-                                        alert(res.message || `IP ${u.last_ip} has been banned!`);
-                                        loadData();
-                                      }
-                                    }}
-                                  >
-                                    Ban IP
-                                  </button>
-                                )}
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '9px', color: 'var(--text-secondary)', padding: '2px 6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', fontWeight: '600' }}>
-                                🛡️ Admin Account
-                              </span>
+                            <button
+                              style={{
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: u.is_banned ? '#22c55e' : '#ef4444',
+                                border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
+                              }}
+                              onClick={async () => {
+                                if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
+                                  try {
+                                    await toggleUserBan(u.id);
+                                    loadData();
+                                  } catch(e) {
+                                    alert(e.message);
+                                  }
+                                }
+                              }}
+                            >
+                              {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
+                            </button>
+                            {u.last_ip && (
+                              <button
+                                style={{
+                                  padding: '2px 5px',
+                                  borderRadius: '3px',
+                                  fontSize: '9px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  background: 'rgba(239,68,68,0.1)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239,68,68,0.3)'
+                                }}
+                                onClick={async () => {
+                                  if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
+                                    const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
+                                    alert(res.message || `IP ${u.last_ip} has been banned!`);
+                                    loadData();
+                                  }
+                                }}
+                              >
+                                Ban IP
+                              </button>
                             )}
                             <button 
                               className="btn btn-primary" 
@@ -4027,40 +4010,38 @@ export default function AdminDashboard() {
                   <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>{selectedUser.city || selectedUser.state || 'India'}</span></div>
                 </div>
-                {!selectedUser.is_admin && (selectedUser.last_ip || selectedUser.phone) && (
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    {selectedUser.last_ip && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm(`Ban IP ${selectedUser.last_ip}?`)) {
-                            await banEntity('IP', selectedUser.last_ip, `Banned from ${selectedUser.username}`);
-                            alert(`IP ${selectedUser.last_ip} banned successfully!`);
-                            loadData();
-                          }
-                        }}
-                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        🚫 Ban IP ({selectedUser.last_ip})
-                      </button>
-                    )}
-                    {selectedUser.phone && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm(`Ban Phone ${selectedUser.phone}?`)) {
-                            await banEntity('PHONE', selectedUser.phone, `Banned from ${selectedUser.username}`);
-                            alert(`Phone ${selectedUser.phone} banned successfully!`);
-                            loadData();
-                          }
-                        }}
-                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                      >
-                        🚫 Ban Phone ({selectedUser.phone})
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {selectedUser.last_ip && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm(`Ban IP ${selectedUser.last_ip}?`)) {
+                          await banEntity('IP', selectedUser.last_ip, `Banned from ${selectedUser.username}`);
+                          alert(`IP ${selectedUser.last_ip} banned successfully!`);
+                          loadData();
+                        }
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      🚫 Ban IP ({selectedUser.last_ip})
+                    </button>
+                  )}
+                  {selectedUser.phone && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm(`Ban Phone ${selectedUser.phone}?`)) {
+                          await banEntity('PHONE', selectedUser.phone, `Banned from ${selectedUser.username}`);
+                          alert(`Phone ${selectedUser.phone} banned successfully!`);
+                          loadData();
+                        }
+                      }}
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      🚫 Ban Phone ({selectedUser.phone})
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* User Profile Details */}
@@ -4112,40 +4093,33 @@ export default function AdminDashboard() {
               </div>
 
               {/* Danger Zone */}
-              {!selectedUser.is_admin ? (
-                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginTop: '8px' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-red-light)' }}>Danger Zone</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Wipe all trades, positions, ledger, and reset balance to ₹10,00,000.
-                    </div>
-                    <button 
-                      onClick={handleResetUser}
-                      disabled={updating}
-                      style={{ background: 'var(--color-red)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
-                    >
-                      {updating ? 'WORKING...' : 'RESET ACCOUNT'}
-                    </button>
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginTop: '8px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--color-red-light)' }}>Danger Zone</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Wipe all trades, positions, ledger, and reset balance to ₹10,00,000.
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      <span style={{ color: '#ff4444', fontWeight: '700' }}>PERMANENT:</span> Delete this account and all associated data. This cannot be undone.
-                    </div>
-                    <button
-                      onClick={handleDeleteUser}
-                      disabled={updating}
-                      style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
-                    >
-                      {updating ? 'WORKING...' : '🗑️ DELETE ACCOUNT'}
-                    </button>
+                  <button 
+                    onClick={handleResetUser}
+                    disabled={updating}
+                    style={{ background: 'var(--color-red)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
+                  >
+                    {updating ? 'WORKING...' : 'RESET ACCOUNT'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span style={{ color: '#ff4444', fontWeight: '700' }}>PERMANENT:</span> Delete this account and all associated data. This cannot be undone.
                   </div>
+                  <button
+                    onClick={handleDeleteUser}
+                    disabled={updating}
+                    style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '12px' }}
+                  >
+                    {updating ? 'WORKING...' : '🗑️ DELETE ACCOUNT'}
+                  </button>
                 </div>
-              ) : (
-                <div style={{ background: 'rgba(59, 130, 246, 0.05)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ShieldCheck size={16} color="var(--color-blue)" />
-                  <span><strong>System Administrator:</strong> Protected master account. Deletion, ban, and wipe are permanently disabled.</span>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
