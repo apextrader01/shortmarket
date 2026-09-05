@@ -152,8 +152,8 @@ function initCronJobs(priceCache, triggerEngine) {
     cron.schedule('0 23 * * *', () => phase3SquareOff('COM'), TZ);
 
     
-    // --- 9:30 AM SIP Execution ---
-    cron.schedule('30 9 * * 1-5', async () => {
+    // --- 9:30 AM SIP Execution (Daily Mon-Sun) ---
+    cron.schedule('30 9 * * *', async () => {
         console.log('[CRON] 9:30 AM: Executing due SIPs...');
         try {
             await db.transaction(async (trx) => {

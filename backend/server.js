@@ -4481,8 +4481,8 @@ server.listen(PORT, async () => {
       } catch(e) { console.error('Backup auto-login cron error:', e); }
     });
 
+    // Automated Options & Futures Master Download daily at 08:15 AM IST (Mon-Sun)
     const optionsRule = new schedule.RecurrenceRule();
-    optionsRule.dayOfWeek = [new schedule.Range(1, 5)];
     optionsRule.hour = 8;
     optionsRule.minute = 15;
     optionsRule.tz = 'Asia/Kolkata';
