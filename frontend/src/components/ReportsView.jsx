@@ -1294,33 +1294,17 @@ const DownloadReports = () => {
     return `📊 Found ${matching.length} executed trade(s) in selected period.`;
   };
 
-  const handleDownload = (fmt) => {
-    if (!currentCfg || isGenerating) return;
-
-    // Snapshot config + period NOW, synchronously, before any state mutation
-    const cfg = { ...currentCfg };
-    const handler = cfg.handler;
-
-    setIsGenerating(true);
-
-    // Small timeout ensures React has painted the "generating..." state before we block
-    requestAnimationFrame(() => {
-      try {
-        handler(fmt);
-      } catch (err) {
-        console.error('Download error:', err);
-        setIsGenerating(false);
-        alert(`Download failed: ${err.message || 'Unknown error'}. Please try Excel or HTML format.`);
-        return;
-      }
-
-      setTimeout(() => {
-        setIsGenerating(false);
-        if (fmt === 'excel' || fmt === 'html') {
-          setActiveModal(null);
-        }
-      }, 1000);
-    });
+  // Direct download - called synchronously on button click, no async, no state dependencies
+  const doDownload = (fmt) => {
+    const modal = activeModal;
+    const cfg = reportConfigs[modal];
+    if (!cfg) { alert('No report selected. Please close and try again.'); return; }
+    try {
+      cfg.handler(fmt);
+      if (fmt === 'excel' || fmt === 'html') setTimeout(() => setActiveModal(null), 500);
+    } catch (err) {
+      alert('Error generating report: ' + (err.message || String(err)));
+    }
   };
 
   return (
@@ -1440,40 +1424,37 @@ const DownloadReports = () => {
               {getRecordPreviewText()}
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons — direct calls, no disabled state */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '6px' }}>
               <button
                 type="button"
-                disabled={isGenerating}
-                onClick={() => handleDownload('excel')}
+                onClick={() => doDownload('excel')}
                 style={{
                   background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)',
                   color: '#60a5fa', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
                 <Download size={14} /> Excel (.csv)
               </button>
               <button
                 type="button"
-                disabled={isGenerating}
-                onClick={() => handleDownload('html')}
+                onClick={() => doDownload('html')}
                 style={{
                   background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)',
                   color: '#34d399', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
                 <Download size={14} /> HTML File
               </button>
               <button
                 type="button"
-                disabled={isGenerating}
-                onClick={() => handleDownload('pdf')}
+                onClick={() => doDownload('pdf')}
                 style={{
                   background: 'var(--color-blue)', border: 'none',
                   color: '#fff', padding: '10px 6px', borderRadius: '8px', fontSize: '11.5px', fontWeight: '700',
-                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   boxShadow: '0 4px 12px rgba(37,99,235,0.4)'
                 }}
               >
@@ -1481,17 +1462,14 @@ const DownloadReports = () => {
               </button>
             </div>
 
-            {/* Status + Close row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-              <div style={{ fontSize: '11px', color: isGenerating ? '#fbbf24' : 'var(--text-secondary)' }}>
-                {isGenerating ? '⏳ Generating statement...' : '✅ Ready to download'}
-              </div>
+            {/* Close row */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
               <button
                 type="button"
-                onClick={() => { setActiveModal(null); setIsGenerating(false); }}
+                onClick={() => setActiveModal(null)}
                 style={{
                   background: 'transparent', border: '1px solid var(--border-color)',
-                  color: 'var(--text-secondary)', padding: '6px 16px', borderRadius: '6px',
+                  color: 'var(--text-secondary)', padding: '6px 20px', borderRadius: '6px',
                   fontSize: '11.5px', fontWeight: '600', cursor: 'pointer'
                 }}
               >
