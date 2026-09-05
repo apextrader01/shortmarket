@@ -588,6 +588,11 @@ export const useStore = create(persist((set, get) => ({
       get().fetchTodayMarketSchedule();
     });
 
+    socket.off('announcement_update');
+    socket.on('announcement_update', (data) => {
+      set({ announcement: data || null });
+    });
+
     const onConnect = () => {
       set({ isConnected: true });
       const currentUser = get().user;
@@ -597,6 +602,7 @@ export const useStore = create(persist((set, get) => ({
       get().fetchMarketStatus();
       get().fetchMarketCalendar();
       get().fetchTodayMarketSchedule();
+      get().fetchAnnouncement();
       // Force a fresh REST price fetch on every socket connect/reconnect
       get().refreshPrices(true);
       

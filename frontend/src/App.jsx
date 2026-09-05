@@ -179,7 +179,28 @@ function App() {
   const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
-  const [isDismissedAnnouncement, setIsDismissedAnnouncement] = useState(false);
+  const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
+    return localStorage.getItem('last_dismissed_announcement') || '';
+  });
+
+  const announcementIdentifier = announcement?.text ? `${announcement.text}_${announcement.updated_at || ''}` : '';
+  const isAnnouncementVisible = Boolean(
+    announcement &&
+    announcement.text &&
+    announcementIdentifier &&
+    announcementIdentifier !== dismissedAnnouncementId &&
+    localStorage.getItem(`dismissed_announcement_${announcementIdentifier}`) !== 'true'
+  );
+
+  const handleDismissAnnouncement = () => {
+    if (announcementIdentifier) {
+      try {
+        localStorage.setItem(`dismissed_announcement_${announcementIdentifier}`, 'true');
+        localStorage.setItem('last_dismissed_announcement', announcementIdentifier);
+      } catch (e) {}
+      setDismissedAnnouncementId(announcementIdentifier);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
@@ -369,7 +390,7 @@ function App() {
     <div className="app-container" data-theme={theme} style={{ flexDirection: 'column', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}>
       <BackgroundPriceMonitor />
       {/* Real-time Global Announcement Banner */}
-      {announcement && announcement.text && !isDismissedAnnouncement && (
+      {isAnnouncementVisible && (
         <div style={{
           background: announcement.type === 'alert' ? 'linear-gradient(90deg, #b91c1c, #991b1b)' : (announcement.type === 'warning' ? 'linear-gradient(90deg, #b45309, #d97706)' : 'linear-gradient(90deg, #1d4ed8, #2563eb)'),
           color: '#fff',
@@ -387,7 +408,8 @@ function App() {
             <span>{announcement.text}</span>
           </div>
           <button
-            onClick={() => setIsDismissedAnnouncement(true)}
+            onClick={handleDismissAnnouncement}
+            title="Dismiss announcement"
             style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', opacity: 0.8, fontSize: '14px' }}
           >
             ✕
