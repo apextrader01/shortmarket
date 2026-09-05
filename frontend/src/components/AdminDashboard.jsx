@@ -4,6 +4,17 @@ import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 
+const isMarketHours = () => {
+  const now = new Date();
+  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+  const day = ist.getUTCDay();
+  const hr = ist.getUTCHours();
+  const min = ist.getUTCMinutes();
+  const timeNum = hr * 100 + min;
+  if (day === 0 || day === 6) return false;
+  return timeNum >= 900 && timeNum <= 2330;
+};
+
 function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLoading }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,17 +48,6 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
 
   if (loading) return <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>Loading system status...</div>;
   if (!status) return <div style={{ padding: '24px', color: 'var(--color-red)' }}>Failed to fetch system status. Is the backend running?</div>;
-
-  const isMarketHours = () => {
-    const now = new Date();
-    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-    const day = ist.getUTCDay();
-    const hr = ist.getUTCHours();
-    const min = ist.getUTCMinutes();
-    const timeNum = hr * 100 + min;
-    if (day === 0 || day === 6) return false;
-    return timeNum >= 900 && timeNum <= 2330;
-  };
 
   const isMarketOpenNow = isMarketHours();
   const isHealthy = status.hasAccessToken && !status.tokenExpired && (status.secondsSinceLastTick < 30 || !isMarketOpenNow || status.isFyersConnected);
@@ -314,6 +314,7 @@ export default function AdminDashboard() {
   const [fyersStatus, setFyersStatus] = useState(null);
   const [fyersLoading, setFyersLoading] = useState(true);
   const [marketUpdating, setMarketUpdating] = useState(false);
+  const isMarketOpenNow = isMarketHours();
 
   useEffect(() => {
     fetchMarketStatus?.();
