@@ -1228,6 +1228,7 @@ export default function AdminDashboard() {
     if (userSearch.trim()) {
       const q = userSearch.toLowerCase().trim();
       list = list.filter(u => 
+        (u.clientId && u.clientId.toLowerCase().includes(q)) ||
         (u.username && u.username.toLowerCase().includes(q)) || 
         String(u.userId || '').toLowerCase().includes(q)
       );
@@ -1269,6 +1270,7 @@ export default function AdminDashboard() {
     if (clientSearch.trim()) {
       const q = clientSearch.toLowerCase().trim();
       list = list.filter(u => 
+        (u.client_id && u.client_id.toLowerCase().includes(q)) ||
         (u.username && u.username.toLowerCase().includes(q)) ||
         (u.email && u.email.toLowerCase().includes(q)) ||
         (u.phone && u.phone.toLowerCase().includes(q)) ||
@@ -1308,6 +1310,7 @@ export default function AdminDashboard() {
     if (withdrawalSearch.trim()) {
       const q = withdrawalSearch.toLowerCase().trim();
       list = list.filter(w => 
+        (w.client_id && w.client_id.toLowerCase().includes(q)) ||
         (w.username && w.username.toLowerCase().includes(q)) ||
         (w.phone && w.phone.toLowerCase().includes(q)) ||
         (w.upi_id && w.upi_id.toLowerCase().includes(q)) ||
@@ -1346,6 +1349,7 @@ export default function AdminDashboard() {
     if (depositSearch.trim()) {
       const q = depositSearch.toLowerCase().trim();
       list = list.filter(d => 
+        (d.client_id && d.client_id.toLowerCase().includes(q)) ||
         (d.username && d.username.toLowerCase().includes(q)) ||
         (d.email && d.email.toLowerCase().includes(q)) ||
         String(d.amount).includes(q)
@@ -1377,6 +1381,7 @@ export default function AdminDashboard() {
     if (orderSearch.trim()) {
       const q = orderSearch.toLowerCase().trim();
       list = list.filter(o => 
+        (o.client_id && o.client_id.toLowerCase().includes(q)) ||
         (o.username && o.username.toLowerCase().includes(q)) ||
         (o.symbol && o.symbol.toLowerCase().includes(q)) ||
         String(o.id).includes(q)
@@ -1415,6 +1420,7 @@ export default function AdminDashboard() {
     if (positionSearch.trim()) {
       const q = positionSearch.toLowerCase().trim();
       list = list.filter(p => 
+        (p.client_id && p.client_id.toLowerCase().includes(q)) ||
         (p.username && p.username.toLowerCase().includes(q)) ||
         (p.symbol && p.symbol.toLowerCase().includes(q))
       );
@@ -1442,6 +1448,7 @@ export default function AdminDashboard() {
     if (ledgerSearch.trim()) {
       const q = ledgerSearch.toLowerCase().trim();
       list = list.filter(l => 
+        (l.client_id && l.client_id.toLowerCase().includes(q)) ||
         (l.username && l.username.toLowerCase().includes(q)) ||
         (l.description && l.description.toLowerCase().includes(q)) ||
         (l.type && l.type.toLowerCase().includes(q))
@@ -2388,7 +2395,14 @@ export default function AdminDashboard() {
                   filteredOrders.map(o => (
                     <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
-                      <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            {o.client_id || (o.user_id ? `SE${String(o.user_id).padStart(6, '0')}` : 'CLIENT')}
+                          </span>
+                          <span style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</span>
+                        </div>
+                      </td>
                       <td style={{ padding: '6px 12px', fontWeight: '600' }}>{o.symbol}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'center' }}>
                         <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)', fontWeight: '700' }}>{o.side}</span> {o.type}
@@ -2543,7 +2557,14 @@ export default function AdminDashboard() {
                 ) : (
                   filteredPositions.map(p => (
                     <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</div></td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            {p.client_id || (p.user_id ? `SE${String(p.user_id).padStart(6, '0')}` : 'CLIENT')}
+                          </span>
+                          <span style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</span>
+                        </div>
+                      </td>
                       <td style={{ padding: '6px 12px', fontWeight: '600' }}>{p.symbol}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '700', color: p.quantity > 0 ? 'var(--color-blue)' : 'var(--color-red)' }}>{p.quantity}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'right' }}>₹{Number(p.average_price || 0).toFixed(2)}</td>
@@ -2677,7 +2698,14 @@ export default function AdminDashboard() {
                   filteredLedger.map(l => (
                     <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
-                      <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            {l.client_id || (l.user_id ? `SE${String(l.user_id).padStart(6, '0')}` : 'CLIENT')}
+                          </span>
+                          <span style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</span>
+                        </div>
+                      </td>
                       <td style={{ padding: '6px 12px' }}>
                         <span style={{ background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>{l.type}</span>
                       </td>
@@ -2821,8 +2849,11 @@ export default function AdminDashboard() {
                               {(u.username || 'U').substring(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                                {u.username || 'Unknown User'} 
+                              <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                  {u.client_id || (u.id ? `SE${String(u.id).padStart(6, '0')}` : 'CLIENT')}
+                                </span>
+                                <span>{u.username || 'Unknown User'}</span>
                                 {u.is_admin && <span style={{ fontSize: '8px', background: 'var(--color-red)', padding: '1px 3px', borderRadius: '3px' }}>ADMIN</span>}
                                 {u.subscription_tier === 'PRO' && <span style={{ fontSize: '8px', background: 'rgba(34,197,94,0.15)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>PRO</span>}
                                 {u.shared_ip_count > 1 && (
@@ -3097,8 +3128,11 @@ export default function AdminDashboard() {
                     <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '6px 12px', fontSize: '10px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                       <td style={{ padding: '6px 12px' }}>
-                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
-                          {w.username}
+                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            {w.client_id || (w.user_id ? `SE${String(w.user_id).padStart(6, '0')}` : 'CLIENT')}
+                          </span>
+                          <span>{w.username}</span>
                           {w.shared_ip_count > 1 && (
                             <span 
                               title={`Multi-Account Fraud Risk! ${w.shared_ip_count} accounts share this IP (${w.shared_users?.join(', ') || ''})`}
@@ -3724,7 +3758,7 @@ export default function AdminDashboard() {
                           return (
                             <tr key={u.userId} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                               <td style={{ padding: '5px 8px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                                   <span style={{
                                     fontSize: '9px',
                                     fontWeight: '700',
@@ -3735,6 +3769,11 @@ export default function AdminDashboard() {
                                   }}>
                                     #{idx + 1}
                                   </span>
+                                  {(u.clientId || (u.userId && u.userId !== 'anonymous')) && (
+                                    <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                                      {u.clientId || `SE${String(u.userId).padStart(6, '0')}`}
+                                    </span>
+                                  )}
                                   <span style={{ fontWeight: 'bold', color: isDeleted ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
                                     {u.username}
                                   </span>
@@ -3882,7 +3921,12 @@ export default function AdminDashboard() {
                     <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{new Date(d.created_at).toLocaleString()}</td>
                       <td style={{ padding: '6px 12px' }}>
-                        <div style={{ fontWeight: '600' }}>{d.username}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                          <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '10.5px', background: 'rgba(59,130,246,0.1)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            {d.client_id || (d.user_id ? `SE${String(d.user_id).padStart(6, '0')}` : 'CLIENT')}
+                          </span>
+                          <span style={{ fontWeight: '600' }}>{d.username}</span>
+                        </div>
                         <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{d.email}</div>
                       </td>
                       <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
@@ -3926,7 +3970,12 @@ export default function AdminDashboard() {
             borderRadius: '16px', width: '500px', maxWidth: '90vw', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '600' }}>Manage {selectedUser.username}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>Manage {selectedUser.username}</h3>
+                <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700', fontSize: '12px', background: 'rgba(59,130,246,0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  {selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : '')}
+                </span>
+              </div>
               <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setSelectedUser(null)} />
             </div>
 
@@ -4054,6 +4103,7 @@ export default function AdminDashboard() {
                   <Users size={14} style={{ color: 'var(--color-blue)' }} /> Client Profile (Onboarding Data)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12px' }}>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Client ID:</span> <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : 'N/A')}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.state || 'N/A'}</span></div>

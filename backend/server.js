@@ -1145,6 +1145,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const dbUser = await db('users').where({ id: userId }).first();
                 userStats.push({
                     userId,
+                    clientId: dbUser ? dbUser.client_id : null,
                     username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${userId})`),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
@@ -1200,6 +1201,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 const dbUser = await db('users').where({ id: u.userId }).first();
                 userStats.push({
                     userId: u.userId,
+                    clientId: dbUser ? dbUser.client_id : null,
                     username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${u.userId})`),
                     apiCalls: u.apiCalls,
                     apiBytes: u.apiBytes,
@@ -1433,7 +1435,7 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
 
     const deposits = await db('deposit_requests')
       .join('users', 'deposit_requests.user_id', 'users.id')
-      .select('deposit_requests.*', 'users.username', 'users.email')
+      .select('deposit_requests.*', 'users.username', 'users.email', 'users.client_id')
       .orderBy('deposit_requests.created_at', 'desc');
       
     res.json({ success: true, deposits });
@@ -1544,7 +1546,7 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     
     const orders = await db('orders')
       .join('users', 'orders.user_id', '=', 'users.id')
-      .select('orders.*', 'users.username', 'users.email')
+      .select('orders.*', 'users.username', 'users.email', 'users.client_id')
       .orderBy('orders.created_at', 'desc')
       .limit(100);
     res.json({ success: true, orders });
@@ -1560,7 +1562,7 @@ app.get('/api/admin/positions', authenticateToken, async (req, res) => {
     
     const positions = await db('positions')
       .join('users', 'positions.user_id', '=', 'users.id')
-      .select('positions.*', 'users.username', 'users.email')
+      .select('positions.*', 'users.username', 'users.email', 'users.client_id')
       .where('positions.quantity', '!=', 0)
       .orderBy('positions.id', 'desc');
     res.json({ success: true, positions });
@@ -1576,7 +1578,7 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
     
     const ledger = await db('ledger')
       .join('users', 'ledger.user_id', '=', 'users.id')
-      .select('ledger.*', 'users.username', 'users.email')
+      .select('ledger.*', 'users.username', 'users.email', 'users.client_id')
       .orderBy('ledger.created_at', 'desc')
       .limit(100);
     res.json({ success: true, ledger });
@@ -4443,6 +4445,7 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
       .select(
         'reward_withdrawals.*', 
         'users.username', 
+        'users.client_id',
         'users.email',
         'users.phone',
         'users.upi_id',
