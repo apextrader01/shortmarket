@@ -13,7 +13,9 @@ import {
   generateTradesAndChargesReport,
   generateLedgerReport,
   generateContractNoteReport,
-  generateDPHoldingReport
+  generateDPHoldingReport,
+  getISTDateString,
+  filterRecordsByPeriod
 } from '../utils/clientReportGenerator';
 
 // --- Subcomponents for Tabs ---
@@ -1155,6 +1157,7 @@ const TradingInsights = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // 5. DOWNLOAD REPORTS WITH REPORT CONFIGURATION MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const DownloadReports = () => {
@@ -1169,27 +1172,34 @@ const DownloadReports = () => {
 
   const [activeModal, setActiveModal] = useState(null); // 'tax_pnl' | 'pnl_summary' | 'trades_charges' | 'ledger' | 'contract_note' | 'dp_holdings'
   const [selectedPeriod, setSelectedPeriod] = useState('FY 2025-26');
-  const [contractDate, setContractDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [contractDate, setContractDate] = useState(() => getISTDateString(new Date()));
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [ledgerData, setLedgerData] = useState([]);
-  const [loadingLedger, setLoadingLedger] = useState(false);
+  const [ordersData, setOrdersData] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Auto fetch ledger when modal opens
+  // Pre-fetch fresh orders and ledger data on mount
   useEffect(() => {
-    if (activeModal === 'ledger') {
-      setLoadingLedger(true);
-      fetch(`${API}/api/ledger`, {
-        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    fetch(`${API}/api/orders`, { headers, credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setOrdersData(data);
       })
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setLedgerData(data);
-          setLoadingLedger(false);
-        })
-        .catch(() => setLoadingLedger(false));
-    }
-  }, [activeModal, token]);
+      .catch(() => {});
+
+    fetch(`${API}/api/ledger`, { headers, credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setLedgerData(data);
+      })
+      .catch(() => {});
+  }, [token]);
+
+  const effectiveOrders = ordersData.length > 0 ? ordersData : (orders || []);
+  const effectiveLedger = ledgerData.length > 0 ? ledgerData : [];
 
   const reportConfigs = {
     tax_pnl: {
@@ -1197,28 +1207,28 @@ const DownloadReports = () => {
       desc: 'Scripwise Taxable Profit & Loss with Buy/Sell values, turnover, and STT classification.',
       icon: FileDown,
       color: '#3b82f6',
-      handler: (fmt) => generateTaxPnLReport(orders, positions, user, selectedPeriod === 'Custom' ? `${customStart} to ${customEnd}` : selectedPeriod, fmt)
+      handler: (fmt) => generateTaxPnLReport(effectiveOrders, positions, user, selectedPeriod, fmt, customStart, customEnd)
     },
     pnl_summary: {
       title: 'Segmentwise P&L Summary',
       desc: 'Comprehensive overview of Gross P&L, Regulatory Charges, and Net Realized P&L across all trading segments.',
       icon: PieChart,
       color: '#10b981',
-      handler: (fmt) => generatePnLSummaryReport(orders, positions, user, selectedPeriod === 'Custom' ? `${customStart} to ${customEnd}` : selectedPeriod, fmt)
+      handler: (fmt) => generatePnLSummaryReport(effectiveOrders, positions, user, selectedPeriod, fmt, customStart, customEnd)
     },
     trades_charges: {
       title: 'Trades & Regulatory Charges',
       desc: 'Tradewise charges breakdown including Brokerage, STT/CTT, Exchange Txn Fees, GST, and Stamp Duty.',
       icon: Receipt,
       color: '#f59e0b',
-      handler: (fmt) => generateTradesAndChargesReport(orders, user, selectedPeriod === 'Custom' ? `${customStart} to ${customEnd}` : selectedPeriod, fmt)
+      handler: (fmt) => generateTradesAndChargesReport(effectiveOrders, user, selectedPeriod, fmt, customStart, customEnd)
     },
     ledger: {
       title: 'Financial Ledger Statement',
       desc: 'Daywise debit/credit transactions, deposit/withdrawal logs, and running available account balance.',
       icon: Layers,
       color: '#6366f1',
-      handler: (fmt) => generateLedgerReport(ledgerData, user, selectedPeriod === 'Custom' ? `${customStart} to ${customEnd}` : selectedPeriod, fmt)
+      handler: (fmt) => generateLedgerReport(effectiveLedger, user, selectedPeriod, fmt, customStart, customEnd)
     },
     contract_note: {
       title: 'Electronic Contract Note (ECN)',
@@ -1226,7 +1236,7 @@ const DownloadReports = () => {
       icon: FileText,
       color: '#ec4899',
       isContractNote: true,
-      handler: (fmt) => generateContractNoteReport(orders, user, contractDate, fmt)
+      handler: (fmt) => generateContractNoteReport(effectiveOrders, user, contractDate, fmt)
     },
     dp_holdings: {
       title: 'DP Holding & Portfolio Statement',
@@ -1260,6 +1270,44 @@ const DownloadReports = () => {
   );
 
   const currentCfg = activeModal ? reportConfigs[activeModal] : null;
+
+  // Calculate live preview metrics
+  const getRecordPreviewText = () => {
+    if (!currentCfg) return '';
+    if (currentCfg.isHolding) {
+      return `📊 Valuation for ${holdings?.length || 0} Demat holding(s) as on today.`;
+    }
+    if (currentCfg.isContractNote) {
+      const matching = (effectiveOrders || []).filter(o => {
+        const isDone = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+        return isDone && getISTDateString(o.created_at) === contractDate;
+      });
+      return matching.length > 0 
+        ? `✅ Found ${matching.length} executed trade(s) on ${contractDate}.`
+        : `ℹ️ No trades on ${contractDate} (Will generate statement with zero records).`;
+    }
+    if (activeModal === 'ledger') {
+      const matching = filterRecordsByPeriod(effectiveLedger, selectedPeriod, customStart, customEnd);
+      return `📊 Found ${matching.length} ledger entry(s) in selected period.`;
+    }
+    const matching = filterRecordsByPeriod(effectiveOrders, selectedPeriod, customStart, customEnd).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+    return `📊 Found ${matching.length} executed trade(s) in selected period.`;
+  };
+
+  const handleDownload = (fmt) => {
+    if (!currentCfg) return;
+    setIsGenerating(true);
+    try {
+      currentCfg.handler(fmt);
+    } catch (err) {
+      console.error('Download error:', err);
+    } finally {
+      setTimeout(() => {
+        setIsGenerating(false);
+        setActiveModal(null);
+      }, 200);
+    }
+  };
 
   return (
     <div>
@@ -1371,42 +1419,39 @@ const DownloadReports = () => {
                   )}
                 </div>
               </div>
-            ) : (
-              <div style={{ background: 'rgba(59,130,246,0.08)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '12px', color: '#93c5fd' }}>
-                ℹ️ Generating valuation report for <strong>{holdings?.length || 0} demat holdings</strong> as on today ({new Date().toLocaleDateString('en-IN')}).
-              </div>
-            )}
+            ) : null}
+
+            {/* Live Record Preview Notice */}
+            <div style={{ background: 'rgba(59,130,246,0.08)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)', fontSize: '11.5px', color: '#93c5fd' }}>
+              {getRecordPreviewText()}
+            </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '6px' }}>
               <button
                 type="button"
-                onClick={() => {
-                  currentCfg.handler('excel');
-                  setActiveModal(null);
-                }}
+                disabled={isGenerating}
+                onClick={() => handleDownload('excel')}
                 style={{
                   background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)',
                   color: '#60a5fa', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                 }}
               >
-                <Download size={15} /> Download Excel
+                <Download size={15} /> {isGenerating ? 'Generating...' : 'Download Excel'}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  currentCfg.handler('pdf');
-                  setActiveModal(null);
-                }}
+                disabled={isGenerating}
+                onClick={() => handleDownload('pdf')}
                 style={{
                   background: 'var(--color-blue)', border: 'none',
                   color: '#fff', padding: '10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   boxShadow: '0 4px 12px rgba(37,99,235,0.4)'
                 }}
               >
-                <FileText size={15} /> Download PDF
+                <FileText size={15} /> {isGenerating ? 'Generating...' : 'Print / Save PDF'}
               </button>
             </div>
           </div>
@@ -1493,6 +1538,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
+    useStore.getState().fetchUserData();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 

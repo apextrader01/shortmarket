@@ -1,13 +1,83 @@
 // frontend/src/utils/clientReportGenerator.js
-// High-precision client-side Financial Reports & Statements Generator (Excel + PDF)
+// Ultra-fast, popup-proof Financial Reports & Statements Generator (Excel + PDF)
 
 /**
- * Helper to escape CSV values
+ * Escape CSV string values properly
  */
 function esc(val) {
   if (val === null || val === undefined) return '""';
   let str = String(val).replace(/"/g, '""');
   return `"${str}"`;
+}
+
+/**
+ * Returns YYYY-MM-DD in IST timezone (Asia/Kolkata)
+ */
+export function getISTDateString(dateVal) {
+  if (!dateVal) return '';
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' };
+  const parts = new Intl.DateTimeFormat('en-IN', options).formatToParts(d);
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Robust filter for any list of records based on period preset or custom date range
+ */
+export function filterRecordsByPeriod(records = [], period = 'All Time', customStart = '', customEnd = '', dateField = 'created_at') {
+  if (!Array.isArray(records) || records.length === 0) return [];
+  if (period === 'All' || period === 'All Time' || period === 'All Records') return records;
+
+  const now = new Date();
+  const todayIST = getISTDateString(now);
+
+  return records.filter(item => {
+    const rawDate = item[dateField] || item.createdAt || item.date || item.timestamp;
+    if (!rawDate) return true; // Include if date missing to prevent silent drops
+    const itemDate = new Date(rawDate);
+    if (isNaN(itemDate.getTime())) return true;
+    const itemIST = getISTDateString(itemDate);
+
+    if (period === 'Today') {
+      return itemIST === todayIST;
+    }
+    if (period === 'This Week' || period === 'Week') {
+      const diffMs = now.getTime() - itemDate.getTime();
+      return diffMs >= 0 && diffMs <= (7 * 24 * 60 * 60 * 1000);
+    }
+    if (period === '15 Days') {
+      const diffMs = now.getTime() - itemDate.getTime();
+      return diffMs >= 0 && diffMs <= (15 * 24 * 60 * 60 * 1000);
+    }
+    if (period === 'This Month' || period === 'Month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return itemDate >= startOfMonth && itemDate <= now;
+    }
+    if (period === '3 Months') {
+      const diffMs = now.getTime() - itemDate.getTime();
+      return diffMs >= 0 && diffMs <= (90 * 24 * 60 * 60 * 1000);
+    }
+    if (period === 'FY 2025-26') {
+      const fyStart = '2025-04-01';
+      const fyEnd = '2026-03-31';
+      return itemIST >= fyStart && itemIST <= fyEnd;
+    }
+    if (period === 'FY 2024-25') {
+      const fyStart = '2024-04-01';
+      const fyEnd = '2025-03-31';
+      return itemIST >= fyStart && itemIST <= fyEnd;
+    }
+    if (period === 'Custom') {
+      if (customStart && itemIST < customStart) return false;
+      if (customEnd && itemIST > customEnd) return false;
+      return true;
+    }
+    return true;
+  });
 }
 
 /**
@@ -89,37 +159,42 @@ export function calculateIndianCharges(order) {
 /**
  * Downloads a CSV file with UTF-8 BOM
  */
-function triggerCsvDownload(csvRows, filename) {
-  const csvContent = '\uFEFF' + csvRows.join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+export function triggerCsvDownload(csvRows, filename) {
+  try {
+    const csvContent = '\uFEFF' + csvRows.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (err) {
+    console.error('CSV Download failed:', err);
+  }
 }
 
 /**
- * Prints a clean, branded PDF in a printable popup window
+ * Prints a clean, branded PDF without popup blocker issues (via hidden iframe)
  */
-function triggerPdfPrint(title, clientMeta, summaryCards, tablesHtml) {
+export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
   const generatedDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const clientName = clientMeta.username || 'Valued Trader';
+  const clientName = clientMeta.username || clientMeta.name || 'Valued Trader';
   const clientId = clientMeta.client_id || (clientMeta.id ? `SE${String(clientMeta.id).padStart(6, '0')}` : 'SE000001');
-  const pan = clientMeta.pan_card || 'XXXXX0000X';
+  const pan = clientMeta.pan_card || clientMeta.pan || 'XXXXX0000X';
 
-  const cardsHtml = summaryCards.map(c => `
+  const cardsHtml = (summaryCards || []).map(c => `
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; flex: 1; min-width: 140px;">
       <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">${c.label}</div>
       <div style="font-size: 15px; font-weight: 700; color: ${c.color || '#0f172a'};">${c.value}</div>
     </div>
   `).join('');
 
-  const html = `
-<!DOCTYPE html>
+  const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -173,28 +248,55 @@ function triggerPdfPrint(title, clientMeta, summaryCards, tablesHtml) {
     This is a computer-generated official statement from Short Edge. No physical signature is required. For discrepancies, contact support@shortedge.in.
   </div>
 </body>
-</html>
-  `;
+</html>`;
 
-  const printWindow = window.open('', '_blank', 'width=1100,height=800');
-  if (printWindow) {
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
+  try {
+    // Hidden IFrame print method avoids popup blocker
+    let iframe = document.getElementById('__report_print_frame__');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = '__report_print_frame__';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(fullHtml);
+    doc.close();
+
     setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-    }, 350);
-  } else {
-    alert('Please allow popups to view & print the PDF statement.');
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (err) {
+        console.warn('Iframe print error, trying popup window:', err);
+        const w = window.open('', '_blank');
+        if (w) {
+          w.document.open();
+          w.document.write(fullHtml);
+          w.document.close();
+          w.focus();
+          w.print();
+        }
+      }
+    }, 200);
+  } catch (e) {
+    console.error('Print generation failed:', e);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. TAX P&L STATEMENT GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
-export function generateTaxPnLReport(orders = [], positions = [], user = {}, dateRange = 'FY 2025-26', format = 'excel') {
-  const executed = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+export function generateTaxPnLReport(orders = [], positions = [], user = {}, dateRange = 'FY 2025-26', format = 'excel', customStart = '', customEnd = '') {
+  const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
+  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
   
   // Scripwise grouping
   const scripMap = {};
@@ -238,10 +340,12 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
   const totalCharges = scripList.reduce((acc, s) => acc + s.charges, 0);
   const totalNetTaxable = totalGrossPnl - totalCharges;
 
+  const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;
+
   if (format === 'excel') {
     const rows = [];
     rows.push([esc('SHORT EDGE - SCRIPWISE TAX P&L STATEMENT')]);
-    rows.push([esc(`Client ID: ${user.client_id || user.id}`), esc(`Client Name: ${user.username}`), esc(`Period: ${dateRange}`)]);
+    rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Turnover: ₹${totalTurnover.toFixed(2)}`), esc(`Gross Realized P&L: ₹${totalGrossPnl.toFixed(2)}`), esc(`Net Taxable P&L: ₹${totalNetTaxable.toFixed(2)}`)]);
     rows.push('');
     rows.push([esc('Scrip Symbol'), esc('Segment'), esc('Buy Qty'), esc('Buy Value (₹)'), esc('Sell Qty'), esc('Sell Value (₹)'), esc('Gross Realized P&L (₹)'), esc('Total Taxes & Charges (₹)'), esc('Net Taxable P&L (₹)')]);
@@ -261,7 +365,11 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
       ]);
     });
 
-    triggerCsvDownload(rows, `Tax_PnL_${dateRange.replace(/\s+/g, '_')}`);
+    if (scripList.length === 0) {
+      rows.push([esc('No trades executed during this selected period.'), '', '', '', '', '', '', '', '']);
+    }
+
+    triggerCsvDownload(rows, `Tax_PnL_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Turnover', value: `₹${totalTurnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
@@ -308,15 +416,16 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
       </table>
     `;
 
-    triggerPdfPrint('Scripwise Tax P&L Statement', { ...user, period: dateRange }, summaryCards, tablesHtml);
+    triggerPdfPrint('Scripwise Tax P&L Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. P&L SUMMARY STATEMENT GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
-export function generatePnLSummaryReport(orders = [], positions = [], user = {}, dateRange = 'Current Month', format = 'excel') {
-  const executed = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+export function generatePnLSummaryReport(orders = [], positions = [], user = {}, dateRange = 'Current Month', format = 'excel', customStart = '', customEnd = '') {
+  const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
+  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
   
   const segments = {
     'Equity Intraday': { trades: 0, turnover: 0, grossPnl: 0, charges: 0 },
@@ -347,10 +456,12 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
   const totalCharges = Object.values(segments).reduce((a, b) => a + b.charges, 0);
   const totalNet = totalGross - totalCharges;
 
+  const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;
+
   if (format === 'excel') {
     const rows = [];
     rows.push([esc('SHORT EDGE - SEGMENTWISE P&L SUMMARY STATEMENT')]);
-    rows.push([esc(`Client ID: ${user.client_id || user.id}`), esc(`Client Name: ${user.username}`), esc(`Period: ${dateRange}`)]);
+    rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push('');
     rows.push([esc('Trading Segment'), esc('Total Trades'), esc('Total Turnover (₹)'), esc('Gross P&L (₹)'), esc('Total Charges (₹)'), esc('Net Realized P&L (₹)')]);
 
@@ -365,7 +476,7 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
       ]);
     });
 
-    triggerCsvDownload(rows, `PnL_Summary_${dateRange.replace(/\s+/g, '_')}`);
+    triggerCsvDownload(rows, `PnL_Summary_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Realized Gross P&L', value: `${totalGross >= 0 ? '+' : ''}₹${totalGross.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: totalGross >= 0 ? '#16a34a' : '#dc2626' },
@@ -405,15 +516,16 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
       </table>
     `;
 
-    triggerPdfPrint('Segmentwise P&L Summary Statement', { ...user, period: dateRange }, summaryCards, tablesHtml);
+    triggerPdfPrint('Segmentwise P&L Summary Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. TRADES & CHARGES DETAILED BREAKDOWN
 // ─────────────────────────────────────────────────────────────────────────────
-export function generateTradesAndChargesReport(orders = [], user = {}, dateRange = 'Current Month', format = 'excel') {
-  const executed = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+export function generateTradesAndChargesReport(orders = [], user = {}, dateRange = 'Current Month', format = 'excel', customStart = '', customEnd = '') {
+  const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
+  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
 
   let grandBrokerage = 0;
   let grandSTT = 0;
@@ -446,10 +558,12 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
     };
   });
 
+  const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;
+
   if (format === 'excel') {
     const rows = [];
     rows.push([esc('SHORT EDGE - TRADES & CHARGES BREAKDOWN STATEMENT')]);
-    rows.push([esc(`Client ID: ${user.client_id || user.id}`), esc(`Client Name: ${user.username}`), esc(`Period: ${dateRange}`)]);
+    rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Trades: ${executed.length}`), esc(`Total Brokerage: ₹${grandBrokerage.toFixed(2)}`), esc(`Total Charges & Taxes: ₹${grandTotalCharges.toFixed(2)}`)]);
     rows.push('');
     rows.push([
@@ -467,7 +581,11 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
       ]);
     });
 
-    triggerCsvDownload(rows, `Trades_and_Charges_${dateRange.replace(/\s+/g, '_')}`);
+    if (tradeRows.length === 0) {
+      rows.push([esc('No trades executed during this selected period.'), '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    }
+
+    triggerCsvDownload(rows, `Trades_and_Charges_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Executed Trades', value: `${executed.length}` },
@@ -505,34 +623,38 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
           </tr>
         </thead>
         <tbody>
-          ${tableRows.length ? tableRows : '<tr><td colspan="8" style="text-align:center; padding: 20px;">No trades recorded.</td></tr>'}
+          ${tableRows.length ? tableRows : '<tr><td colspan="8" style="text-align:center; padding: 20px;">No trades recorded in this period.</td></tr>'}
         </tbody>
       </table>
     `;
 
-    triggerPdfPrint('Trades & Regulatory Charges Statement', { ...user, period: dateRange }, summaryCards, tablesHtml);
+    triggerPdfPrint('Trades & Regulatory Charges Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. STATEMENT - LEDGER GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
-export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Records', format = 'excel') {
+export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Records', format = 'excel', customStart = '', customEnd = '') {
+  const filtered = filterRecordsByPeriod(ledger, dateRange, customStart, customEnd);
+  
   let currentBalance = parseFloat(user.balance || 0);
-  const ledgerWithBalance = (ledger || []).map(entry => {
+  const ledgerWithBalance = (filtered || []).map(entry => {
     const balanceAfter = currentBalance;
     currentBalance -= Number(entry.amount);
     return { ...entry, running_balance: balanceAfter };
   });
 
-  const totalCredits = ledger.filter(l => Number(l.amount) > 0).reduce((acc, l) => acc + Number(l.amount), 0);
-  const totalDebits = ledger.filter(l => Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount)), 0);
+  const totalCredits = filtered.filter(l => Number(l.amount) > 0).reduce((acc, l) => acc + Number(l.amount), 0);
+  const totalDebits = filtered.filter(l => Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount)), 0);
   const closingBalance = parseFloat(user.balance || 0);
+
+  const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;
 
   if (format === 'excel') {
     const rows = [];
     rows.push([esc('SHORT EDGE - FINANCIAL LEDGER ACCOUNT STATEMENT')]);
-    rows.push([esc(`Client ID: ${user.client_id || user.id}`), esc(`Client Name: ${user.username}`), esc(`Period: ${dateRange}`)]);
+    rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Credits: ₹${totalCredits.toFixed(2)}`), esc(`Total Debits: ₹${totalDebits.toFixed(2)}`), esc(`Closing Available Balance: ₹${closingBalance.toFixed(2)}`)]);
     rows.push('');
     rows.push([esc('Date & Time'), esc('Transaction Type'), esc('Description / Narration'), esc('Credit (₹)'), esc('Debit (₹)'), esc('Net Amount (₹)'), esc('Running Balance (₹)')]);
@@ -550,7 +672,11 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
       ]);
     });
 
-    triggerCsvDownload(rows, `Ledger_Statement_${dateRange.replace(/\s+/g, '_')}`);
+    if (ledgerWithBalance.length === 0) {
+      rows.push([esc('No ledger transactions recorded in this period.'), '', '', '', '', '', '']);
+    }
+
+    triggerCsvDownload(rows, `Ledger_Statement_${displayPeriod.replace(/\s+/g, '_')}`);
   } else {
     const summaryCards = [
       { label: 'Total Deposits & Credits', value: `+₹${totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#16a34a' },
@@ -563,7 +689,7 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
       return `
         <tr>
           <td>${new Date(l.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-          <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9.5px;">${l.type.replace('_', ' ')}</span></td>
+          <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9.5px;">${String(l.type || '').replace('_', ' ')}</span></td>
           <td>${l.description || l.type}</td>
           <td class="text-right text-green">${amt > 0 ? `₹${amt.toFixed(2)}` : '-'}</td>
           <td class="text-right text-red">${amt < 0 ? `₹${Math.abs(amt).toFixed(2)}` : '-'}</td>
@@ -585,12 +711,12 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
           </tr>
         </thead>
         <tbody>
-          ${tableRows.length ? tableRows : '<tr><td colspan="6" style="text-align:center; padding: 20px;">No transactions recorded in ledger.</td></tr>'}
+          ${tableRows.length ? tableRows : '<tr><td colspan="6" style="text-align:center; padding: 20px;">No transactions recorded in ledger for this period.</td></tr>'}
         </tbody>
       </table>
     `;
 
-    triggerPdfPrint('Financial Ledger Statement', { ...user, period: dateRange }, summaryCards, tablesHtml);
+    triggerPdfPrint('Financial Ledger Statement', { ...user, period: displayPeriod }, summaryCards, tablesHtml);
   }
 }
 
@@ -601,11 +727,11 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
   const executed = (orders || []).filter(o => {
     const isDone = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
     if (!isDone) return false;
-    const oDate = new Date(o.created_at).toISOString().slice(0, 10);
+    const oDate = getISTDateString(o.created_at);
     return oDate === tradeDate;
   });
 
-  const cnNumber = `CN-${tradeDate.replace(/-/g, '')}-${(user.client_id || user.id || '001')}`;
+  const cnNumber = `CN-${tradeDate.replace(/-/g, '')}-${(user.client_id || user.id || 'SE000001')}`;
   
   let totalBuyVal = 0;
   let totalSellVal = 0;
@@ -644,14 +770,13 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
   });
 
   const totalTaxes = totalBrokerage + totalSTT + totalExchange + totalGST + totalSEBI + totalStamp;
-  // Net settlement = Total Sell Value - Total Buy Value - Total Charges
   const netSettlement = totalSellVal - totalBuyVal - totalTaxes;
 
   if (format === 'excel') {
     const rows = [];
     rows.push([esc('SHORT EDGE - ELECTRONIC CONTRACT NOTE (ECN)')]);
-    rows.push([esc(`Contract Note No: ${cnNumber}`), esc(`Trade Date: ${tradeDate}`), esc(`Client ID: ${user.client_id || user.id}`)]);
-    rows.push([esc(`Client Name: ${user.username}`), esc(`Net Settlement: ₹${netSettlement.toFixed(2)} (${netSettlement >= 0 ? 'Receivable' : 'Payable'})`)]);
+    rows.push([esc(`Contract Note No: ${cnNumber}`), esc(`Trade Date: ${tradeDate}`), esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`)]);
+    rows.push([esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Net Settlement: ₹${netSettlement.toFixed(2)} (${netSettlement >= 0 ? 'Receivable' : 'Payable'})`)]);
     rows.push('');
     rows.push([esc('Order No'), esc('Trade Time'), esc('Symbol'), esc('Buy/Sell'), esc('Quantity'), esc('Gross Price (₹)'), esc('Trade Value (₹)'), esc('Brokerage (₹)'), esc('Net Rate (₹)'), esc('Net Amount (₹)')]);
 
@@ -661,6 +786,10 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
         esc(t.price.toFixed(2)), esc(t.tradeValue.toFixed(2)), esc(t.brokerage.toFixed(2)), esc(t.netRate.toFixed(2)), esc(t.netTotal.toFixed(2))
       ]);
     });
+
+    if (tradeItems.length === 0) {
+      rows.push([esc(`No trades executed on ${tradeDate}.`), '', '', '', '', '', '', '', '', '']);
+    }
 
     triggerCsvDownload(rows, `Contract_Note_${tradeDate}`);
   } else {
@@ -748,58 +877,68 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
     totalInvested += invested;
     totalCurrentVal += currentVal;
 
-    // Standardized ISIN generator
-    const isin = `INE${String(h.symbol).replace(/[^A-Z0-9]/gi, '').slice(0, 8).padEnd(8, '0')}010`;
-
     return {
+      isin: h.isin || `INE${String(idx + 1).padStart(9, '0')}`,
       symbol: h.symbol,
-      isin: isin,
       qty,
       avgPrice,
-      invested,
       cmp,
+      invested,
       currentVal,
       pnl,
       pnlPct
     };
   });
 
-  const totalPnL = totalCurrentVal - totalInvested;
-  const totalPnLPct = totalInvested > 0 ? ((totalPnL / totalInvested) * 100).toFixed(2) : '0.00';
+  const totalUnrealizedPnl = totalCurrentVal - totalInvested;
+  const totalReturnPct = totalInvested > 0 ? ((totalUnrealizedPnl / totalInvested) * 100).toFixed(2) : '0.00';
+  const asOfDate = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - DEMAT PORTFOLIO & HOLDINGS STATEMENT')]);
-    rows.push([esc(`Client ID: ${user.client_id || user.id}`), esc(`Client Name: ${user.username}`), esc(`As On: ${new Date().toLocaleDateString('en-IN')}`)]);
-    rows.push([esc(`Total Invested: ₹${totalInvested.toFixed(2)}`), esc(`Current Portfolio Value: ₹${totalCurrentVal.toFixed(2)}`), esc(`Unrealized P&L: ₹${totalPnL.toFixed(2)} (${totalPnLPct}%)`)]);
+    rows.push([esc('SHORT EDGE - DP HOLDINGS & DEMAT PORTFOLIO VALUATION')]);
+    rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Valuation Date: ${asOfDate}`)]);
+    rows.push([esc(`Total Invested: ₹${totalInvested.toFixed(2)}`), esc(`Current Portfolio Value: ₹${totalCurrentVal.toFixed(2)}`), esc(`Unrealized P&L: ₹${totalUnrealizedPnl.toFixed(2)} (${totalReturnPct}%)`)]);
     rows.push('');
-    rows.push([esc('Scrip Symbol'), esc('ISIN'), esc('Holding Quantity'), esc('Average Buy Price (₹)'), esc('Total Invested (₹)'), esc('Current Market Price (₹)'), esc('Current Value (₹)'), esc('Unrealized P&L (₹)'), esc('Gain/Loss (%)')]);
+    rows.push([esc('ISIN'), esc('Scrip Symbol'), esc('Holding Qty'), esc('Buy Avg Price (₹)'), esc('CMP / LTP (₹)'), esc('Invested Value (₹)'), esc('Current Value (₹)'), esc('Unrealized P&L (₹)'), esc('P&L (%)')]);
 
     holdingRows.forEach(h => {
       rows.push([
-        esc(h.symbol), esc(h.isin), esc(h.qty), esc(h.avgPrice.toFixed(2)), esc(h.invested.toFixed(2)),
-        esc(h.cmp.toFixed(2)), esc(h.currentVal.toFixed(2)), esc(h.pnl.toFixed(2)), esc(`${h.pnlPct}%`)
+        esc(h.isin),
+        esc(h.symbol),
+        esc(h.qty),
+        esc(h.avgPrice.toFixed(2)),
+        esc(h.cmp.toFixed(2)),
+        esc(h.invested.toFixed(2)),
+        esc(h.currentVal.toFixed(2)),
+        esc(h.pnl.toFixed(2)),
+        esc(`${h.pnlPct}%`)
       ]);
     });
 
-    triggerCsvDownload(rows, `DP_Holdings_Valuation`);
+    if (holdingRows.length === 0) {
+      rows.push([esc('No Demat holdings available in portfolio.'), '', '', '', '', '', '', '', '']);
+    }
+
+    triggerCsvDownload(rows, `DP_Holdings_Valuation_${new Date().toISOString().slice(0, 10)}`);
   } else {
     const summaryCards = [
       { label: 'Total Invested Value', value: `₹${totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
       { label: 'Current Portfolio Value', value: `₹${totalCurrentVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, color: '#2563eb' },
-      { label: 'Total Unrealized P&L', value: `${totalPnL >= 0 ? '+' : ''}₹${totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${totalPnLPct}%)`, color: totalPnL >= 0 ? '#16a34a' : '#dc2626' }
+      { label: 'Total Unrealized P&L', value: `${totalUnrealizedPnl >= 0 ? '+' : ''}₹${totalUnrealizedPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${totalReturnPct}%)`, color: totalUnrealizedPnl >= 0 ? '#16a34a' : '#dc2626' }
     ];
 
     const tableRows = holdingRows.map(h => `
       <tr>
+        <td><span style="font-family: monospace; font-size: 10px; color: #64748b;">${h.isin}</span></td>
         <td><strong>${h.symbol}</strong></td>
-        <td style="font-family: monospace; color: #64748b;">${h.isin}</td>
         <td class="text-right">${h.qty}</td>
         <td class="text-right">₹${h.avgPrice.toFixed(2)}</td>
-        <td class="text-right">₹${h.invested.toFixed(2)}</td>
         <td class="text-right">₹${h.cmp.toFixed(2)}</td>
-        <td class="text-right"><strong>₹${h.currentVal.toFixed(2)}</strong></td>
-        <td class="text-right ${h.pnl >= 0 ? 'text-green' : 'text-red'}">${h.pnl >= 0 ? '+' : ''}₹${h.pnl.toFixed(2)} (${h.pnlPct}%)</td>
+        <td class="text-right">₹${h.invested.toFixed(2)}</td>
+        <td class="text-right">₹${h.currentVal.toFixed(2)}</td>
+        <td class="text-right ${h.pnl >= 0 ? 'text-green' : 'text-red'}">${h.pnl >= 0 ? '+' : ''}₹${h.pnl.toFixed(2)}</td>
+        <td class="text-right ${h.pnl >= 0 ? 'text-green' : 'text-red'}">${h.pnl >= 0 ? '+' : ''}${h.pnlPct}%</td>
       </tr>
     `).join('');
 
@@ -807,22 +946,23 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
       <table>
         <thead>
           <tr>
-            <th>Security Name</th>
             <th>ISIN</th>
-            <th class="text-right">Quantity</th>
+            <th>Scrip Symbol</th>
+            <th class="text-right">Qty</th>
             <th class="text-right">Buy Avg</th>
-            <th class="text-right">Invested Value</th>
             <th class="text-right">LTP / CMP</th>
+            <th class="text-right">Invested Value</th>
             <th class="text-right">Current Value</th>
             <th class="text-right">Unrealized P&L</th>
+            <th class="text-right">Return %</th>
           </tr>
         </thead>
         <tbody>
-          ${tableRows.length ? tableRows : '<tr><td colspan="8" style="text-align:center; padding: 20px;">No demat holdings currently in portfolio.</td></tr>'}
+          ${tableRows.length ? tableRows : '<tr><td colspan="9" style="text-align:center; padding: 20px;">No Demat holdings found in portfolio.</td></tr>'}
         </tbody>
       </table>
     `;
 
-    triggerPdfPrint('Demat Holding & Portfolio Valuation Statement', { ...user, period: `As On: ${new Date().toLocaleDateString('en-IN')}` }, summaryCards, tablesHtml);
+    triggerPdfPrint('DP Holdings & Demat Valuation Statement', { ...user, period: `As on ${asOfDate}` }, summaryCards, tablesHtml);
   }
 }
