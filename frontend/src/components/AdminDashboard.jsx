@@ -2,7 +2,194 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle } from 'lucide-react';
+import { exportToExcel, exportToPDF } from '../utils/adminExport';
 
+const calculateDateBounds = (preset, customStart, customEnd) => {
+  const now = new Date();
+  if (preset === 'week') {
+    return {
+      startDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: ''
+    };
+  }
+  if (preset === '15days') {
+    return {
+      startDate: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: ''
+    };
+  }
+  if (preset === 'month') {
+    return {
+      startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: ''
+    };
+  }
+  if (preset === '3months') {
+    return {
+      startDate: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: ''
+    };
+  }
+  if (preset === 'custom') {
+    return {
+      startDate: customStart ? new Date(customStart + 'T00:00:00.000Z').toISOString() : '',
+      endDate: customEnd ? new Date(customEnd + 'T23:59:59.999Z').toISOString() : ''
+    };
+  }
+  return { startDate: '', endDate: '' };
+};
+
+function DateRangeExportBar({
+  datePreset,
+  setDatePreset,
+  customStart,
+  setCustomStart,
+  customEnd,
+  setCustomEnd,
+  onExportExcel,
+  onExportPDF,
+  exporting
+}) {
+  const presets = [
+    { id: 'week', label: 'Week' },
+    { id: '15days', label: '15 Days' },
+    { id: 'month', label: 'Month' },
+    { id: '3months', label: '3 Months' },
+    { id: 'all', label: 'All' },
+    { id: 'custom', label: '📅 Custom' }
+  ];
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: '6px',
+      padding: '4px 8px',
+      background: 'rgba(255, 255, 255, 0.02)',
+      borderRadius: '5px',
+      border: '1px solid var(--border-color)',
+      margin: '2px 0'
+    }}>
+      {/* Date Presets */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600', marginRight: '2px' }}>
+          Date Range:
+        </span>
+        {presets.map(p => {
+          const isActive = datePreset === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setDatePreset(p.id)}
+              style={{
+                background: isActive ? 'var(--color-blue)' : 'rgba(255, 255, 255, 0.04)',
+                color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                border: isActive ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                borderRadius: '3px',
+                padding: '2px 6px',
+                fontSize: '9.5px',
+                fontWeight: isActive ? '700' : '500',
+                cursor: 'pointer',
+                transition: 'all 0.12s ease'
+              }}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+
+        {/* Custom date range picker if custom selected */}
+        {datePreset === 'custom' && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginLeft: '4px' }}>
+            <input
+              type="date"
+              value={customStart}
+              onChange={e => setCustomStart(e.target.value)}
+              style={{
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '3px',
+                padding: '1px 4px',
+                fontSize: '9.5px',
+                color: 'var(--text-primary)',
+                height: '20px'
+              }}
+            />
+            <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>to</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={e => setCustomEnd(e.target.value)}
+              style={{
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '3px',
+                padding: '1px 4px',
+                fontSize: '9.5px',
+                color: 'var(--text-primary)',
+                height: '20px'
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Export Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <button
+          type="button"
+          onClick={onExportExcel}
+          disabled={exporting}
+          title="Download Excel / CSV format"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            background: 'rgba(16, 185, 129, 0.12)',
+            color: '#10b981',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            borderRadius: '3px',
+            padding: '2px 8px',
+            fontSize: '9.5px',
+            fontWeight: '600',
+            cursor: exporting ? 'not-allowed' : 'pointer',
+            opacity: exporting ? 0.6 : 1,
+            transition: 'all 0.12s ease'
+          }}
+        >
+          <span>📥</span> Excel
+        </button>
+
+        <button
+          type="button"
+          onClick={onExportPDF}
+          disabled={exporting}
+          title="Print or Save PDF report"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            background: 'rgba(239, 68, 68, 0.12)',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            borderRadius: '3px',
+            padding: '2px 8px',
+            fontSize: '9.5px',
+            fontWeight: '600',
+            cursor: exporting ? 'not-allowed' : 'pointer',
+            opacity: exporting ? 0.6 : 1,
+            transition: 'all 0.12s ease'
+          }}
+        >
+          <span>📄</span> PDF
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const isMarketHours = () => {
   const now = new Date();
@@ -1249,31 +1436,60 @@ export default function AdminDashboard() {
   }, [adminTelemetry?.users, userSearch, userFilter, userSort]);
   const [announcementInput, setAnnouncementInput] = useState('');
   const [announcementType, setAnnouncementType] = useState('info');
+  const [exporting, setExporting] = useState(false);
+
+  // Client Management State & Date Filters
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [usersDatePreset, setUsersDatePreset] = useState('all');
+  const [usersCustomStart, setUsersCustomStart] = useState('');
+  const [usersCustomEnd, setUsersCustomEnd] = useState('');
 
+  // Order Flow State & Date Filters
   const [orders, setOrders] = useState([]);
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersTotalPages, setOrdersTotalPages] = useState(1);
   const [ordersTotal, setOrdersTotal] = useState(0);
+  const [ordersDatePreset, setOrdersDatePreset] = useState('all');
+  const [ordersCustomStart, setOrdersCustomStart] = useState('');
+  const [ordersCustomEnd, setOrdersCustomEnd] = useState('');
 
+  // Live Positions State & Date Filters
   const [positions, setPositions] = useState([]);
+  const [positionsPage, setPositionsPage] = useState(1);
+  const [positionsTotalPages, setPositionsTotalPages] = useState(1);
+  const [positionsTotal, setPositionsTotal] = useState(0);
+  const [positionsDatePreset, setPositionsDatePreset] = useState('all');
+  const [positionsCustomStart, setPositionsCustomStart] = useState('');
+  const [positionsCustomEnd, setPositionsCustomEnd] = useState('');
 
+  // Platform Ledger State & Date Filters
   const [ledger, setLedger] = useState([]);
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledgerTotalPages, setLedgerTotalPages] = useState(1);
   const [ledgerTotal, setLedgerTotal] = useState(0);
+  const [ledgerDatePreset, setLedgerDatePreset] = useState('all');
+  const [ledgerCustomStart, setLedgerCustomStart] = useState('');
+  const [ledgerCustomEnd, setLedgerCustomEnd] = useState('');
 
+  // Deposit Requests State & Date Filters
   const [deposits, setDeposits] = useState([]);
   const [depositsPage, setDepositsPage] = useState(1);
   const [depositsTotalPages, setDepositsTotalPages] = useState(1);
   const [depositsTotal, setDepositsTotal] = useState(0);
+  const [depositsDatePreset, setDepositsDatePreset] = useState('all');
+  const [depositsCustomStart, setDepositsCustomStart] = useState('');
+  const [depositsCustomEnd, setDepositsCustomEnd] = useState('');
 
+  // Withdrawal Requests State & Date Filters
   const [withdrawals, setWithdrawals] = useState([]);
   const [withdrawalsPage, setWithdrawalsPage] = useState(1);
   const [withdrawalsTotalPages, setWithdrawalsTotalPages] = useState(1);
   const [withdrawalsTotal, setWithdrawalsTotal] = useState(0);
+  const [withdrawalsDatePreset, setWithdrawalsDatePreset] = useState('all');
+  const [withdrawalsCustomStart, setWithdrawalsCustomStart] = useState('');
+  const [withdrawalsCustomEnd, setWithdrawalsCustomEnd] = useState('');
 
   const [analytics, setAnalytics] = useState(null);
 
@@ -1512,7 +1728,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
   
-  // Debounce search
+  // Debounce searches
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedClientSearch(clientSearch || search);
@@ -1529,6 +1745,15 @@ export default function AdminDashboard() {
     }, 400);
     return () => clearTimeout(timer);
   }, [orderSearch]);
+
+  const [debouncedPositionSearch, setDebouncedPositionSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPositionSearch(positionSearch);
+      setPositionsPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [positionSearch]);
 
   const [debouncedLedgerSearch, setDebouncedLedgerSearch] = useState('');
   useEffect(() => {
@@ -1579,7 +1804,8 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       if (activeTab === 'users') {
-        const res = await fetchAdminUsers?.(page, 50, debouncedClientSearch);
+        const { startDate, endDate } = calculateDateBounds(usersDatePreset, usersCustomStart, usersCustomEnd);
+        const res = await fetchAdminUsers?.(page, 50, debouncedClientSearch, startDate, endDate);
         if (res?.success) {
           setUsers(res.users || []);
           setTotalPages(res.totalPages || 1);
@@ -1589,14 +1815,16 @@ export default function AdminDashboard() {
       } else if (activeTab === 'telemetry') {
         await fetchAdminTelemetry?.(telemetryTimeframe);
       } else if (activeTab === 'withdrawals') {
-        const res = await fetchAdminWithdrawals?.(withdrawalsPage, 50, debouncedWithdrawalSearch);
+        const { startDate, endDate } = calculateDateBounds(withdrawalsDatePreset, withdrawalsCustomStart, withdrawalsCustomEnd);
+        const res = await fetchAdminWithdrawals?.(withdrawalsPage, 50, debouncedWithdrawalSearch, startDate, endDate);
         if (res?.success) {
           setWithdrawals(res.withdrawals || []);
           setWithdrawalsTotalPages(res.totalPages || 1);
           setWithdrawalsTotal(res.total || (res.withdrawals || []).length);
         }
       } else if (activeTab === 'deposits') {
-        const res = await fetchDepositRequests?.(depositsPage, 50, debouncedDepositSearch);
+        const { startDate, endDate } = calculateDateBounds(depositsDatePreset, depositsCustomStart, depositsCustomEnd);
+        const res = await fetchDepositRequests?.(depositsPage, 50, debouncedDepositSearch, startDate, endDate);
         if (res?.success) {
           setDeposits(res.deposits || []);
           setDepositsTotalPages(res.totalPages || 1);
@@ -1606,17 +1834,24 @@ export default function AdminDashboard() {
         const res = await fetchAdminAnalytics?.();
         if (res?.success) setAnalytics(res.data);
       } else if (activeTab === 'orders') {
-        const res = await fetchAdminOrders?.(ordersPage, 50, debouncedOrderSearch);
+        const { startDate, endDate } = calculateDateBounds(ordersDatePreset, ordersCustomStart, ordersCustomEnd);
+        const res = await fetchAdminOrders?.(ordersPage, 50, debouncedOrderSearch, startDate, endDate);
         if (res?.success) {
           setOrders(res.orders || []);
           setOrdersTotalPages(res.totalPages || 1);
           setOrdersTotal(res.total || (res.orders || []).length);
         }
       } else if (activeTab === 'positions') {
-        const res = await fetchAdminPositions?.();
-        if (res?.success) setPositions(res.positions || []);
+        const { startDate, endDate } = calculateDateBounds(positionsDatePreset, positionsCustomStart, positionsCustomEnd);
+        const res = await fetchAdminPositions?.(positionsPage, 50, debouncedPositionSearch, startDate, endDate);
+        if (res?.success) {
+          setPositions(res.positions || []);
+          setPositionsTotalPages(res.totalPages || 1);
+          setPositionsTotal(res.total || (res.positions || []).length);
+        }
       } else if (activeTab === 'ledger') {
-        const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch);
+        const { startDate, endDate } = calculateDateBounds(ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd);
+        const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch, startDate, endDate);
         if (res?.success) {
           setLedger(res.ledger || []);
           setLedgerTotalPages(res.totalPages || 1);
@@ -1634,12 +1869,182 @@ export default function AdminDashboard() {
     loadData();
   }, [
     activeTab, 
-    page, debouncedClientSearch,
-    ordersPage, debouncedOrderSearch,
-    ledgerPage, debouncedLedgerSearch,
-    depositsPage, debouncedDepositSearch,
-    withdrawalsPage, debouncedWithdrawalSearch
+    page, debouncedClientSearch, usersDatePreset, usersCustomStart, usersCustomEnd,
+    ordersPage, debouncedOrderSearch, ordersDatePreset, ordersCustomStart, ordersCustomEnd,
+    positionsPage, debouncedPositionSearch, positionsDatePreset, positionsCustomStart, positionsCustomEnd,
+    ledgerPage, debouncedLedgerSearch, ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd,
+    depositsPage, debouncedDepositSearch, depositsDatePreset, depositsCustomStart, depositsCustomEnd,
+    withdrawalsPage, debouncedWithdrawalSearch, withdrawalsDatePreset, withdrawalsCustomStart, withdrawalsCustomEnd
   ]);
+
+  // --- Export Handlers ---
+  const handleExportUsers = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(usersDatePreset, usersCustomStart, usersCustomEnd);
+      const res = await fetchAdminUsers?.(1, 10000, debouncedClientSearch, startDate, endDate, true);
+      const exportData = res?.users || users || [];
+      const cols = [
+        { header: 'User ID', key: 'id' },
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Username', key: 'username' },
+        { header: 'Email', key: 'email' },
+        { header: 'Phone', key: 'phone' },
+        { header: 'Wallet Balance (₹)', key: 'balance', format: b => `₹${Number(b || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, align: 'right' },
+        { header: 'Plan', key: 'subscription_tier' },
+        { header: 'Status', key: 'is_banned', format: b => b ? 'BANNED' : 'ACTIVE' },
+        { header: 'Registration IP', key: 'registration_ip' },
+        { header: 'Last IP', key: 'last_ip' },
+        { header: 'Registered On', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${usersDatePreset.toUpperCase()}${debouncedClientSearch ? ` | Search: "${debouncedClientSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'client_management_export', 'Client Accounts Roster');
+      else exportToPDF(exportData, cols, 'client_management_report', 'Client Accounts Roster', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportPositions = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(positionsDatePreset, positionsCustomStart, positionsCustomEnd);
+      const res = await fetchAdminPositions?.(1, 10000, debouncedPositionSearch, startDate, endDate, true);
+      const exportData = res?.positions || positions || [];
+      const cols = [
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Client Name', key: 'username' },
+        { header: 'Symbol', key: 'symbol' },
+        { header: 'Product', key: 'product_type' },
+        { header: 'Quantity', key: 'quantity', format: q => q > 0 ? `+${q} (LONG)` : `${q} (SHORT)`, align: 'right' },
+        { header: 'Buy Price (₹)', key: 'buy_price', format: p => p ? `₹${Number(p).toFixed(2)}` : '-', align: 'right' },
+        { header: 'Sell Price (₹)', key: 'sell_price', format: p => p ? `₹${Number(p).toFixed(2)}` : '-', align: 'right' },
+        { header: 'Opened At', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${positionsDatePreset.toUpperCase()}${debouncedPositionSearch ? ` | Search: "${debouncedPositionSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'live_positions_export', 'Live Positions Audit Report');
+      else exportToPDF(exportData, cols, 'live_positions_report', 'Live Positions Audit Report', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportOrders = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(ordersDatePreset, ordersCustomStart, ordersCustomEnd);
+      const res = await fetchAdminOrders?.(1, 10000, debouncedOrderSearch, startDate, endDate, true);
+      const exportData = res?.orders || orders || [];
+      const cols = [
+        { header: 'Order ID', key: 'id' },
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Client Name', key: 'username' },
+        { header: 'Symbol', key: 'symbol' },
+        { header: 'Side', key: 'side' },
+        { header: 'Order Type', key: 'order_type' },
+        { header: 'Product', key: 'product_type' },
+        { header: 'Qty', key: 'quantity', align: 'right' },
+        { header: 'Price (₹)', key: 'price', format: p => `₹${Number(p || 0).toFixed(2)}`, align: 'right' },
+        { header: 'Avg Price (₹)', key: 'average_price', format: p => p ? `₹${Number(p).toFixed(2)}` : '-', align: 'right' },
+        { header: 'Status', key: 'status' },
+        { header: 'Remarks', key: 'rejection_reason' },
+        { header: 'Timestamp', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${ordersDatePreset.toUpperCase()}${debouncedOrderSearch ? ` | Search: "${debouncedOrderSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'order_flow_export', 'Order Flow Audit Log');
+      else exportToPDF(exportData, cols, 'order_flow_report', 'Order Flow Audit Log', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportLedger = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd);
+      const res = await fetchAdminLedger?.(1, 10000, debouncedLedgerSearch, startDate, endDate, true);
+      const exportData = res?.ledger || ledger || [];
+      const cols = [
+        { header: 'Entry ID', key: 'id' },
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Client Name', key: 'username' },
+        { header: 'Type', key: 'type' },
+        { header: 'Amount (₹)', key: 'amount', format: a => `${Number(a) >= 0 ? '+' : ''}₹${Number(a || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, align: 'right' },
+        { header: 'Balance After (₹)', key: 'balance_after', format: b => b !== undefined && b !== null ? `₹${Number(b).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-', align: 'right' },
+        { header: 'Description', key: 'description' },
+        { header: 'Timestamp', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${ledgerDatePreset.toUpperCase()}${debouncedLedgerSearch ? ` | Search: "${debouncedLedgerSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'platform_ledger_export', 'Platform Financial Ledger');
+      else exportToPDF(exportData, cols, 'platform_ledger_report', 'Platform Financial Ledger', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportDeposits = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(depositsDatePreset, depositsCustomStart, depositsCustomEnd);
+      const res = await fetchDepositRequests?.(1, 10000, debouncedDepositSearch, startDate, endDate, true);
+      const exportData = res?.deposits || deposits || [];
+      const cols = [
+        { header: 'Request ID', key: 'id' },
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Client Name', key: 'username' },
+        { header: 'Email', key: 'email' },
+        { header: 'Amount (₹)', key: 'amount', format: a => `₹${Number(a || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, align: 'right' },
+        { header: 'UTR / Ref No', key: 'utr_number' },
+        { header: 'Status', key: 'status' },
+        { header: 'Requested At', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' },
+        { header: 'Processed At', key: 'updated_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${depositsDatePreset.toUpperCase()}${debouncedDepositSearch ? ` | Search: "${debouncedDepositSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'deposit_requests_export', 'Deposit Requests Report');
+      else exportToPDF(exportData, cols, 'deposit_requests_report', 'Deposit Requests Report', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportWithdrawals = async (format) => {
+    setExporting(true);
+    try {
+      const { startDate, endDate } = calculateDateBounds(withdrawalsDatePreset, withdrawalsCustomStart, withdrawalsCustomEnd);
+      const res = await fetchAdminWithdrawals?.(1, 10000, debouncedWithdrawalSearch, startDate, endDate, true);
+      const exportData = res?.withdrawals || withdrawals || [];
+      const cols = [
+        { header: 'Withdrawal ID', key: 'id' },
+        { header: 'Client ID', key: 'client_id' },
+        { header: 'Client Name', key: 'username' },
+        { header: 'Phone', key: 'phone' },
+        { header: 'Amount (₹)', key: 'amount', format: a => `₹${Number(a || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, align: 'right' },
+        { header: 'UPI ID', key: 'upi_id' },
+        { header: 'Bank Acc No', key: 'bank_account_no' },
+        { header: 'IFSC Code', key: 'bank_ifsc' },
+        { header: 'Status', key: 'status' },
+        { header: 'Requested At', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' },
+        { header: 'Processed At', key: 'processed_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+      ];
+      const subtitle = `Filter: ${withdrawalsDatePreset.toUpperCase()}${debouncedWithdrawalSearch ? ` | Search: "${debouncedWithdrawalSearch}"` : ''}`;
+      if (format === 'excel') exportToExcel(exportData, cols, 'withdrawals_export', 'Withdrawals Report');
+      else exportToPDF(exportData, cols, 'withdrawals_report', 'Withdrawals Report', subtitle);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleUpdateSubscription = async (e) => {
     e.preventDefault();
@@ -2388,6 +2793,19 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={ordersDatePreset}
+                setDatePreset={p => { setOrdersDatePreset(p); setOrdersPage(1); }}
+                customStart={ordersCustomStart}
+                setCustomStart={v => { setOrdersCustomStart(v); setOrdersPage(1); }}
+                customEnd={ordersCustomEnd}
+                setCustomEnd={v => { setOrdersCustomEnd(v); setOrdersPage(1); }}
+                onExportExcel={() => handleExportOrders('excel')}
+                onExportPDF={() => handleExportOrders('pdf')}
+                exporting={exporting}
+              />
+
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
@@ -2578,6 +2996,19 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={positionsDatePreset}
+                setDatePreset={p => { setPositionsDatePreset(p); setPositionsPage(1); }}
+                customStart={positionsCustomStart}
+                setCustomStart={v => { setPositionsCustomStart(v); setPositionsPage(1); }}
+                customEnd={positionsCustomEnd}
+                setCustomEnd={v => { setPositionsCustomEnd(v); setPositionsPage(1); }}
+                onExportExcel={() => handleExportPositions('excel')}
+                onExportPDF={() => handleExportPositions('pdf')}
+                exporting={exporting}
+              />
+
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
@@ -2681,6 +3112,29 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {positionsPage} of {positionsTotalPages} ({positionsTotal || positions.length} positions)
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setPositionsPage(p => Math.max(1, p - 1))} 
+                  disabled={positionsPage === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setPositionsPage(p => Math.min(positionsTotalPages, p + 1))} 
+                  disabled={positionsPage >= positionsTotalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'ledger' ? (
           <div>
@@ -2717,6 +3171,19 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
+
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={ledgerDatePreset}
+                setDatePreset={p => { setLedgerDatePreset(p); setLedgerPage(1); }}
+                customStart={ledgerCustomStart}
+                setCustomStart={v => { setLedgerCustomStart(v); setLedgerPage(1); }}
+                customEnd={ledgerCustomEnd}
+                setCustomEnd={v => { setLedgerCustomEnd(v); setLedgerPage(1); }}
+                onExportExcel={() => handleExportLedger('excel')}
+                onExportPDF={() => handleExportLedger('pdf')}
+                exporting={exporting}
+              />
 
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -2878,6 +3345,19 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
+
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={usersDatePreset}
+                setDatePreset={p => { setUsersDatePreset(p); setPage(1); }}
+                customStart={usersCustomStart}
+                setCustomStart={v => { setUsersCustomStart(v); setPage(1); }}
+                customEnd={usersCustomEnd}
+                setCustomEnd={v => { setUsersCustomEnd(v); setPage(1); }}
+                onExportExcel={() => handleExportUsers('excel')}
+                onExportPDF={() => handleExportUsers('pdf')}
+                exporting={exporting}
+              />
 
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -3165,6 +3645,19 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
+
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={withdrawalsDatePreset}
+                setDatePreset={p => { setWithdrawalsDatePreset(p); setWithdrawalsPage(1); }}
+                customStart={withdrawalsCustomStart}
+                setCustomStart={v => { setWithdrawalsCustomStart(v); setWithdrawalsPage(1); }}
+                customEnd={withdrawalsCustomEnd}
+                setCustomEnd={v => { setWithdrawalsCustomEnd(v); setWithdrawalsPage(1); }}
+                onExportExcel={() => handleExportWithdrawals('excel')}
+                onExportPDF={() => handleExportWithdrawals('pdf')}
+                exporting={exporting}
+              />
 
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -3984,6 +4477,19 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
+
+              {/* Date Filter Pills & Export Bar */}
+              <DateRangeExportBar
+                datePreset={depositsDatePreset}
+                setDatePreset={p => { setDepositsDatePreset(p); setDepositsPage(1); }}
+                customStart={depositsCustomStart}
+                setCustomStart={v => { setDepositsCustomStart(v); setDepositsPage(1); }}
+                customEnd={depositsCustomEnd}
+                setCustomEnd={v => { setDepositsCustomEnd(v); setDepositsPage(1); }}
+                onExportExcel={() => handleExportDeposits('excel')}
+                onExportPDF={() => handleExportDeposits('pdf')}
+                exporting={exporting}
+              />
 
               {/* Search & Filter Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>

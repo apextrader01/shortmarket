@@ -1260,28 +1260,50 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
 
     let query = db('users').leftJoin('user_profiles', 'users.id', 'user_profiles.user_id');
     let countQuery = db('users');
 
     if (search) {
-      query = query.where('users.username', 'ilike', `%${search}%`)
-                   .orWhere('users.email', 'ilike', `%${search}%`)
-                   .orWhere('users.client_id', 'ilike', `%${search}%`);
-                   
-      countQuery = countQuery.where('username', 'ilike', `%${search}%`)
-                             .orWhere('email', 'ilike', `%${search}%`)
-                             .orWhere('client_id', 'ilike', `%${search}%`);
+      query = query.where(function() {
+        this.where('users.username', 'ilike', `%${search}%`)
+            .orWhere('users.email', 'ilike', `%${search}%`)
+            .orWhere('users.client_id', 'ilike', `%${search}%`);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('username', 'ilike', `%${search}%`)
+            .orWhere('email', 'ilike', `%${search}%`)
+            .orWhere('client_id', 'ilike', `%${search}%`);
+      });
+    }
+
+    if (startDate) {
+      query = query.where('users.created_at', '>=', startDate);
+      countQuery = countQuery.where('users.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('users.created_at', '<=', endDate);
+      countQuery = countQuery.where('users.created_at', '<=', endDate);
     }
 
     const [countResult] = await countQuery.count('id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
 
-    const rawUsers = await query
+    let userQuery = query
       .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name', 'users.browser_name', 'users.city', 'users.state', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
-      .orderBy('users.created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
+      .orderBy('users.created_at', 'desc');
+
+    if (!isExport) {
+      userQuery = userQuery.limit(limit).offset(offset);
+    } else {
+      userQuery = userQuery.limit(10000);
+    }
+
+    const rawUsers = await userQuery;
 
     // Group users by IP to detect multi-account fraud across all users
     const ipCounts = await db('users')
@@ -1437,6 +1459,9 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
 
     let query = db('deposit_requests')
       .join('users', 'deposit_requests.user_id', 'users.id')
@@ -1461,14 +1486,26 @@ app.get('/api/admin/deposits', authenticateToken, async (req, res) => {
       });
     }
 
+    if (startDate) {
+      query = query.where('deposit_requests.created_at', '>=', startDate);
+      countQuery = countQuery.where('deposit_requests.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('deposit_requests.created_at', '<=', endDate);
+      countQuery = countQuery.where('deposit_requests.created_at', '<=', endDate);
+    }
+
     const [countResult] = await countQuery.count('deposit_requests.id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
     const totalPages = Math.ceil(total / limit) || 1;
 
-    const deposits = await query
-      .orderBy('deposit_requests.created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
+    let depQuery = query.orderBy('deposit_requests.created_at', 'desc');
+    if (!isExport) {
+      depQuery = depQuery.limit(limit).offset(offset);
+    } else {
+      depQuery = depQuery.limit(10000);
+    }
+    const deposits = await depQuery;
       
     res.json({ success: true, deposits, total, page, totalPages });
   } catch (err) {
@@ -1580,6 +1617,9 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
 
     let query = db('orders')
       .join('users', 'orders.user_id', '=', 'users.id')
@@ -1604,14 +1644,26 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
       });
     }
 
+    if (startDate) {
+      query = query.where('orders.created_at', '>=', startDate);
+      countQuery = countQuery.where('orders.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('orders.created_at', '<=', endDate);
+      countQuery = countQuery.where('orders.created_at', '<=', endDate);
+    }
+
     const [countResult] = await countQuery.count('orders.id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
     const totalPages = Math.ceil(total / limit) || 1;
 
-    const orders = await query
-      .orderBy('orders.created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
+    let ordQuery = query.orderBy('orders.created_at', 'desc');
+    if (!isExport) {
+      ordQuery = ordQuery.limit(limit).offset(offset);
+    } else {
+      ordQuery = ordQuery.limit(10000);
+    }
+    const orders = await ordQuery;
 
     res.json({ success: true, orders, total, page, totalPages });
   } catch (err) {
@@ -1624,12 +1676,58 @@ app.get('/api/admin/positions', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
     
-    const positions = await db('positions')
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
+
+    let query = db('positions')
       .join('users', 'positions.user_id', '=', 'users.id')
       .select('positions.*', 'users.username', 'users.email', 'users.client_id')
-      .where('positions.quantity', '!=', 0)
-      .orderBy('positions.id', 'desc');
-    res.json({ success: true, positions });
+      .where('positions.quantity', '!=', 0);
+    
+    let countQuery = db('positions')
+      .join('users', 'positions.user_id', '=', 'users.id')
+      .where('positions.quantity', '!=', 0);
+
+    if (search) {
+      const s = `%${search}%`;
+      query = query.where(function() {
+        this.where('positions.symbol', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s);
+      });
+      countQuery = countQuery.where(function() {
+        this.where('positions.symbol', 'ilike', s)
+            .orWhere('users.username', 'ilike', s)
+            .orWhere('users.client_id', 'ilike', s);
+      });
+    }
+
+    if (startDate) {
+      query = query.where('positions.created_at', '>=', startDate);
+      countQuery = countQuery.where('positions.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('positions.created_at', '<=', endDate);
+      countQuery = countQuery.where('positions.created_at', '<=', endDate);
+    }
+
+    const [countResult] = await countQuery.count('positions.id as total');
+    const total = countResult ? parseInt(countResult.total) : 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    let posQuery = query.orderBy('positions.id', 'desc');
+    if (!isExport) {
+      posQuery = posQuery.limit(limit).offset(offset);
+    } else {
+      posQuery = posQuery.limit(10000);
+    }
+    const positions = await posQuery;
+    res.json({ success: true, positions, total, page, totalPages });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1644,6 +1742,9 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
 
     let query = db('ledger')
       .join('users', 'ledger.user_id', '=', 'users.id')
@@ -1668,14 +1769,26 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
       });
     }
 
+    if (startDate) {
+      query = query.where('ledger.created_at', '>=', startDate);
+      countQuery = countQuery.where('ledger.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('ledger.created_at', '<=', endDate);
+      countQuery = countQuery.where('ledger.created_at', '<=', endDate);
+    }
+
     const [countResult] = await countQuery.count('ledger.id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
     const totalPages = Math.ceil(total / limit) || 1;
 
-    const ledger = await query
-      .orderBy('ledger.created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
+    let ledQuery = query.orderBy('ledger.created_at', 'desc');
+    if (!isExport) {
+      ledQuery = ledQuery.limit(limit).offset(offset);
+    } else {
+      ledQuery = ledQuery.limit(10000);
+    }
+    const ledger = await ledQuery;
 
     res.json({ success: true, ledger, total, page, totalPages });
   } catch (err) {
@@ -4540,6 +4653,9 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
     const search = req.query.search || '';
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
 
     let query = db('reward_withdrawals')
       .join('users', 'reward_withdrawals.user_id', 'users.id')
@@ -4579,14 +4695,26 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
       });
     }
 
+    if (startDate) {
+      query = query.where('reward_withdrawals.created_at', '>=', startDate);
+      countQuery = countQuery.where('reward_withdrawals.created_at', '>=', startDate);
+    }
+    if (endDate) {
+      query = query.where('reward_withdrawals.created_at', '<=', endDate);
+      countQuery = countQuery.where('reward_withdrawals.created_at', '<=', endDate);
+    }
+
     const [countResult] = await countQuery.count('reward_withdrawals.id as total');
     const total = countResult ? parseInt(countResult.total) : 0;
     const totalPages = Math.ceil(total / limit) || 1;
 
-    const withdrawals = await query
-      .orderBy('reward_withdrawals.created_at', 'desc')
-      .limit(limit)
-      .offset(offset);
+    let withQuery = query.orderBy('reward_withdrawals.created_at', 'desc');
+    if (!isExport) {
+      withQuery = withQuery.limit(limit).offset(offset);
+    } else {
+      withQuery = withQuery.limit(10000);
+    }
+    const withdrawals = await withQuery;
 
     // Group users by IP to detect multi-account fraud
     const ipCounts = await db('users')

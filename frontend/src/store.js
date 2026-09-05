@@ -949,9 +949,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminWithdrawals: async (page = 1, limit = 50, search = '') => {
+  fetchAdminWithdrawals: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/withdrawals?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
+      let url = `${API}/api/admin/withdrawals?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       if (res.ok) return { success: true, ...data };
       return { success: false, withdrawals: [], total: 0, totalPages: 1 };
@@ -1167,9 +1171,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminOrders: async (page = 1, limit = 50, search = '') => {
+  fetchAdminOrders: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/orders?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
+      let url = `${API}/api/admin/orders?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1177,9 +1185,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminPositions: async () => {
+  fetchAdminPositions: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/positions`, { credentials: 'include' });
+      let url = `${API}/api/admin/positions?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1215,9 +1227,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminLedger: async (page = 1, limit = 50, search = '') => {
+  fetchAdminLedger: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/ledger?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
+      let url = `${API}/api/admin/ledger?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1280,10 +1296,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminUsers: async (page = 1, limit = 50, search = '') => {
+  fetchAdminUsers: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include'
-      });
+      let url = `${API}/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         return { success: true, ...data }; // returns { success, users, total, page, totalPages }
@@ -1349,9 +1368,13 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchDepositRequests: async (page = 1, limit = 50, search = '') => {
+  fetchDepositRequests: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/deposits?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, { credentials: 'include' });
+      let url = `${API}/api/admin/deposits?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         return { success: true, ...data };
