@@ -1048,7 +1048,7 @@ function MarketCalendarTab({ isMobile }) {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal })));
   
   const [fyersStatus, setFyersStatus] = useState(null);
   const [fyersLoading, setFyersLoading] = useState(true);
@@ -1258,7 +1258,232 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [positions, setPositions] = useState([]);
   const [ledger, setLedger] = useState([]);
-  
+
+  // Client Management Filters & Sorting
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientFilter, setClientFilter] = useState('ALL'); // 'ALL' | 'ACTIVE' | 'BANNED' | 'PRO' | 'KYC_VERIFIED' | 'KYC_MISSING' | 'SHARED_IP'
+  const [clientSort, setClientSort] = useState('balance_desc'); // 'balance_desc' | 'balance_asc' | 'name_asc' | 'newest'
+
+  const filteredClients = useMemo(() => {
+    let list = users || [];
+    if (clientSearch.trim()) {
+      const q = clientSearch.toLowerCase().trim();
+      list = list.filter(u => 
+        (u.username && u.username.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.phone && u.phone.toLowerCase().includes(q)) ||
+        (u.last_ip && u.last_ip.toLowerCase().includes(q)) ||
+        String(u.id).includes(q)
+      );
+    }
+    if (clientFilter === 'ACTIVE') {
+      list = list.filter(u => !u.is_banned);
+    } else if (clientFilter === 'BANNED') {
+      list = list.filter(u => u.is_banned);
+    } else if (clientFilter === 'PRO') {
+      list = list.filter(u => u.subscription_tier === 'PRO');
+    } else if (clientFilter === 'KYC_VERIFIED') {
+      list = list.filter(u => u.kyc_pan_url && u.kyc_aadhar_url);
+    } else if (clientFilter === 'KYC_MISSING') {
+      list = list.filter(u => !u.kyc_pan_url || !u.kyc_aadhar_url);
+    } else if (clientFilter === 'SHARED_IP') {
+      list = list.filter(u => (u.shared_ip_count || 0) > 1);
+    }
+    return [...list].sort((a, b) => {
+      if (clientSort === 'balance_desc') return (Number(b.balance) || 0) - (Number(a.balance) || 0);
+      if (clientSort === 'balance_asc') return (Number(a.balance) || 0) - (Number(b.balance) || 0);
+      if (clientSort === 'name_asc') return (a.username || '').localeCompare(b.username || '');
+      if (clientSort === 'newest') return (b.id || 0) - (a.id || 0);
+      return 0;
+    });
+  }, [users, clientSearch, clientFilter, clientSort]);
+
+  // Withdrawal Requests Filters & Sorting
+  const [withdrawalSearch, setWithdrawalSearch] = useState('');
+  const [withdrawalFilter, setWithdrawalFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'PROCESSING' | 'CREDITED' | 'REJECTED' | 'SHARED_IP'
+  const [withdrawalSort, setWithdrawalSort] = useState('date_desc'); // 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
+
+  const filteredWithdrawals = useMemo(() => {
+    let list = withdrawals || [];
+    if (withdrawalSearch.trim()) {
+      const q = withdrawalSearch.toLowerCase().trim();
+      list = list.filter(w => 
+        (w.username && w.username.toLowerCase().includes(q)) ||
+        (w.phone && w.phone.toLowerCase().includes(q)) ||
+        (w.upi_id && w.upi_id.toLowerCase().includes(q)) ||
+        (w.bank_account_no && w.bank_account_no.toLowerCase().includes(q)) ||
+        (w.bank_ifsc && w.bank_ifsc.toLowerCase().includes(q)) ||
+        String(w.amount).includes(q)
+      );
+    }
+    if (withdrawalFilter === 'PENDING') {
+      list = list.filter(w => w.status === 'PENDING');
+    } else if (withdrawalFilter === 'PROCESSING') {
+      list = list.filter(w => w.status === 'PROCESSING');
+    } else if (withdrawalFilter === 'CREDITED') {
+      list = list.filter(w => w.status === 'CREDITED' || w.status === 'APPROVED');
+    } else if (withdrawalFilter === 'REJECTED') {
+      list = list.filter(w => w.status === 'REJECTED');
+    } else if (withdrawalFilter === 'SHARED_IP') {
+      list = list.filter(w => (w.shared_ip_count || 0) > 1);
+    }
+    return [...list].sort((a, b) => {
+      if (withdrawalSort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (withdrawalSort === 'date_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      if (withdrawalSort === 'amount_desc') return (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0);
+      if (withdrawalSort === 'amount_asc') return (parseFloat(a.amount) || 0) - (parseFloat(b.amount) || 0);
+      return 0;
+    });
+  }, [withdrawals, withdrawalSearch, withdrawalFilter, withdrawalSort]);
+
+  // Deposit Requests Filters & Sorting
+  const [depositSearch, setDepositSearch] = useState('');
+  const [depositFilter, setDepositFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [depositSort, setDepositSort] = useState('date_desc'); // 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
+
+  const filteredDeposits = useMemo(() => {
+    let list = deposits || [];
+    if (depositSearch.trim()) {
+      const q = depositSearch.toLowerCase().trim();
+      list = list.filter(d => 
+        (d.username && d.username.toLowerCase().includes(q)) ||
+        (d.email && d.email.toLowerCase().includes(q)) ||
+        String(d.amount).includes(q)
+      );
+    }
+    if (depositFilter === 'PENDING') {
+      list = list.filter(d => d.status === 'PENDING');
+    } else if (depositFilter === 'APPROVED') {
+      list = list.filter(d => d.status === 'APPROVED');
+    } else if (depositFilter === 'REJECTED') {
+      list = list.filter(d => d.status === 'REJECTED');
+    }
+    return [...list].sort((a, b) => {
+      if (depositSort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (depositSort === 'date_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      if (depositSort === 'amount_desc') return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+      if (depositSort === 'amount_asc') return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+      return 0;
+    });
+  }, [deposits, depositSearch, depositFilter, depositSort]);
+
+  // Order Flow Filters & Sorting
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderFilter, setOrderFilter] = useState('ALL'); // 'ALL' | 'EXECUTED' | 'REJECTED' | 'PENDING' | 'BUY' | 'SELL'
+  const [orderSort, setOrderSort] = useState('date_desc'); // 'date_desc' | 'date_asc' | 'value_desc'
+
+  const filteredOrders = useMemo(() => {
+    let list = orders || [];
+    if (orderSearch.trim()) {
+      const q = orderSearch.toLowerCase().trim();
+      list = list.filter(o => 
+        (o.username && o.username.toLowerCase().includes(q)) ||
+        (o.symbol && o.symbol.toLowerCase().includes(q)) ||
+        String(o.id).includes(q)
+      );
+    }
+    if (orderFilter === 'EXECUTED') {
+      list = list.filter(o => o.status === 'EXECUTED');
+    } else if (orderFilter === 'REJECTED') {
+      list = list.filter(o => o.status === 'REJECTED');
+    } else if (orderFilter === 'PENDING') {
+      list = list.filter(o => o.status === 'PENDING' || o.status === 'OPEN');
+    } else if (orderFilter === 'BUY') {
+      list = list.filter(o => o.side === 'BUY');
+    } else if (orderFilter === 'SELL') {
+      list = list.filter(o => o.side === 'SELL');
+    }
+    return [...list].sort((a, b) => {
+      if (orderSort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (orderSort === 'date_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      if (orderSort === 'value_desc') {
+        const valA = (a.quantity || 0) * (Number(a.average_price || a.price) || 0);
+        const valB = (b.quantity || 0) * (Number(b.average_price || b.price) || 0);
+        return valB - valA;
+      }
+      return 0;
+    });
+  }, [orders, orderSearch, orderFilter, orderSort]);
+
+  // Live Positions Filters & Sorting
+  const [positionSearch, setPositionSearch] = useState('');
+  const [positionFilter, setPositionFilter] = useState('ALL'); // 'ALL' | 'LONG' | 'SHORT'
+  const [positionSort, setPositionSort] = useState('qty_desc'); // 'qty_desc' | 'symbol_asc' | 'client_asc'
+
+  const filteredPositions = useMemo(() => {
+    let list = positions || [];
+    if (positionSearch.trim()) {
+      const q = positionSearch.toLowerCase().trim();
+      list = list.filter(p => 
+        (p.username && p.username.toLowerCase().includes(q)) ||
+        (p.symbol && p.symbol.toLowerCase().includes(q))
+      );
+    }
+    if (positionFilter === 'LONG') {
+      list = list.filter(p => p.quantity > 0);
+    } else if (positionFilter === 'SHORT') {
+      list = list.filter(p => p.quantity < 0);
+    }
+    return [...list].sort((a, b) => {
+      if (positionSort === 'qty_desc') return Math.abs(b.quantity || 0) - Math.abs(a.quantity || 0);
+      if (positionSort === 'symbol_asc') return (a.symbol || '').localeCompare(b.symbol || '');
+      if (positionSort === 'client_asc') return (a.username || '').localeCompare(b.username || '');
+      return 0;
+    });
+  }, [positions, positionSearch, positionFilter, positionSort]);
+
+  // Platform Ledger Filters & Sorting
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerFilter, setLedgerFilter] = useState('ALL'); // 'ALL' | 'CREDIT' | 'DEBIT'
+  const [ledgerSort, setLedgerSort] = useState('date_desc'); // 'date_desc' | 'amount_desc'
+
+  const filteredLedger = useMemo(() => {
+    let list = ledger || [];
+    if (ledgerSearch.trim()) {
+      const q = ledgerSearch.toLowerCase().trim();
+      list = list.filter(l => 
+        (l.username && l.username.toLowerCase().includes(q)) ||
+        (l.description && l.description.toLowerCase().includes(q)) ||
+        (l.type && l.type.toLowerCase().includes(q))
+      );
+    }
+    if (ledgerFilter === 'CREDIT') {
+      list = list.filter(l => l.amount >= 0);
+    } else if (ledgerFilter === 'DEBIT') {
+      list = list.filter(l => l.amount < 0);
+    }
+    return [...list].sort((a, b) => {
+      if (ledgerSort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (ledgerSort === 'amount_desc') return Math.abs(b.amount || 0) - Math.abs(a.amount || 0);
+      return 0;
+    });
+  }, [ledger, ledgerSearch, ledgerFilter, ledgerSort]);
+
+  const handleMasterSquareOff = async () => {
+    if (window.confirm('⚠️ WARNING: This will immediately close ALL open positions for ALL users at MARKET price. Are you sure you want to execute a Master Square-Off?')) {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/admin/master_square_off`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Master Square-Off initiated! Positions are being closed in the background.');
+          loadData();
+        } else {
+          alert(data.error || 'Failed to initiate Master Square-Off');
+        }
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+  };
+
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -2044,76 +2269,260 @@ export default function AdminDashboard() {
             ) : <div style={{ color: 'var(--text-secondary)', fontSize: '12px', padding: '16px' }}>No analytics data available.</div>}
           </div>
         ) : activeTab === 'orders' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Symbol</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Type</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Qty @ Price</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(!orders || orders.length === 0) ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>No orders found</td>
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Order Flow</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredOrders.length} / {orders.length}
+                  </span>
+                </div>
+
+                {/* Sort selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                  <select
+                    value={orderSort}
+                    onChange={e => setOrderSort(e.target.value)}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="date_desc">Date (Newest First)</option>
+                    <option value="date_asc">Date (Oldest First)</option>
+                    <option value="value_desc">Total Value (High → Low)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search orders (symbol, client, ID)..."
+                    value={orderSearch}
+                    onChange={e => setOrderSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {orderSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setOrderSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '✅ Executed', val: 'EXECUTED' },
+                    { label: '❌ Rejected', val: 'REJECTED' },
+                    { label: '⏳ Pending', val: 'PENDING' },
+                    { label: 'BUY', val: 'BUY' },
+                    { label: 'SELL', val: 'SELL' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setOrderFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: orderFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: orderFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: orderFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Symbol</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Type</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Qty @ Price</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
                 </tr>
-              ) : (
-                orders.map(o => (
-                  <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
-                    <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
-                    <td style={{ padding: '6px 12px', fontWeight: '600' }}>{o.symbol}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)', fontWeight: '700' }}>{o.side}</span> {o.type}
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right' }}>{o.quantity} @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      <span style={{ 
-                        color: o.status === 'EXECUTED' ? 'var(--color-green-light)' : o.status === 'REJECTED' ? 'var(--color-red-light)' : 'var(--color-yellow)',
-                        background: o.status === 'EXECUTED' ? 'rgba(34,197,94,0.1)' : o.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
-                        padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '700'
-                      }}>{o.status}</span>
+              </thead>
+              <tbody>
+                {(!filteredOrders || filteredOrders.length === 0) ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {orderSearch || orderFilter !== 'ALL' ? 'No orders match your filter criteria' : 'No orders found'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredOrders.map(o => (
+                    <tr key={o.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
+                      <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{o.username || 'Unknown'}</div></td>
+                      <td style={{ padding: '6px 12px', fontWeight: '600' }}>{o.symbol}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                        <span style={{ color: o.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)', fontWeight: '700' }}>{o.side}</span> {o.type}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right' }}>{o.quantity} @ ₹{Number(o.average_price || o.price || 0).toFixed(2)}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                        <span style={{ 
+                          color: o.status === 'EXECUTED' ? 'var(--color-green-light)' : o.status === 'REJECTED' ? 'var(--color-red-light)' : 'var(--color-yellow)',
+                          background: o.status === 'EXECUTED' ? 'rgba(34,197,94,0.1)' : o.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.1)',
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '700'
+                        }}>{o.status}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         ) : activeTab === 'positions' ? (
-          <>
-            <div style={{ padding: '6px 12px', display: 'flex', justifyContent: 'flex-end', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)' }}>
-              <button
-                onClick={async () => {
-                  if (window.confirm('⚠️ WARNING: This will immediately close ALL open positions for ALL users at MARKET price. Are you sure you want to execute a Master Square-Off?')) {
-                    try {
-                      await adminMasterSquareOff();
-                      alert('Master Square-Off initiated! Positions are being closed in the background. Refresh the page in a few seconds.');
-                      loadData();
-                    } catch (e) {
-                      alert(e.message);
-                    }
-                  }
-                }}
-                style={{
-                  background: 'var(--color-red)',
-                  color: '#fff',
-                  padding: '3px 10px',
-                  borderRadius: '4px',
-                  fontWeight: 'bold',
-                  fontSize: '10px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                🚨 MASTER SQUARE-OFF (ALL USERS)
-              </button>
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Live Positions</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredPositions.length} / {positions.length}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Sort selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                    <select
+                      value={positionSort}
+                      onChange={e => setPositionSort(e.target.value)}
+                      style={{
+                        background: 'var(--bg-primary)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="qty_desc">Quantity (High → Low)</option>
+                      <option value="symbol_asc">Symbol (A → Z)</option>
+                      <option value="client_asc">Client (A → Z)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleMasterSquareOff}
+                    style={{
+                      background: 'var(--color-red)',
+                      color: '#fff',
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      fontWeight: 'bold',
+                      fontSize: '10px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    🚨 MASTER SQUARE-OFF (ALL USERS)
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search position (symbol, client)..."
+                    value={positionSearch}
+                    onChange={e => setPositionSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {positionSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setPositionSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '🟢 Long (BUY)', val: 'LONG' },
+                    { label: '🔴 Short (SELL)', val: 'SHORT' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setPositionFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: positionFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: positionFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: positionFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
@@ -2125,12 +2534,14 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {(!positions || positions.length === 0) ? (
+                {(!filteredPositions || filteredPositions.length === 0) ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>No active positions found</td>
+                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {positionSearch || positionFilter !== 'ALL' ? 'No positions match your filter criteria' : 'No active positions found'}
+                    </td>
                   </tr>
                 ) : (
-                  positions.map(p => (
+                  filteredPositions.map(p => (
                     <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{p.username || 'Unknown'}</div></td>
                       <td style={{ padding: '6px 12px', fontWeight: '600' }}>{p.symbol}</td>
@@ -2150,304 +2561,608 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
-          </>
+          </div>
         ) : activeTab === 'ledger' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Type</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Description</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(!ledger || ledger.length === 0) ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>No ledger entries found</td>
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Activity size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Platform Ledger</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredLedger.length} / {ledger.length}
+                  </span>
+                </div>
+
+                {/* Sort selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                  <select
+                    value={ledgerSort}
+                    onChange={e => setLedgerSort(e.target.value)}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="date_desc">Date (Newest First)</option>
+                    <option value="amount_desc">Amount (High → Low)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search ledger (client, description, type)..."
+                    value={ledgerSearch}
+                    onChange={e => setLedgerSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {ledgerSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setLedgerSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '🟢 Credit (+)', val: 'CREDIT' },
+                    { label: '🔴 Debit (-)', val: 'DEBIT' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setLedgerFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: ledgerFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: ledgerFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: ledgerFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Type</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Description</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
                 </tr>
-              ) : (
-                ledger.map(l => (
-                  <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
-                    <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
-                    <td style={{ padding: '6px 12px' }}>
-                      <span style={{ background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>{l.type}</span>
-                    </td>
-                    <td style={{ padding: '6px 12px', color: 'var(--text-secondary)' }}>{l.description}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
-                      {l.amount >= 0 ? '+' : ''}₹{Number(l.amount || 0).toFixed(2)}
+              </thead>
+              <tbody>
+                {(!filteredLedger || filteredLedger.length === 0) ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {ledgerSearch || ledgerFilter !== 'ALL' ? 'No ledger entries match your filter criteria' : 'No ledger entries found'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        ) : activeTab === 'users' ? (
-          <>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Contact</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Margin Balance</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>KYC Status</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                users.map(u => {
-                  const hasKyc = Boolean(u.kyc_pan_url && u.kyc_aadhar_url);
-                  const hasPartialKyc = Boolean(u.kyc_pan_url || u.kyc_aadhar_url);
-                  
-                  return (
-                    <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                ) : (
+                  filteredLedger.map(l => (
+                    <tr key={l.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{l.created_at ? new Date(l.created_at).toLocaleString() : '-'}</td>
+                      <td style={{ padding: '6px 12px' }}><div style={{ fontWeight: '600' }}>{l.username || 'Unknown'}</div></td>
                       <td style={{ padding: '6px 12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: u.is_admin ? 'var(--color-red)' : 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold' }}>
-                            {(u.username || 'U').substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                              {u.username || 'Unknown User'} 
-                              {u.is_admin && <span style={{ fontSize: '8px', background: 'var(--color-red)', padding: '1px 3px', borderRadius: '3px' }}>ADMIN</span>}
-                              {u.shared_ip_count > 1 && (
-                                <span 
-                                  title={`Multi-Account Risk! ${u.shared_ip_count} accounts on this IP (${u.shared_users?.join(', ') || ''})`}
-                                  style={{ 
-                                    background: 'rgba(239, 68, 68, 0.15)', 
-                                    color: '#ef4444', 
-                                    border: '1px solid rgba(239, 68, 68, 0.3)', 
-                                    padding: '1px 4px', 
-                                    borderRadius: '3px', 
-                                    fontSize: '8px', 
-                                    fontWeight: '700',
-                                    cursor: 'help' 
-                                  }}
-                                >
-                                  ⚠️ {u.shared_ip_count} ACCOUNTS
-                                </span>
-                              )}
+                        <span style={{ background: 'var(--bg-hover)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px' }}>{l.type}</span>
+                      </td>
+                      <td style={{ padding: '6px 12px', color: 'var(--text-secondary)' }}>{l.description}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600', color: l.amount >= 0 ? 'var(--color-green)' : 'var(--color-red)' }}>
+                        {l.amount >= 0 ? '+' : ''}₹{Number(l.amount || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : activeTab === 'users' ? (
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Client Accounts</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredClients.length} / {users.length} Clients
+                  </span>
+                </div>
+
+                {/* Sort selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                  <select
+                    value={clientSort}
+                    onChange={e => setClientSort(e.target.value)}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="balance_desc">Balance (High → Low)</option>
+                    <option value="balance_asc">Balance (Low → High)</option>
+                    <option value="name_asc">Name (A → Z)</option>
+                    <option value="newest">Newest First</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search client (username, email, phone, IP)..."
+                    value={clientSearch}
+                    onChange={e => setClientSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {clientSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setClientSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '🟢 Active', val: 'ACTIVE' },
+                    { label: '🚫 Banned', val: 'BANNED' },
+                    { label: '⭐ PRO Tier', val: 'PRO' },
+                    { label: '📄 Verified KYC', val: 'KYC_VERIFIED' },
+                    { label: '⚠️ KYC Missing', val: 'KYC_MISSING' },
+                    { label: '⚠️ Multi-IP', val: 'SHARED_IP' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setClientFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: clientFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: clientFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: chip.val === 'BANNED' && clientFilter === 'BANNED' ? '#ef4444' : clientFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Contact</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Margin Balance</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>KYC Status</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {clientSearch || clientFilter !== 'ALL' ? 'No clients match your filter criteria' : 'No users found'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredClients.map(u => {
+                    const hasKyc = Boolean(u.kyc_pan_url && u.kyc_aadhar_url);
+                    const hasPartialKyc = Boolean(u.kyc_pan_url || u.kyc_aadhar_url);
+                    
+                    return (
+                      <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '6px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: u.is_admin ? 'var(--color-red)' : 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold' }}>
+                              {(u.username || 'U').substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                {u.username || 'Unknown User'} 
+                                {u.is_admin && <span style={{ fontSize: '8px', background: 'var(--color-red)', padding: '1px 3px', borderRadius: '3px' }}>ADMIN</span>}
+                                {u.subscription_tier === 'PRO' && <span style={{ fontSize: '8px', background: 'rgba(34,197,94,0.15)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>PRO</span>}
+                                {u.shared_ip_count > 1 && (
+                                  <span 
+                                    title={`Multi-Account Risk! ${u.shared_ip_count} accounts on this IP (${u.shared_users?.join(', ') || ''})`}
+                                    style={{ 
+                                      background: 'rgba(239, 68, 68, 0.15)', 
+                                      color: '#ef4444', 
+                                      border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                      padding: '1px 4px', 
+                                      borderRadius: '3px', 
+                                      fontSize: '8px', 
+                                      fontWeight: '700',
+                                      cursor: 'help' 
+                                    }}
+                                  >
+                                    ⚠️ {u.shared_ip_count} ACCOUNTS
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '6px 12px', color: 'var(--text-secondary)' }}>
-                        <div>{u.email}</div>
-                        <div style={{ fontSize: '10px' }}>{u.phone || 'No phone'}</div>
-                      </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
-                        ₹{Number(u.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                        {hasKyc ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-green-light)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
-                            <CheckCircle size={9} /> Verified
-                          </div>
-                        ) : hasPartialKyc ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
-                            <Clock size={9} /> Pending
-                          </div>
-                        ) : (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
-                            Missing
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '6px 12px' }}>
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          <button
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: '3px',
-                              fontSize: '10px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                              color: u.is_banned ? '#22c55e' : '#ef4444',
-                              border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
-                            }}
-                            onClick={async () => {
-                              if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
-                                try {
-                                  await toggleUserBan(u.id);
-                                  loadData();
-                                } catch(e) {
-                                  alert(e.message);
-                                }
-                              }
-                            }}
-                          >
-                            {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
-                          </button>
-                          {u.last_ip && (
+                        </td>
+                        <td style={{ padding: '6px 12px', color: 'var(--text-secondary)' }}>
+                          <div>{u.email}</div>
+                          <div style={{ fontSize: '10px' }}>{u.phone || 'No phone'}</div>
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
+                          ₹{Number(u.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                          {hasKyc ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-green-light)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
+                              <CheckCircle size={9} /> Verified
+                            </div>
+                          ) : hasPartialKyc ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
+                              <Clock size={9} /> Pending
+                            </div>
+                          ) : (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', padding: '1px 5px', borderRadius: '3px', fontSize: '9px', fontWeight: '600' }}>
+                              Missing
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 12px' }}>
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button
                               style={{
-                                padding: '2px 5px',
+                                padding: '2px 6px',
                                 borderRadius: '3px',
-                                fontSize: '9px',
-                                fontWeight: '700',
+                                fontSize: '10px',
+                                fontWeight: '600',
                                 cursor: 'pointer',
-                                background: 'rgba(239,68,68,0.1)',
-                                color: '#ef4444',
-                                border: '1px solid rgba(239,68,68,0.3)'
+                                background: u.is_banned ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: u.is_banned ? '#22c55e' : '#ef4444',
+                                border: `1px solid ${u.is_banned ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
                               }}
                               onClick={async () => {
-                                if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
-                                  const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
-                                  alert(res.message || `IP ${u.last_ip} has been banned!`);
-                                  loadData();
+                                if (window.confirm(`Are you sure you want to ${u.is_banned ? 'UNBAN' : 'BAN'} ${u.username}?`)) {
+                                  try {
+                                    await toggleUserBan(u.id);
+                                    loadData();
+                                  } catch(e) {
+                                    alert(e.message);
+                                  }
                                 }
                               }}
                             >
-                              Ban IP
+                              {u.is_banned ? '🟢 Unban' : '🚫 Ban'}
                             </button>
+                            {u.last_ip && (
+                              <button
+                                style={{
+                                  padding: '2px 5px',
+                                  borderRadius: '3px',
+                                  fontSize: '9px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  background: 'rgba(239,68,68,0.1)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239,68,68,0.3)'
+                                }}
+                                onClick={async () => {
+                                  if (window.confirm(`Ban IP address ${u.last_ip}? All accounts on this IP will be blocked from accessing the website.`)) {
+                                    const res = await banEntity('IP', u.last_ip, `Banned from client ${u.username}`);
+                                    alert(res.message || `IP ${u.last_ip} has been banned!`);
+                                    loadData();
+                                  }
+                                }}
+                              >
+                                Ban IP
+                              </button>
+                            )}
+                            <button 
+                              className="btn btn-primary" 
+                              style={{ padding: '2px 7px', fontSize: '10px' }}
+                              onClick={() => { 
+                                setSelectedUser(u); 
+                                setNewBalance(u.balance); 
+                                setNewSubTier(u.subscription_tier || 'BASIC');
+                                setNewUsername(u.username || '');
+                                setNewEmail(u.email || '');
+                                setNewPhone(u.phone || '');
+                              }}
+                            >
+                              Manage
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                Page {page} of {totalPages}
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setPage(p => Math.max(1, p - 1))} 
+                  disabled={page === 1}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Previous
+                </button>
+                <button 
+                  className="btn btn-outline" 
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                  disabled={page >= totalPages}
+                  style={{ padding: '2px 8px', fontSize: '10px' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'withdrawals' ? (
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CreditCard size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Withdrawal Requests</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredWithdrawals.length} / {withdrawals.length}
+                  </span>
+                  {(() => {
+                    const pendingTotal = (withdrawals || []).filter(w => w.status === 'PENDING').reduce((acc, w) => acc + (parseFloat(w.amount) || 0), 0);
+                    return pendingTotal > 0 ? (
+                      <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '3px', background: 'rgba(234,179,8,0.15)', color: 'var(--color-yellow)', fontWeight: '700' }}>
+                        Pending: ₹{pendingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
+
+                {/* Sort selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                  <select
+                    value={withdrawalSort}
+                    onChange={e => setWithdrawalSort(e.target.value)}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="date_desc">Date (Newest First)</option>
+                    <option value="date_asc">Date (Oldest First)</option>
+                    <option value="amount_desc">Amount (High → Low)</option>
+                    <option value="amount_asc">Amount (Low → High)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search withdrawal (client, UPI, bank, IFSC, amount)..."
+                    value={withdrawalSearch}
+                    onChange={e => setWithdrawalSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {withdrawalSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setWithdrawalSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '⏳ Pending', val: 'PENDING' },
+                    { label: '🔄 Processing', val: 'PROCESSING' },
+                    { label: '✅ Credited', val: 'CREDITED' },
+                    { label: '❌ Rejected', val: 'REJECTED' },
+                    { label: '⚠️ Multi-IP', val: 'SHARED_IP' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setWithdrawalFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: withdrawalFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: withdrawalFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: withdrawalFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Bank / UPI Details</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(!filteredWithdrawals || filteredWithdrawals.length === 0) ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {withdrawalSearch || withdrawalFilter !== 'ALL' ? 'No withdrawal requests match your filter criteria' : 'No withdrawal requests found'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredWithdrawals.map(w => (
+                    <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '6px 12px', fontSize: '10px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
+                          {w.username}
+                          {w.shared_ip_count > 1 && (
+                            <span 
+                              title={`Multi-Account Fraud Risk! ${w.shared_ip_count} accounts share this IP (${w.shared_users?.join(', ') || ''})`}
+                              style={{ 
+                                background: 'rgba(239, 68, 68, 0.15)', 
+                                color: '#ef4444', 
+                                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                padding: '1px 4px', 
+                                borderRadius: '3px', 
+                                fontSize: '8px', 
+                                fontWeight: '700', 
+                                cursor: 'help' 
+                              }}
+                            >
+                              ⚠️ {w.shared_ip_count} ON IP
+                            </span>
                           )}
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ padding: '2px 7px', fontSize: '10px' }}
-                            onClick={() => { 
-                              setSelectedUser(u); 
-                              setNewBalance(u.balance); 
-                              setNewSubTier(u.subscription_tier || 'BASIC');
-                              setNewUsername(u.username || '');
-                              setNewEmail(u.email || '');
-                              setNewPhone(u.phone || '');
-                            }}
-                          >
-                            Manage
-                          </button>
+                        </div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{w.phone}</div>
+                        {w.last_ip && <div style={{ fontSize: '8px', color: 'var(--text-secondary)', opacity: 0.6 }}>IP: {w.last_ip}</div>}
+                      </td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>UPI: <span style={{color: '#fff'}}>{w.upi_id || 'N/A'}</span></div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>A/C: <span style={{color: '#fff'}}>{w.bank_account_no || 'N/A'}</span></div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>IFSC: <span style={{color: '#fff'}}>{w.bank_ifsc || 'N/A'}</span></div>
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>₹{parseFloat(w.amount).toFixed(2)}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          color: w.status === 'CREDITED' ? 'var(--color-green-light)' : w.status === 'REJECTED' ? 'var(--color-red-light)' : w.status === 'PROCESSING' ? 'var(--color-blue)' : 'var(--color-yellow)',
+                          background: w.status === 'CREDITED' ? 'rgba(34,197,94,0.1)' : w.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : w.status === 'PROCESSING' ? 'rgba(59,130,246,0.1)' : 'rgba(234,179,8,0.1)',
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '700'
+                        }}>{w.status}</span>
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          {w.status === 'PENDING' && (
+                            <>
+                              <button className="btn btn-primary" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={async () => {
+                                if(window.confirm('Approve this withdrawal? User will see "Processing".')) {
+                                  await processAdminWithdrawal(w.id, 'PROCESSING');
+                                  loadData();
+                                }
+                              }}>Approve</button>
+                              <button className="btn btn-outline" style={{ padding: '2px 6px', fontSize: '10px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }} onClick={async () => {
+                                if(window.confirm('Reject this withdrawal? Amount will return to user.')) {
+                                  await processAdminWithdrawal(w.id, 'REJECTED');
+                                  loadData();
+                                }
+                              }}>Reject</button>
+                            </>
+                          )}
+                          {w.status === 'PROCESSING' && (
+                            <button className="btn btn-primary" style={{ padding: '2px 6px', fontSize: '10px', background: 'var(--color-green)' }} onClick={async () => {
+                              if(window.confirm('Mark as Credited? This means you have successfully transferred the money.')) {
+                                await processAdminWithdrawal(w.id, 'CREDITED');
+                                loadData();
+                              }
+                            }}>Mark Credited</button>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              Page {page} of {totalPages}
-            </div>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button 
-                className="btn btn-outline" 
-                onClick={() => setPage(p => Math.max(1, p - 1))} 
-                disabled={page === 1}
-                style={{ padding: '2px 8px', fontSize: '10px' }}
-              >
-                Previous
-              </button>
-              <button 
-                className="btn btn-outline" 
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
-                disabled={page >= totalPages}
-                style={{ padding: '2px 8px', fontSize: '10px' }}
-              >
-                Next
-              </button>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-          </>
-        ) : activeTab === 'withdrawals' ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Bank / UPI Details</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(!withdrawals || withdrawals.length === 0) ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>No withdrawal requests found</td>
-                </tr>
-              ) : (
-                withdrawals.map(w => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '6px 12px', fontSize: '10px' }}>{new Date(w.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                    <td style={{ padding: '6px 12px' }}>
-                      <div style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
-                        {w.username}
-                        {w.shared_ip_count > 1 && (
-                          <span 
-                            title={`Multi-Account Fraud Risk! ${w.shared_ip_count} accounts share this IP (${w.shared_users?.join(', ') || ''})`}
-                            style={{ 
-                              background: 'rgba(239, 68, 68, 0.15)', 
-                              color: '#ef4444', 
-                              border: '1px solid rgba(239, 68, 68, 0.3)', 
-                              padding: '1px 4px', 
-                              borderRadius: '3px', 
-                              fontSize: '8px', 
-                              fontWeight: '700',
-                              cursor: 'help' 
-                            }}
-                          >
-                            ⚠️ {w.shared_ip_count} ON IP
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{w.phone}</div>
-                      {w.last_ip && <div style={{ fontSize: '8px', color: 'var(--text-secondary)', opacity: 0.6 }}>IP: {w.last_ip}</div>}
-                    </td>
-                    <td style={{ padding: '6px 12px' }}>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>UPI: <span style={{color: '#fff'}}>{w.upi_id || 'N/A'}</span></div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>A/C: <span style={{color: '#fff'}}>{w.bank_account_no || 'N/A'}</span></div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>IFSC: <span style={{color: '#fff'}}>{w.bank_ifsc || 'N/A'}</span></div>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>₹{parseFloat(w.amount).toFixed(2)}</td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      <span style={{
-                        color: w.status === 'CREDITED' ? 'var(--color-green-light)' : w.status === 'REJECTED' ? 'var(--color-red-light)' : w.status === 'PROCESSING' ? 'var(--color-blue)' : 'var(--color-yellow)',
-                        background: w.status === 'CREDITED' ? 'rgba(34,197,94,0.1)' : w.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : w.status === 'PROCESSING' ? 'rgba(59,130,246,0.1)' : 'rgba(234,179,8,0.1)',
-                        padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '700'
-                      }}>{w.status}</span>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                        {w.status === 'PENDING' && (
-                          <>
-                            <button className="btn btn-primary" style={{ padding: '2px 6px', fontSize: '10px' }} onClick={async () => {
-                              if(window.confirm('Approve this withdrawal? User will see "Processing".')) {
-                                await processAdminWithdrawal(w.id, 'PROCESSING');
-                                loadData();
-                              }
-                            }}>Approve</button>
-                            <button className="btn btn-outline" style={{ padding: '2px 6px', fontSize: '10px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }} onClick={async () => {
-                              if(window.confirm('Reject this withdrawal? Amount will return to user.')) {
-                                await processAdminWithdrawal(w.id, 'REJECTED');
-                                loadData();
-                              }
-                            }}>Reject</button>
-                          </>
-                        )}
-                        {w.status === 'PROCESSING' && (
-                          <button className="btn btn-primary" style={{ padding: '2px 6px', fontSize: '10px', background: 'var(--color-green)' }} onClick={async () => {
-                            if(window.confirm('Mark as Credited? This means you have successfully transferred the money.')) {
-                              await processAdminWithdrawal(w.id, 'CREDITED');
-                              loadData();
-                            }
-                          }}>Mark Credited</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         ) : activeTab === 'telemetry' ? (
           <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {/* TOP CONTROLS & TIMEFRAME SELECTOR */}
@@ -3040,56 +3755,158 @@ export default function AdminDashboard() {
             </div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
-                <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deposits.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No deposit requests found
-                  </td>
+          <div>
+            {/* Toolbar */}
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CreditCard size={13} color="var(--color-blue)" />
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Deposit Requests</span>
+                  <span style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    {filteredDeposits.length} / {deposits.length}
+                  </span>
+                  {deposits.filter(d => d.status === 'PENDING').length > 0 && (
+                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '3px', background: 'rgba(234,179,8,0.15)', color: 'var(--color-yellow)', fontWeight: '700' }}>
+                      ⏳ {deposits.filter(d => d.status === 'PENDING').length} Pending (₹{deposits.filter(d => d.status === 'PENDING').reduce((acc, d) => acc + (Number(d.amount) || 0), 0).toLocaleString('en-IN')})
+                    </span>
+                  )}
+                </div>
+
+                {/* Sort selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Sort:</span>
+                  <select
+                    value={depositSort}
+                    onChange={e => setDepositSort(e.target.value)}
+                    style={{
+                      background: 'var(--bg-primary)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="date_desc">Date (Newest First)</option>
+                    <option value="date_asc">Date (Oldest First)</option>
+                    <option value="amount_desc">Amount (High → Low)</option>
+                    <option value="amount_asc">Amount (Low → High)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search & Filter Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '160px' }}>
+                  <Search size={11} style={{ position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search deposits (client, email, amount)..."
+                    value={depositSearch}
+                    onChange={e => setDepositSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'var(--bg-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '4px',
+                      padding: '3px 20px 3px 22px',
+                      fontSize: '10.5px',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  {depositSearch && (
+                    <X
+                      size={11}
+                      onClick={() => setDepositSearch('')}
+                      style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                    />
+                  )}
+                </div>
+
+                {/* Filter Chips */}
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'All', val: 'ALL' },
+                    { label: '⏳ Pending', val: 'PENDING' },
+                    { label: '✅ Approved', val: 'APPROVED' },
+                    { label: '❌ Rejected', val: 'REJECTED' }
+                  ].map(chip => (
+                    <button
+                      key={chip.val}
+                      type="button"
+                      onClick={() => setDepositFilter(chip.val)}
+                      style={{
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        borderRadius: '3px',
+                        border: '1px solid',
+                        borderColor: depositFilter === chip.val ? 'var(--color-blue)' : 'var(--border-color)',
+                        background: depositFilter === chip.val ? 'rgba(59,130,246,0.2)' : 'transparent',
+                        color: depositFilter === chip.val ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Date</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600' }}>Client</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Amount</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '6px 12px', fontWeight: '600', textAlign: 'right' }}>Actions</th>
                 </tr>
-              ) : (
-                deposits.map(d => (
-                  <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{new Date(d.created_at).toLocaleString()}</td>
-                    <td style={{ padding: '6px 12px' }}>
-                      <div style={{ fontWeight: '600' }}>{d.username}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{d.email}</div>
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
-                      ₹{Number(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                      {d.status === 'PENDING' && <span style={{ color: 'var(--color-yellow)', background: 'rgba(234,179,8,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>PENDING</span>}
-                      {d.status === 'APPROVED' && <span style={{ color: 'var(--color-green-light)', background: 'rgba(34,197,94,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>APPROVED</span>}
-                      {d.status === 'REJECTED' && <span style={{ color: 'var(--color-red-light)', background: 'rgba(239,68,68,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>REJECTED</span>}
-                    </td>
-                    <td style={{ padding: '6px 12px', textAlign: 'right' }}>
-                      {d.status === 'PENDING' && (
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                          <button onClick={() => handleProcessDeposit(d.id, 'approve')} className="btn" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.2)', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}>
-                            <Check size={12} />
-                          </button>
-                          <button onClick={() => handleProcessDeposit(d.id, 'reject')} className="btn" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}>
-                            <XCircle size={12} />
-                          </button>
-                        </div>
-                      )}
+              </thead>
+              <tbody>
+                {filteredDeposits.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '18px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {depositSearch || depositFilter !== 'ALL' ? 'No deposit requests match your filter criteria' : 'No deposit requests found'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredDeposits.map(d => (
+                    <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '6px 12px', color: 'var(--text-secondary)', fontSize: '11px' }}>{new Date(d.created_at).toLocaleString()}</td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ fontWeight: '600' }}>{d.username}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{d.email}</div>
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: '600' }}>
+                        ₹{Number(d.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                        {d.status === 'PENDING' && <span style={{ color: 'var(--color-yellow)', background: 'rgba(234,179,8,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>PENDING</span>}
+                        {d.status === 'APPROVED' && <span style={{ color: 'var(--color-green-light)', background: 'rgba(34,197,94,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>APPROVED</span>}
+                        {d.status === 'REJECTED' && <span style={{ color: 'var(--color-red-light)', background: 'rgba(239,68,68,0.1)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontWeight: '600' }}>REJECTED</span>}
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                        {d.status === 'PENDING' && (
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleProcessDeposit(d.id, 'approve')} className="btn" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--color-green-light)', border: '1px solid rgba(34,197,94,0.2)', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}>
+                              <Check size={12} />
+                            </button>
+                            <button onClick={() => handleProcessDeposit(d.id, 'reject')} className="btn" style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.2)', padding: '3px 6px', borderRadius: '3px', display: 'flex', alignItems: 'center' }}>
+                              <XCircle size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
