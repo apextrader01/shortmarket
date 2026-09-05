@@ -1295,18 +1295,29 @@ const DownloadReports = () => {
   };
 
   const handleDownload = (fmt) => {
-    if (!currentCfg) return;
+    if (!currentCfg || isGenerating) return;
+    
+    // Capture config IMMEDIATELY before any state mutation (user gesture window)
+    const cfg = currentCfg;
+    
     setIsGenerating(true);
+    
     try {
-      currentCfg.handler(fmt);
+      // Execute generation synchronously within the same user-gesture call stack
+      cfg.handler(fmt);
     } catch (err) {
       console.error('Download error:', err);
-    } finally {
-      setTimeout(() => {
-        setIsGenerating(false);
-        setActiveModal(null);
-      }, 200);
+      alert('Download failed. Please try again.');
     }
+    
+    // Reset state: for PDF/print keep modal open so user can retry; for csv/html close after short delay
+    setTimeout(() => {
+      setIsGenerating(false);
+      if (fmt === 'excel' || fmt === 'html') {
+        setActiveModal(null);
+      }
+      // For PDF format: keep modal open - user sees the new print tab
+    }, 800);
   };
 
   return (
@@ -1464,6 +1475,24 @@ const DownloadReports = () => {
                 }}
               >
                 <FileText size={14} /> Print / PDF
+              </button>
+            </div>
+
+            {/* Status + Close row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: isGenerating ? '#fbbf24' : 'var(--text-secondary)' }}>
+                {isGenerating ? '⏳ Generating statement...' : '✅ Ready to download'}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setActiveModal(null); setIsGenerating(false); }}
+                style={{
+                  background: 'transparent', border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)', padding: '6px 16px', borderRadius: '6px',
+                  fontSize: '11.5px', fontWeight: '600', cursor: 'pointer'
+                }}
+              >
+                Close
               </button>
             </div>
           </div>
