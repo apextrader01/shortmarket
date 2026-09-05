@@ -38,7 +38,26 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
   if (loading) return <div style={{ padding: '24px', color: 'var(--text-secondary)' }}>Loading system status...</div>;
   if (!status) return <div style={{ padding: '24px', color: 'var(--color-red)' }}>Failed to fetch system status. Is the backend running?</div>;
 
-  const isHealthy = status.isFyersConnected && status.hasAccessToken && status.secondsSinceLastTick < 30;
+  const isMarketHours = () => {
+    const now = new Date();
+    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const day = ist.getUTCDay();
+    const hr = ist.getUTCHours();
+    const min = ist.getUTCMinutes();
+    const timeNum = hr * 100 + min;
+    if (day === 0 || day === 6) return false;
+    return timeNum >= 900 && timeNum <= 2330;
+  };
+
+  const isMarketOpenNow = isMarketHours();
+  const isHealthy = status.hasAccessToken && !status.tokenExpired && (status.secondsSinceLastTick < 30 || !isMarketOpenNow || status.isFyersConnected);
+  const statusText = (!status.hasAccessToken || status.tokenExpired)
+    ? 'Fyers Token Expired or Disconnected (Action Required)'
+    : status.secondsSinceLastTick < 30
+      ? 'System is Healthy & Receiving Live Data'
+      : !isMarketOpenNow
+        ? 'System is Healthy & Authenticated (Standing By - Markets Closed / Weekend)'
+        : 'System Connected (Waiting for Live Exchange Ticks)';
 
   return (
     <div style={{ padding: '24px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -47,7 +66,7 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
         <div>
           <h3 style={{ margin: '0 0 4px 0', fontSize: '18px' }}>Broker & Market Engine Status</h3>
           <div style={{ color: isHealthy ? 'var(--color-green)' : 'var(--color-red)', fontWeight: 'bold' }}>
-            {isHealthy ? 'System is Healthy & Receiving Live Data' : 'Fyers Connection Disconnected or Stalled (Action Required)'}
+            {statusText}
           </div>
         </div>
       </div>

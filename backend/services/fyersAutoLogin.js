@@ -121,30 +121,48 @@ async function performFyersAutoLogin(retryCount = 0) {
         }
 
         // Step 4: Generate Auth Code
+        const appTypeSuffix = app_id.includes('-') ? app_id.split('-')[1] : '100';
         const cleanAppId = app_id.includes('-') ? app_id.split('-')[0] : app_id;
-        const authRes = await fetch('https://api-t1.fyers.in/api/v3/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${dataToken}`
-            },
-            body: JSON.stringify({
-                fyers_id: fy_id.trim(),
-                app_id: cleanAppId,
-                redirect_uri: redirect_url,
-                app_type: 100,
-                code_challenge: '',
-                state: 'None',
-                scope: '',
-                nonce: '',
-                response_type: 'code',
-                create_cookie: true
-            })
-        });
-        const authData = await authRes.json();
-        const authUrl = authData.Url || authData.url || authData.data?.url || authData.data?.Url;
+        const appTypeNum = parseInt(appTypeSuffix, 10) || 100;
+
+        let authData = null;
+        let authUrl = null;
+        const candidateTypes = [appTypeNum, String(appTypeNum), 200, '200', 100, '100', 2, '2'];
+
+        for (const trialType of candidateTypes) {
+            try {
+                const authRes = await fetch('https://api-t1.fyers.in/api/v3/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${dataToken}`
+                    },
+                    body: JSON.stringify({
+                        fyers_id: fy_id.trim(),
+                        app_id: cleanAppId,
+                        redirect_uri: redirect_url,
+                        app_type: trialType,
+                        appType: trialType,
+                        code_challenge: '',
+                        state: 'None',
+                        scope: '',
+                        nonce: '',
+                        response_type: 'code',
+                        create_cookie: true
+                    })
+                });
+                const parsed = await authRes.json();
+                authData = parsed;
+                const foundUrl = parsed.Url || parsed.url || parsed.data?.url || parsed.data?.Url;
+                if (foundUrl) {
+                    authUrl = foundUrl;
+                    break;
+                }
+            } catch (e) {}
+        }
+
         if (!authUrl) {
-            throw new Error(`Step 4 (Generate Auth Code) failed: ${authData.message || JSON.stringify(authData)}`);
+            throw new Error(`Step 4 (Generate Auth Code) failed: ${authData ? (authData.message || JSON.stringify(authData)) : 'No response'}`);
         }
 
         const urlObj = new URL(authUrl);

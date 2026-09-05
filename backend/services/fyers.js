@@ -846,10 +846,10 @@ function getFyersStatus() {
         lastDataSocketError.toLowerCase().includes('expired token') || 
         lastDataSocketError.toLowerCase().includes('failed to decode jwt')
     );
-    const masterConnected = isFyersConnected && recentTick && !isTokenExpiredError;
+    const masterConnected = isFyersConnected && !isTokenExpiredError;
     return {
         isMasterNode,
-        isFyersConnected: isMasterNode ? masterConnected : recentTick,
+        isFyersConnected: isMasterNode ? masterConnected : (isFyersConnected || recentTick),
         hasAccessToken: (!!activeAccessToken && !isTokenExpiredError),
         tokenExpired: !!isTokenExpiredError,
         wsInstanceExists: !!wsInstance,
