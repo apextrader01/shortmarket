@@ -81,7 +81,7 @@ export default function TradingJournalView({ onBack }) {
     (positions || []).forEach(p => {
       const pnl = Number(p.realized_pnl || 0);
       const isClosed = Number(p.quantity) === 0 || p.closed_quantity > 0;
-      const key = pos--;
+      const key = `pos-${p.id || p.symbol}`;
       if (isClosed && !seen.has(key)) {
         seen.add(key);
         list.push({
