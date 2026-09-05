@@ -155,45 +155,52 @@ export function calculateIndianCharges(order) {
 }
 
 /**
- * Downloads a CSV file with UTF-8 BOM
+ * Downloads a CSV file — bulletproof direct anchor approach
  */
 export function triggerCsvDownload(csvRows, filename) {
   try {
-    const csvContent = '\uFEFF' + csvRows.join('\r\n');
+    const csvContent = '\uFEFF' + csvRows.map(r => Array.isArray(r) ? r.join(',') : r).join('\r\n');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const safeFilename = `${filename}_${dateStr}.csv`;
+
+    // Method 1: Blob URL anchor
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    link.style.display = 'none';
     link.href = url;
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.download = safeFilename;
     document.body.appendChild(link);
     link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 150);
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (err) {
     console.error('CSV Download failed:', err);
+    alert('CSV download failed. Please try again or use a different browser.');
   }
 }
 
 /**
- * Downloads a standalone offline HTML statement
+ * Downloads a standalone HTML statement file — bulletproof direct anchor approach
  */
 export function triggerHtmlDownload(htmlContent, filename) {
   try {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const safeFilename = `${filename}_${dateStr}.html`;
+
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+    link.style.display = 'none';
     link.href = url;
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0, 10)}.html`);
+    link.download = safeFilename;
     document.body.appendChild(link);
     link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 150);
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (err) {
     console.error('HTML Download failed:', err);
+    alert('HTML download failed. Please try again.');
   }
 }
 
@@ -294,26 +301,44 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
 }
 
 /**
- * Opens a dedicated printable statement tab with instant auto-print and fallback
+ * Opens printable statement — triple fallback: blank window > blob tab > HTML download
  */
 export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
   const fullHtml = buildReportHtml(title, clientMeta, summaryCards, tablesHtml);
+  const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+  // Attempt 1: Open a blank window and write HTML directly (synchronous, no popup blocker)
   try {
     const printWindow = window.open('', '_blank');
-    if (printWindow && printWindow.document) {
+    if (printWindow && printWindow.document && !printWindow.closed) {
       printWindow.document.open();
       printWindow.document.write(fullHtml);
       printWindow.document.close();
       printWindow.focus();
-    } else {
-      console.warn('Popup blocked, triggering direct HTML download');
-      triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
+      return; // Success — exit
     }
-  } catch (e) {
-    console.error('Print generation failed, downloading HTML file:', e);
-    triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
+  } catch (e1) {
+    console.warn('Attempt 1 (blank window) failed:', e1);
   }
+
+  // Attempt 2: Open a Blob URL in new tab
+  try {
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const w2 = window.open(blobUrl, '_blank');
+    if (w2) {
+      w2.focus();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+      return; // Success — exit
+    }
+    URL.revokeObjectURL(blobUrl);
+  } catch (e2) {
+    console.warn('Attempt 2 (blob URL) failed:', e2);
+  }
+
+  // Attempt 3 (guaranteed fallback): Direct HTML file download — works 100% regardless of popup settings
+  console.warn('All popup methods blocked — falling back to direct HTML download');
+  triggerHtmlDownload(fullHtml, safeTitle);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

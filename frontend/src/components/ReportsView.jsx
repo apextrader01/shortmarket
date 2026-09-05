@@ -1296,28 +1296,31 @@ const DownloadReports = () => {
 
   const handleDownload = (fmt) => {
     if (!currentCfg || isGenerating) return;
-    
-    // Capture config IMMEDIATELY before any state mutation (user gesture window)
-    const cfg = currentCfg;
-    
+
+    // Snapshot config + period NOW, synchronously, before any state mutation
+    const cfg = { ...currentCfg };
+    const handler = cfg.handler;
+
     setIsGenerating(true);
-    
-    try {
-      // Execute generation synchronously within the same user-gesture call stack
-      cfg.handler(fmt);
-    } catch (err) {
-      console.error('Download error:', err);
-      alert('Download failed. Please try again.');
-    }
-    
-    // Reset state: for PDF/print keep modal open so user can retry; for csv/html close after short delay
-    setTimeout(() => {
-      setIsGenerating(false);
-      if (fmt === 'excel' || fmt === 'html') {
-        setActiveModal(null);
+
+    // Small timeout ensures React has painted the "generating..." state before we block
+    requestAnimationFrame(() => {
+      try {
+        handler(fmt);
+      } catch (err) {
+        console.error('Download error:', err);
+        setIsGenerating(false);
+        alert(`Download failed: ${err.message || 'Unknown error'}. Please try Excel or HTML format.`);
+        return;
       }
-      // For PDF format: keep modal open - user sees the new print tab
-    }, 800);
+
+      setTimeout(() => {
+        setIsGenerating(false);
+        if (fmt === 'excel' || fmt === 'html') {
+          setActiveModal(null);
+        }
+      }, 1000);
+    });
   };
 
   return (
