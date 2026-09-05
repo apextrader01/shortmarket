@@ -1,5 +1,5 @@
 // frontend/src/utils/clientReportGenerator.js
-// Ultra-fast, popup-proof Financial Reports & Statements Generator (Excel + PDF + HTML)
+// High-Precision Financial Reports & Statements Generator (Excel + PDF + HTML)
 
 /**
  * Escape CSV string values properly
@@ -42,36 +42,36 @@ export function filterRecordsByPeriod(records = [], period = 'All Time', customS
     if (isNaN(itemDate.getTime())) return true;
     const itemIST = getISTDateString(itemDate);
 
-    if (period === 'Today') {
+    if (period === 'Today' || period.includes('Today')) {
       return itemIST === todayIST;
     }
-    if (period === 'This Week' || period === 'Week') {
+    if (period === 'This Week' || period === 'Week' || period.includes('Week')) {
       const diffMs = now.getTime() - itemDate.getTime();
       return diffMs >= 0 && diffMs <= (7 * 24 * 60 * 60 * 1000);
     }
-    if (period === '15 Days') {
+    if (period === '15 Days' || period.includes('15 Days')) {
       const diffMs = now.getTime() - itemDate.getTime();
       return diffMs >= 0 && diffMs <= (15 * 24 * 60 * 60 * 1000);
     }
-    if (period === 'This Month' || period === 'Month') {
+    if (period === 'This Month' || period === 'Month' || period === 'Current Month' || period.includes('Month')) {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       return itemDate >= startOfMonth && itemDate <= now;
     }
-    if (period === '3 Months') {
+    if (period === '3 Months' || period.includes('3 Months')) {
       const diffMs = now.getTime() - itemDate.getTime();
       return diffMs >= 0 && diffMs <= (90 * 24 * 60 * 60 * 1000);
     }
-    if (period === 'FY 2025-26') {
+    if (period.includes('2025-26')) {
       const fyStart = '2025-04-01';
       const fyEnd = '2026-03-31';
       return itemIST >= fyStart && itemIST <= fyEnd;
     }
-    if (period === 'FY 2024-25') {
+    if (period.includes('2024-25')) {
       const fyStart = '2024-04-01';
       const fyEnd = '2025-03-31';
       return itemIST >= fyStart && itemIST <= fyEnd;
     }
-    if (period === 'Custom') {
+    if (period === 'Custom' || period.includes('Custom')) {
       if (customStart && itemIST < customStart) return false;
       if (customEnd && itemIST > customEnd) return false;
       return true;
@@ -220,7 +220,8 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   <title>${title} - ${clientId}</title>
   <style>
     @page { size: A4 landscape; margin: 12mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 12px; background: #fff; font-size: 11px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 16px; background: #fff; font-size: 11.5px; }
+    .no-print { position: sticky; top: 0; background: #ffffff; padding: 12px 16px; border-bottom: 2px solid #2563eb; margin: -16px -16px 16px -16px; display: flex; justify-content: space-between; align-items: center; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
     .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 14px; }
     .logo-title { font-size: 20px; font-weight: 800; color: #1e3a8a; letter-spacing: -0.5px; }
     .doc-title { font-size: 14px; font-weight: 700; color: #2563eb; margin-top: 2px; }
@@ -235,11 +236,23 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
     .text-red { color: #dc2626; font-weight: 600; }
     .footer { font-size: 9px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 20px; }
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; }
     }
   </style>
 </head>
 <body>
+  <div class="no-print">
+    <div style="font-size: 13px; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 8px;">
+      <span style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SHORT EDGE</span>
+      <span>${title} - Statement Preview</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">🖨️ Print / Save as PDF</button>
+      <button onclick="window.close()" style="background: #e2e8f0; color: #334155; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">✕ Close</button>
+    </div>
+  </div>
+
   <div class="header">
     <div>
       <div class="logo-title">SHORT EDGE</div>
@@ -266,66 +279,37 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   <div class="footer">
     This is a computer-generated official statement from Short Edge. No physical signature is required. For discrepancies, contact support@shortedge.in.
   </div>
+
+  <script>
+    if (document.readyState === 'complete') {
+      setTimeout(function() { try { window.print(); } catch(e) {} }, 350);
+    } else {
+      window.addEventListener('load', function() {
+        setTimeout(function() { try { window.print(); } catch(e) {} }, 350);
+      });
+    }
+  </script>
 </body>
 </html>`;
 }
 
 /**
- * Prints a clean, branded PDF (Always destroys stale frames and creates a fresh Blob frame)
+ * Opens a dedicated printable statement tab with instant auto-print and fallback
  */
 export function triggerPdfPrint(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
   const fullHtml = buildReportHtml(title, clientMeta, summaryCards, tablesHtml);
 
   try {
-    // 1. Remove all old print frames from DOM to prevent browser print queue lock
-    const oldFrames = document.querySelectorAll('iframe[data-report-print]');
-    oldFrames.forEach(f => f.remove());
-
-    // 2. Create fresh isolated iframe
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('data-report-print', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '1000px';
-    iframe.style.height = '1000px';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
-    iframe.style.border = 'none';
-    iframe.style.zIndex = '-9999';
-    document.body.appendChild(iframe);
-
-    // 3. Blob URL avoids cross-origin and document write locks
-    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(blob);
-
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        } catch (err) {
-          console.warn('Iframe print failed, falling back to popup window / HTML download:', err);
-          const w = window.open('', '_blank');
-          if (w) {
-            w.document.open();
-            w.document.write(fullHtml);
-            w.document.close();
-            w.focus();
-            w.print();
-          } else {
-            triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
-          }
-        } finally {
-          URL.revokeObjectURL(blobUrl);
-          setTimeout(() => {
-            try { iframe.remove(); } catch (_) {}
-          }, 5000);
-        }
-      }, 150);
-    };
-
-    iframe.src = blobUrl;
+    const printWindow = window.open('', '_blank');
+    if (printWindow && printWindow.document) {
+      printWindow.document.open();
+      printWindow.document.write(fullHtml);
+      printWindow.document.close();
+      printWindow.focus();
+    } else {
+      console.warn('Popup blocked, triggering direct HTML download');
+      triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
+    }
   } catch (e) {
     console.error('Print generation failed, downloading HTML file:', e);
     triggerHtmlDownload(fullHtml, title.replace(/[^a-zA-Z0-9_-]/g, '_'));
@@ -339,7 +323,6 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
   const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
   const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
   
-  // Scripwise grouping
   const scripMap = {};
   executed.forEach(o => {
     const sym = o.symbol || 'UNKNOWN';
@@ -1143,7 +1126,6 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
     const avgPrice = Number(h.average_price || 0);
     const invested = qty * avgPrice;
     
-    // Live price fallback
     const livePriceObj = prices[h.symbol];
     const cmp = (livePriceObj && typeof livePriceObj === 'object') ? Number(livePriceObj.ltp || avgPrice) : Number(livePriceObj || avgPrice);
     const currentVal = qty * cmp;
