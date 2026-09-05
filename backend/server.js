@@ -83,9 +83,24 @@ adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Con
 })();
 // ----------------------------------------------------
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
-// ─── Price Cache (lives in server.js to avoid module issues) ─────────────────
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const first = forwarded.split(',')[0].trim();
+    if (first && first !== '::1' && first !== '127.0.0.1' && !first.startsWith('127.')) {
+      return first.replace(/^::ffff:/, '');
+    }
+  }
+  const realIp = req.headers['x-real-ip'] || req.headers['cf-connecting-ip'] || req.headers['x-client-ip'];
+  if (realIp && realIp !== '::1' && realIp !== '127.0.0.1') {
+    return realIp.trim().replace(/^::ffff:/, '');
+  }
+  const raw = req.ip || req.socket?.remoteAddress || '';
+  return raw.replace(/^::ffff:/, '') || '127.0.0.1';
+}
 const priceCache = {};
 
 function isDerivativeContract(sym) {
@@ -522,7 +537,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
-    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : (req.socket?.remoteAddress || req.ip || '');
+    const clientIp = getClientIp(req);
     
     // Check if IP or Phone is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -613,7 +628,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
-    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : (req.socket?.remoteAddress || req.ip || '');
+    const clientIp = getClientIp(req);
     
     // Check if IP or Account is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -1294,7 +1309,19 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const totalPages = Math.ceil(total / limit) || 1;
 
     let userQuery = query
-      .select('users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance', 'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number', 'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at', 'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name', 'users.browser_name', 'users.city', 'users.state', 'user_profiles.dob', 'user_profiles.gender', 'user_profiles.state', 'user_profiles.city', 'user_profiles.occupation', 'user_profiles.annual_income', 'user_profiles.financial_goal', 'user_profiles.trading_experience', 'user_profiles.preferred_segment', 'user_profiles.trading_style')
+      .select(
+        'users.id', 'users.client_id', 'users.username', 'users.email', 'users.balance',
+        'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number',
+        'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at',
+        'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name',
+        'users.browser_name',
+        'users.city as ip_city', 'users.state as ip_state',
+        'user_profiles.dob', 'user_profiles.gender',
+        'user_profiles.state as onboarding_state', 'user_profiles.city as onboarding_city',
+        'user_profiles.occupation', 'user_profiles.annual_income',
+        'user_profiles.financial_goal', 'user_profiles.trading_experience',
+        'user_profiles.preferred_segment', 'user_profiles.trading_style'
+      )
       .orderBy('users.created_at', 'desc');
 
     if (!isExport) {
@@ -1321,6 +1348,13 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
     const enhancedUsers = [];
     for (const u of rawUsers) {
       const ip = u.last_ip || u.registration_ip;
+      let detectedCity = u.ip_city || '';
+      let detectedState = u.ip_state || '';
+      if ((!detectedCity || !detectedState) && ip && ip !== '::1' && ip !== '127.0.0.1') {
+        const geo = parseIpLocation(ip);
+        if (geo.city) detectedCity = geo.city;
+        if (geo.state) detectedState = geo.state;
+      }
       const sharedCount = ip ? (ipMap[ip] || 1) : 1;
       let sharedUsers = [];
       if (sharedCount > 1 && ip) {
@@ -1335,6 +1369,10 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       }
       enhancedUsers.push({
         ...u,
+        ip_city: detectedCity,
+        ip_state: detectedState,
+        city: u.onboarding_city || u.city || '',
+        state: u.onboarding_state || u.state || '',
         shared_ip_count: sharedCount,
         shared_users: sharedUsers
       });

@@ -4735,7 +4735,7 @@ export default function AdminDashboard() {
                   <div><span style={{ color: 'var(--text-secondary)' }}>Device Model:</span> <strong style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.device_model || 'Desktop PC'}</strong></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>OS & Browser:</span> <span style={{ color: '#fff', marginLeft: '4px' }}>{selectedUser.os_name || 'Windows'} ({selectedUser.browser_name || 'Chrome'})</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Network IP:</span> <span style={{ color: '#93c5fd', marginLeft: '4px' }}>{selectedUser.last_ip || selectedUser.registration_ip || 'Not recorded'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>{selectedUser.city || selectedUser.state || 'India'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>Detected IP Location:</span> <span style={{ color: '#4ade80', marginLeft: '4px' }}>{selectedUser.ip_city ? `${selectedUser.ip_city}${selectedUser.ip_state ? `, ${selectedUser.ip_state}` : ''}` : (selectedUser.ip_state ? `${selectedUser.ip_state}, India` : (selectedUser.last_ip && selectedUser.last_ip !== '::1' && selectedUser.last_ip !== '127.0.0.1' ? 'India' : 'Localhost / Network'))}</span></div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   {selectedUser.last_ip && (
@@ -4780,8 +4780,8 @@ export default function AdminDashboard() {
                   <div><span style={{ color: 'var(--text-secondary)' }}>Client ID:</span> <span style={{ color: 'var(--color-blue)', fontFamily: 'monospace', fontWeight: '700' }}>{selectedUser.client_id || (selectedUser.id ? `SE${String(selectedUser.id).padStart(6, '0')}` : 'N/A')}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>DOB:</span> <span style={{ color: 'white' }}>{selectedUser.dob || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Gender:</span> <span style={{ color: 'white' }}>{selectedUser.gender || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.state || 'N/A'}</span></div>
-                  <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.city || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>State:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_state || selectedUser.state || 'N/A'}</span></div>
+                  <div><span style={{ color: 'var(--text-secondary)' }}>City:</span> <span style={{ color: 'white' }}>{selectedUser.onboarding_city || selectedUser.city || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Occupation:</span> <span style={{ color: 'white' }}>{selectedUser.occupation || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Income:</span> <span style={{ color: 'white' }}>{selectedUser.annual_income || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Goal:</span> <span style={{ color: 'white' }}>{selectedUser.financial_goal || 'N/A'}</span></div>

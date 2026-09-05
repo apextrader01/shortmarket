@@ -1,4 +1,4 @@
-﻿let geoip = null;
+let geoip = null;
 try {
   geoip = require('geoip-lite');
 } catch (e) {
@@ -74,16 +74,29 @@ function parseDeviceDetails(userAgent = '') {
   return { deviceModel, osName, browserName };
 }
 
+const INDIAN_STATES = {
+  'AP': 'Andhra Pradesh', 'AR': 'Arunachal Pradesh', 'AS': 'Assam', 'BR': 'Bihar',
+  'CT': 'Chhattisgarh', 'GA': 'Goa', 'GJ': 'Gujarat', 'HR': 'Haryana',
+  'HP': 'Himachal Pradesh', 'JH': 'Jharkhand', 'KA': 'Karnataka', 'KL': 'Kerala',
+  'MP': 'Madhya Pradesh', 'MH': 'Maharashtra', 'MN': 'Manipur', 'ML': 'Meghalaya',
+  'MZ': 'Mizoram', 'NL': 'Nagaland', 'OR': 'Odisha', 'PB': 'Punjab',
+  'RJ': 'Rajasthan', 'SK': 'Sikkim', 'TN': 'Tamil Nadu', 'TG': 'Telangana',
+  'TR': 'Tripura', 'UT': 'Uttarakhand', 'UP': 'Uttar Pradesh', 'WB': 'West Bengal',
+  'AN': 'Andaman and Nicobar', 'CH': 'Chandigarh', 'DN': 'Dadra and Nagar Haveli',
+  'DD': 'Daman and Diu', 'DL': 'Delhi', 'JK': 'Jammu and Kashmir', 'LA': 'Ladakh',
+  'LD': 'Lakshadweep', 'PY': 'Puducherry'
+};
+
 /**
  * Extract GeoIP location from IP
  */
 function parseIpLocation(ip) {
-  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
-    return { city: 'Local Network', state: 'Local', country: 'IN' };
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.16.') || ip.startsWith('172.31.')) {
+    return { city: '', state: '', country: 'Localhost / Network' };
   }
 
   if (!geoip) {
-    return { city: 'India', state: '', country: 'IN' };
+    return { city: '', state: '', country: 'India' };
   }
   
   try {
@@ -91,16 +104,20 @@ function parseIpLocation(ip) {
     const geo = geoip.lookup(cleanIp);
     
     if (!geo) {
-      return { city: 'India', state: '', country: 'IN' };
+      return { city: '', state: '', country: 'India' };
     }
 
+    const stateName = INDIAN_STATES[geo.region] || geo.region || '';
+    const cityName = geo.city || '';
+    const countryName = geo.country === 'IN' ? 'India' : (geo.country || 'India');
+
     return {
-      city: geo.city || geo.region || 'India',
-      state: geo.region || '',
-      country: geo.country || 'IN'
+      city: cityName,
+      state: stateName,
+      country: countryName
     };
   } catch (e) {
-    return { city: 'India', state: '', country: 'IN' };
+    return { city: '', state: '', country: 'India' };
   }
 }
 
