@@ -1491,10 +1491,13 @@ export const useStore = create(persist((set, get) => ({
     return { theme: newTheme };
   }),
   setTheme: (newTheme) => set((state) => {
-    if (newTheme === 'light') {
-      document.body.classList.add('light-mode');
-    } else {
-      document.body.classList.remove('light-mode');
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', newTheme);
+      if (newTheme === 'light') {
+        document.body.classList.add('light-mode');
+      } else {
+        document.body.classList.remove('light-mode');
+      }
     }
     return { theme: newTheme };
   }),

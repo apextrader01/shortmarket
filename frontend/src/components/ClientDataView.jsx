@@ -606,15 +606,41 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ minWidth: '200px', flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your high-contrast trading theme</div>
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <span onClick={() => setTheme('light')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'light' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'light' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'light' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'light' ? '600' : '500' }}>Light</span>
-                <span onClick={() => setTheme('dark')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'dark' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'dark' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'dark' ? '600' : '500' }}>Dark</span>
-                <span onClick={() => setTheme('system')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: theme === 'system' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: theme === 'system' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: theme === 'system' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: theme === 'system' ? '600' : '500' }}>System</span>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'oled', label: '🖤 OLED Black', bg: '#000000', border: '#333' },
+                  { id: 'midnight', label: '🌌 Midnight', bg: '#070c18', border: '#1e3a8a' },
+                  { id: 'charcoal', label: '🪙 Charcoal', bg: '#121214', border: '#2a2a30' },
+                  { id: 'dark', label: '🚀 Deep Space', bg: '#0B1121', border: '#1e293b' },
+                  { id: 'light', label: '☀️ Light', bg: '#FFFFFF', border: '#cbd5e1' }
+                ].map(t => {
+                  const isSel = theme === t.id;
+                  return (
+                    <span
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      style={{
+                        fontSize: '11.5px',
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        background: isSel ? 'rgba(59, 130, 246, 0.2)' : t.bg,
+                        border: isSel ? '1px solid var(--color-blue)' : `1px solid ${t.border}`,
+                        borderRadius: '6px',
+                        color: isSel ? 'var(--color-blue-light)' : (t.id === 'light' && theme !== 'light' ? '#0f172a' : 'var(--text-primary)'),
+                        fontWeight: isSel ? '700' : '500',
+                        boxShadow: isSel ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {t.label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 

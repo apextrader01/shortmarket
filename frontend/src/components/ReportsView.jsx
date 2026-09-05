@@ -17,6 +17,7 @@ import {
   getISTDateString,
   filterRecordsByPeriod
 } from '../utils/clientReportGenerator';
+import TradingJournalView from './TradingJournalView';
 
 // --- Subcomponents for Tabs ---
 
@@ -1685,6 +1686,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
   }, []);
 
   const tabs = [
+    'Trading Journal',
     'Trading Insights', 
     'Trades and Charges', 
     'Statement - Ledger', 
@@ -1734,6 +1736,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
 
       {/* Content */}
       <div style={{ minHeight: '400px' }}>
+        {activeTab === 'Trading Journal' && <TradingJournalView onBack={() => setActiveTab('Trading Insights')} />}
         {activeTab === 'Statement - Ledger' && <LedgerStatement />}
         {activeTab === 'Trades and Charges' && <TradesAndCharges />}
         {activeTab === 'Profit and Loss' && <ProfitAndLoss />}

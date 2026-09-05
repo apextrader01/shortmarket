@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone } from 'lucide-react';
+import {
+  isUserPinEnabled,
+  saveUserPin,
+  removeUserPin,
+  isBiometricsAvailable,
+  isBiometricsEnabled,
+  registerBiometrics,
+  setAppLocked
+} from '../utils/biometricAuth';
 
 export default function SettingsView() {
   const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier, updateBankDetails } = useStore(useShallow(state => ({ user: state.user, updatePassword: state.updatePassword, logout: state.logout, oneClickMode: state.oneClickMode, setOneClickMode: state.setOneClickMode, oneClickMultiplier: state.oneClickMultiplier, setOneClickMultiplier: state.setOneClickMultiplier, updateBankDetails: state.updateBankDetails })));
@@ -178,6 +187,18 @@ export default function SettingsView() {
           </form>
         </div>
 
+        {/* Biometric & 4-Digit PIN Security Card */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Fingerprint size={20} color="var(--color-blue)" /> Quick App Unlock (4-Digit PIN & Biometrics)
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Set a 4-digit PIN or enable Face ID / Fingerprint to quickly unlock Short Edge on mobile and desktop without typing your full password.
+          </p>
+
+          <BiometricSettingsSection user={user} />
+        </div>
+
       </div>
 
       
@@ -185,5 +206,261 @@ export default function SettingsView() {
     </div>
   );
 }
+
+function BiometricSettingsSection({ user }) {
+  const userId = user?.id || 'default';
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+  const [showPinSetup, setShowPinSetup] = useState(false);
+
+  useEffect(() => {
+    setPinEnabled(isUserPinEnabled(userId));
+    setBioEnabled(isBiometricsEnabled(userId));
+    isBiometricsAvailable().then(setBioAvailable);
+  }, [userId]);
+
+  const handleSavePin = async (e) => {
+    e.preventDefault();
+    setStatusMsg({ type: '', text: '' });
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setStatusMsg({ type: 'error', text: 'PIN must be exactly 4 numeric digits.' });
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setStatusMsg({ type: 'error', text: 'PIN confirmation does not match.' });
+      return;
+    }
+
+    try {
+      await saveUserPin(newPin, userId);
+      setPinEnabled(true);
+      setShowPinSetup(false);
+      setNewPin('');
+      setConfirmPin('');
+      setStatusMsg({ type: 'success', text: '✅ 4-Digit Security PIN configured successfully!' });
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to save PIN' });
+    }
+  };
+
+  const handleDisablePin = () => {
+    if (window.confirm('Disable PIN and Biometric unlock for this account?')) {
+      removeUserPin(userId);
+      setPinEnabled(false);
+      setBioEnabled(false);
+      setStatusMsg({ type: 'success', text: 'Quick unlock disabled.' });
+    }
+  };
+
+  const handleToggleBiometrics = async () => {
+    if (bioEnabled) {
+      removeUserPin(userId);
+      setBioEnabled(false);
+      setStatusMsg({ type: 'success', text: 'Biometrics disabled.' });
+      return;
+    }
+
+    if (!pinEnabled) {
+      setStatusMsg({ type: 'error', text: 'Please configure a 4-Digit PIN first as a fallback before enabling Biometrics.' });
+      return;
+    }
+
+    try {
+      const res = await registerBiometrics(userId, user?.username || 'Trader');
+      if (res) {
+        setBioEnabled(true);
+        setStatusMsg({ type: 'success', text: '✅ Face ID / Fingerprint enabled successfully!' });
+      }
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: 'Biometric setup failed or cancelled: ' + (err.message || String(err)) });
+    }
+  };
+
+  const handleTestLock = () => {
+    setAppLocked(true);
+    window.location.reload();
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {statusMsg.text && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: '600',
+          background: statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+          color: statusMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)',
+          border: `1px solid ${statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          {statusMsg.text}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+        {/* PIN Status Tile */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: pinEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+              <KeyRound size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>4-Digit Quick PIN</div>
+              <div style={{ fontSize: '11.5px', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                {pinEnabled ? '✅ Active & Protected' : '⚪ Not Set Up'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {pinEnabled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowPinSetup(true)}
+                  style={{ flex: 1, padding: '8px 12px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.35)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Change PIN
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisablePin}
+                  style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Disable
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowPinSetup(true)}
+                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Set Up 4-Digit PIN
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Biometrics Status Tile */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: bioEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+              <Fingerprint size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
+              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Hardware unavailable')}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={handleToggleBiometrics}
+              disabled={!pinEnabled && !bioEnabled}
+              style={{
+                width: '100%',
+                padding: '9px 16px',
+                background: bioEnabled ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.15)',
+                border: bioEnabled ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(59,130,246,0.35)',
+                color: bioEnabled ? '#ef4444' : '#60a5fa',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: (!pinEnabled && !bioEnabled) ? 'not-allowed' : 'pointer',
+                opacity: (!pinEnabled && !bioEnabled) ? 0.5 : 1
+              }}
+            >
+              {bioEnabled ? 'Disable Biometrics' : 'Enable Touch ID / Face ID'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* PIN Setup Form Overlay / Modal */}
+      {showPinSetup && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--color-blue)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#fff' }}>Configure 4-Digit PIN</h4>
+            <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowPinSetup(false)} />
+          </div>
+
+          <form onSubmit={handleSavePin} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>New 4-Digit PIN</label>
+              <input
+                type="password"
+                maxLength={4}
+                value={newPin}
+                onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Confirm 4-Digit PIN</label>
+              <input
+                type="password"
+                maxLength={4}
+                value={confirmPin}
+                onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              Save PIN
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Test Quick Lock Button */}
+      {pinEnabled && (
+        <div style={{ display: 'flex', justifyContent: 'flex-start', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+          <button
+            type="button"
+            onClick={handleTestLock}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            <Lock size={14} /> Test Lock Screen Now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 

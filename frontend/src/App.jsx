@@ -28,9 +28,12 @@ import PricingView from './components/PricingView';
 import ReferralsView from './components/ReferralsView';
 import LeaderboardView from './components/LeaderboardView';
 import ErrorBoundary from './components/ErrorBoundary';
+import BiometricLockModal from './components/BiometricLockModal';
+import TradingJournalView from './components/TradingJournalView';
+import { isUserPinEnabled, isAppLocked, setAppLocked } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -202,6 +205,48 @@ function App() {
     }
   };
 
+  const [isLocked, setIsLocked] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    if (!token || !userStr) return false;
+    try {
+      const u = JSON.parse(userStr);
+      if (u && isUserPinEnabled(u.id)) {
+        return isAppLocked();
+      }
+    } catch (e) {}
+    return false;
+  });
+
+  // Background inactivity / tab blur lock listener (3 minutes)
+  useEffect(() => {
+    if (!user || !isUserPinEnabled(user.id)) return;
+
+    let bgTime = null;
+    const handleVisibility = () => {
+      if (document.hidden) {
+        bgTime = Date.now();
+      } else {
+        if (bgTime && (Date.now() - bgTime > 180000)) {
+          setAppLocked(true);
+          setIsLocked(true);
+        }
+      }
+    };
+
+    const handleCustomLock = () => {
+      setIsLocked(true);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('shortmarket_lock_app', handleCustomLock);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('shortmarket_lock_app', handleCustomLock);
+    };
+  }, [user]);
+
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
     if (!path) return 'Markets';
@@ -211,10 +256,10 @@ function App() {
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-      'leaderboard': 'Leaderboard',
+      'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
-        'aboutus': 'AboutUs'
+      'aboutus': 'AboutUs'
     };
     return tabsMap[path.toLowerCase()] || 'Markets';
   });
@@ -252,6 +297,7 @@ function App() {
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
+        'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
         'aboutus': 'AboutUs'
@@ -451,7 +497,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard', 'Journal',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -505,7 +551,7 @@ function App() {
         </header>
 
       <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-        {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing'].includes(activeTab) && (
+        {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
           <MarketWatch 
             className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
             onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
@@ -534,6 +580,11 @@ function App() {
           {activeTab === 'Analytics' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}><AnalyticsView /></div>}
           {activeTab === 'MutualFunds' && <MutualFundsView />}
           {activeTab === 'Leaderboard' && <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}><LeaderboardView /></div>}
+          {activeTab === 'Journal' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
+              <TradingJournalView onBack={() => setActiveTab('Markets')} />
+            </div>
+          )}
           {activeTab === 'ClientData' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
               <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
@@ -577,6 +628,9 @@ function App() {
       <AlertModal />
       <ChartModal />
       <BasketModal />
+      {user && isLocked && isUserPinEnabled(user.id) && (
+        <BiometricLockModal onUnlock={() => setIsLocked(false)} />
+      )}
       
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${showMobileMenu ? 'open' : ''}`}>
@@ -605,6 +659,7 @@ function App() {
             { label: 'Orders', icon: List },
             { label: 'Portfolio', icon: Briefcase },
             { label: 'Leaderboard', icon: Trophy },
+            { label: 'Trading Journal', icon: BookOpen },
             { label: 'Mutual Funds', icon: CircleDollarSign },
             { label: 'Reports', icon: FileText },
             { label: 'Referrals', icon: Gift },
@@ -612,7 +667,7 @@ function App() {
             { label: 'About Us', icon: Info },
             ...(user?.is_admin ? [{ label: 'Admin Panel', icon: ShieldCheck }] : [])
           ].map(tab => (
-            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
+            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label === 'Trading Journal' ? 'Journal' : tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
               <tab.icon size={20} />
               {tab.label}
             </div>

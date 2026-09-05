@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Activity, X } from 'lucide-react';
+import { Activity, X, Share2 } from 'lucide-react';
+import PnLShareCardModal from './PnLShareCardModal';
 
 export default function PositionsView() {
   const isToday = (dateString) => {
@@ -12,6 +13,7 @@ export default function PositionsView() {
   };
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [shareModalTrade, setShareModalTrade] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -466,34 +468,68 @@ export default function PositionsView() {
                       <td data-label="Exchange" style={{ fontWeight: '500' }}>{pos.exchange}</td>
                       <td data-label="Product" style={{ fontWeight: '500' }}>{pos.productLabel}</td>
                       <td data-label="Actions" style={{ textAlign: 'center', paddingRight: '20px' }}>
-                        {viewMode === 'OPEN' && (
-                          <X 
-                            size={18} 
-                            style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                            onClick={() => {
-                              if (pos.unencumberedQty === 0) {
-                                alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
-                                return;
-                              }
-                              setPartialExitPos(pos);
-                              const ls = pos.lotSize || 1;
-                              setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
-                              setPartialExitType('MARKET');
-                              setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            title="Share P&L Social Card"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShareModalTrade({
+                                symbol: pos.symbol,
+                                realized_pnl: realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0),
+                                pnl: realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0),
+                                avg: pos.avg,
+                                exit_price: pos.exit_price || pos.ltp,
+                                qty: Math.abs(pos.qty || pos.closed_quantity || 1),
+                                product_type: pos.productLabel || pos.product_type || 'INT',
+                                side: pos.qty >= 0 ? 'BUY' : 'SELL'
+                              });
                             }}
-                          />
-                        )}
-                        {viewMode === 'HOLDINGS' && (
-                          <X 
-                            size={18} 
-                            style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                            onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
-                          />
-                        )}
+                            style={{
+                              background: 'rgba(56, 189, 248, 0.1)',
+                              border: '1px solid rgba(56, 189, 248, 0.25)',
+                              color: '#38bdf8',
+                              borderRadius: '6px',
+                              padding: '4px 8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600'
+                            }}
+                          >
+                            <Share2 size={12} /> Share
+                          </button>
+                          {viewMode === 'OPEN' && (
+                            <X 
+                              size={18} 
+                              style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                              onClick={() => {
+                                if (pos.unencumberedQty === 0) {
+                                  alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+                                  return;
+                                }
+                                setPartialExitPos(pos);
+                                const ls = pos.lotSize || 1;
+                                setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+                                setPartialExitType('MARKET');
+                                setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
+                              }}
+                            />
+                          )}
+                          {viewMode === 'HOLDINGS' && (
+                            <X 
+                              size={18} 
+                              style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                              onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -610,13 +646,45 @@ export default function PositionsView() {
                         </div>
                       </div>
 
-                      {/* Line 3: Qty & Avg Price (Left) | LTP (Right) */}
+                      {/* Line 3: Qty & Avg Price (Left) | LTP & Actions (Right) */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                         <div>
                           Qty: {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)} • Avg: ₹{pos.avg.toFixed(2)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>LTP: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const relPnl = parseFloat(pos.realized_pnl) || 0;
+                              setShareModalTrade({
+                                symbol: pos.symbol,
+                                realized_pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
+                                pnl: relPnl !== 0 ? relPnl : (pos.pnl || 0),
+                                avg: pos.avg,
+                                exit_price: pos.exit_price || pos.ltp,
+                                qty: Math.abs(pos.qty || pos.closed_quantity || 1),
+                                product_type: pos.productLabel || pos.product_type || 'INT',
+                                side: pos.qty >= 0 ? 'BUY' : 'SELL'
+                              });
+                            }}
+                            style={{
+                              fontSize: '10px',
+                              color: '#38bdf8',
+                              background: 'rgba(56,189,248,0.12)',
+                              border: '1px solid rgba(56,189,248,0.3)',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                          >
+                            <Share2 size={10} /> Share
+                          </button>
                           {viewMode === 'OPEN' && (
                             <span style={{ fontSize: '10px', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>
                               Exit ✕
@@ -736,6 +804,13 @@ export default function PositionsView() {
             </div>
           </div>
         </div>
+      )}
+
+      {shareModalTrade && (
+        <PnLShareCardModal
+          trade={shareModalTrade}
+          onClose={() => setShareModalTrade(null)}
+        />
       )}
     </div>
   );
