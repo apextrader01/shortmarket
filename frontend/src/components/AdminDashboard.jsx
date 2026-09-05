@@ -314,6 +314,7 @@ function MarketCalendarTab({ isMobile }) {
   const [selectedDateStr, setSelectedDateStr] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
+  const [searchFilter, setSearchFilter] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [holidaySeeding, setHolidaySeeding] = useState(false);
 
@@ -483,13 +484,19 @@ function MarketCalendarTab({ isMobile }) {
     }
   };
 
+  const filteredRules = (marketCalendar || []).filter(r => {
+    if (!searchFilter.trim()) return true;
+    const q = searchFilter.toLowerCase();
+    return (r.date && r.date.toLowerCase().includes(q)) || (r.reason && r.reason.toLowerCase().includes(q));
+  });
+
   return (
-    <div style={{ padding: isMobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ padding: isMobile ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Calendar Tab Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
-            <Calendar size={22} style={{ color: '#c084fc' }} />
+          <h3 style={{ margin: '0 0 3px 0', fontSize: '17px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Calendar size={20} style={{ color: '#c084fc' }} />
             Market Trading Calendar & Scheduled Holidays
           </h3>
           <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -497,7 +504,7 @@ function MarketCalendarTab({ isMobile }) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={handleBulkSeed}
             disabled={holidaySeeding}
@@ -508,30 +515,32 @@ function MarketCalendarTab({ isMobile }) {
               background: 'linear-gradient(135deg, #9333ea, #6366f1)',
               color: '#fff',
               border: 'none',
-              borderRadius: '8px',
-              padding: '8px 16px',
+              borderRadius: '7px',
+              padding: '7px 14px',
               fontSize: '12px',
               fontWeight: '700',
               cursor: holidaySeeding ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+              boxShadow: '0 4px 12px rgba(147, 51, 234, 0.25)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Sparkles size={15} />
+            <Sparkles size={14} />
             {holidaySeeding ? 'Importing...' : '✨ Import 2026 Official Exchange Holidays'}
           </button>
 
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '3px', border: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '7px', padding: '2px', border: '1px solid var(--border-color)' }}>
             <button
               onClick={() => setViewMode('grid')}
               style={{
                 background: viewMode === 'grid' ? 'var(--color-blue)' : 'transparent',
                 color: viewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
                 border: 'none',
-                borderRadius: '6px',
-                padding: '6px 12px',
+                borderRadius: '5px',
+                padding: '5px 12px',
                 fontSize: '12px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
               }}
             >
               🗓️ Month Grid
@@ -542,11 +551,12 @@ function MarketCalendarTab({ isMobile }) {
                 background: viewMode === 'list' ? 'var(--color-blue)' : 'transparent',
                 color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
                 border: 'none',
-                borderRadius: '6px',
-                padding: '6px 12px',
+                borderRadius: '5px',
+                padding: '5px 12px',
                 fontSize: '12px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
               }}
             >
               📋 Scheduled Rules ({(marketCalendar || []).length})
@@ -556,24 +566,24 @@ function MarketCalendarTab({ isMobile }) {
       </div>
 
       {viewMode === 'grid' ? (
-        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: isMobile ? '12px' : '20px' }}>
-          {/* Month Navigation Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: isMobile ? '12px' : '16px' }}>
+          {/* Month Navigation Controls & Legend */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <button
                 onClick={prevMonth}
-                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={16} />
               </button>
-              <h4 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', minWidth: '150px' }}>
                 {monthNames[month]} {year}
               </h4>
               <button
                 onClick={nextMonth}
-                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}
               >
-                <ChevronRight size={18} />
+                <ChevronRight size={16} />
               </button>
               <button
                 onClick={jumpToToday}
@@ -585,17 +595,17 @@ function MarketCalendarTab({ isMobile }) {
 
             {/* Legend */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-green)' }} /> Open / Special Session</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-green)' }} /> Open / Special</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} /> MCX Evening Only</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} /> Market Holiday / Closed</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} /> Default Schedule</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-red)' }} /> Closed / Holiday</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)' }} /> Standard</span>
             </div>
           </div>
 
           {/* Days of Week Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '6px' }}>
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
-              <div key={d} style={{ fontSize: '12px', fontWeight: '700', color: (i === 0 || i === 6) ? '#f87171' : 'var(--text-secondary)', padding: '6px' }}>
+              <div key={d} style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', color: (i === 0 || i === 6) ? '#f87171' : 'var(--text-secondary)', padding: '4px' }}>
                 {d}
               </div>
             ))}
@@ -605,7 +615,7 @@ function MarketCalendarTab({ isMobile }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
             {/* Blank offset boxes */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-              <div key={`blank-${i}`} style={{ minHeight: isMobile ? '70px' : '95px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px', opacity: 0.2 }} />
+              <div key={`blank-${i}`} style={{ minHeight: isMobile ? '65px' : '82px', background: 'rgba(0,0,0,0.06)', borderRadius: '6px', opacity: 0.15 }} />
             ))}
 
             {/* Days in Month */}
@@ -639,7 +649,8 @@ function MarketCalendarTab({ isMobile }) {
               }
 
               if (isToday) {
-                cellBorder = '2px solid var(--color-blue)';
+                cellBorder = '2px solid #3b82f6';
+                cellBg = 'rgba(59, 130, 246, 0.08)';
               }
 
               return (
@@ -647,11 +658,11 @@ function MarketCalendarTab({ isMobile }) {
                   key={dateStr}
                   onClick={() => handleOpenEdit(dateStr)}
                   style={{
-                    minHeight: isMobile ? '75px' : '98px',
+                    minHeight: isMobile ? '65px' : '82px',
                     background: cellBg,
                     border: cellBorder,
-                    borderRadius: '8px',
-                    padding: '8px',
+                    borderRadius: '6px',
+                    padding: '6px 8px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -659,17 +670,23 @@ function MarketCalendarTab({ isMobile }) {
                     transition: 'all 0.15s ease',
                     position: 'relative'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.borderColor = isToday ? '#60a5fa' : 'rgba(255,255,255,0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.borderColor = cellBorder.split(' ')[2];
+                  }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{
-                      fontSize: '13px',
+                      fontSize: '12px',
                       fontWeight: isToday ? '800' : '700',
                       color: isToday ? '#fff' : isWeekend ? '#f87171' : 'var(--text-primary)',
-                      background: isToday ? 'var(--color-blue)' : 'transparent',
-                      width: isToday ? '22px' : 'auto',
-                      height: isToday ? '22px' : 'auto',
+                      background: isToday ? '#3b82f6' : 'transparent',
+                      width: isToday ? '20px' : 'auto',
+                      height: isToday ? '20px' : 'auto',
                       borderRadius: isToday ? '50%' : '0',
                       display: 'flex',
                       alignItems: 'center',
@@ -679,46 +696,46 @@ function MarketCalendarTab({ isMobile }) {
                     </span>
 
                     {hasRule && (
-                      <span style={{ fontSize: '10px', background: 'rgba(192, 132, 252, 0.2)', color: '#c084fc', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                      <span style={{ fontSize: '9px', background: 'rgba(192, 132, 252, 0.2)', color: '#c084fc', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>
                         Custom
                       </span>
                     )}
                   </div>
 
                   {/* Badges / Status Preview */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
                     {hasRule ? (
                       <>
                         {rule.reason && (
-                          <div style={{ fontSize: '10px', fontWeight: '700', color: isFullHoliday ? '#fca5a5' : isEveningOnly ? '#fde047' : '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rule.reason}>
-                            ⭐ {rule.reason}
+                          <div style={{ fontSize: '9px', fontWeight: '700', color: isFullHoliday ? '#fca5a5' : isEveningOnly ? '#fde047' : '#86efac', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={rule.reason}>
+                            {rule.reason}
                           </div>
                         )}
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
                           <span style={{
-                            fontSize: '9px',
+                            fontSize: '8px',
                             fontWeight: '700',
-                            padding: '1px 4px',
+                            padding: '1px 3px',
                             borderRadius: '3px',
                             background: rule.equity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.25)' : rule.equity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255,255,255,0.1)',
                             color: rule.equity_status === 'CLOSED' ? 'var(--color-red-light)' : rule.equity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
                           }}>
-                            NSE: {rule.equity_status}
+                            NSE:{rule.equity_status === 'CLOSED' ? 'OFF' : 'ON'}
                           </span>
                           <span style={{
-                            fontSize: '9px',
+                            fontSize: '8px',
                             fontWeight: '700',
-                            padding: '1px 4px',
+                            padding: '1px 3px',
                             borderRadius: '3px',
                             background: rule.commodity_status === 'CLOSED' ? 'rgba(239, 68, 68, 0.25)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? 'rgba(234, 179, 8, 0.25)' : rule.commodity_status === 'OPEN' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255,255,255,0.1)',
                             color: rule.commodity_status === 'CLOSED' ? 'var(--color-red-light)' : (rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00') ? '#fef08a' : rule.commodity_status === 'OPEN' ? 'var(--color-green-light)' : 'var(--text-secondary)'
                           }}>
-                            MCX: {rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00' ? 'EVENING' : rule.commodity_status}
+                            MCX:{rule.commodity_status === 'OPEN' && rule.commodity_start_time === '17:00' ? 'EVE' : rule.commodity_status === 'CLOSED' ? 'OFF' : 'ON'}
                           </span>
                         </div>
                       </>
                     ) : (
-                      <div style={{ fontSize: '10px', color: isWeekend ? 'rgba(255,255,255,0.25)' : 'var(--text-secondary)', fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '9px', color: isWeekend ? 'rgba(255,255,255,0.25)' : 'var(--text-secondary)', fontStyle: 'italic' }}>
                         {isWeekend ? '🔒 Weekend' : '⚡ Regular'}
                       </div>
                     )}
@@ -731,18 +748,26 @@ function MarketCalendarTab({ isMobile }) {
       ) : (
         /* List View of Scheduled Rules */
         <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>All Configured Calendar Rules & Holidays</h4>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Click any row to modify</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>Configured Calendar Rules & Holidays ({filteredRules.length})</h4>
+            </div>
+            <input
+              type="text"
+              placeholder="Search by date or reason..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: '#fff', width: '220px' }}
+            />
           </div>
 
-          {(marketCalendar || []).length === 0 ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              No custom rules or holidays configured yet. Click "✨ Import 2026 Official Exchange Holidays" or select a date on the month grid.
+          {filteredRules.length === 0 ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              No custom rules match your filter. Click "✨ Import 2026 Official Exchange Holidays" or select a date on the month grid.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {(marketCalendar || []).map(rule => {
+              {filteredRules.map(rule => {
                 const dt = new Date(rule.date);
                 const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dt.getDay()];
                 return (
@@ -756,25 +781,28 @@ function MarketCalendarTab({ isMobile }) {
                       background: 'var(--bg-panel)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '8px',
-                      padding: '10px 16px',
+                      padding: '10px 14px',
                       cursor: 'pointer',
                       flexWrap: 'wrap',
-                      gap: '10px'
+                      gap: '10px',
+                      transition: 'border-color 0.15s ease'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'}
+                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{rule.date}</span>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{dayName}</span>
                       </div>
                       {rule.reason && (
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#c084fc', background: 'rgba(192, 132, 252, 0.1)', padding: '3px 8px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#c084fc', background: 'rgba(192, 132, 252, 0.1)', padding: '3px 8px', borderRadius: '5px' }}>
                           ⭐ {rule.reason}
                         </span>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
                         fontSize: '11px',
                         fontWeight: '700',
@@ -813,7 +841,7 @@ function MarketCalendarTab({ isMobile }) {
           right: 0,
           bottom: 0,
           background: 'rgba(0,0,0,0.75)',
-          backdropFilter: 'blur(3px)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -825,17 +853,17 @@ function MarketCalendarTab({ isMobile }) {
             border: '1px solid var(--border-color)',
             borderRadius: '16px',
             width: '100%',
-            maxWidth: '540px',
-            padding: '24px',
+            maxWidth: '520px',
+            padding: '22px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '18px',
+            gap: '16px',
             boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Calendar size={20} style={{ color: 'var(--color-blue)' }} />
+                <h3 style={{ margin: '0 0 3px 0', fontSize: '17px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} style={{ color: 'var(--color-blue)' }} />
                   Configure Trading Schedule
                 </h3>
                 <div style={{ fontSize: '13px', color: 'var(--color-blue-light)', fontWeight: '600' }}>
@@ -982,30 +1010,30 @@ function MarketCalendarTab({ isMobile }) {
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '10px' }}>
                 {calendarMap[editForm.date] ? (
                   <button
                     type="button"
                     onClick={handleDeleteRule}
                     disabled={actionLoading}
-                    style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                   >
                     Reset to Default
                   </button>
                 ) : <div />}
 
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     type="button"
                     onClick={() => setEditModalOpen(false)}
-                    style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border-color)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                    style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border-color)', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: actionLoading ? 'not-allowed' : 'pointer' }}
+                    style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: actionLoading ? 'not-allowed' : 'pointer' }}
                   >
                     {actionLoading ? 'Saving...' : '💾 Save Schedule Rule'}
                   </button>

@@ -483,11 +483,13 @@ function App() {
         </header>
 
       <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-        <MarketWatch 
-          className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
-          onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
-        />
-        <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing'].includes(activeTab) && (
+          <MarketWatch 
+            className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
+            onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
+          />
+        )}
+        <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
           {(activeTab === 'Markets' || activeTab === 'Chart') && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
@@ -537,7 +539,7 @@ function App() {
             </div>
           )}
           {activeTab === 'AdminPanel' && user?.is_admin && (
-            <div className="dashboard-grid" style={{ width: '100%', gridTemplateColumns: '1fr' }}>
+            <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
               <AdminDashboard />
             </div>
           )}
