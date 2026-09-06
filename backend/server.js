@@ -519,7 +519,7 @@ app.get('/api/stocks', async (req, res) => {
 // ─── Auth ───────────────────────────────────────────────────────────────────
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { authenticateToken, JWT_SECRET } = require('./middleware/auth');
+const { authenticateToken, JWT_SECRET, hashToken } = require('./middleware/auth');
 const { parseDeviceDetails, parseIpLocation, syncBannedEntities, isIpBanned, isPhoneBanned } = require('./services/deviceSecurity');
 const rateLimit = require('express-rate-limit');
 
@@ -638,6 +638,20 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
 
     const token = jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: '7d' });
+    const tokenHash = hashToken(token);
+    if (tokenHash) {
+      await db('user_sessions').insert({
+        user_id: userId,
+        token_hash: tokenHash,
+        device_model: deviceModel,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
+        state: (state && state !== 'Local') ? state : '',
+        last_active_at: new Date()
+      }).catch(() => {});
+    }
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
@@ -717,6 +731,20 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     await db('users').where({ id: user.id }).update(updateFields).catch(e => console.error('Failed to update user login meta:', e));
     
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
+    const tokenHash = hashToken(token);
+    if (tokenHash) {
+      await db('user_sessions').insert({
+        user_id: user.id,
+        token_hash: tokenHash,
+        device_model: deviceModel,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        city: (city && city !== 'Local Network' && city !== 'Local') ? city : '',
+        state: (state && state !== 'Local') ? state : '',
+        last_active_at: new Date()
+      }).catch(() => {});
+    }
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
@@ -5013,6 +5041,275 @@ app.post('/api/admin/announcement', authenticateToken, async (req, res) => {
     res.json({ success: true, announcement: announcementData });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save announcement' });
+  }
+});
+
+// ─── Session & Device Security Manager Endpoints ─────────────────────────
+app.get('/api/user/sessions', authenticateToken, async (req, res) => {
+  try {
+    const currentHash = req.tokenHash || '';
+    const sessions = await db('user_sessions')
+      .where({ user_id: req.user.id })
+      .orderBy('last_active_at', 'desc');
+
+    const formatted = sessions.map(s => ({
+      id: s.id,
+      device_model: s.device_model || 'Unknown Device',
+      browser_name: s.browser_name || 'Browser',
+      os_name: s.os_name || 'Unknown OS',
+      ip_address: s.ip_address || '',
+      city: s.city || '',
+      state: s.state || '',
+      last_active_at: s.last_active_at,
+      created_at: s.created_at,
+      is_current: s.token_hash === currentHash
+    }));
+
+    res.json({ success: true, sessions: formatted });
+  } catch (err) {
+    console.error('Error fetching user sessions:', err);
+    res.status(500).json({ error: 'Failed to fetch active login sessions' });
+  }
+});
+
+app.post('/api/user/sessions/revoke-others', authenticateToken, async (req, res) => {
+  try {
+    const currentHash = req.tokenHash || '';
+    if (!currentHash) return res.status(400).json({ error: 'Current session identifier not found' });
+
+    const deletedCount = await db('user_sessions')
+      .where({ user_id: req.user.id })
+      .where('token_hash', '!=', currentHash)
+      .del();
+
+    res.json({ success: true, message: `Successfully logged out ${deletedCount} other device(s).`, revokedCount: deletedCount });
+  } catch (err) {
+    console.error('Error revoking other sessions:', err);
+    res.status(500).json({ error: 'Failed to revoke other sessions' });
+  }
+});
+
+app.delete('/api/user/sessions/:id', authenticateToken, async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    await db('user_sessions')
+      .where({ id: sessionId, user_id: req.user.id })
+      .del();
+
+    res.json({ success: true, message: 'Device session revoked.' });
+  } catch (err) {
+    console.error('Error revoking session:', err);
+    res.status(500).json({ error: 'Failed to revoke session' });
+  }
+});
+
+// ─── Contests & Tournaments Endpoints ─────────────────────────────────────
+app.get('/api/contests/active', async (req, res) => {
+  try {
+    let contest = await db('contests')
+      .where({ status: 'ACTIVE' })
+      .orderBy('id', 'desc')
+      .first();
+
+    // If no active contest exists, auto-seed one for the current month
+    if (!contest) {
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthName = monthNames[now.getMonth()];
+      const [newId] = await db('contests').insert({
+        title: `🏆 ${monthName} Premier Trader Championship ${now.getFullYear()}`,
+        description: `Official monthly intraday & F&O championship. Trade, scale up profits, and top the leaderboard to win real cash prizes and free PRO memberships!`,
+        start_date: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0),
+        end_date: endOfMonth,
+        prize_1st: '₹500 Cash + 1-Month Free PRO',
+        prize_2nd: '₹250 Cash + 1-Month Free PRO',
+        prize_3rd: '₹100 Cash + Free PRO',
+        status: 'ACTIVE'
+      }).returning('id');
+      const cid = typeof newId === 'object' ? newId.id : newId;
+      contest = await db('contests').where({ id: cid }).first();
+    }
+
+    // Also fetch the top 3 leaderboard contenders for the contest period
+    const startDate = contest?.start_date || new Date(0);
+    const topContenders = await db('positions')
+      .join('users', 'positions.user_id', 'users.id')
+      .where('users.is_admin', false)
+      .where('positions.created_at', '>=', startDate)
+      .groupBy('users.id', 'users.username', 'users.profile_picture_url')
+      .select(
+        'users.id as user_id',
+        'users.username',
+        'users.profile_picture_url',
+        db.raw('COALESCE(SUM(positions.realized_pnl), 0) as total_pnl'),
+        db.raw('COUNT(positions.id) as total_trades'),
+        db.raw('SUM(CASE WHEN positions.realized_pnl > 0 THEN 1 ELSE 0 END) as winning_trades')
+      )
+      .having(db.raw('COALESCE(SUM(positions.realized_pnl), 0) > 0'))
+      .orderBy('total_pnl', 'desc')
+      .limit(3);
+
+    const formattedContenders = topContenders.map((t, idx) => {
+      const total = parseInt(t.total_trades || 0, 10);
+      const wins = parseInt(t.winning_trades || 0, 10);
+      const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+      return {
+        rank: idx + 1,
+        username: t.username,
+        profile_picture_url: t.profile_picture_url,
+        pnl: parseFloat(t.total_pnl || 0),
+        totalTrades: total,
+        winRate
+      };
+    });
+
+    res.json({
+      success: true,
+      contest,
+      topContenders: formattedContenders
+    });
+  } catch (err) {
+    console.error('Error fetching active contest:', err);
+    res.status(500).json({ error: 'Failed to fetch contest' });
+  }
+});
+
+// Admin: Get all contests
+app.get('/api/admin/contests', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+
+    const contests = await db('contests').orderBy('id', 'desc');
+    res.json({ success: true, contests });
+  } catch (err) {
+    console.error('Error fetching admin contests:', err);
+    res.status(500).json({ error: 'Failed to fetch contests' });
+  }
+});
+
+// Admin: Create or update contest
+app.post('/api/admin/contests', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+
+    const { id, title, description, start_date, end_date, prize_1st, prize_2nd, prize_3rd, status } = req.body;
+
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    if (id) {
+      await db('contests').where({ id }).update({
+        title,
+        description: description || '',
+        start_date: start_date ? new Date(start_date) : undefined,
+        end_date: end_date ? new Date(end_date) : undefined,
+        prize_1st: prize_1st || '₹500 Cash + Free PRO',
+        prize_2nd: prize_2nd || '₹250 Cash + Free PRO',
+        prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
+        status: status || 'ACTIVE',
+        updated_at: new Date()
+      });
+      return res.json({ success: true, message: 'Contest updated successfully' });
+    } else {
+      const [newId] = await db('contests').insert({
+        title,
+        description: description || '',
+        start_date: start_date ? new Date(start_date) : new Date(),
+        end_date: end_date ? new Date(end_date) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        prize_1st: prize_1st || '₹500 Cash + Free PRO',
+        prize_2nd: prize_2nd || '₹250 Cash + Free PRO',
+        prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
+        status: status || 'ACTIVE'
+      }).returning('id');
+      return res.json({ success: true, message: 'Contest created successfully', id: typeof newId === 'object' ? newId.id : newId });
+    }
+  } catch (err) {
+    console.error('Error saving contest:', err);
+    res.status(500).json({ error: 'Failed to save contest' });
+  }
+});
+
+// Admin: Finalize and award winners
+app.post('/api/admin/contests/:id/award', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+
+    const contestId = req.params.id;
+    const { awardProUpgrade, cashAmount1st, cashAmount2nd, cashAmount3rd } = req.body;
+
+    const contest = await db('contests').where({ id: contestId }).first();
+    if (!contest) return res.status(404).json({ error: 'Contest not found' });
+
+    // Fetch top 3 traders for the contest duration
+    const startDate = contest.start_date || new Date(0);
+    const topTraders = await db('positions')
+      .join('users', 'positions.user_id', 'users.id')
+      .where('users.is_admin', false)
+      .where('positions.created_at', '>=', startDate)
+      .groupBy('users.id')
+      .select('users.id')
+      .orderBy(db.raw('COALESCE(SUM(positions.realized_pnl), 0)'), 'desc')
+      .limit(3);
+
+    const winner1 = topTraders[0]?.id || null;
+    const winner2 = topTraders[1]?.id || null;
+    const winner3 = topTraders[2]?.id || null;
+
+    await db('contests').where({ id: contestId }).update({
+      winner_1st_id: winner1,
+      winner_2nd_id: winner2,
+      winner_3rd_id: winner3,
+      status: 'COMPLETED',
+      updated_at: new Date()
+    });
+
+    // Credit Cash or Pro upgrades if selected
+    if (awardProUpgrade) {
+      const oneMonthLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const winnerIds = [winner1, winner2, winner3].filter(Boolean);
+      for (const wid of winnerIds) {
+        await db('users').where({ id: wid }).update({
+          subscription_tier: 'PRO',
+          subscription_expires: oneMonthLater
+        });
+      }
+    }
+
+    if (cashAmount1st && winner1) {
+      await db('users').where({ id: winner1 }).increment('balance', Number(cashAmount1st));
+      await db('ledger').insert({
+        user_id: winner1,
+        amount: Number(cashAmount1st),
+        type: 'DEPOSIT',
+        description: `🏆 1st Prize Reward - ${contest.title}`
+      });
+    }
+    if (cashAmount2nd && winner2) {
+      await db('users').where({ id: winner2 }).increment('balance', Number(cashAmount2nd));
+      await db('ledger').insert({
+        user_id: winner2,
+        amount: Number(cashAmount2nd),
+        type: 'DEPOSIT',
+        description: `🥈 2nd Prize Reward - ${contest.title}`
+      });
+    }
+    if (cashAmount3rd && winner3) {
+      await db('users').where({ id: winner3 }).increment('balance', Number(cashAmount3rd));
+      await db('ledger').insert({
+        user_id: winner3,
+        amount: Number(cashAmount3rd),
+        type: 'DEPOSIT',
+        description: `🥉 3rd Prize Reward - ${contest.title}`
+      });
+    }
+
+    res.json({ success: true, message: 'Contest completed and rewards successfully distributed!' });
+  } catch (err) {
+    console.error('Error awarding contest:', err);
+    res.status(500).json({ error: 'Failed to award contest rewards' });
   }
 });
 

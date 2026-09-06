@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
+import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
+import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound, playRiskAlertSound } from './utils/soundManager';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
@@ -593,6 +595,18 @@ export const useStore = create(persist((set, get) => ({
       set({ announcement: data || null });
     });
 
+    socket.off('trade_alert');
+    socket.on('trade_alert', (data) => {
+      if (!data) return;
+      if (data.event === 'TARGET_HIT') {
+        playTargetHitSound();
+      } else if (data.event === 'SL_HIT') {
+        playStopLossHitSound();
+      } else if (data.event === 'EXECUTED') {
+        playOrderExecutedSound();
+      }
+    });
+
     const onConnect = () => {
       set({ isConnected: true });
       const currentUser = get().user;
@@ -1081,12 +1095,61 @@ export const useStore = create(persist((set, get) => ({
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
     try {
-      const res  = await fetch(`${API}/api/order`, { credentials: 'include', method:  'POST',
-        headers: { 'Content-Type': 'application/json', },
-        body:    JSON.stringify(orderPayload),
+      const { symbol, quantity } = orderPayload;
+      const slices = calculateOrderSlices(symbol, quantity);
+
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      if (slices && slices.length > 1) {
+        // Multi-slice execution for large orders exceeding freeze limits
+        const sliceGroupId = `slice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const slicePromises = slices.map((sliceQty, index) => {
+          const childPayload = {
+            ...orderPayload,
+            quantity: sliceQty,
+            slice_group_id: sliceGroupId,
+            slice_index: index + 1,
+            slice_total: slices.length
+          };
+          return fetch(`${API}/api/order`, {
+            credentials: 'include',
+            method: 'POST',
+            headers,
+            body: JSON.stringify(childPayload)
+          }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+        });
+
+        const results = await Promise.all(slicePromises);
+        const successful = results.filter(r => r && r.success);
+        
+        get().fetchUserData().catch(() => {});
+        if (successful.length > 0) {
+          playOrderExecutedSound();
+          return {
+            success: true,
+            status: successful[0].status || 'EXECUTED',
+            isSliced: true,
+            slicesCount: slices.length,
+            message: `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
+          };
+        } else {
+          const firstErr = results[0]?.error || 'Order placement failed';
+          set({ authError: firstErr });
+          return null;
+        }
+      }
+
+      const res = await fetch(`${API}/api/order`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers,
+        body: JSON.stringify(orderPayload),
       });
       const data = await res.json();
       if (data.success) {
+        playOrderExecutedSound();
         // Sync user data non-blockingly in background for sub-100ms instant execution
         get().fetchUserData().catch(() => {});
         return data;
@@ -1796,6 +1859,151 @@ export const useStore = create(persist((set, get) => ({
         return { success: true, count: data.count };
       }
       return { success: false, error: data?.error || 'Failed to seed holidays' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Contests & Tournaments ────────────────────────────────────────────────
+  activeContest: null,
+  activeContestLoading: false,
+  adminContests: [],
+
+  fetchActiveContest: async () => {
+    try {
+      set({ activeContestLoading: true });
+      const res = await fetch(`${API}/api/contests/active`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ activeContest: data.contest, activeContestTop: data.topContenders || [] });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchActiveContest error:', e);
+    } finally {
+      set({ activeContestLoading: false });
+    }
+    return null;
+  },
+
+  fetchAdminContests: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ adminContests: data.contests || [] });
+        return data.contests || [];
+      }
+    } catch (e) {
+      console.error('fetchAdminContests error:', e);
+    }
+    return [];
+  },
+
+  saveContest: async (contestData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(contestData)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to save contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  awardContest: async (contestId, awardData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests/${contestId}/award`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(awardData)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to award contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Session & Device Security Manager ─────────────────────────────────────
+  userSessions: [],
+  userSessionsLoading: false,
+
+  fetchUserSessions: async () => {
+    try {
+      set({ userSessionsLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ userSessions: data.sessions || [] });
+        return data.sessions || [];
+      }
+    } catch (e) {
+      console.error('fetchUserSessions error:', e);
+    } finally {
+      set({ userSessionsLoading: false });
+    }
+    return [];
+  },
+
+  revokeOtherSessions: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions/revoke-others`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchUserSessions();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke other sessions' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  revokeSession: async (sessionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchUserSessions();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke session' };
     } catch (e) {
       return { success: false, error: e.message };
     }

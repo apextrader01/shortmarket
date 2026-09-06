@@ -434,6 +434,15 @@ class TriggerEngine {
             
             if (this.io) {
                 this.io.to(order.user_id.toString()).emit('sync_user_data');
+                const isSL = order.type === 'SL-M' || order.type === 'SL-L' || (order.remarks && (order.remarks.includes('SL') || order.remarks.includes('Stop Loss')));
+                const isTgt = order.remarks && (order.remarks.includes('Target') || order.remarks.includes('TGT'));
+                this.io.to(order.user_id.toString()).emit('trade_alert', {
+                    event: isSL ? 'SL_HIT' : isTgt ? 'TARGET_HIT' : 'EXECUTED',
+                    symbol: order.symbol,
+                    price: execPrice,
+                    qty: order.quantity,
+                    side: order.side
+                });
             }
             
         });

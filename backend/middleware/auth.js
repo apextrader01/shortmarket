@@ -1,7 +1,13 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../database/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
+
+function hashToken(token) {
+  if (!token) return '';
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 function authenticateToken(req, res, next) {
   // Read token from httpOnly cookie, fallback to Authorization header if provided
@@ -11,7 +17,7 @@ function authenticateToken(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
 
   jwt.verify(token, JWT_SECRET, async (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid token.' });
+    if (err) return res.status(403).json({ error: 'Invalid or expired token.' });
     
     // Check if user is banned
     try {
@@ -22,8 +28,11 @@ function authenticateToken(req, res, next) {
     } catch (e) {
       // Ignore db errors silently to not break auth if DB is temporarily slow
     }
-    
+
+    const tokenHash = hashToken(token);
     req.user = user; // Set req.user to the payload { id, username }
+    req.token = token;
+    req.tokenHash = tokenHash;
 
     // Opportunistically record real IP & device info if missing or on change
     try {
@@ -81,6 +90,33 @@ function authenticateToken(req, res, next) {
           })
           .update(updateData)
           .catch(() => {});
+
+        // Upsert user_sessions entry to keep device security manager synchronized
+        if (tokenHash) {
+          db('user_sessions')
+            .where({ token_hash: tokenHash })
+            .first()
+            .then(existing => {
+              if (existing) {
+                return db('user_sessions')
+                  .where({ id: existing.id })
+                  .update({ last_active_at: new Date(), ip_address: clientIp });
+              } else {
+                return db('user_sessions').insert({
+                  user_id: user.id,
+                  token_hash: tokenHash,
+                  device_model: deviceModel,
+                  browser_name: browserName,
+                  os_name: osName,
+                  ip_address: clientIp,
+                  city: city || '',
+                  state: state || '',
+                  last_active_at: new Date()
+                });
+              }
+            })
+            .catch(() => {});
+        }
       }
     } catch (e) {
       // Non-blocking
@@ -90,4 +126,4 @@ function authenticateToken(req, res, next) {
   });
 }
 
-module.exports = { authenticateToken, JWT_SECRET };
+module.exports = { authenticateToken, JWT_SECRET, hashToken };

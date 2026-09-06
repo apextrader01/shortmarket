@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, Clock, Search, Shield, X, RefreshCw, Check, XCircle, Activity, Mail, Phone, Edit, User, Download, Trash2, Zap, Play, Pause, TrendingUp, HardDrive, Key, Settings, Lock, Eye, EyeOff, ShieldCheck, Calendar, ChevronLeft, ChevronRight, Sparkles, Plus, Info, Sun, Moon, AlertTriangle, Trophy, Gift, Award } from 'lucide-react';
 import { exportToExcel, exportToPDF } from '../utils/adminExport';
 
 const calculateDateBounds = (preset, customStart, customEnd) => {
@@ -1235,7 +1235,31 @@ function MarketCalendarTab({ isMobile }) {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, awardContest } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, awardContest: state.awardContest })));
+
+  const [contestForm, setContestForm] = useState({
+    id: null,
+    title: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    prize_1st: '₹500 Cash + 1-Month Free PRO',
+    prize_2nd: '₹250 Cash + 1-Month Free PRO',
+    prize_3rd: '₹100 Cash + Free PRO',
+    status: 'ACTIVE'
+  });
+  const [showContestModal, setShowContestModal] = useState(false);
+  const [contestSaving, setContestSaving] = useState(false);
+  const [awardModal, setAwardModal] = useState({
+    open: false,
+    contestId: null,
+    contestTitle: '',
+    awardProUpgrade: true,
+    cashAmount1st: 500,
+    cashAmount2nd: 250,
+    cashAmount3rd: 100
+  });
+  const [awarding, setAwarding] = useState(false);
   
   const [fyersStatus, setFyersStatus] = useState(null);
   const [fyersLoading, setFyersLoading] = useState(true);
@@ -1849,6 +1873,8 @@ export default function AdminDashboard() {
           setPositionsTotalPages(res.totalPages || 1);
           setPositionsTotal(res.total || (res.positions || []).length);
         }
+      } else if (activeTab === 'contests') {
+        await fetchAdminContests?.();
       } else if (activeTab === 'ledger') {
         const { startDate, endDate } = calculateDateBounds(ledgerDatePreset, ledgerCustomStart, ledgerCustomEnd);
         const res = await fetchAdminLedger?.(ledgerPage, 50, debouncedLedgerSearch, startDate, endDate);
@@ -2580,12 +2606,459 @@ export default function AdminDashboard() {
         >
           ⚡ Resource Telemetry
         </button>
+        <button 
+          onClick={() => { setActiveTab('contests'); fetchAdminContests?.(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'contests' ? '2px solid #eab308' : '2px solid transparent', color: activeTab === 'contests' ? '#fbbf24' : 'var(--text-secondary)', fontWeight: activeTab === 'contests' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          🏆 Tournaments
+        </button>
       </div>
 
       {/* Content Container */}
       <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>Loading platform data...</div>
+        ) : activeTab === 'contests' ? (
+          <div style={{ padding: isMobile ? '10px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Header / Create Action Card */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%)',
+              border: '1px solid rgba(234, 179, 8, 0.35)',
+              borderRadius: '10px',
+              padding: '16px 20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '12px'
+            }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '800', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Trophy size={18} color="#eab308" /> Trading Contests & Monthly Tournaments
+                </h3>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Configure monthly tournament rules, customize cash/PRO prize pools (e.g. ₹100 cash or free membership), and automatically finalize winners.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    const monthName = monthNames[now.getMonth()];
+                    setContestForm({
+                      id: null,
+                      title: `🏆 ${monthName} Premier Trader Championship ${now.getFullYear()}`,
+                      description: 'Official monthly intraday & F&O championship. Trade, scale up profits, and top the leaderboard to win real cash prizes and free PRO memberships!',
+                      start_date: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0).toISOString().split('T')[0],
+                      end_date: endOfMonth.toISOString().split('T')[0],
+                      prize_1st: '₹500 Cash + 1-Month Free PRO',
+                      prize_2nd: '₹250 Cash + 1-Month Free PRO',
+                      prize_3rd: '₹100 Cash + Free PRO',
+                      status: 'ACTIVE'
+                    });
+                    setShowContestModal(true);
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Plus size={14} /> Create New Contest
+                </button>
+              </div>
+            </div>
+
+            {/* Contests List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {adminContests && adminContests.length > 0 ? (
+                adminContests.map(c => {
+                  const isActive = c.status === 'ACTIVE';
+                  return (
+                    <div
+                      key={c.id}
+                      style={{
+                        background: isActive ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isActive ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '8px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: '#fff' }}>
+                              {c.title}
+                            </h4>
+                            <span style={{
+                              background: isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                              border: isActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--border-color)',
+                              color: isActive ? '#4ade80' : 'var(--text-secondary)',
+                              fontSize: '10.5px',
+                              fontWeight: '800',
+                              padding: '2px 8px',
+                              borderRadius: '12px'
+                            }}>
+                              {c.status}
+                            </span>
+                          </div>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            {c.description}
+                          </p>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setContestForm({
+                                id: c.id,
+                                title: c.title,
+                                description: c.description || '',
+                                start_date: c.start_date ? new Date(c.start_date).toISOString().split('T')[0] : '',
+                                end_date: c.end_date ? new Date(c.end_date).toISOString().split('T')[0] : '',
+                                prize_1st: c.prize_1st || '',
+                                prize_2nd: c.prize_2nd || '',
+                                prize_3rd: c.prize_3rd || '',
+                                status: c.status || 'ACTIVE'
+                              });
+                              setShowContestModal(true);
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Edit size={12} /> Edit Rewards
+                          </button>
+
+                          {isActive && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAwardModal({
+                                  open: true,
+                                  contestId: c.id,
+                                  contestTitle: c.title,
+                                  awardProUpgrade: true,
+                                  cashAmount1st: 500,
+                                  cashAmount2nd: 250,
+                                  cashAmount3rd: 100
+                                });
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '6px 14px',
+                                fontSize: '11.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Award size={13} /> Finalize & Award Winners
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Prize Badges */}
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px', background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '12px' }}>
+                          <span style={{ color: '#fbbf24', fontWeight: '700' }}>🥇 1st Place: </span>
+                          <span style={{ color: '#fff', fontWeight: '600' }}>{c.prize_1st}</span>
+                        </div>
+                        <div style={{ fontSize: '12px' }}>
+                          <span style={{ color: '#cbd5e1', fontWeight: '700' }}>🥈 2nd Place: </span>
+                          <span style={{ color: '#fff', fontWeight: '600' }}>{c.prize_2nd}</span>
+                        </div>
+                        <div style={{ fontSize: '12px' }}>
+                          <span style={{ color: '#f59e0b', fontWeight: '700' }}>🥉 3rd Place: </span>
+                          <span style={{ color: '#fff', fontWeight: '600' }}>{c.prize_3rd}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span>📅 Start: {c.start_date ? new Date(c.start_date).toLocaleDateString('en-IN') : 'N/A'}</span>
+                        <span>🏁 End: {c.end_date ? new Date(c.end_date).toLocaleDateString('en-IN') : 'N/A'}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  No contests configured yet. Click "Create New Contest" above to set this month's tournament and rewards.
+                </div>
+              )}
+            </div>
+
+            {/* Contest Edit Modal */}
+            {showContestModal && (
+              <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trophy size={18} color="#eab308" /> {contestForm.id ? 'Edit Contest & Rewards' : 'Create Monthly Tournament'}
+                    </h3>
+                    <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowContestModal(false)} />
+                  </div>
+
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setContestSaving(true);
+                    const res = await saveContest(contestForm);
+                    if (res.success) {
+                      alert('Contest saved successfully!');
+                      setShowContestModal(false);
+                      loadData();
+                    } else {
+                      alert(res.error || 'Failed to save contest');
+                    }
+                    setContestSaving(false);
+                  }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        Tournament Title *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={contestForm.title}
+                        onChange={e => setContestForm({ ...contestForm, title: e.target.value })}
+                        placeholder="e.g. 🏆 March Premier Trader Championship"
+                        required
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                        Description
+                      </label>
+                      <textarea
+                        className="input-field"
+                        value={contestForm.description}
+                        onChange={e => setContestForm({ ...contestForm, description: e.target.value })}
+                        placeholder="Tournament terms, rewards info..."
+                        rows={2}
+                        style={{ width: '100%', resize: 'vertical' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          value={contestForm.start_date}
+                          onChange={e => setContestForm({ ...contestForm, start_date: e.target.value })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          End Date
+                        </label>
+                        <input
+                          type="date"
+                          className="input-field"
+                          value={contestForm.end_date}
+                          onChange={e => setContestForm({ ...contestForm, end_date: e.target.value })}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#fbbf24', marginBottom: '4px' }}>
+                        🥇 1st Place Reward String *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={contestForm.prize_1st}
+                        onChange={e => setContestForm({ ...contestForm, prize_1st: e.target.value })}
+                        placeholder="e.g. ₹500 Cash + 1-Month Free PRO (or ₹100 Cash / Free Membership)"
+                        required
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#cbd5e1', marginBottom: '4px' }}>
+                        🥈 2nd Place Reward String *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={contestForm.prize_2nd}
+                        onChange={e => setContestForm({ ...contestForm, prize_2nd: e.target.value })}
+                        placeholder="e.g. ₹250 Cash + 1-Month Free PRO"
+                        required
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#f59e0b', marginBottom: '4px' }}>
+                        🥉 3rd Place Reward String *
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={contestForm.prize_3rd}
+                        onChange={e => setContestForm({ ...contestForm, prize_3rd: e.target.value })}
+                        placeholder="e.g. ₹100 Cash + Free PRO"
+                        required
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setShowContestModal(false)}>
+                        Cancel
+                      </button>
+                      <button type="submit" disabled={contestSaving} className="btn btn-primary" style={{ background: '#eab308', color: '#000', fontWeight: '800' }}>
+                        {contestSaving ? 'Saving...' : '💾 Save Tournament'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Award Winners Modal */}
+            {awardModal.open && (
+              <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+                <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '520px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Award size={18} color="#22c55e" /> Finalize Winners & Distribute Rewards
+                    </h3>
+                    <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setAwardModal({ ...awardModal, open: false })} />
+                  </div>
+
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>
+                    This will finalize the tournament <strong>"{awardModal.contestTitle}"</strong>, record the top 3 leaderboard champions as official winners, and automatically credit cash balance / upgrade their PRO subscriptions!
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#fff', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={awardModal.awardProUpgrade}
+                        onChange={e => setAwardModal({ ...awardModal, awardProUpgrade: e.target.checked })}
+                      />
+                      <span>⭐ Automatically upgrade Top 3 Winners to <strong>PRO Membership (1 Month Free)</strong></span>
+                    </label>
+
+                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                        Auto-Deposit Cash Rewards (Optional):
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', color: '#fbbf24', fontWeight: '700', marginBottom: '4px' }}>🥇 1st (₹)</label>
+                          <input
+                            type="number"
+                            className="input-field"
+                            value={awardModal.cashAmount1st}
+                            onChange={e => setAwardModal({ ...awardModal, cashAmount1st: e.target.value })}
+                            placeholder="500"
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', color: '#cbd5e1', fontWeight: '700', marginBottom: '4px' }}>🥈 2nd (₹)</label>
+                          <input
+                            type="number"
+                            className="input-field"
+                            value={awardModal.cashAmount2nd}
+                            onChange={e => setAwardModal({ ...awardModal, cashAmount2nd: e.target.value })}
+                            placeholder="250"
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', color: '#f59e0b', fontWeight: '700', marginBottom: '4px' }}>🥉 3rd (₹)</label>
+                          <input
+                            type="number"
+                            className="input-field"
+                            value={awardModal.cashAmount3rd}
+                            onChange={e => setAwardModal({ ...awardModal, cashAmount3rd: e.target.value })}
+                            placeholder="100"
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => setAwardModal({ ...awardModal, open: false })}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={awarding}
+                        onClick={async () => {
+                          setAwarding(true);
+                          const res = await awardContest(awardModal.contestId, {
+                            awardProUpgrade: awardModal.awardProUpgrade,
+                            cashAmount1st: awardModal.cashAmount1st,
+                            cashAmount2nd: awardModal.cashAmount2nd,
+                            cashAmount3rd: awardModal.cashAmount3rd
+                          });
+                          if (res.success) {
+                            alert('🏆 Winners finalized and rewards distributed successfully!');
+                            setAwardModal({ ...awardModal, open: false });
+                            loadData();
+                          } else {
+                            alert(res.error || 'Failed to finalize contest');
+                          }
+                          setAwarding(false);
+                        }}
+                        style={{
+                          background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '8px 18px',
+                          fontSize: '12px',
+                          fontWeight: '800',
+                          cursor: awarding ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {awarding ? 'Distributing...' : '🏆 Confirm & Distribute Rewards'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ) : activeTab === 'security' ? (
           <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* Manual Ban Card */}

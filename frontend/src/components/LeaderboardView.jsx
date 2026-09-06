@@ -1,10 +1,11 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
-import { Trophy, RefreshCw, Users, ShieldCheck, Flame } from 'lucide-react';
+import { Trophy, RefreshCw, Users, ShieldCheck, Flame, Gift, Calendar, Award, Sparkles, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function LeaderboardView() {
-  const { leaderboard, leaderboardLoading, fetchLeaderboard } = useStore();
+  const { leaderboard, leaderboardLoading, fetchLeaderboard, activeContest, activeContestLoading, fetchActiveContest } = useStore();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -14,10 +15,22 @@ export default function LeaderboardView() {
 
   useEffect(() => {
     fetchLeaderboard();
+    fetchActiveContest();
   }, []);
 
   const handleRefresh = async () => {
-    await fetchLeaderboard();
+    await Promise.all([fetchLeaderboard(), fetchActiveContest()]);
+  };
+
+  const calculateTimeLeft = (endDateStr) => {
+    if (!endDateStr) return null;
+    const diff = new Date(endDateStr).getTime() - Date.now();
+    if (diff <= 0) return 'Tournament Ended';
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    if (days > 0) return `${days}d ${hours}h remaining`;
+    const mins = Math.floor((diff / (1000 * 60)) % 60);
+    return `${hours}h ${mins}m remaining`;
   };
 
   const top3 = leaderboard.slice(0, 3);
@@ -74,53 +87,183 @@ export default function LeaderboardView() {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', padding: isMobile ? '12px 6px' : '16px 8px' }}>
       
-      {/* Hero Header Card */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.8) 50%, rgba(88, 28, 135, 0.25) 100%)',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
-        borderRadius: isMobile ? '12px' : '16px',
-        padding: isMobile ? '16px' : '24px 28px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: isMobile ? 'flex-start' : 'center',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: '16px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)',
-            color: '#60a5fa', padding: '3px 10px', borderRadius: '20px', fontSize: '10px',
-            fontWeight: '700', letterSpacing: '0.5px', marginBottom: '8px'
-          }}>
-            <Flame size={12} color="#f97316" />
-            LIVE INTRADAY RANKINGS
-          </div>
-          <h1 style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '800', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
-            <Trophy size={isMobile ? 22 : 28} color="#eab308" />
-            Trader Leaderboard
-          </h1>
-          <p style={{ margin: 0, fontSize: isMobile ? '11px' : '13px', color: 'var(--text-secondary)' }}>
-            Top intraday & delivery traders ranked by verified profit.
-          </p>
-        </div>
+      {/* Active Tournament & Prize Pool Hero Banner */}
+      {activeContest && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.9) 45%, rgba(88, 28, 135, 0.35) 100%)',
+          border: '1px solid rgba(234, 179, 8, 0.35)',
+          borderRadius: isMobile ? '12px' : '16px',
+          padding: isMobile ? '16px' : '22px 26px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          boxShadow: '0 10px 36px rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(14px)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: 'linear-gradient(90deg, #f59e0b, #eab308, #3b82f6, #a855f7)' }} />
 
-        <button
-          onClick={handleRefresh}
-          disabled={leaderboardLoading}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)',
-            color: '#fff', padding: isMobile ? '8px 14px' : '10px 18px', borderRadius: '8px', fontSize: isMobile ? '12px' : '13px',
-            fontWeight: '600', cursor: 'pointer', width: isMobile ? '100%' : 'auto', justifyContent: 'center'
-          }}
-        >
-          <RefreshCw size={14} color="#3b82f6" className={leaderboardLoading ? 'animate-spin' : ''} />
-          {leaderboardLoading ? 'Refreshing...' : 'Refresh Rankings'}
-        </button>
-      </div>
+          {/* Top Bar: Badges & Live Status */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                background: 'rgba(34, 197, 94, 0.18)', border: '1px solid rgba(34, 197, 94, 0.45)',
+                color: '#4ade80', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800'
+              }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+                🟢 LIVE TOURNAMENT
+              </span>
+
+              {activeContest.end_date && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.3)',
+                  color: '#fbbf24', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700'
+                }}>
+                  <Calendar size={12} />
+                  {calculateTimeLeft(activeContest.end_date)}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+              <button
+                type="button"
+                onClick={() => setShowRules(!showRules)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: '8px', fontSize: '11.5px',
+                  fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                }}
+              >
+                Rules & Eligibility {showRules ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+
+              <button
+                onClick={handleRefresh}
+                disabled={leaderboardLoading || activeContestLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)',
+                  color: '#93c5fd', padding: '6px 14px', borderRadius: '8px', fontSize: '11.5px',
+                  fontWeight: '700', cursor: 'pointer', marginLeft: 'auto'
+                }}
+              >
+                <RefreshCw size={12} className={(leaderboardLoading || activeContestLoading) ? 'animate-spin' : ''} />
+                {leaderboardLoading ? 'Syncing...' : 'Live Sync'}
+              </button>
+            </div>
+          </div>
+
+          {/* Title & Description */}
+          <div>
+            <h1 style={{ fontSize: isMobile ? '19px' : '25px', fontWeight: '900', margin: '0 0 6px 0', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {activeContest.title || '🏆 Monthly Trader League'}
+            </h1>
+            <p style={{ margin: 0, fontSize: isMobile ? '12px' : '13px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.4' }}>
+              {activeContest.description || 'Trade live market instruments, build profitable positions, and top the leaderboard to take home guaranteed cash & PRO membership perks!'}
+            </p>
+          </div>
+
+          {/* Rules Dropdown Banner */}
+          {showRules && (
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.35)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff', fontWeight: '700' }}>
+                <CheckCircle2 size={14} color="#22c55e" /> Tournament Rules & Auto-Payout
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <li>All registered traders are automatically enrolled (₹0 entry fee).</li>
+                <li>Rankings are determined by total verified realized net P&L on closed positions.</li>
+                <li>Prizes are credited to your platform wallet or activated as Free PRO membership immediately upon monthly close.</li>
+                <li>Automated fair-play risk & RMS verification ensures transparent competition.</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Guaranteed Monthly Reward Pool Tiles */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: isMobile ? '10px' : '14px',
+            marginTop: '4px'
+          }}>
+            {/* 1st Prize */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(30, 20, 10, 0.4) 100%)',
+              border: '1px solid rgba(234, 179, 8, 0.4)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{ fontSize: '24px' }}>🥇</div>
+              <div>
+                <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  1ST PLACE REWARD
+                </div>
+                <div style={{ fontSize: isMobile ? '13px' : '14.5px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+                  {activeContest.prize_1st || '₹500 Cash + 1-Month PRO'}
+                </div>
+              </div>
+            </div>
+
+            {/* 2nd Prize */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(203, 213, 225, 0.12) 0%, rgba(15, 23, 42, 0.4) 100%)',
+              border: '1px solid rgba(203, 213, 225, 0.3)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{ fontSize: '24px' }}>🥈</div>
+              <div>
+                <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  2ND PLACE REWARD
+                </div>
+                <div style={{ fontSize: isMobile ? '13px' : '14.5px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+                  {activeContest.prize_2nd || '₹250 Cash + 1-Month PRO'}
+                </div>
+              </div>
+            </div>
+
+            {/* 3rd Prize */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.12) 0%, rgba(20, 15, 10, 0.4) 100%)',
+              border: '1px solid rgba(217, 119, 6, 0.35)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{ fontSize: '24px' }}>🥉</div>
+              <div>
+                <div style={{ fontSize: '10.5px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  3RD PLACE REWARD
+                </div>
+                <div style={{ fontSize: isMobile ? '13px' : '14.5px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+                  {activeContest.prize_3rd || '₹100 Cash + Free PRO'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top 3 Podium Cards */}
       {top3.length > 0 && (

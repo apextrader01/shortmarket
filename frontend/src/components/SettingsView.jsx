@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2 } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -16,7 +16,11 @@ import {
 } from '../utils/biometricAuth';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails } = useStore(useShallow(state => ({ 
+  const { 
+    user, updatePassword, logout, oneClickMode, setOneClickMode, 
+    oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails,
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession
+  } = useStore(useShallow(state => ({ 
     user: state.user, 
     updatePassword: state.updatePassword, 
     logout: state.logout, 
@@ -25,8 +29,20 @@ export default function SettingsView() {
     oneClickMultiplier: state.oneClickMultiplier, 
     setOneClickMultiplier: state.setOneClickMultiplier, 
     updateBankDetails: state.updateBankDetails,
-    updateUserDetails: state.updateUserDetails
+    updateUserDetails: state.updateUserDetails,
+    userSessions: state.userSessions,
+    userSessionsLoading: state.userSessionsLoading,
+    fetchUserSessions: state.fetchUserSessions,
+    revokeOtherSessions: state.revokeOtherSessions,
+    revokeSession: state.revokeSession
   })));
+
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    fetchUserSessions();
+  }, []);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -657,7 +673,7 @@ export function BiometricSettingsSection({ user }) {
         </div>
       )}
 
-      {/* Test Quick Lock Button */}
+      {/* Auto-Lock / PIN Screen Test */}
       {pinEnabled && (
         <div style={{ display: 'flex', justifyContent: 'flex-start', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
           <button
@@ -669,6 +685,272 @@ export function BiometricSettingsSection({ user }) {
           </button>
         </div>
       )}
+
+      {/* ─── Session & Device Security Manager ───────────────────────── */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
+              <ShieldAlert size={18} color="var(--color-blue)" /> Active Devices & Login Sessions
+            </h3>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              Review and manage all web, desktop, and mobile devices authorized to access your trading account.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+            <button
+              type="button"
+              onClick={() => fetchUserSessions()}
+              disabled={userSessionsLoading}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+              title="Refresh sessions list"
+            >
+              <RefreshCw size={13} className={userSessionsLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+
+            {userSessions.filter(s => !s.is_current).length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to log out all other devices? They will need to sign in again.')) {
+                    setRevokingOthers(true);
+                    setSessionMsg({ type: '', text: '' });
+                    const res = await revokeOtherSessions();
+                    if (res.success) {
+                      setSessionMsg({ type: 'success', text: res.message || 'All other devices have been logged out.' });
+                      setTimeout(() => setSessionMsg({ type: '', text: '' }), 4000);
+                    } else {
+                      setSessionMsg({ type: 'error', text: res.error || 'Failed to revoke other sessions' });
+                    }
+                    setRevokingOthers(false);
+                  }
+                }}
+                disabled={revokingOthers}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#ef4444',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: revokingOthers ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {revokingOthers ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />}
+                Log Out All Other Devices
+              </button>
+            )}
+          </div>
+        </div>
+
+        {sessionMsg.text && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: sessionMsg.type === 'success' ? '#4ade80' : '#ef4444'
+          }}>
+            {sessionMsg.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+            {sessionMsg.text}
+          </div>
+        )}
+
+        {/* Sessions List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {userSessionsLoading && userSessions.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+              Loading active sessions...
+            </div>
+          ) : userSessions.length === 0 ? (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: 'rgba(34, 197, 94, 0.15)', padding: '10px', borderRadius: '50%', color: '#22c55e' }}>
+                  <Monitor size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Current Device
+                    <span style={{ background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.4)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '800' }}>
+                      THIS DEVICE
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Active session
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            userSessions.map((session) => {
+              const isPhone = (session.device_model || '').toLowerCase().includes('phone') || (session.os_name || '').toLowerCase().includes('android') || (session.os_name || '').toLowerCase().includes('ios');
+              const isMac = (session.device_model || '').toLowerCase().includes('mac') || (session.os_name || '').toLowerCase().includes('mac');
+              
+              const formatRelativeTime = (dateStr) => {
+                if (!dateStr) return 'Recently active';
+                const diff = Date.now() - new Date(dateStr).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 2) return 'Active now';
+                if (mins < 60) return `${mins}m ago`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}h ago`;
+                const days = Math.floor(hrs / 24);
+                return `${days}d ago`;
+              };
+
+              return (
+                <div
+                  key={session.id}
+                  style={{
+                    background: session.is_current ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                    border: session.is_current ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      background: session.is_current ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      padding: '10px',
+                      borderRadius: '50%',
+                      color: session.is_current ? 'var(--color-blue-light)' : 'var(--text-secondary)'
+                    }}>
+                      {isPhone ? <Smartphone size={20} /> : isMac ? <Laptop size={20} /> : <Monitor size={20} />}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {session.device_model || 'Desktop / Browser'}
+                        {session.is_current && (
+                          <span style={{
+                            background: 'rgba(34, 197, 94, 0.18)',
+                            border: '1px solid rgba(34, 197, 94, 0.45)',
+                            color: '#4ade80',
+                            fontSize: '10px',
+                            padding: '2px 7px',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            letterSpacing: '0.4px'
+                          }}>
+                            🟢 THIS DEVICE (Current)
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+                        <span>{session.os_name || 'OS'} · {session.browser_name || 'Browser'}</span>
+                        {(session.city || session.state) && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)' }}>
+                            <MapPin size={11} /> {[session.city, session.state].filter(Boolean).join(', ')}
+                          </span>
+                        )}
+                        {session.ip_address && (
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            • IP: {session.ip_address}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: isMobile ? '0' : 'auto' }}>
+                    <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                      <div style={{ fontSize: '11px', color: session.is_current ? '#4ade80' : 'var(--text-secondary)', fontWeight: '600' }}>
+                        {session.is_current ? 'Active now' : `Last active: ${formatRelativeTime(session.last_active_at)}`}
+                      </div>
+                    </div>
+
+                    {!session.is_current && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm(`Revoke session for ${session.device_model || 'this device'}?`)) {
+                            const res = await revokeSession(session.id);
+                            if (res.success) {
+                              setSessionMsg({ type: 'success', text: 'Device session revoked.' });
+                              setTimeout(() => setSessionMsg({ type: '', text: '' }), 3000);
+                            } else {
+                              setSessionMsg({ type: 'error', text: res.error || 'Failed to revoke session' });
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Log out this device"
+                      >
+                        <Trash2 size={12} /> Revoke
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Security Footnote */}
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '1px solid rgba(59, 130, 246, 0.15)',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          fontSize: '11.5px',
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>🛡️</span>
+          <span>
+            <strong>Security Recommendation:</strong> If you notice an unfamiliar device or location, immediately click <strong>Log Out All Other Devices</strong> and change your account password.
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

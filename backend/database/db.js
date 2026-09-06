@@ -594,6 +594,66 @@ async function ensureCriticalColumns() {
       )
     `);
 
+    // Contests & Tournaments Table
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS contests (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_date TIMESTAMP,
+        prize_1st VARCHAR(255) DEFAULT '₹500 Cash + 1-Month Free PRO',
+        prize_2nd VARCHAR(255) DEFAULT '₹250 Cash + 1-Month Free PRO',
+        prize_3rd VARCHAR(255) DEFAULT '₹100 Cash + Free PRO',
+        status VARCHAR(50) DEFAULT 'ACTIVE',
+        winner_1st_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        winner_2nd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        winner_3rd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_contests_status ON contests(status)');
+
+    // Seed default monthly contest if table empty
+    const contestCount = await db('contests').count('id as count').first();
+    if (!contestCount || parseInt(contestCount.count || 0, 10) === 0) {
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthName = monthNames[now.getMonth()];
+      await db('contests').insert({
+        title: `🏆 ${monthName} Premier Trader Championship ${now.getFullYear()}`,
+        description: `Official monthly intraday & F&O championship. Trade, scale up profits, and top the leaderboard to win real cash prizes and free PRO memberships!`,
+        start_date: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0),
+        end_date: endOfMonth,
+        prize_1st: '₹500 Cash + 1-Month Free PRO',
+        prize_2nd: '₹250 Cash + 1-Month Free PRO',
+        prize_3rd: '₹100 Cash + Free PRO',
+        status: 'ACTIVE'
+      });
+      console.log('Seeded initial monthly trading contest');
+    }
+
+    // User Sessions Table (Session & Device Security Manager)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        device_model VARCHAR(100),
+        browser_name VARCHAR(100),
+        os_name VARCHAR(100),
+        ip_address VARCHAR(50),
+        city VARCHAR(100),
+        state VARCHAR(100),
+        last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash)');
+
     // Seed default market controls if not exist
     const hasEq = await db('system_settings').where({ key: 'equity_market_status' }).first();
     if (!hasEq) {
@@ -618,7 +678,7 @@ async function ensureCriticalColumns() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_market_calendar_date ON market_calendar(date)');
 
-    console.log('✅ Critical columns, indexes, system_settings, and market_calendar verified on tables');
+    console.log('✅ Critical columns, indexes, system_settings, contests, user_sessions, and market_calendar verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }

@@ -1,8 +1,9 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
-import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
+import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
@@ -481,6 +482,25 @@ export default function OrderModal() {
               {orderModal.lotsize > 1 && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                   Total Qty: {(parseInt(quantity) || 0) * orderModal.lotsize}
+                </div>
+              )}
+              {totalQuantity > getFreezeLimit(symbol) && (
+                <div style={{ 
+                  fontSize: '10.5px', 
+                  color: '#93c5fd', 
+                  background: 'rgba(59, 130, 246, 0.15)', 
+                  border: '1px solid rgba(59, 130, 246, 0.3)', 
+                  borderRadius: '4px', 
+                  padding: '4px 6px', 
+                  marginTop: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <Zap size={12} color="#60a5fa" />
+                  <span>
+                    Auto-Sliced into <strong>{calculateOrderSlices(symbol, totalQuantity).length} orders</strong> (Freeze Limit: {getFreezeLimit(symbol).toLocaleString('en-IN')})
+                  </span>
                 </div>
               )}
             </div>
