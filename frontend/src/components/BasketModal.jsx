@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
+import { getFreezeLimit } from '../utils/freezeLimits';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -97,7 +98,6 @@ export default function BasketModal() {
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
   const [showBreakup, setShowBreakup] = useState(false);
-  const [estimatedTaxes, setEstimatedTaxes] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -385,76 +385,94 @@ export default function BasketModal() {
 
   const isInsufficient = balanceNum < finalMargin;
 
-  // Aggregate Estimated Charges for all Basket Items
-  useEffect(() => {
-    if (!basketItems || basketItems.length === 0) {
-      setEstimatedTaxes(null);
-      return;
-    }
+  // Bulletproof synchronous calculation of aggregated regulatory charges for all basket items
+  const estimatedTaxes = useMemo(() => {
+    if (!basketItems || basketItems.length === 0) return null;
     
-    let isCancelled = false;
-    const fetchAllTaxes = async () => {
-      try {
-        const token = useStore.getState().token;
-        const validLegs = enhancedItems.filter(item => {
-          const p = item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price);
-          return item.symbol && item.totalQuantity > 0 && p > 0;
-        });
+    const agg = {
+      brokerage: 0,
+      exchangeCharge: 0,
+      stt: 0,
+      gst: 0,
+      cgst: 0,
+      sgst: 0,
+      sebiCharge: 0,
+      stampDuty: 0,
+      totalTaxes: 0,
+      legsCount: enhancedItems.length
+    };
 
-        if (validLegs.length === 0) {
-          setEstimatedTaxes(null);
-          return;
+    enhancedItems.forEach(item => {
+      const sym = item.symbol || '';
+      const side = item.side || 'BUY';
+      const qty = item.totalQuantity || (Number(item.quantity || 1) * (item.lotsize || 1));
+      const p = item.orderType === 'MARKET' ? (item.livePrice || 0) : (parseFloat(item.price) || item.livePrice || 0);
+      const turnover = qty * p;
+      
+      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      const isOption = item.isOption || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+      const isFuture = !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT'));
+      const isEquity = !isOption && !isFuture;
+      const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => clean.startsWith(c));
+
+      const freezeLimit = getFreezeLimit(sym, item.lotsize);
+      const slicesCount = qty > freezeLimit ? Math.ceil(qty / freezeLimit) : 1;
+
+      let legBrokerage = 0;
+      let legStt = 0;
+      let legExchange = 0;
+      let legStamp = 0;
+      let legSebi = 0;
+
+      if (isOption) {
+        legBrokerage = 20 * slicesCount;
+        if (side === 'SELL') {
+          legStt = turnover * (isCommodity ? 0.0005 : 0.000625);
         }
-
-        const promises = validLegs.map(item => {
-          const p = item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price);
-          return fetch(`${API}/api/estimate-charges?symbol=${item.symbol}&product_type=${productType}&side=${item.side}&quantity=${item.totalQuantity}&price=${p}`, {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-          }).then(r => r.json()).catch(() => null);
-        });
-
-        const results = await Promise.all(promises);
-        if (isCancelled) return;
-
-        const agg = {
-          brokerage: 0,
-          exchangeCharge: 0,
-          stt: 0,
-          gst: 0,
-          cgst: 0,
-          sgst: 0,
-          sebiCharge: 0,
-          stampDuty: 0,
-          totalTaxes: 0,
-          legsCount: validLegs.length
-        };
-
-        results.forEach(res => {
-          if (res && res.totalTaxes !== undefined) {
-            agg.brokerage += Number(res.brokerage) || 0;
-            agg.exchangeCharge += Number(res.exchangeCharge) || 0;
-            agg.stt += Number(res.stt) || 0;
-            agg.gst += Number(res.gst) || 0;
-            agg.cgst += Number(res.cgst !== undefined ? res.cgst : res.gst / 2) || 0;
-            agg.sgst += Number(res.sgst !== undefined ? res.sgst : res.gst / 2) || 0;
-            agg.sebiCharge += Number(res.sebiCharge) || 0;
-            agg.stampDuty += Number(res.stampDuty) || 0;
-            agg.totalTaxes += Number(res.totalTaxes) || 0;
-          }
-        });
-
-        setEstimatedTaxes(agg);
-      } catch (e) {
-        console.error('Error fetching basket taxes:', e);
+        legExchange = turnover * (isCommodity ? 0.000418 : 0.0003553);
+        if (side === 'BUY') legStamp = turnover * 0.00003;
+        legSebi = turnover * 0.000001;
+      } else if (isFuture) {
+        legBrokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
+        if (side === 'SELL') {
+          legStt = turnover * (isCommodity ? 0.0001 : 0.000125);
+        }
+        legExchange = turnover * (isCommodity ? 0.000021 : 0.0000183);
+        if (side === 'BUY') legStamp = turnover * 0.00002;
+        legSebi = turnover * 0.000001;
+      } else {
+        // Equity
+        if (productType === 'DEL') {
+          legBrokerage = 0;
+          legStt = turnover * 0.001;
+          if (side === 'BUY') legStamp = turnover * 0.00015;
+        } else {
+          legBrokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
+          if (side === 'SELL') legStt = turnover * 0.00025;
+          if (side === 'BUY') legStamp = turnover * 0.00003;
+        }
+        legExchange = turnover * 0.0000307;
+        legSebi = turnover * 0.000001;
       }
-    };
 
-    const timer = setTimeout(fetchAllTaxes, 300);
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [basketItems, productType, prices]);
+      const legGst = (legBrokerage + legExchange + legSebi) * 0.18;
+      const legCgst = legGst / 2;
+      const legSgst = legGst / 2;
+      const legTotal = legBrokerage + legStt + legExchange + legStamp + legSebi + legGst;
+
+      agg.brokerage += legBrokerage;
+      agg.exchangeCharge += legExchange;
+      agg.stt += legStt;
+      agg.gst += legGst;
+      agg.cgst += legCgst;
+      agg.sgst += legSgst;
+      agg.sebiCharge += legSebi;
+      agg.stampDuty += legStamp;
+      agg.totalTaxes += legTotal;
+    });
+
+    return agg;
+  }, [enhancedItems, basketItems, productType]);
 
   // Check market session restrictions and cutoff
   let blockedMarketReason = null;
@@ -1508,58 +1526,82 @@ export default function BasketModal() {
         </div>
 
         {/* Charges Breakup Modal */}
-        {showBreakup && estimatedTaxes && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, backdropFilter: 'blur(2px)' }}>
-            <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', width: '400px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.6)', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+        {showBreakup && (
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowBreakup(false);
+            }}
+            style={{ 
+              position: 'fixed', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              background: 'rgba(0,0,0,0.75)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              zIndex: 2000, 
+              backdropFilter: 'blur(3px)' 
+            }}
+          >
+            <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', width: '420px', maxWidth: '92vw', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.8)', border: '1px solid var(--border-color)', animation: 'fadeIn 0.15s ease' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-                  <FileText size={18} />
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Basket Charges Breakup</h3>
+                  <FileText size={18} color="#60a5fa" />
+                  <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: '#fff' }}>Basket Charges Breakup</h3>
                 </div>
-                <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowBreakup(false)} />
+                <div 
+                  onClick={() => setShowBreakup(false)}
+                  style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                >
+                  <X size={16} />
+                </div>
               </div>
               
-              <div style={{ padding: '16px' }}>
+              <div style={{ padding: '18px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                  <span>Brokerage ({estimatedTaxes.legsCount || basketItems.length} orders)</span>
-                  <span style={{ fontWeight: '600' }}>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                  <span>Brokerage ({estimatedTaxes?.legsCount || basketItems.length} orders)</span>
+                  <span style={{ fontWeight: '700' }}>₹{Number(estimatedTaxes?.brokerage || 0).toFixed(2)}</span>
                 </div>
                 
-                <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>Regulatory & Other Charges</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '6px' }}>
+                  Regulatory & Other Charges
+                </div>
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>Exchange Turnover Charges</span>
-                  <span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.exchangeCharge || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>CTT / STT</span>
-                  <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.stt || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>CGST (9%)</span>
-                  <span>₹{estimatedTaxes.cgst.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.cgst || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>SGST (9%)</span>
-                  <span>₹{estimatedTaxes.sgst.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.sgst || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>SEBI Turnover Charges</span>
-                  <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.sebiCharge || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                   <span>Stamp Duty</span>
-                  <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                  <span>₹{Number(estimatedTaxes?.stampDuty || 0).toFixed(2)}</span>
                 </div>
               </div>
               
-              <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px' }}>
                   <span>Total Estimated Charges</span>
-                  <span style={{ color: '#60a5fa' }}>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                  <span style={{ color: '#60a5fa' }}>₹{Number(estimatedTaxes?.totalTaxes || 0).toFixed(2)}</span>
                 </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-                  *Actual taxes & brokerage are calculated and deducted dynamically upon execution.
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  *Actual statutory taxes & brokerage are calculated dynamically upon execution.
                 </div>
               </div>
             </div>
