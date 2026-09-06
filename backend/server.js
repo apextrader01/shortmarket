@@ -4010,6 +4010,12 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         await trx('users')
           .where({ id: req.user.id })
           .update({ balance: parseFloat(user.balance) - requiredMargin });
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: -requiredMargin,
+          type: 'MARGIN_BLOCK',
+          description: `Combined margin blocked for Basket Order (${items.length} legs)`
+        });
       }
 
       // 3. Process each item (Hedge-Aware Sequence: BUY legs first)

@@ -118,6 +118,54 @@ const LedgerStatement = () => {
   const totalCredits = filteredLedger.filter(l => Number(l.amount) > 0).reduce((a, b) => a + Number(b.amount), 0);
   const totalDebits = filteredLedger.filter(l => Number(l.amount) < 0).reduce((a, b) => a + Math.abs(Number(b.amount)), 0);
 
+  const renderLedgerBadge = (type, amount) => {
+    const t = (type || '').toUpperCase();
+    let bg = 'rgba(59,130,246,0.15)';
+    let color = '#60a5fa';
+    let label = type ? type.replace(/_/g, ' ') : 'TRANSACTION';
+
+    if (t === 'MARGIN_BLOCK') {
+      bg = 'rgba(245, 158, 11, 0.15)';
+      color = '#f59e0b';
+      label = 'Margin Block';
+    } else if (t === 'MARGIN_RELEASE') {
+      bg = 'rgba(6, 182, 212, 0.15)';
+      color = '#06b6d4';
+      label = 'Margin Release';
+    } else if (t === 'TAXES') {
+      bg = 'rgba(168, 85, 247, 0.15)';
+      color = '#c084fc';
+      label = 'Taxes & Charges';
+    } else if (t === 'REALIZED_PNL') {
+      const isProfit = Number(amount) >= 0;
+      bg = isProfit ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+      color = isProfit ? '#4ade80' : '#f87171';
+      label = 'Realized P&L';
+    } else if (t === 'DEPOSIT') {
+      bg = 'rgba(34, 197, 94, 0.15)';
+      color = '#22c55e';
+      label = 'Deposit';
+    } else if (t === 'WITHDRAWAL') {
+      bg = 'rgba(249, 115, 22, 0.15)';
+      color = '#fb923c';
+      label = 'Withdrawal';
+    } else if (t === 'HOLDING_RELEASE') {
+      bg = 'rgba(59, 130, 246, 0.15)';
+      color = '#60a5fa';
+      label = 'Holding Release';
+    } else if (t === 'RMS_PENALTY') {
+      bg = 'rgba(239, 68, 68, 0.2)';
+      color = '#ef4444';
+      label = 'RMS Penalty';
+    }
+
+    return (
+      <span style={{ background: bg, color, padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', textTransform: 'capitalize', display: 'inline-block', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
@@ -229,9 +277,7 @@ const LedgerStatement = () => {
               paginatedLedger.map((entry) => (
                 <div key={entry.id} style={{ padding: '12px 14px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.15)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                      {entry.type.replace('_', ' ')}
-                    </span>
+                    {renderLedgerBadge(entry.type, entry.amount)}
                     <span style={{ fontWeight: '800', fontSize: '14px', color: Number(entry.amount) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                       {Number(entry.amount) >= 0 ? '+' : ''}₹{Math.abs(Number(entry.amount)).toFixed(2)}
                     </span>
@@ -284,9 +330,7 @@ const LedgerStatement = () => {
                       </div>
                     </td>
                     <td style={{ padding: '16px' }}>
-                      <span style={{ background: 'rgba(59,130,246,0.1)', color: '#60a5fa', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '600' }}>
-                        {entry.type.replace('_', ' ')}
-                      </span>
+                      {renderLedgerBadge(entry.type, entry.amount)}
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{entry.description || entry.type}</td>
                     <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)' }}>
