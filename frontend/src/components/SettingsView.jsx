@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -9,7 +9,10 @@ import {
   isBiometricsAvailable,
   isBiometricsEnabled,
   registerBiometrics,
-  setAppLocked
+  setAppLocked,
+  AUTO_LOCK_OPTIONS,
+  getAutoLockDuration,
+  setAutoLockDuration
 } from '../utils/biometricAuth';
 
 export default function SettingsView() {
@@ -212,6 +215,7 @@ export function BiometricSettingsSection({ user }) {
   const [pinEnabled, setPinEnabled] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutesState] = useState(() => getAutoLockDuration(userId));
   
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -222,7 +226,16 @@ export function BiometricSettingsSection({ user }) {
     setPinEnabled(isUserPinEnabled(userId));
     setBioEnabled(isBiometricsEnabled(userId));
     isBiometricsAvailable().then(setBioAvailable);
+    setAutoLockMinutesState(getAutoLockDuration(userId));
   }, [userId]);
+
+  const handleSelectAutoLock = (val) => {
+    setAutoLockMinutesState(val);
+    setAutoLockDuration(val, userId);
+    const label = val === 0 ? 'Immediately on background' : val === -1 ? 'Disabled (Off)' : `${val} Minutes`;
+    setStatusMsg({ type: 'success', text: `⏱️ Auto-lock timer set to ${label}` });
+    setTimeout(() => setStatusMsg({ type: '', text: '' }), 3500);
+  };
 
   const handleSavePin = async (e) => {
     e.preventDefault();
@@ -451,6 +464,54 @@ export function BiometricSettingsSection({ user }) {
               Save PIN
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Auto-Lock Inactivity Timer Options */}
+      {pinEnabled && (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '16px 18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
+        }}>
+          <div>
+            <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Clock size={16} color="var(--color-blue-light)" /> Auto-Lock Inactivity Timer
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Automatically lock terminal after period of inactivity or backgrounding
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {AUTO_LOCK_OPTIONS.map(opt => {
+              const isSel = autoLockMinutes === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSelectAutoLock(opt.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: isSel ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
+                    border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                    color: isSel ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                    fontSize: '11.5px',
+                    fontWeight: isSel ? '700' : '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

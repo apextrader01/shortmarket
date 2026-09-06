@@ -30,7 +30,7 @@ import LeaderboardView from './components/LeaderboardView';
 import ErrorBoundary from './components/ErrorBoundary';
 import BiometricLockModal from './components/BiometricLockModal';
 import TradingJournalView from './components/TradingJournalView';
-import { isUserPinEnabled, isAppLocked, setAppLocked } from './utils/biometricAuth';
+import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen } from 'lucide-react';
@@ -219,19 +219,45 @@ function App() {
     return false;
   });
 
-  // Background inactivity / tab blur lock listener (3 minutes)
+  // Configurable Inactivity & Background Auto-Lock Listener
   useEffect(() => {
     if (!user || !isUserPinEnabled(user.id)) return;
 
+    let lastActivity = Date.now();
     let bgTime = null;
+
+    const updateActivity = () => {
+      lastActivity = Date.now();
+    };
+
+    const checkInactivity = () => {
+      const lockMinutes = getAutoLockDuration(user.id);
+      if (lockMinutes === -1 || lockMinutes === 0) return; // -1 = Off, 0 = only on background
+
+      const limitMs = lockMinutes * 60 * 1000;
+      if (Date.now() - lastActivity >= limitMs) {
+        setAppLocked(true);
+        setIsLocked(true);
+      }
+    };
+
     const handleVisibility = () => {
+      const lockMinutes = getAutoLockDuration(user.id);
+      if (lockMinutes === -1) return; // Disabled
+
       if (document.hidden) {
         bgTime = Date.now();
       } else {
-        if (bgTime && (Date.now() - bgTime > 180000)) {
-          setAppLocked(true);
-          setIsLocked(true);
+        if (bgTime) {
+          const bgDuration = Date.now() - bgTime;
+          const limitMs = lockMinutes * 60 * 1000;
+          if (lockMinutes === 0 || bgDuration >= limitMs) {
+            setAppLocked(true);
+            setIsLocked(true);
+          }
+          bgTime = null;
         }
+        lastActivity = Date.now();
       }
     };
 
@@ -239,9 +265,17 @@ function App() {
       setIsLocked(true);
     };
 
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+    activityEvents.forEach(evt => window.addEventListener(evt, updateActivity, { passive: true }));
+
+    const interval = setInterval(checkInactivity, 10000); // Check every 10s
+
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('shortmarket_lock_app', handleCustomLock);
+
     return () => {
+      activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity));
+      clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('shortmarket_lock_app', handleCustomLock);
     };

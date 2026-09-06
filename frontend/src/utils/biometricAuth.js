@@ -229,3 +229,31 @@ export function setAppLocked(locked = true) {
     sessionStorage.removeItem(LOCK_STATE_KEY);
   }
 }
+
+const AUTO_LOCK_STORAGE_KEY_PREFIX = 'shortmarket_autolock_minutes_';
+
+export const AUTO_LOCK_OPTIONS = [
+  { value: 0, label: '⚡ Immediately' },
+  { value: 1, label: '1 Min' },
+  { value: 5, label: '5 Mins' },
+  { value: 10, label: '10 Mins' },
+  { value: 15, label: '15 Mins' },
+  { value: 30, label: '30 Mins' },
+  { value: 60, label: '1 Hour' },
+  { value: -1, label: 'Off' }
+];
+
+export function getAutoLockDuration(userId = 'default') {
+  try {
+    const val = localStorage.getItem(`${AUTO_LOCK_STORAGE_KEY_PREFIX}${userId}`);
+    if (val !== null && val !== undefined) {
+      return Number(val);
+    }
+  } catch (e) {}
+  return 5; // Default 5 minutes
+}
+
+export function setAutoLockDuration(durationMinutes, userId = 'default') {
+  localStorage.setItem(`${AUTO_LOCK_STORAGE_KEY_PREFIX}${userId}`, String(durationMinutes));
+  window.dispatchEvent(new CustomEvent('shortmarket_autolock_changed', { detail: { duration: durationMinutes } }));
+}
