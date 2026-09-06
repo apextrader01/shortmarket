@@ -853,27 +853,28 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
-                  { id: 'oled', label: '🖤 OLED Black', bg: '#000000', border: '#333' },
-                  { id: 'midnight', label: '🌌 Midnight', bg: '#070c18', border: '#1e3a8a' },
-                  { id: 'charcoal', label: '🪙 Charcoal', bg: '#121214', border: '#2a2a30' },
-                  { id: 'dark', label: '🚀 Deep Space', bg: '#0B1121', border: '#1e293b' },
-                  { id: 'light', label: '☀️ Light', bg: '#FFFFFF', border: '#cbd5e1' }
+                  { id: 'oled', label: '🖤 OLED Black', bg: '#000000', border: '#333333', color: '#ffffff' },
+                  { id: 'midnight', label: '🌌 Midnight', bg: '#070c18', border: '#1e3a8a', color: '#ffffff' },
+                  { id: 'charcoal', label: '🪙 Charcoal', bg: '#121214', border: '#2a2a30', color: '#ffffff' },
+                  { id: 'dark', label: '🚀 Deep Space', bg: '#0B1121', border: '#1e293b', color: '#ffffff' },
+                  { id: 'light', label: '☀️ Light', bg: '#FFFFFF', border: '#cbd5e1', color: '#0f172a' }
                 ].map(t => {
                   const isSel = theme === t.id;
+                  const isLightMode = theme === 'light';
                   return (
                     <span
                       key={t.id}
                       onClick={() => setTheme(t.id)}
                       style={{
                         fontSize: '11.5px',
-                        padding: '6px 12px',
+                        padding: '6px 14px',
                         cursor: 'pointer',
-                        background: isSel ? 'rgba(59, 130, 246, 0.2)' : t.bg,
-                        border: isSel ? '1px solid var(--color-blue)' : `1px solid ${t.border}`,
+                        background: isSel ? (isLightMode ? '#eff6ff' : 'rgba(59, 130, 246, 0.25)') : t.bg,
+                        border: isSel ? '1.5px solid var(--color-blue)' : `1px solid ${t.border}`,
                         borderRadius: '6px',
-                        color: isSel ? 'var(--color-blue-light)' : (t.id === 'light' && theme !== 'light' ? '#0f172a' : 'var(--text-primary)'),
+                        color: isSel ? 'var(--color-blue)' : t.color,
                         fontWeight: isSel ? '700' : '500',
-                        boxShadow: isSel ? '0 0 10px rgba(59, 130, 246, 0.3)' : 'none',
+                        boxShadow: isSel ? (isLightMode ? '0 0 0 2px rgba(37,99,235,0.15)' : '0 0 10px rgba(59, 130, 246, 0.3)') : 'none',
                         transition: 'all 0.15s'
                       }}
                     >

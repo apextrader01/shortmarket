@@ -202,8 +202,8 @@ export default function MutualFundsView() {
                       padding: '0 4px 16px 4px',
                       fontSize: isMobile ? '16px' : '18px',
                       fontWeight: mainTab === tab ? '700' : '600',
-                      color: mainTab === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                      borderBottom: mainTab === tab ? '3px solid #E2E8F0' : '3px solid transparent',
+                      color: mainTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
+                      borderBottom: mainTab === tab ? '3px solid var(--color-blue)' : '3px solid transparent',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       position: 'relative',
@@ -223,7 +223,7 @@ export default function MutualFundsView() {
                         placeholder="Search HDFC, SBI, Quant..." 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', outline: 'none', width: '100%' }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', width: '100%' }}
                     />
                     {isSearching && <Loader2 size={16} color="var(--color-blue)" className="spin" />}
                 </form>

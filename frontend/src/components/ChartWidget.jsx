@@ -39,10 +39,11 @@ export default function ChartWidget() {
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
 
-  const { selectedSymbol, prices, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, prices: state.prices, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal })));
+  const { selectedSymbol, prices, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, prices: state.prices, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
 
   const price   = prices[selectedSymbol];
   const candles = candleData[selectedSymbol] || [];
+  const isLight = theme === 'light';
 
   // ── Build chart instance ────────────────────────────────────────────────────
   const buildChart = useCallback(() => {
@@ -72,25 +73,25 @@ export default function ChartWidget() {
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: 'solid', color: 'transparent' },
-        textColor: '#94A3B8',
+        textColor: isLight ? '#475569' : '#94A3B8',
         fontSize: 11,
         fontFamily: "'Inter', 'Roboto', sans-serif",
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,0.04)' },
-        horzLines: { color: 'rgba(255,255,255,0.04)' },
+        vertLines: { color: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)' },
+        horzLines: { color: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)' },
       },
       crosshair: {
         mode: 1,
-        vertLine: { color: '#334155', width: 1, style: 1, labelBackgroundColor: '#1E293B' },
-        horzLine: { color: '#334155', width: 1, style: 1, labelBackgroundColor: '#1E293B' },
+        vertLine: { color: isLight ? '#94a3b8' : '#334155', width: 1, style: 1, labelBackgroundColor: isLight ? '#334155' : '#1E293B' },
+        horzLine: { color: isLight ? '#94a3b8' : '#334155', width: 1, style: 1, labelBackgroundColor: isLight ? '#334155' : '#1E293B' },
       },
       rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.07)',
+        borderColor: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)',
         scaleMargins: { top: 0.05, bottom: mainBottom + 0.05 },
       },
       timeScale: {
-        borderColor: 'rgba(255,255,255,0.07)',
+        borderColor: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -103,9 +104,12 @@ export default function ChartWidget() {
 
     // Candlestick
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a', downColor: '#ef5350',
-      borderUpColor: '#26a69a', borderDownColor: '#ef5350',
-      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+      upColor: isLight ? '#089981' : '#26a69a',
+      downColor: isLight ? '#f23645' : '#ef5350',
+      borderUpColor: isLight ? '#089981' : '#26a69a',
+      borderDownColor: isLight ? '#f23645' : '#ef5350',
+      wickUpColor: isLight ? '#089981' : '#26a69a',
+      wickDownColor: isLight ? '#f23645' : '#ef5350',
     });
 
     // Volume histogram on main scale
@@ -284,7 +288,7 @@ export default function ChartWidget() {
 
       chartRef.current?.timeScale().fitContent();
     } catch (e) { console.error(e) }
-  }, [candles, showSMA, showEMA, showRSI, showMACD]);
+  }, [candles, showSMA, showEMA, showRSI, showMACD, theme]);
 
   // Live tick update
   useEffect(() => {
@@ -305,19 +309,19 @@ export default function ChartWidget() {
       {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px', color: 'var(--text-primary)' }}>
             {selectedSymbol.replace('-', ' (')} {selectedSymbol.includes('-') ? ')' : ''}
           </h3>
           {price ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '21px', fontWeight: '700', color: isUp ? '#26a69a' : '#ef5350' }}>
+              <span style={{ fontSize: '21px', fontWeight: '700', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                 ₹{price.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
               {pct !== null && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
-                  background: isUp ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,80,0.15)',
-                  color: isUp ? '#26a69a' : '#ef5350',
+                  background: isUp ? 'rgba(22, 163, 74, 0.12)' : 'rgba(220, 38, 38, 0.12)',
+                  color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)',
                   padding: '2px 7px', borderRadius: '5px', fontSize: '12px', fontWeight: '600'
                 }}>
                   {isUp ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
@@ -331,7 +335,7 @@ export default function ChartWidget() {
         </div>
 
         {/* Timeframes */}
-        <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-hover)', padding: '3px', borderRadius: '8px', flexShrink: 0, border: '1px solid var(--border-color)' }}>
           {TIMEFRAMES.map(tf => {
             const active = chartInterval === tf.value;
             return (
@@ -340,10 +344,10 @@ export default function ChartWidget() {
                 onClick={() => setChartInterval(tf.value)}
                 disabled={isLoadingCandles}
                 style={{
-                  background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
-                  color:      active ? '#60A5FA' : '#64748B',
-                  border:     active ? '1px solid rgba(96,165,250,0.35)' : '1px solid transparent',
-                  borderRadius: '5px', padding: '3px 7px',
+                  background: active ? 'var(--color-blue)' : 'transparent',
+                  color:      active ? '#ffffff' : 'var(--text-secondary)',
+                  border:     'none',
+                  borderRadius: '5px', padding: '4px 8px',
                   fontSize: '11px', fontWeight: '700', cursor: isLoadingCandles ? 'default' : 'pointer',
                   transition: 'all 0.15s',
                 }}
