@@ -142,6 +142,29 @@ async function updateOptionsMaster() {
 
     fs.writeFileSync(path.join(__dirname, 'stocks.json'), JSON.stringify(stocks));
     console.log(`Saved ${stocks.length} Stock contracts to stocks.json!`);
+
+    // Generate lotsizeMap.json for frontend
+    const lotsizeMap = {};
+    for (const underlying of Object.keys(options)) {
+        const firstExp = Object.keys(options[underlying])[0];
+        if (firstExp) {
+            const firstStrike = Object.keys(options[underlying][firstExp])[0];
+            if (firstStrike) {
+                const item = options[underlying][firstExp][firstStrike].CE || options[underlying][firstExp][firstStrike].PE;
+                if (item && item.lotsize) lotsizeMap[underlying] = item.lotsize;
+            }
+        }
+    }
+    for (const underlying of Object.keys(futures)) {
+        if (!lotsizeMap[underlying] && futures[underlying][0] && futures[underlying][0].lotsize) {
+            lotsizeMap[underlying] = futures[underlying][0].lotsize;
+        }
+    }
+    const frontendMapPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'lotsizeMap.json');
+    if (fs.existsSync(path.dirname(frontendMapPath))) {
+        fs.writeFileSync(frontendMapPath, JSON.stringify(lotsizeMap, null, 2));
+        console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to frontend lotsizeMap.json!`);
+    }
 }
 
 if (require.main === module) {
