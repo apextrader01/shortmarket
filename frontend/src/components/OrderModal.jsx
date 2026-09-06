@@ -382,7 +382,8 @@ export default function OrderModal() {
       }}
     >
       <div style={{
-        width: '520px', 
+        width: '540px', 
+        maxWidth: '95vw',
         background: '#161b26', 
         borderRadius: '10px', 
         border: '1px solid rgba(255, 255, 255, 0.1)', 
@@ -725,61 +726,106 @@ export default function OrderModal() {
         )}
 
         {/* Footer Bar */}
-        <div style={{ background: '#0e121a', padding: '14px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Margin Required:</span>
-              <span style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff' }}>₹{requiredMargin.toFixed(2)} ({leverageText})</span>
+        <div style={{
+          background: '#0e121a',
+          padding: '12px 18px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          {/* Left Info Column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '180px' }}>
+            {/* Margin Required Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Margin Required:</span>
+              <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#ffffff' }}>
+                ₹{requiredMargin.toFixed(2)}
+              </span>
+              {leverageText && (
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#60a5fa',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '3px',
+                  padding: '1px 5px',
+                  lineHeight: '1.2'
+                }}>
+                  {leverageText}
+                </span>
+              )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Available:</span>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>₹{balanceNum.toFixed(2)}</span>
+
+            {/* Available Margin Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Available:</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
+                ₹{balanceNum.toFixed(2)}
+              </span>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '2px' }}>
+            {/* Price Breakup Link */}
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: '1px' }}>
               <button 
                 type="button"
                 onClick={() => estimatedTaxes && setShowBreakup(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '12px', padding: 0, cursor: 'pointer', fontWeight: '500' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#60a5fa',
+                  fontSize: '11.5px',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap'
+                }}
               >
                 <FileText size={12} /> Price breakup
               </button>
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button 
-              type="button"
-              onClick={() => {
-                useStore.getState().addToBasket({
-                  symbol,
-                  side,
-                  quantity: parseInt(quantity) || 1,
-                  lotsize: orderModal.lotsize || 1,
-                  orderType,
-                  price: orderType === 'MARKET' ? '' : price
-                });
-                closeOrderModal();
-                useStore.getState().setBasketModalOpen(true);
-              }}
-              style={{
-                background: 'rgba(59, 130, 246, 0.12)',
-                border: '1px solid rgba(59, 130, 246, 0.35)',
-                color: '#60a5fa',
-                padding: '10px 14px',
-                borderRadius: '6px',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <ShoppingBag size={13} /> Add to Basket
-            </button>
+          {/* Right Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+            {!isTrueExit && (
+              <button 
+                type="button"
+                onClick={() => {
+                  useStore.getState().addToBasket({
+                    symbol,
+                    side,
+                    quantity: parseInt(quantity) || 1,
+                    lotsize: orderModal.lotsize || 1,
+                    orderType,
+                    price: orderType === 'MARKET' ? '' : price
+                  });
+                  closeOrderModal();
+                  useStore.getState().setBasketModalOpen(true);
+                }}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  color: '#60a5fa',
+                  padding: '9px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <ShoppingBag size={13} /> Add to Basket
+              </button>
+            )}
 
             <button 
               type="button"
@@ -788,22 +834,25 @@ export default function OrderModal() {
               style={{ 
                 background: (isInsufficient || isPlacing) ? '#334155' : (isBuy ? '#10b981' : '#ef4444'), 
                 color: (isInsufficient || isPlacing) ? '#94a3b8' : '#ffffff', 
-                padding: '10px 20px', 
+                padding: '9px 18px', 
                 borderRadius: '6px', 
                 fontSize: '12.5px', 
                 fontWeight: '800', 
-                letterSpacing: '0.4px',
+                letterSpacing: '0.3px',
                 border: 'none', 
                 cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', 
                 transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minWidth: '140px',
-                boxShadow: (isInsufficient || isPlacing) ? 'none' : (isBuy ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 4px 12px rgba(239, 68, 68, 0.3)')
+                minWidth: '120px',
+                whiteSpace: 'nowrap',
+                boxShadow: (isInsufficient || isPlacing) ? 'none' : (isBuy ? '0 0 12px rgba(16, 185, 129, 0.3)' : '0 0 12px rgba(239, 68, 68, 0.3)')
               }}
             >
-              {isPlacing ? 'PLACING ORDER...' : (isBuy ? `BUY ${totalQuantity > 1 ? `${totalQuantity} Qty` : ''}` : `SELL ${totalQuantity > 1 ? `${totalQuantity} Qty` : ''}`)}
+              {isPlacing ? 'PLACING...' : (
+                isTrueExit ? `EXIT ${totalQuantity} Qty` : `${side} ${totalQuantity} Qty`
+              )}
             </button>
           </div>
         </div>
