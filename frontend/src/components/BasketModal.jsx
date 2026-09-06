@@ -314,13 +314,28 @@ export default function BasketModal() {
   const unhedgedBuys = buys.map(b => ({ ...b, remainingQty: b.totalQuantity }));
   const unhedgedSells = sells.map(s => ({ ...s, remainingQty: s.totalQuantity }));
 
-  let totalPremiumPaid = 0;
+  let totalBuyMargin = 0;
   let hedgedMargin = 0;
 
-  // 1. Calculate premium paid for all buy legs
+  // 1. Calculate margin required for all buy legs (Standardized SPAN for Futures, 100% for Option Premium, 4x leverage for INT Stocks)
   buys.forEach(buy => {
-    const premium = buy.totalQuantity * (buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0));
-    totalPremiumPaid += premium;
+    const price = buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0);
+    const cleanSym = (buy.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const isFuture = buy.symbol.includes('FUT') || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
+    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => buy.symbol.includes(idx));
+
+    if (buy.isOption) {
+      // 100% upfront premium paid for Option Buys
+      totalBuyMargin += (buy.totalQuantity * price);
+    } else if (isFuture) {
+      // Futures Margin (Standardized SPAN: 10% for Index Futures, 15% for Stock/Commodity Futures)
+      const marginRate = isIndex ? 0.10 : 0.15;
+      totalBuyMargin += (buy.totalQuantity * price * marginRate);
+    } else {
+      // Cash Equity: 25% for Intraday (4x Leverage), 100% for Delivery
+      const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0;
+      totalBuyMargin += (buy.totalQuantity * price * leverageMultiplier);
+    }
   });
 
   // 2. Match Buy Options with Sell Options of same type (CE with CE, PE with PE) for hedge benefit
@@ -361,28 +376,20 @@ export default function BasketModal() {
       } else {
         baseMargin = sell.remainingQty * (isIndex ? 4000 : 8000);
       }
-    } else if (sell.symbol.includes('FUT')) {
+    } else if (sell.symbol.includes('FUT') || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(sell.symbol)) {
+      // Futures Margin (Symmetric 10% Index, 15% Stock)
       const marginRate = isIndex ? 0.10 : 0.15;
       baseMargin = sell.remainingQty * price * marginRate;
     } else {
-      baseMargin = sell.remainingQty * price;
+      // Equity Shorting
+      const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0;
+      baseMargin = sell.remainingQty * price * leverageMultiplier;
     }
     
-    const leverageMultiplier = (productType === 'INT' && !sell.isOption) ? 0.25 : 1.0;
-    requiredMargin += (baseMargin * leverageMultiplier);
+    requiredMargin += baseMargin;
   });
 
-  let finalMargin = hedgedMargin + requiredMargin + totalPremiumPaid;
-  
-  // Intraday leverage for non-options buys
-  buys.forEach(buy => {
-    if (!buy.isOption && productType === 'INT') {
-      const premium = buy.totalQuantity * (buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0));
-      finalMargin -= premium;
-      finalMargin += premium * 0.25;
-    }
-  });
-
+  const finalMargin = hedgedMargin + requiredMargin + totalBuyMargin;
   const isInsufficient = balanceNum < finalMargin;
 
   // Calculate total execution slices across all basket legs
