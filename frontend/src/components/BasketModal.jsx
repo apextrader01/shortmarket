@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { X, Trash2, ShoppingBag, Search, Calendar } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 
 function extractOptionStrike(symbol) {
@@ -96,6 +96,8 @@ export default function BasketModal() {
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
+  const [showBreakup, setShowBreakup] = useState(false);
+  const [estimatedTaxes, setEstimatedTaxes] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -384,6 +386,77 @@ export default function BasketModal() {
   });
 
   const isInsufficient = balanceNum < finalMargin;
+
+  // Aggregate Estimated Charges for all Basket Items
+  useEffect(() => {
+    if (!basketItems || basketItems.length === 0) {
+      setEstimatedTaxes(null);
+      return;
+    }
+    
+    let isCancelled = false;
+    const fetchAllTaxes = async () => {
+      try {
+        const token = useStore.getState().token;
+        const validLegs = enhancedItems.filter(item => {
+          const p = item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price);
+          return item.symbol && item.totalQuantity > 0 && p > 0;
+        });
+
+        if (validLegs.length === 0) {
+          setEstimatedTaxes(null);
+          return;
+        }
+
+        const promises = validLegs.map(item => {
+          const p = item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price);
+          return fetch(`${API}/api/estimate-charges?symbol=${item.symbol}&product_type=${productType}&side=${item.side}&quantity=${item.totalQuantity}&price=${p}`, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          }).then(r => r.json()).catch(() => null);
+        });
+
+        const results = await Promise.all(promises);
+        if (isCancelled) return;
+
+        const agg = {
+          brokerage: 0,
+          exchangeCharge: 0,
+          stt: 0,
+          gst: 0,
+          cgst: 0,
+          sgst: 0,
+          sebiCharge: 0,
+          stampDuty: 0,
+          totalTaxes: 0,
+          legsCount: validLegs.length
+        };
+
+        results.forEach(res => {
+          if (res && res.totalTaxes !== undefined) {
+            agg.brokerage += Number(res.brokerage) || 0;
+            agg.exchangeCharge += Number(res.exchangeCharge) || 0;
+            agg.stt += Number(res.stt) || 0;
+            agg.gst += Number(res.gst) || 0;
+            agg.cgst += Number(res.cgst !== undefined ? res.cgst : res.gst / 2) || 0;
+            agg.sgst += Number(res.sgst !== undefined ? res.sgst : res.gst / 2) || 0;
+            agg.sebiCharge += Number(res.sebiCharge) || 0;
+            agg.stampDuty += Number(res.stampDuty) || 0;
+            agg.totalTaxes += Number(res.totalTaxes) || 0;
+          }
+        });
+
+        setEstimatedTaxes(agg);
+      } catch (e) {
+        console.error('Error fetching basket taxes:', e);
+      }
+    };
+
+    const timer = setTimeout(fetchAllTaxes, 300);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [basketItems, productType, prices]);
 
   // Check market session restrictions and cutoff
   let blockedMarketReason = null;
@@ -1387,7 +1460,7 @@ export default function BasketModal() {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', gap: '28px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Available Balance</div>
                 <div style={{ fontSize: '13.5px', fontWeight: '700' }}>₹{balanceNum.toFixed(2)}</div>
@@ -1396,6 +1469,28 @@ export default function BasketModal() {
                 <div style={{ fontSize: '10.5px', color: 'var(--color-blue)', marginBottom: '2px' }}>Combined Margin</div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--color-blue)' }}>₹{finalMargin.toFixed(2)}</div>
               </div>
+              {basketItems.length > 0 && (
+                <button 
+                  type="button"
+                  onClick={() => setShowBreakup(true)}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
+                    background: 'rgba(59, 130, 246, 0.1)', 
+                    border: '1px solid rgba(59, 130, 246, 0.25)', 
+                    color: '#60a5fa', 
+                    fontSize: '12px', 
+                    padding: '6px 10px', 
+                    borderRadius: '4px', 
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <FileText size={13} /> Price breakup
+                </button>
+              )}
             </div>
             <button 
               onClick={handleExecute}
@@ -1411,6 +1506,65 @@ export default function BasketModal() {
             </button>
           </div>
         </div>
+
+        {/* Charges Breakup Modal */}
+        {showBreakup && estimatedTaxes && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, backdropFilter: 'blur(2px)' }}>
+            <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', width: '400px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.6)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                  <FileText size={18} />
+                  <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: 'var(--text-primary)' }}>Basket Charges Breakup</h3>
+                </div>
+                <X size={20} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowBreakup(false)} />
+              </div>
+              
+              <div style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
+                  <span>Brokerage ({estimatedTaxes.legsCount || basketItems.length} orders)</span>
+                  <span style={{ fontWeight: '600' }}>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                </div>
+                
+                <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>Regulatory & Other Charges</div>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>Exchange Turnover Charges</span>
+                  <span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>CTT / STT</span>
+                  <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>CGST (9%)</span>
+                  <span>₹{estimatedTaxes.cgst.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>SGST (9%)</span>
+                  <span>₹{estimatedTaxes.sgst.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>SEBI Turnover Charges</span>
+                  <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                  <span>Stamp Duty</span>
+                  <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                  <span>Total Estimated Charges</span>
+                  <span style={{ color: '#60a5fa' }}>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  *Actual taxes & brokerage are calculated and deducted dynamically upon execution.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
