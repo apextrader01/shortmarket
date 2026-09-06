@@ -26,6 +26,7 @@ const PricingView = lazy(() => import('./components/PricingView'));
 const ReferralsView = lazy(() => import('./components/ReferralsView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
 const TradingJournalView = lazy(() => import('./components/TradingJournalView'));
+const TradeDiaryView = lazy(() => import('./components/TradeDiaryView'));
 const OnboardingWizard = lazy(() => import('./components/OnboardingWizard'));
 const DOMLadderModal = lazy(() => import('./components/DOMLadderModal'));
 const MarketDepthModal = lazy(() => import('./components/MarketDepthModal'));
@@ -290,11 +291,12 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
-    if (!path) return 'Journal';
+    if (!path) return 'TradeDiary';
     
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
-      'journal': 'Journal', 'tradediary': 'Journal', 'tradingjournal': 'Journal',
+      'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
+      'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
@@ -303,7 +305,7 @@ function App() {
       'reports': 'Reports',
       'aboutus': 'AboutUs'
     };
-    return tabsMap[path.toLowerCase()] || 'Journal';
+    return tabsMap[path.toLowerCase()] || 'TradeDiary';
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -318,7 +320,7 @@ function App() {
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
-      let newPath = activeTab === 'Journal' ? '/' : `/${activeTab.toLowerCase()}`;
+      let newPath = activeTab === 'TradeDiary' ? '/' : `/${activeTab.toLowerCase()}`;
       if (activeTab === 'Portfolio' && typeof portfolioSubTab !== 'undefined') {
         newPath = `/portfolio/${portfolioSubTab.toLowerCase()}`;
       }
@@ -332,11 +334,12 @@ function App() {
     const handlePopState = () => {
       const path = window.location.pathname.replace('/', '');
       if (!path) {
-        setActiveTab('Journal');
+        setActiveTab('TradeDiary');
         return;
       }
       const tabsMap = {
-        'journal': 'Journal', 'tradediary': 'Journal', 'tradingjournal': 'Journal',
+        'tradediary': 'TradeDiary', 'trade-diary': 'TradeDiary',
+        'journal': 'Journal', 'tradingjournal': 'Journal', 'trading-journal': 'Journal',
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
@@ -345,7 +348,7 @@ function App() {
         'reports': 'Reports',
         'aboutus': 'AboutUs'
       };
-      setActiveTab(tabsMap[path.toLowerCase()] || 'Journal');
+      setActiveTab(tabsMap[path.toLowerCase()] || 'TradeDiary');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -506,9 +509,9 @@ function App() {
         </div>
       )}
 
-      {activeTab === 'Journal' ? (
+      {activeTab === 'TradeDiary' ? (
         <Suspense fallback={<TabLoader />}>
-          <TradingJournalView onOpenPaperTrading={() => setActiveTab('Markets')} onBack={() => setActiveTab('Markets')} />
+          <TradeDiaryView onOpenPaperTrading={() => setActiveTab('Markets')} onBack={() => setActiveTab('Markets')} />
         </Suspense>
       ) : (
         <>
@@ -543,13 +546,14 @@ function App() {
                   fontSize: '10px', fontWeight: '700', marginRight: '4px',
                 }}>
                   {[
-                    { key: 'Journal', label: 'Trade Diary' },
+                    { key: 'TradeDiary', label: 'Trade Diary' },
                     { key: 'Markets', label: 'Markets' },
                     { key: 'Positions', label: 'Positions' },
                     { key: 'Orders', label: 'Orders' },
                     { key: 'Portfolio', label: 'Portfolio' },
                     { key: 'MutualFunds', label: 'Mutual Funds' },
                     { key: 'Leaderboard', label: 'Leaderboard' },
+                    { key: 'Journal', label: 'Trading Journal' },
                     ...(user?.is_admin ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
                   ].map((tabItem) => (
                     <div
@@ -647,6 +651,13 @@ function App() {
                   </Suspense>
                 </div>
               )}
+              {activeTab === 'Journal' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <TradingJournalView onBack={() => setActiveTab('Markets')} />
+                  </Suspense>
+                </div>
+              )}
               {activeTab === 'ClientData' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
                   <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
@@ -730,20 +741,21 @@ function App() {
         </div>
         <div className="mobile-menu-content">
           {[
-            { label: 'Markets', icon: TrendingUp },
-            { label: 'Positions', icon: Briefcase },
-            { label: 'Orders', icon: List },
-            { label: 'Portfolio', icon: Briefcase },
-            { label: 'Leaderboard', icon: Trophy },
-            { label: 'Trading Journal', icon: BookOpen },
-            { label: 'Mutual Funds', icon: CircleDollarSign },
-            { label: 'Reports', icon: FileText },
-            { label: 'Referrals', icon: Gift },
-            { label: 'Pricing', icon: Star },
-            { label: 'About Us', icon: Info },
-            ...(user?.is_admin ? [{ label: 'Admin Panel', icon: ShieldCheck }] : [])
+            { label: 'Trade Diary', key: 'TradeDiary', icon: BookOpen },
+            { label: 'Markets', key: 'Markets', icon: TrendingUp },
+            { label: 'Positions', key: 'Positions', icon: Briefcase },
+            { label: 'Orders', key: 'Orders', icon: List },
+            { label: 'Portfolio', key: 'Portfolio', icon: Briefcase },
+            { label: 'Leaderboard', key: 'Leaderboard', icon: Trophy },
+            { label: 'Trading Journal', key: 'Journal', icon: BookOpen },
+            { label: 'Mutual Funds', key: 'MutualFunds', icon: CircleDollarSign },
+            { label: 'Reports', key: 'Reports', icon: FileText },
+            { label: 'Referrals', key: 'Referrals', icon: Gift },
+            { label: 'Pricing', key: 'Pricing', icon: Star },
+            { label: 'About Us', key: 'AboutUs', icon: Info },
+            ...(user?.is_admin ? [{ label: 'Admin Panel', key: 'AdminPanel', icon: ShieldCheck }] : [])
           ].map(tab => (
-            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label === 'Trading Journal' ? 'Journal' : tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
+            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.key); setShowMobileMenu(false); }}>
               <tab.icon size={20} />
               {tab.label}
             </div>
