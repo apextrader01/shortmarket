@@ -702,6 +702,7 @@ const [riskCalc, setRiskCalc] = useState({
 
   // Calendar State
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
+  const [calendarDayFilter, setCalendarDayFilter] = useState('ALL'); // 'ALL' | 'WINS' | 'LOSSES'
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayStr);
 
   // Challenge State
@@ -7469,111 +7470,339 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 12. CALENDAR SUB-VIEW                                          */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'CALENDAR' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Monthly P&L Calendar</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Visual daily heatmap of green vs red days and session summaries ({marketSegment}).</p>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {/* Market Switcher */}
-                  <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
-                    {Object.keys(MARKET_CONFIGS).map(segKey => {
-                      const cfg = MARKET_CONFIGS[segKey];
-                      const isSel = marketSegment === segKey;
-                      return (
-                        <button
-                          key={segKey}
-                          onClick={() => setMarketSegment(segKey)}
-                          style={{
-                            backgroundColor: isSel ? '#2563eb' : 'transparent',
-                            color: isSel ? '#ffffff' : colors.textSecondary,
-                            border: 'none',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {segKey}
-                        </button>
-                      );
-                    })}
+          {activeTab === 'CALENDAR' && (() => {
+            // Month statements lookup
+            const monthStatement = (typeof HISTORICAL_MONTHLY_STATEMENTS !== 'undefined' && HISTORICAL_MONTHLY_STATEMENTS[marketSegment]?.find(m => m.month === selectedReportMonth)) || {
+              month: selectedReportMonth, totalTrades: 28, wins: 19, losses: 9, grossPnl: 68400, charges: 2400, netPnl: 66000, bestTrade: 14500, worstTrade: -4200
+            };
+
+            // Days definition for the active month (September 2026 starts on Tuesday, Day 1)
+            // Leading empty slots for Sun (0), Mon (1) -> 2 empty slots
+            const leadingEmptySlots = 2; // Sept 1, 2026 is Tuesday
+            const totalDaysInMonth = 30;
+
+            // Generate days with realistic multi-market P&L
+            const daysData = Array.from({ length: totalDaysInMonth }).map((_, i) => {
+              const dayNum = i + 1;
+              const dateStr = `${selectedReportMonth}-${dayNum < 10 ? '0' + dayNum : dayNum}`;
+              // Day of week (0 = Sun, 1 = Mon, ..., 6 = Sat)
+              const dayOfWeek = (dayNum + leadingEmptySlots - 1) % 7;
+              const isWeekend = (dayOfWeek === 0) || (dayOfWeek === 6);
+
+              let isGreen = false;
+              let isRed = false;
+              let pnlVal = 0;
+
+              if (marketSegment === 'Crypto') {
+                // Crypto trades 7 days/week
+                isGreen = [1, 2, 4, 6, 7, 8, 9, 11, 13, 14, 15, 16, 18, 20, 21, 22, 25, 27, 28, 29].includes(dayNum);
+                isRed = [3, 5, 10, 12, 17, 19, 23, 24, 26].includes(dayNum);
+                pnlVal = isGreen ? (dayNum * 45 + 180) : (isRed ? -(dayNum * 25 + 90) : 0);
+              } else {
+                // Equities / Forex / Indian
+                isGreen = !isWeekend && [1, 2, 4, 7, 8, 9, 11, 14, 15, 16, 18, 21, 22, 25, 28, 29].includes(dayNum);
+                isRed = !isWeekend && [3, 10, 17, 23, 24].includes(dayNum);
+                if (marketSegment === 'Indian') {
+                  pnlVal = isGreen ? (dayNum * 420 + 1500) : (isRed ? -(dayNum * 220 + 800) : 0);
+                } else if (marketSegment === 'US') {
+                  pnlVal = isGreen ? (dayNum * 65 + 240) : (isRed ? -(dayNum * 35 + 120) : 0);
+                } else {
+                  // Forex
+                  pnlVal = isGreen ? (dayNum * 32 + 140) : (isRed ? -(dayNum * 18 + 70) : 0);
+                }
+              }
+
+              return {
+                dayNum,
+                dateStr,
+                dayOfWeek,
+                isWeekend,
+                isGreen,
+                isRed,
+                pnlVal
+              };
+            });
+
+            const totalGreenDays = daysData.filter(d => d.isGreen).length;
+            const totalRedDays = daysData.filter(d => d.isRed).length;
+            const totalFlatDays = daysData.filter(d => !d.isGreen && !d.isRed).length;
+
+            // Calculate weekly row totals (5 weeks)
+            const weekTotals = [
+              daysData.slice(0, 5).reduce((acc, d) => acc + d.pnlVal, 0),
+              daysData.slice(5, 12).reduce((acc, d) => acc + d.pnlVal, 0),
+              daysData.slice(12, 19).reduce((acc, d) => acc + d.pnlVal, 0),
+              daysData.slice(19, 26).reduce((acc, d) => acc + d.pnlVal, 0),
+              daysData.slice(26, 30).reduce((acc, d) => acc + d.pnlVal, 0)
+            ];
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Header & Controls */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Calendar size={22} color="#2563eb" /> Monthly P&L Calendar Heatmap
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Visual daily distribution of winning vs drawdown sessions with weekly totals ({marketSegment}).
+                    </p>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => setCalendarMonthOffset(o => o - 1)} style={{ background: colors.bgCard, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}>
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary, display: 'flex', alignItems: 'center', padding: '0 8px' }}>
-                      September 2026
-                    </span>
-                    <button onClick={() => setCalendarMonthOffset(o => o + 1)} style={{ background: colors.bgCard, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '4px 8px', borderRadius: '6px', cursor: 'pointer' }}>
-                      <ChevronRight size={14} />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Market Switcher */}
+                    <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
+                      {Object.keys(MARKET_CONFIGS).map(segKey => {
+                        const cfg = MARKET_CONFIGS[segKey];
+                        const isSel = marketSegment === segKey;
+                        return (
+                          <button
+                            key={segKey}
+                            onClick={() => setMarketSegment(segKey)}
+                            style={{
+                              backgroundColor: isSel ? '#2563eb' : 'transparent',
+                              color: isSel ? '#ffffff' : colors.textSecondary,
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '4px 9px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <span>{cfg.flag}</span>
+                            <span>{segKey}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Month Picker */}
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '2px 6px' }}>
+                      <button
+                        onClick={() => {
+                          const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+                          const idx = months.indexOf(selectedReportMonth);
+                          if (idx > 0) setSelectedReportMonth(months[idx - 1]);
+                        }}
+                        style={{ background: 'none', border: 'none', color: colors.textPrimary, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary, padding: '0 4px' }}>
+                        {selectedReportMonth === '2026-09' ? 'September 2026' : (selectedReportMonth === '2026-08' ? 'August 2026' : (selectedReportMonth === '2026-07' ? 'July 2026' : (selectedReportMonth === '2026-06' ? 'June 2026' : 'May 2026')))}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const months = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+                          const idx = months.indexOf(selectedReportMonth);
+                          if (idx < months.length - 1) setSelectedReportMonth(months[idx + 1]);
+                        }}
+                        style={{ background: 'none', border: 'none', color: colors.textPrimary, padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedTradeForShare({
+                          symbol: `${marketSegment} Monthly Statement`,
+                          strategy: '🔥 Multi-Strategy Portfolio',
+                          net_pnl: monthStatement.netPnl,
+                          realized_pnl: monthStatement.grossPnl,
+                          entry_price: 24500,
+                          exit_price: 25150,
+                          qty: 50,
+                          market_segment: marketSegment
+                        });
+                      }}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '7px 12px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Share2 size={14} /> Share Card
                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Calendar Heatmap Grid */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '12px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', marginBottom: '8px' }}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <div key={d} style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>{d}</div>
+                {/* 5 Monthly KPI Cards Strip */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '10px' }}>
+                  {[
+                    { label: 'NET MONTHLY P&L', val: formatMoney(monthStatement.netPnl, marketSegment), color: monthStatement.netPnl >= 0 ? colors.accentGreen : colors.accentRed },
+                    { label: 'SESSION WIN RATE', val: `${Math.round((totalGreenDays / (totalGreenDays + totalRedDays || 1)) * 100)}% (${totalGreenDays}G / ${totalRedDays}R)`, color: colors.accentGreen },
+                    { label: 'LARGEST GAIN DAY', val: formatMoney(monthStatement.bestTrade, marketSegment), color: colors.accentGreen },
+                    { label: 'LARGEST DRAWDOWN', val: formatMoney(monthStatement.worstTrade, marketSegment), color: colors.accentRed },
+                    { label: 'PROFIT FACTOR', val: monthStatement.profitFactor || '2.65', color: colors.accentBlueLight }
+                  ].map((k, i) => (
+                    <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: k.color, marginTop: '3px' }}>{k.val}</div>
+                    </div>
                   ))}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-                  {Array.from({ length: 30 }).map((_, i) => {
-                    const dayNum = i + 1;
-                    const dateStr = `2026-09-${dayNum < 10 ? '0' + dayNum : dayNum}`;
-                    const isGreen = [1, 2, 4, 7, 8, 9, 11, 14, 15, 16, 18, 21, 22, 25, 28, 29].includes(dayNum);
-                    const isRed = [3, 10, 17, 23, 24].includes(dayNum);
-                    const isWeekend = (dayNum % 7 === 0) || (dayNum % 7 === 6);
-                    const pnlVal = isGreen ? (dayNum * 380 + 1500) : (isRed ? -(dayNum * 180 + 900) : 0);
-
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => {
-                          if (!isWeekend) {
-                            setSelectedCalendarSession({
-                              date: dateStr,
-                              pnl: pnlVal,
-                              trades: isGreen ? 2 : (isRed ? 3 : 0),
-                              strategy: isGreen ? '🔥 Breakout Momentum' : '⚠️ Overtrading Chop',
-                              discipline: isGreen ? '5/5 Disciplined Follow-through' : '3/5 Early Exit',
-                              market: marketSegment
-                            });
-                          }
-                        }}
+                {/* Filter Pills Strip */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>VIEW FILTER:</span>
+                    {[
+                      { id: 'ALL', label: `All Days (${totalDaysInMonth})` },
+                      { id: 'WINS', label: `🟢 Winning Days (${totalGreenDays})` },
+                      { id: 'LOSSES', label: `🔴 Red Days (${totalRedDays})` }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setCalendarDayFilter(f.id)}
                         style={{
-                          backgroundColor: isWeekend ? 'transparent' : (isGreen ? 'rgba(16, 185, 129, 0.12)' : (isRed ? 'rgba(239, 68, 68, 0.12)' : colors.bgInner)),
-                          border: selectedCalendarDate === dateStr ? '2px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                          borderRadius: '8px',
-                          padding: '8px 4px',
-                          minHeight: isMobile ? '48px' : '64px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          cursor: isWeekend ? 'default' : 'pointer'
+                          backgroundColor: calendarDayFilter === f.id ? '#2563eb' : colors.bgCard,
+                          color: calendarDayFilter === f.id ? '#ffffff' : colors.textSecondary,
+                          border: `1px solid ${colors.borderColor}`,
+                          borderRadius: '6px',
+                          padding: '4px 9px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
                         }}
                       >
-                        <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textPrimary }}>{dayNum}</span>
-                        {!isWeekend && pnlVal !== 0 && (
-                          <span style={{ fontSize: '10px', fontWeight: '800', color: pnlVal > 0 ? colors.accentGreen : colors.accentRed }}>
-                            {pnlVal > 0 ? '+' : ''}{formatMoneyPlain(pnlVal, marketSegment)}
-                          </span>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                    Click any active day to inspect the full session trade log
+                  </span>
+                </div>
+
+                {/* MAIN CALENDAR HEATMAP CONTAINER WITH WEEKLY TOTALS */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '14px', padding: isMobile ? '12px' : '20px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Calendar Column Headers (Sun -> Sat + Weekly Total) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(7, 1fr)' : 'repeat(7, 1fr) 100px', gap: '8px', textAlign: 'center', paddingBottom: '6px', borderBottom: `1px solid ${colors.borderColor}` }}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                      <div key={d} style={{ fontSize: '11px', fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase' }}>{d}</div>
+                    ))}
+                    {!isMobile && (
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#2563eb', textTransform: 'uppercase' }}>WEEK TOTAL</div>
+                    )}
+                  </div>
+
+                  {/* Calendar Weeks */}
+                  {[0, 1, 2, 3, 4].map((weekIdx) => {
+                    const weekPnl = weekTotals[weekIdx] || 0;
+                    return (
+                      <div key={weekIdx} style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(7, 1fr)' : 'repeat(7, 1fr) 100px', gap: '8px', alignItems: 'stretch' }}>
+                        {/* 7 Days of the Week */}
+                        {[0, 1, 2, 3, 4, 5, 6].map((colIdx) => {
+                          const slotIdx = weekIdx * 7 + colIdx;
+                          const dayNum = slotIdx - leadingEmptySlots + 1;
+
+                          if (dayNum < 1 || dayNum > totalDaysInMonth) {
+                            return (
+                              <div
+                                key={colIdx}
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  borderRadius: '8px',
+                                  minHeight: isMobile ? '48px' : '68px'
+                                }}
+                              />
+                            );
+                          }
+
+                          const dayItem = daysData[dayNum - 1];
+                          const isMatchFilter = calendarDayFilter === 'ALL' || (calendarDayFilter === 'WINS' && dayItem.isGreen) || (calendarDayFilter === 'LOSSES' && dayItem.isRed);
+
+                          return (
+                            <div
+                              key={colIdx}
+                              onClick={() => {
+                                if (dayItem.isGreen || dayItem.isRed) {
+                                  setSelectedCalendarSession({
+                                    date: dayItem.dateStr,
+                                    dayNum: dayItem.dayNum,
+                                    pnl: dayItem.pnlVal,
+                                    trades: dayItem.isGreen ? 2 : 3,
+                                    strategy: dayItem.isGreen ? '🔥 Breakout Momentum' : '⚠️ Late Session Chop',
+                                    discipline: dayItem.isGreen ? '5/5 Disciplined Execution' : '3/5 Cut Winners Early',
+                                    market: marketSegment,
+                                    tradesList: dayItem.isGreen ? [
+                                      { symbol: marketSegment === 'Indian' ? 'NIFTY 24600 CE' : (marketSegment === 'Crypto' ? 'BTC/USDT' : 'EUR/USD'), pnl: Math.round(dayItem.pnlVal * 0.65), type: 'BUY', rr: '1:2.5' },
+                                      { symbol: marketSegment === 'Indian' ? 'BANKNIFTY 52000 CE' : (marketSegment === 'Crypto' ? 'SOL/USDT' : 'GBP/USD'), pnl: Math.round(dayItem.pnlVal * 0.35), type: 'BUY', rr: '1:2.0' }
+                                    ] : [
+                                      { symbol: marketSegment === 'Indian' ? 'NIFTY 24500 PE' : 'BTC/USDT', pnl: Math.round(dayItem.pnlVal * 0.7), type: 'BUY', rr: '1:1.0' },
+                                      { symbol: marketSegment === 'Indian' ? 'RELIANCE' : 'ETH/USDT', pnl: Math.round(dayItem.pnlVal * 0.3), type: 'BUY', rr: '1:1.0' }
+                                    ]
+                                  });
+                                }
+                              }}
+                              style={{
+                                backgroundColor: dayItem.isWeekend ? colors.bgInner : (dayItem.isGreen ? 'rgba(16, 185, 129, 0.12)' : (dayItem.isRed ? 'rgba(239, 68, 68, 0.12)' : colors.bgInner)),
+                                border: `1px solid ${dayItem.isGreen ? 'rgba(16, 185, 129, 0.35)' : (dayItem.isRed ? 'rgba(239, 68, 68, 0.35)' : colors.borderColor)}`,
+                                borderRadius: '10px',
+                                padding: '8px 6px',
+                                minHeight: isMobile ? '48px' : '68px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                cursor: (dayItem.isGreen || dayItem.isRed) ? 'pointer' : 'default',
+                                transition: 'all 0.15s ease',
+                                opacity: isMatchFilter ? (dayItem.isWeekend ? 0.45 : 1) : 0.2
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textPrimary }}>{dayNum}</span>
+                                {dayItem.isGreen && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: colors.accentGreen }} />}
+                                {dayItem.isRed && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: colors.accentRed }} />}
+                              </div>
+
+                              {!dayItem.isWeekend && dayItem.pnlVal !== 0 && (
+                                <div style={{ fontSize: '11px', fontWeight: '800', color: dayItem.pnlVal > 0 ? colors.accentGreen : colors.accentRed }}>
+                                  {dayItem.pnlVal > 0 ? '+' : ''}{formatMoneyPlain(dayItem.pnlVal, marketSegment)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* Weekly Summary Pill on Right */}
+                        {!isMobile && (
+                          <div
+                            style={{
+                              backgroundColor: colors.bgInner,
+                              border: `1px solid ${colors.borderColor}`,
+                              borderRadius: '10px',
+                              padding: '8px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              textAlign: 'center'
+                            }}
+                          >
+                            <span style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>W{weekIdx + 1} TOTAL</span>
+                            <div style={{ fontSize: '12px', fontWeight: '800', color: weekPnl >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                              {weekPnl > 0 ? '+' : ''}{formatMoneyPlain(weekPnl, marketSegment)}
+                            </div>
+                          </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 13. AFFILIATE SUB-VIEW                                         */}
@@ -9061,21 +9290,106 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       {/* 10. DAILY CALENDAR SESSION RECAP MODAL */}
       {selectedCalendarSession && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            
+            {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>📅 Daily Session: {selectedCalendarSession.date}</div>
-              <button onClick={() => setSelectedCalendarSession(null)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: selectedCalendarSession.pnl >= 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectedCalendarSession.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Daily Session Recap: {selectedCalendarSession.date}</div>
+                  <div style={{ fontSize: '11px', color: colors.textMuted }}>Market Segment: <b style={{ color: '#2563eb' }}>{selectedCalendarSession.market || marketSegment}</b></div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCalendarSession(null)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: colors.bgInner, padding: '12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
-              <div><span style={{ fontSize: '10px', color: colors.textMuted }}>NET P&L</span><div style={{ fontSize: '15px', fontWeight: '800', color: selectedCalendarSession.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>{formatMoney(selectedCalendarSession.pnl, selectedCalendarSession.market)}</div></div>
-              <div><span style={{ fontSize: '10px', color: colors.textMuted }}>TRADES EXECUTED</span><div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>{selectedCalendarSession.trades} Trades</div></div>
+
+            {/* Session KPI Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              <div style={{ backgroundColor: colors.bgInner, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+                <span style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>NET REALIZED P&L</span>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: selectedCalendarSession.pnl >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                  {formatMoney(selectedCalendarSession.pnl, selectedCalendarSession.market || marketSegment)}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: colors.bgInner, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+                <span style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>EXECUTED TRADES</span>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>
+                  {selectedCalendarSession.trades || (selectedCalendarSession.tradesList ? selectedCalendarSession.tradesList.length : 1)} Trades
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: colors.textSecondary }}>
-              <div><b>Primary Strategy:</b> {selectedCalendarSession.strategy}</div>
-              <div style={{ marginTop: '4px' }}><b>Discipline Rating:</b> {selectedCalendarSession.discipline}</div>
+
+            {/* Session Tags Strip */}
+            <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px' }}>
+                <span style={{ color: colors.textSecondary, fontWeight: '600' }}>Primary Strategy:</span>
+                <span style={{ color: colors.textPrimary, fontWeight: '700', backgroundColor: colors.bgCard, padding: '3px 8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                  {selectedCalendarSession.strategy || '🔥 Breakout Momentum'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px' }}>
+                <span style={{ color: colors.textSecondary, fontWeight: '600' }}>Discipline Score:</span>
+                <span style={{ color: selectedCalendarSession.pnl >= 0 ? colors.accentGreen : colors.accentRed, fontWeight: '700' }}>
+                  {selectedCalendarSession.discipline || (selectedCalendarSession.pnl >= 0 ? '5/5 Disciplined Follow-through' : '3/5 Execution Hesitation')}
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button onClick={() => setSelectedCalendarSession(null)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Done</button>
+
+            {/* Individual Trades Taken on this Day */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>Trades Taken in this Session</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {(selectedCalendarSession.tradesList || [
+                  { symbol: (selectedCalendarSession.market === 'Crypto' ? 'BTC/USDT' : (selectedCalendarSession.market === 'Indian' ? 'NIFTY 24600 CE' : 'EUR/USD')), pnl: selectedCalendarSession.pnl, type: 'BUY', rr: selectedCalendarSession.pnl >= 0 ? '1:2.4' : '1:1.0' }
+                ]).map((tr, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ backgroundColor: tr.type === 'BUY' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: tr.type === 'BUY' ? colors.accentGreen : colors.accentRed, fontSize: '10px', fontWeight: '800', padding: '2px 6px', borderRadius: '4px' }}>
+                        {tr.type}
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{tr.symbol}</span>
+                      {tr.rr && <span style={{ fontSize: '10px', color: colors.textMuted }}>R:R {tr.rr}</span>}
+                    </div>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: tr.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
+                      {tr.pnl > 0 ? '+' : ''}{formatMoney(tr.pnl, selectedCalendarSession.market || marketSegment)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  setSelectedTradeForShare({
+                    symbol: `${selectedCalendarSession.date} Session (${selectedCalendarSession.market || marketSegment})`,
+                    strategy: selectedCalendarSession.strategy || '🔥 Multi-Setup Execution',
+                    net_pnl: selectedCalendarSession.pnl,
+                    realized_pnl: selectedCalendarSession.pnl,
+                    entry_price: 24500,
+                    exit_price: 24850,
+                    qty: 50,
+                    market_segment: selectedCalendarSession.market || marketSegment
+                  });
+                }}
+                style={{ backgroundColor: colors.bgInner, color: colors.accentBlueLight, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Share2 size={14} /> Share Day Card
+              </button>
+
+              <button
+                onClick={() => setSelectedCalendarSession(null)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 18px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Close Session
+              </button>
             </div>
           </div>
         </div>
