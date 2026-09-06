@@ -1,4 +1,5 @@
 const { sendPushNotification } = require('./pushService');
+const { sendTelegramAlert } = require('./telegramService');
 const db = require('../database/db');
 const LedgerService = require('./ledgerService');
 const { calculateTaxes } = require('./taxCalculator');
@@ -436,13 +437,26 @@ class TriggerEngine {
                 this.io.to(order.user_id.toString()).emit('sync_user_data');
                 const isSL = order.type === 'SL-M' || order.type === 'SL-L' || (order.remarks && (order.remarks.includes('SL') || order.remarks.includes('Stop Loss')));
                 const isTgt = order.remarks && (order.remarks.includes('Target') || order.remarks.includes('TGT'));
+                const alertEvent = isSL ? 'SL_HIT' : isTgt ? 'TARGET_HIT' : 'EXECUTED';
+                
                 this.io.to(order.user_id.toString()).emit('trade_alert', {
-                    event: isSL ? 'SL_HIT' : isTgt ? 'TARGET_HIT' : 'EXECUTED',
+                    event: alertEvent,
                     symbol: order.symbol,
                     price: execPrice,
                     qty: order.quantity,
                     side: order.side
                 });
+
+                // Dispatch Telegram alert asynchronously
+                const tgType = isSL ? 'STOPLOSS' : isTgt ? 'TARGET' : 'ORDER';
+                sendTelegramAlert(order.user_id, tgType, {
+                    symbol: order.symbol,
+                    side: order.side,
+                    quantity: order.quantity,
+                    price: execPrice,
+                    exit_price: execPrice,
+                    product_type: order.product_type
+                }).catch(() => {});
             }
             
         });

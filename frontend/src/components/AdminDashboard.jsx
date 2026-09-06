@@ -1235,7 +1235,31 @@ function MarketCalendarTab({ isMobile }) {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, awardContest } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, awardContest: state.awardContest })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, updateUserDetails , toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, updateUserDetails: state.updateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
+
+  const [tgConfigForm, setTgConfigForm] = useState({
+    global_enabled: true,
+    peak_protection_active: true,
+    peak_start_time: '09:15',
+    peak_end_time: '10:15',
+    peak_mode: 'BATCH_DELAY',
+    batch_delay_seconds: 10,
+    bot_token: '',
+    bot_username: 'ShortEdgeAlerts_bot'
+  });
+  const [tgBroadcastText, setTgBroadcastText] = useState('');
+  const [tgBroadcasting, setTgBroadcasting] = useState(false);
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgAdminMsg, setTgAdminMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (telegramAdminConfig?.config) {
+      setTgConfigForm(prev => ({
+        ...prev,
+        ...telegramAdminConfig.config
+      }));
+    }
+  }, [telegramAdminConfig]);
 
   const [contestForm, setContestForm] = useState({
     id: null,
@@ -2612,12 +2636,291 @@ export default function AdminDashboard() {
         >
           🏆 Tournaments
         </button>
+        <button 
+          onClick={() => { setActiveTab('telegram'); fetchTelegramAdminConfig?.(); }} 
+          style={{ background: 'none', border: 'none', padding: '6px 0', borderBottom: activeTab === 'telegram' ? '2px solid #38bdf8' : '2px solid transparent', color: activeTab === 'telegram' ? '#38bdf8' : 'var(--text-secondary)', fontWeight: activeTab === 'telegram' ? '700' : '500', fontSize: '11.5px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          📱 Telegram & Peak Engine
+        </button>
       </div>
 
       {/* Content Container */}
       <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', border: '1px solid var(--border-color)', flex: 1, overflow: 'auto' }}>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>Loading platform data...</div>
+        ) : activeTab === 'telegram' ? (
+          <div style={{ padding: isMobile ? '10px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Header Banner */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(0, 136, 204, 0.15) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              border: '1px solid rgba(0, 136, 204, 0.35)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: '16px'
+            }}>
+              <div>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: '800', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Send size={20} color="#38bdf8" /> Telegram Live Alert Dispatcher & Peak Traffic Protection Engine
+                </h3>
+                <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                  Manage global alert throughput, configure morning peak protection (09:15–10:15 IST) to preserve 100% server CPU for order execution, and broadcast platform announcements.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontSize: '11.5px',
+                  fontWeight: '800',
+                  background: telegramAdminConfig?.config?.global_enabled ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)',
+                  border: telegramAdminConfig?.config?.global_enabled ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(239,68,68,0.4)',
+                  color: telegramAdminConfig?.config?.global_enabled ? '#4ade80' : '#ef4444'
+                }}>
+                  {telegramAdminConfig?.config?.global_enabled ? '🟢 ENGINE ACTIVE' : '🔴 ENGINE PAUSED'}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => fetchTelegramAdminConfig?.()}
+                  className="btn btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+                >
+                  <RefreshCw size={13} /> Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+              <div className="glass-panel" style={{ padding: '16px 20px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700' }}>LINKED USERS</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>
+                  {telegramAdminConfig?.connectedUsers || 0}
+                </div>
+                <div style={{ fontSize: '11px', color: '#4ade80', marginTop: '2px' }}>Active Telegram channels</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '16px 20px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700' }}>ALERTS SENT TODAY</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>
+                  {telegramAdminConfig?.config?.stats?.totalSentToday || 0}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Delivered without CPU lag</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '16px 20px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700' }}>PEAK STATUS NOW</div>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: telegramAdminConfig?.config?.isPeakHourNow ? '#fbbf24' : '#4ade80', marginTop: '6px' }}>
+                  {telegramAdminConfig?.config?.isPeakHourNow ? '🔥 IN PEAK WINDOW' : '🟢 NORMAL HOURS'}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Window: {telegramAdminConfig?.config?.peak_start_time || '09:15'} - {telegramAdminConfig?.config?.peak_end_time || '10:15'}
+                </div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '16px 20px', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700' }}>PEAK DROPPED ALERTS</div>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: '#a78bfa', marginTop: '4px' }}>
+                  {telegramAdminConfig?.config?.stats?.peakDropsCount || 0}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Saved CPU cycles</div>
+              </div>
+            </div>
+
+            {/* Peak Protection & Throttling Configuration Form */}
+            <div className="glass-panel" style={{ padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ShieldAlert size={16} color="var(--color-blue)" /> Peak Hour Server Traffic Protection Settings
+                  </h4>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Protect order execution response times during market open rush.
+                  </div>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={tgConfigForm.global_enabled}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, global_enabled: e.target.checked }))}
+                    style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                  />
+                  <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>Global Telegram Enabled</span>
+                </label>
+              </div>
+
+              {tgAdminMsg.text && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  background: tgAdminMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  border: `1px solid ${tgAdminMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  color: tgAdminMsg.type === 'success' ? '#4ade80' : '#ef4444'
+                }}>
+                  {tgAdminMsg.text}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                    Peak Window Start (IST)
+                  </label>
+                  <input
+                    type="time"
+                    className="input-field"
+                    value={tgConfigForm.peak_start_time}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, peak_start_time: e.target.value }))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                    Peak Window End (IST)
+                  </label>
+                  <input
+                    type="time"
+                    className="input-field"
+                    value={tgConfigForm.peak_end_time}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, peak_end_time: e.target.value }))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                    Peak Protection Action Mode
+                  </label>
+                  <select
+                    className="input-field"
+                    value={tgConfigForm.peak_mode}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, peak_mode: e.target.value }))}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="BATCH_DELAY">⏳ Batch Queue with Delay (Smooth)</option>
+                    <option value="MUTE_DURING_PEAK">🛑 Mute/Drop Alerts during Peak (0% CPU)</option>
+                    <option value="DIRECT_INSTANT">⚡ Always Instant Delivery (No Throttle)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                    Peak Batch Queue Delay (Seconds)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    className="input-field"
+                    value={tgConfigForm.batch_delay_seconds}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, batch_delay_seconds: Number(e.target.value) }))}
+                    style={{ width: '100%' }}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Alerts during peak hours will be queued and dispatched smoothly with this delay.
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                    Telegram Bot Username
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={tgConfigForm.bot_username}
+                    onChange={e => setTgConfigForm(prev => ({ ...prev, bot_username: e.target.value }))}
+                    placeholder="e.g. ShortEdgeAlerts_bot"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTgSaving(true);
+                    setTgAdminMsg({ type: '', text: '' });
+                    const res = await updateTelegramAdminConfig?.(tgConfigForm);
+                    setTgSaving(false);
+                    if (res?.success) {
+                      setTgAdminMsg({ type: 'success', text: '✅ Telegram engine configuration updated successfully!' });
+                      setTimeout(() => setTgAdminMsg({ type: '', text: '' }), 3500);
+                    } else {
+                      setTgAdminMsg({ type: 'error', text: res?.error || 'Failed to update configuration' });
+                    }
+                  }}
+                  disabled={tgSaving}
+                  className="btn btn-primary"
+                  style={{ padding: '10px 24px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {tgSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Protection Rules
+                </button>
+              </div>
+            </div>
+
+            {/* Broadcast Telegram Announcement Tool */}
+            <div className="glass-panel" style={{ padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={16} color="#fbbf24" /> Broadcast Announcement to All Telegram Users
+              </h4>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Sends a broadcast message to all {telegramAdminConfig?.connectedUsers || 0} users who have linked their Telegram accounts.
+              </div>
+
+              <textarea
+                className="input-field"
+                rows={3}
+                value={tgBroadcastText}
+                onChange={e => setTgBroadcastText(e.target.value)}
+                placeholder="e.g. Special Market Session today from 09:00 AM to 11:30 AM IST. Happy Trading!"
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!tgBroadcastText.trim()) {
+                      alert('Please enter a message to broadcast.');
+                      return;
+                    }
+                    if (!window.confirm(`Broadcast this message to all ${telegramAdminConfig?.connectedUsers || 0} connected Telegram users?`)) return;
+
+                    setTgBroadcasting(true);
+                    const res = await broadcastTelegramMessage?.(tgBroadcastText);
+                    setTgBroadcasting(false);
+                    if (res?.success) {
+                      alert(`Successfully queued broadcast to ${res.queuedCount} users!`);
+                      setTgBroadcastText('');
+                    } else {
+                      alert(res?.error || 'Failed to send broadcast');
+                    }
+                  }}
+                  disabled={tgBroadcasting || !tgBroadcastText.trim()}
+                  className="btn btn-primary"
+                  style={{ padding: '8px 20px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px', background: '#0284c7' }}
+                >
+                  {tgBroadcasting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  Broadcast to All ({telegramAdminConfig?.connectedUsers || 0} users)
+                </button>
+              </div>
+            </div>
+
+          </div>
         ) : activeTab === 'contests' ? (
           <div style={{ padding: isMobile ? '10px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Header / Create Action Card */}

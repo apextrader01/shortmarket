@@ -550,6 +550,14 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(50)');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT');
 
+    // Telegram Trade Alerts columns
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_orders BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_targets BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_stoploss BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_risk BOOLEAN DEFAULT TRUE');
+
     // Ensure reward_withdrawals table always exists
     await db.raw(`
       CREATE TABLE IF NOT EXISTS reward_withdrawals (

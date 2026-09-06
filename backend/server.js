@@ -3339,12 +3339,22 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const finalOrder = await db('orders').where({ id: ord.id }).first();
     const finalStatus = finalOrder ? finalOrder.status : ord.status;
 
-    // Send instant push notification
+    // Send instant push & Telegram notification
     sendPushNotification(req.user.id, {
       title: `Order Placed: ${side} ${quantity} ${symbol}`,
       body: `Status: ${finalStatus} (${product_type || 'INT'})`,
       url: '/orders'
     }).catch(() => {});
+
+    if (finalStatus === 'EXECUTED' || finalStatus === 'COMPLETE') {
+      sendTelegramAlert(req.user.id, 'ORDER', {
+        symbol,
+        side,
+        quantity,
+        price: (finalOrder && finalOrder.average_price) || (finalOrder && finalOrder.price) || price,
+        product_type
+      }).catch(() => {});
+    }
 
     res.json({ success: true, orderId: ord.id, status: finalStatus });
 
@@ -3621,6 +3631,120 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'Push subscription registered successfully' });
   } catch (err) {
     console.error('Failed to save push subscription:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📱 Telegram Trade & Risk Alerts Endpoints 📱
+const { 
+  sendTelegramAlert, 
+  sendTestAlert, 
+  broadcastTelegramMessage, 
+  getSystemConfig: getTelegramSystemConfig, 
+  updateSystemConfig: updateTelegramSystemConfig 
+} = require('./services/telegramService');
+
+app.get('/api/telegram/settings', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const sysConfig = getTelegramSystemConfig();
+
+    res.json({
+      success: true,
+      telegram_chat_id: user.telegram_chat_id || '',
+      telegram_alerts_enabled: !!user.telegram_alerts_enabled,
+      telegram_alert_orders: user.telegram_alert_orders !== false,
+      telegram_alert_targets: user.telegram_alert_targets !== false,
+      telegram_alert_stoploss: user.telegram_alert_stoploss !== false,
+      telegram_alert_risk: user.telegram_alert_risk !== false,
+      bot_username: sysConfig.bot_username || 'ShortEdgeAlerts_bot',
+      global_enabled: sysConfig.global_enabled
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/telegram/settings', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      telegram_chat_id, 
+      telegram_alerts_enabled, 
+      telegram_alert_orders, 
+      telegram_alert_targets, 
+      telegram_alert_stoploss, 
+      telegram_alert_risk 
+    } = req.body;
+
+    await db('users').where({ id: req.user.id }).update({
+      telegram_chat_id: (telegram_chat_id || '').trim(),
+      telegram_alerts_enabled: !!telegram_alerts_enabled,
+      telegram_alert_orders: telegram_alert_orders !== undefined ? !!telegram_alert_orders : true,
+      telegram_alert_targets: telegram_alert_targets !== undefined ? !!telegram_alert_targets : true,
+      telegram_alert_stoploss: telegram_alert_stoploss !== undefined ? !!telegram_alert_stoploss : true,
+      telegram_alert_risk: telegram_alert_risk !== undefined ? !!telegram_alert_risk : true
+    });
+
+    res.json({ success: true, message: 'Telegram alert preferences updated successfully!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/telegram/test', authenticateToken, async (req, res) => {
+  try {
+    const { chat_id } = req.body;
+    const user = await db('users').where({ id: req.user.id }).first();
+    const targetChatId = chat_id || user?.telegram_chat_id;
+
+    if (!targetChatId) {
+      return res.status(400).json({ error: 'Please enter a valid Telegram Chat ID first.' });
+    }
+
+    const result = await sendTestAlert(targetChatId, user?.username || 'Trader');
+    if (result.success) {
+      res.json({ success: true, message: 'Test message delivered to your Telegram account!' });
+    } else {
+      res.status(400).json({ error: result.error || 'Failed to deliver test message to Telegram.' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🛡️ Admin Telegram Traffic & Peak Protection Endpoints
+app.get('/api/admin/telegram/config', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const config = getTelegramSystemConfig();
+    const connectedUsersCount = await db('users').whereNotNull('telegram_chat_id').where('telegram_alerts_enabled', true).count('* as count').first();
+    res.json({ success: true, config, connectedUsers: Number(connectedUsersCount?.count || 0) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/telegram/config', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const updated = updateTelegramSystemConfig(req.body);
+    res.json({ success: true, message: 'Telegram system configuration updated!', config: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/telegram/broadcast', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'Message content is required' });
+
+    const result = await broadcastTelegramMessage(message);
+    res.json(result);
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -27,7 +27,8 @@ export default function SettingsView() {
   const { 
     user, updatePassword, logout, oneClickMode, setOneClickMode, 
     oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails,
-    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
+    telegramSettings, telegramSettingsLoading, fetchTelegramSettings, saveTelegramSettings, sendTelegramTest
   } = useStore(useShallow(state => ({ 
     user: state.user, 
     updatePassword: state.updatePassword, 
@@ -42,13 +43,43 @@ export default function SettingsView() {
     userSessionsLoading: state.userSessionsLoading,
     fetchUserSessions: state.fetchUserSessions,
     revokeOtherSessions: state.revokeOtherSessions,
-    revokeSession: state.revokeSession
+    revokeSession: state.revokeSession,
+    telegramSettings: state.telegramSettings,
+    telegramSettingsLoading: state.telegramSettingsLoading,
+    fetchTelegramSettings: state.fetchTelegramSettings,
+    saveTelegramSettings: state.saveTelegramSettings,
+    sendTelegramTest: state.sendTelegramTest
   })));
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
   const [soundActive, setSoundActive] = useState(() => isSoundEnabled());
+
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
+  const [telegramOrders, setTelegramOrders] = useState(true);
+  const [telegramTargets, setTelegramTargets] = useState(true);
+  const [telegramStoploss, setTelegramStoploss] = useState(true);
+  const [telegramRisk, setTelegramRisk] = useState(true);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramMsg, setTelegramMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    fetchTelegramSettings();
+  }, []);
+
+  useEffect(() => {
+    if (telegramSettings) {
+      setTelegramChatId(telegramSettings.telegram_chat_id || '');
+      setTelegramEnabled(!!telegramSettings.telegram_alerts_enabled);
+      setTelegramOrders(telegramSettings.telegram_alert_orders !== false);
+      setTelegramTargets(telegramSettings.telegram_alert_targets !== false);
+      setTelegramStoploss(telegramSettings.telegram_alert_stoploss !== false);
+      setTelegramRisk(telegramSettings.telegram_alert_risk !== false);
+    }
+  }, [telegramSettings]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -492,6 +523,241 @@ export default function SettingsView() {
               <span>⚠️ Test Risk Guardian Alert</span>
               <Play size={14} />
             </button>
+          </div>
+        </div>
+
+        {/* Telegram Live Trade & Risk Alerts Card */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(0, 136, 204, 0.15)', color: '#0088cc', padding: '10px', borderRadius: '50%' }}>
+                <Send size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
+                  Telegram Live Trade & Risk Alerts
+                  <span style={{
+                    fontSize: '10.5px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: telegramEnabled && telegramChatId ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)',
+                    color: telegramEnabled && telegramChatId ? '#4ade80' : 'var(--text-secondary)',
+                    border: telegramEnabled && telegramChatId ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border-color)'
+                  }}>
+                    {telegramEnabled && telegramChatId ? '🟢 ACTIVE' : '⚪ NOT LINKED'}
+                  </span>
+                </h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Receive instant, zero-delay trade execution, target hit, stop-loss trigger, and risk limit alerts directly on your phone via Telegram.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                const next = !telegramEnabled;
+                setTelegramEnabled(next);
+                setTelegramSaving(true);
+                const res = await saveTelegramSettings({
+                  telegram_chat_id: telegramChatId,
+                  telegram_alerts_enabled: next,
+                  telegram_alert_orders: telegramOrders,
+                  telegram_alert_targets: telegramTargets,
+                  telegram_alert_stoploss: telegramStoploss,
+                  telegram_alert_risk: telegramRisk
+                });
+                setTelegramSaving(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: next ? 'Telegram alerts enabled!' : 'Telegram alerts disabled.' });
+                  setTimeout(() => setTelegramMsg({ type: '', text: '' }), 3000);
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to update Telegram status' });
+                }
+              }}
+              disabled={telegramSaving}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: telegramEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                border: telegramEnabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
+                color: telegramEnabled ? '#4ade80' : '#ef4444',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              {telegramEnabled ? <Check size={16} /> : <X size={16} />}
+              {telegramEnabled ? 'Telegram Alerts (ON)' : 'Telegram Alerts (OFF)'}
+            </button>
+          </div>
+
+          {telegramMsg.text && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              fontSize: '12.5px',
+              fontWeight: '600',
+              marginBottom: '16px',
+              background: telegramMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${telegramMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              color: telegramMsg.type === 'success' ? '#4ade80' : '#ef4444'
+            }}>
+              {telegramMsg.text}
+            </div>
+          )}
+
+          {/* Telegram Bot Setup Step Guide */}
+          <div style={{
+            background: 'rgba(0, 136, 204, 0.05)',
+            border: '1px solid rgba(0, 136, 204, 0.2)',
+            borderRadius: '10px',
+            padding: '16px 20px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#38bdf8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📱 3 Simple Steps to Connect:</span>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
+              <li>Open our official Telegram Bot: <a href={`https://t.me/${telegramSettings?.bot_username || 'ShortEdgeAlerts_bot'}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontWeight: '700', textDecoration: 'underline' }}>@{telegramSettings?.bot_username || 'ShortEdgeAlerts_bot'} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /></a></li>
+              <li>Click <strong>Start</strong> (or send <code>/start</code>) in the chat. The bot will reply with your unique <strong>Chat ID</strong>.</li>
+              <li>Paste your <strong>Chat ID</strong> below, choose your alert preferences, and click <strong>Save & Connect</strong>.</li>
+            </ol>
+          </div>
+
+          {/* Chat ID Input & Test Button Form */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto auto', gap: '12px', alignItems: 'flex-end', marginBottom: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                Telegram Chat ID
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                value={telegramChatId}
+                onChange={e => setTelegramChatId(e.target.value)}
+                placeholder="e.g. 1234567890"
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setTelegramSaving(true);
+                setTelegramMsg({ type: '', text: '' });
+                const res = await saveTelegramSettings({
+                  telegram_chat_id: telegramChatId,
+                  telegram_alerts_enabled: telegramEnabled,
+                  telegram_alert_orders: telegramOrders,
+                  telegram_alert_targets: telegramTargets,
+                  telegram_alert_stoploss: telegramStoploss,
+                  telegram_alert_risk: telegramRisk
+                });
+                setTelegramSaving(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: '✅ Telegram Chat ID saved successfully!' });
+                  setTimeout(() => setTelegramMsg({ type: '', text: '' }), 3500);
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to save Chat ID' });
+                }
+              }}
+              disabled={telegramSaving}
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {telegramSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save & Connect
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!telegramChatId) {
+                  setTelegramMsg({ type: 'error', text: 'Please enter your Telegram Chat ID first.' });
+                  return;
+                }
+                setTelegramTesting(true);
+                setTelegramMsg({ type: '', text: '' });
+                const res = await sendTelegramTest(telegramChatId);
+                setTelegramTesting(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: '🚀 Test alert sent! Please check your Telegram chat.' });
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to send test message to Telegram.' });
+                }
+              }}
+              disabled={telegramTesting || !telegramChatId}
+              className="btn btn-secondary"
+              style={{ padding: '10px 18px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {telegramTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send Test Alert
+            </button>
+          </div>
+
+          {/* Granular Alert Preferences Toggles */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>
+              🔔 Active Alert Triggers:
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramOrders}
+                  onChange={e => setTelegramOrders(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚡ Order Executions</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant fill pings for Market & Limit</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramTargets}
+                  onChange={e => setTelegramTargets(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🎯 Target Hits</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Take-Profit reached with realized profit</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramStoploss}
+                  onChange={e => setTelegramStoploss(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🛑 Stop-Loss Triggers</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant risk exit alerts</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramRisk}
+                  onChange={e => setTelegramRisk(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚠️ Risk Guardian</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Daily loss / trade limit warnings</div>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 

@@ -2009,6 +2009,132 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  // ── Telegram Live Trade & Risk Alerts ─────────────────────────────────────
+  telegramSettings: null,
+  telegramSettingsLoading: false,
+
+  fetchTelegramSettings: async () => {
+    try {
+      set({ telegramSettingsLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/settings`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ telegramSettings: data });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchTelegramSettings error:', e);
+    } finally {
+      set({ telegramSettingsLoading: false });
+    }
+    return null;
+  },
+
+  saveTelegramSettings: async (settings) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(settings)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTelegramSettings();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to save Telegram settings' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  sendTelegramTest: async (chatId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ chat_id: chatId })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to send test message' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Admin Telegram Traffic & Peak Protection
+  telegramAdminConfig: null,
+  fetchTelegramAdminConfig: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/config`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ telegramAdminConfig: data });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchTelegramAdminConfig error:', e);
+    }
+    return null;
+  },
+
+  updateTelegramAdminConfig: async (config) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(config)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTelegramAdminConfig();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to update Telegram admin config' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  broadcastTelegramMessage: async (message) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
 }), {
   name: 'shortmarket-storage',
   partialize: (state) => ({
