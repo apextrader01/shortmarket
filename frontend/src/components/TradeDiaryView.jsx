@@ -881,7 +881,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: isMobile ? '12px 10px 80px 10px' : '24px 32px',
+          padding: isMobile ? '12px 10px 24px 10px' : '24px 32px',
           WebkitOverflowScrolling: 'touch'
         }}>
           {/* ══════════════════════════════════════════════════════════════ */}
@@ -889,16 +889,16 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'DASHBOARD' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1400px', margin: '0 auto' }}>
-              {/* Top Filters & "+ New Trade" Row */}
+              {/* Top Filters & "+ New Trade" Row (Single clean line on all screens) */}
               <div style={{ 
                 display: 'flex', 
-                flexDirection: isSmallMobile ? 'column' : 'row',
-                alignItems: isSmallMobile ? 'stretch' : 'center', 
-                justifyContent: 'flex-end', 
-                gap: '8px' 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                gap: '8px',
+                width: '100%'
               }}>
-                <div style={{ display: 'flex', gap: '8px', width: isSmallMobile ? '100%' : 'auto' }}>
-                  <div style={{ position: 'relative', flex: 1 }}>
+                <div style={{ display: 'flex', gap: '6px', flex: 1, minWidth: 0, maxWidth: isMobile ? '100%' : '320px' }}>
+                  <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                     <select
                       value={marketSegment}
                       onChange={(e) => setMarketSegment(e.target.value)}
@@ -907,25 +907,27 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                         backgroundColor: colors.bgInput,
                         border: `1px solid ${colors.borderColor}`,
                         color: colors.textPrimary,
-                        padding: '7px 26px 7px 10px',
+                        padding: isMobile ? '6px 22px 6px 8px' : '7px 26px 7px 10px',
                         borderRadius: '8px',
-                        fontSize: '12px',
+                        fontSize: isMobile ? '11px' : '12px',
                         fontWeight: '600',
                         cursor: 'pointer',
                         appearance: 'none',
                         outline: 'none',
-                        boxShadow: colors.cardShadow
+                        boxShadow: colors.cardShadow,
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       <option value="Indian">🌐 Indian</option>
                       <option value="Crypto">⚡ Crypto</option>
                       <option value="Forex">💱 Forex</option>
-                      <option value="US">🇺🇸 US Stocks</option>
+                      <option value="US">🇺🇸 US</option>
                     </select>
-                    <ChevronDown size={13} color={colors.textSecondary} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                    <ChevronDown size={12} color={colors.textSecondary} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   </div>
 
-                  <div style={{ position: 'relative', flex: 1 }}>
+                  <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                     <select
                       value={timeRange}
                       onChange={(e) => setTimeRange(e.target.value)}
@@ -934,14 +936,16 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                         backgroundColor: colors.bgInput,
                         border: `1px solid ${colors.borderColor}`,
                         color: colors.textPrimary,
-                        padding: '7px 26px 7px 10px',
+                        padding: isMobile ? '6px 22px 6px 8px' : '7px 26px 7px 10px',
                         borderRadius: '8px',
-                        fontSize: '12px',
+                        fontSize: isMobile ? '11px' : '12px',
                         fontWeight: '600',
                         cursor: 'pointer',
                         appearance: 'none',
                         outline: 'none',
-                        boxShadow: colors.cardShadow
+                        boxShadow: colors.cardShadow,
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       <option value="TODAY">📅 Today</option>
@@ -951,7 +955,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                       <option value="1Y">📅 1 Year</option>
                       <option value="ALL">📅 All Time</option>
                     </select>
-                    <ChevronDown size={13} color={colors.textSecondary} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                    <ChevronDown size={12} color={colors.textSecondary} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                   </div>
                 </div>
 
@@ -960,21 +964,23 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                   style={{
                     backgroundColor: '#2563eb',
                     color: '#ffffff',
-                    padding: isSmallMobile ? '9px 16px' : '7px 14px',
+                    padding: isMobile ? '6px 12px' : '7px 14px',
                     borderRadius: '8px',
-                    fontSize: '12px',
+                    fontSize: isMobile ? '11px' : '12px',
                     fontWeight: '700',
                     border: 'none',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-                    transition: 'background 0.15s'
+                    transition: 'background 0.15s',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  <Plus size={15} /> New Trade
+                  <Plus size={14} /> {isTinyMobile ? 'Trade' : (isSmallMobile ? '+ Trade' : 'New Trade')}
                 </button>
               </div>
 
