@@ -3,7 +3,7 @@ import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -34,7 +34,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const { user, orders, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode } = useStore(useShallow(state => ({ 
+  const { 
+    user, orders, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, 
+    fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode,
+    telegramSettings, fetchTelegramSettings
+  } = useStore(useShallow(state => ({ 
     user: state.user,
     orders: state.orders, 
     logout: state.logout, 
@@ -48,7 +52,9 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     accessibilityMode: state.accessibilityMode,
     setAccessibilityMode: state.setAccessibilityMode,
     oneClickMode: state.oneClickMode,
-    setOneClickMode: state.setOneClickMode
+    setOneClickMode: state.setOneClickMode,
+    telegramSettings: state.telegramSettings,
+    fetchTelegramSettings: state.fetchTelegramSettings
   })));
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -56,6 +62,10 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+
+  useEffect(() => {
+    fetchTelegramSettings?.();
+  }, [fetchTelegramSettings]);
     // 🛡️ Risk Guardian State
   const [isRiskActive, setIsRiskActive] = useState(() => !!(user && user.risk_guardian_active));
   const [maxTrades, setMaxTrades] = useState(() => (user && user.max_daily_trades) || 4);
@@ -346,11 +356,32 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
               Client ID: {user?.client_id || user?.id}
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '2px' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
               Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div onClick={() => setShowProfile(true)} style={{ fontSize: '11px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE &rarr;</div>
-            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
+            <div style={{ marginTop: '6px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                onClick={() => setShowProfile(true)} 
+                className="btn btn-secondary"
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '5px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  borderColor: 'rgba(59, 130, 246, 0.35)',
+                  color: 'var(--color-blue-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Settings size={13} /> Profile & Settings (Telegram, Passwords, Security) &rarr;
+              </button>
+            </div>
+            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '11px' }}>
@@ -590,7 +621,53 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 </div>
               </div>
 
-              
+              {/* Telegram Live Trade Alerts (Zero Delay Bot) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Send size={15} color="#0088cc" /> Telegram Live Alerts & Notifications
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      background: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)',
+                      color: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '#4ade80' : 'var(--text-secondary)',
+                      border: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '1px solid rgba(34,197,94,0.35)' : '1px solid var(--border-color)'
+                    }}>
+                      {telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '🟢 Connected' : '⚪ Not Linked'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    {telegramSettings?.settings?.telegram_chat_id 
+                      ? `Linked to Chat ID: ${telegramSettings.settings.telegram_chat_id}. Instant order fills, target hits & stop-loss alerts active.`
+                      : 'Receive instant, zero-delay order fill, target hit & stop-loss notifications directly on your phone via Telegram.'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowProfile(true)}
+                    style={{
+                      padding: '7px 14px',
+                      background: 'linear-gradient(135deg, #0088cc 0%, #006699 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '11.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(0, 136, 204, 0.3)'
+                    }}
+                  >
+                    <Send size={12} /> {telegramSettings?.settings?.telegram_chat_id ? 'Manage Telegram Settings' : 'Connect Telegram Bot 📲'}
+                  </button>
+                </div>
+              </div>
+
               {/* 🛡️ Risk Guardian (Capital & Trade Discipline) */}
               <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
