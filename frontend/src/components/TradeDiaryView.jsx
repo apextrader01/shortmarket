@@ -705,7 +705,12 @@ const [riskCalc, setRiskCalc] = useState({
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayStr);
 
   // Challenge State
-  const [challengeDay, setChallengeDay] = useState(14);
+  
+  const [selectedChallengeDayInfo, setSelectedChallengeDayInfo] = useState(null);
+  const [showDailyPledgeModal, setShowDailyPledgeModal] = useState(false);
+  const [challengeType, setChallengeType] = useState('PROP_30');
+  const [dailyPledgeItems, setDailyPledgeItems] = useState({ planFollowed: true, riskRespected: true, noRevenge: true, loggedCompletely: true });
+const [challengeDay, setChallengeDay] = useState(14);
   const [claimedToday, setClaimedToday] = useState(false);
 
   // Affiliate State
@@ -7237,123 +7242,229 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 11. CHALLENGE SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'CHALLENGE' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Trophy size={20} color="#f59e0b" /> 30-Day Discipline Challenge
-                  </h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Strict rule adherence challenge. Complete 30 trading days to earn the Master Prop Trader Certificate.</p>
-                </div>
-                <button
-                  onClick={() => setShowCertificateModal(true)}
-                  style={{
-                    backgroundColor: colors.bgInner,
-                    border: `1px solid ${colors.borderColor}`,
-                    color: colors.textPrimary,
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Award size={14} color="#f59e0b" /> View Certificate
-                </button>
-              </div>
+          {activeTab === 'CHALLENGE' && (() => {
+            const challengesList = [
+              { id: 'PROP_30', name: '🏆 30-Day Prop Consistency', targetDays: 30, currentDay: challengeDay, desc: 'Execute 30 consecutive sessions respecting daily risk and stop-losses.' },
+              { id: 'FOMO_14', name: '🛡️ 14-Day Zero FOMO Sprint', targetDays: 14, currentDay: 14, desc: 'Zero impulsive entries on green candles without pullback confirmation.' },
+              { id: 'RR_21', name: '⚡ 21-Day 1:2 R:R Master', targetDays: 21, currentDay: 15, desc: 'Maintain minimum 1:2 risk-to-reward on all closed journal trades.' }
+            ];
 
-              {/* Progress Card */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '24px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: colors.cardShadow }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>Current Progress: Day {challengeDay} of 30</span>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#2563eb' }}>{Math.round((challengeDay / 30) * 100)}% Complete</span>
-                </div>
-                <div style={{ height: '8px', borderRadius: '4px', backgroundColor: colors.bgInner, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(challengeDay / 30) * 100}%`, backgroundColor: '#2563eb' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                  <span style={{ fontSize: '11px', color: colors.textSecondary }}>🔥 Active Streak: 14 Days Zero Rule Breaks</span>
-                  <button
-                    onClick={() => {
-                      if (!claimedToday) {
-                        setChallengeDay(d => Math.min(30, d + 1));
-                        setClaimedToday(true);
-                      }
-                    }}
-                    disabled={claimedToday}
-                    style={{
-                      backgroundColor: claimedToday ? colors.accentGreen : '#2563eb',
-                      color: '#ffffff',
-                      padding: '6px 14px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      border: 'none',
-                      cursor: claimedToday ? 'default' : 'pointer'
-                    }}
-                  >
-                    {claimedToday ? '✓ Checked-In Today' : 'Check In for Today'}
-                  </button>
-                </div>
-              </div>
+            const activeChallenge = challengesList.find(c => c.id === challengeType) || challengesList[0];
+            const pctComplete = Math.min(100, Math.round((activeChallenge.currentDay / activeChallenge.targetDays) * 100));
 
-              {/* 30 Day Interactive Grid */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px' }}>Challenge Calendar Checklist</div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(10, 1fr)', gap: '6px' }}>
-                  {Array.from({ length: 30 }).map((_, i) => {
-                    const day = i + 1;
-                    const isDone = day <= challengeDay;
-                    const isCurrent = day === challengeDay;
-                    return (
-                      <div
-                        key={day}
-                        style={{
-                          backgroundColor: isDone ? 'rgba(16, 185, 129, 0.12)' : (isCurrent ? 'rgba(37, 99, 235, 0.15)' : colors.bgInner),
-                          border: isCurrent ? '2px solid #2563eb' : `1px solid ${isDone ? 'rgba(16, 185, 129, 0.3)' : colors.borderColor}`,
-                          borderRadius: '8px',
-                          padding: '8px 4px',
-                          textAlign: 'center',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px'
-                        }}
-                      >
-                        <span style={{ fontSize: '10px', color: colors.textMuted }}>D{day}</span>
-                        <span style={{ fontSize: '12px', fontWeight: '800', color: isDone ? colors.accentGreen : colors.textPrimary }}>
-                          {isDone ? '✓' : (day === 30 ? '🏆' : '🔒')}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Badges Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px' }}>
-                {[
-                  { name: 'Day 1 Kickoff', icon: '🔰', unlocked: true },
-                  { name: '7-Day Zero FOMO', icon: '🛡️', unlocked: true },
-                  { name: '14-Day Discipline', icon: '🎯', unlocked: true },
-                  { name: '30-Day Master Prop', icon: '🏆', unlocked: false }
-                ].map((b, i) => (
-                  <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '16px', textAlign: 'center', opacity: b.unlocked ? 1 : 0.45 }}>
-                    <div style={{ fontSize: '28px', marginBottom: '6px' }}>{b.icon}</div>
-                    <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{b.name}</div>
-                    <div style={{ fontSize: '10px', color: b.unlocked ? colors.accentGreen : colors.textMuted, marginTop: '2px', fontWeight: '600' }}>
-                      {b.unlocked ? 'UNLOCKED' : 'LOCKED'}
-                    </div>
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Header & Main Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Trophy size={22} color="#f59e0b" /> Trader Discipline & Prop Consistency Challenge
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Quantify and build unbreakable execution habits to unlock the Master Prop Trader Diploma.
+                    </p>
                   </div>
-                ))}
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Challenge Track Switcher */}
+                    <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
+                      {challengesList.map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => setChallengeType(c.id)}
+                          style={{
+                            backgroundColor: challengeType === c.id ? '#2563eb' : 'transparent',
+                            color: challengeType === c.id ? '#ffffff' : colors.textSecondary,
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 9px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {c.name.split(' ')[0]} {c.name.split(' ')[1]}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setShowCertificateModal(true)}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '7px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Award size={15} /> View Diploma
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 KPI Discipline Matrix Strip */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
+                  {[
+                    { label: 'DISCIPLINE ADHERENCE', val: '96.8% (Flawless)', color: colors.accentGreen },
+                    { label: 'ACTIVE STREAK', val: `${challengeDay} Days Active`, color: '#2563eb' },
+                    { label: 'CHALLENGE P&L', val: formatMoney(54800, marketSegment), color: colors.accentGreen },
+                    { label: 'TRADER GRADE', val: '⭐ A+ (Prop Ready)', color: '#f59e0b' }
+                  ].map((k, i) => (
+                    <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: k.color, marginTop: '3px' }}>{k.val}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Main Progress Card */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
+                        {activeChallenge.name}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: colors.textSecondary, marginTop: '2px' }}>
+                        {activeChallenge.desc}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: '#2563eb' }}>
+                      {pctComplete}% Complete (Day {activeChallenge.currentDay} of {activeChallenge.targetDays})
+                    </span>
+                  </div>
+
+                  {/* Multi-segmented Progress Bar */}
+                  <div style={{ height: '10px', borderRadius: '5px', backgroundColor: colors.bgInner, overflow: 'hidden', display: 'flex' }}>
+                    <div style={{ height: '100%', width: `${pctComplete}%`, backgroundColor: '#2563eb', transition: 'width 0.4s ease' }} />
+                  </div>
+
+                  {/* Bottom Strip & Daily Check-In Pledge Button */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🔥 <b>Active Streak:</b> {challengeDay} Days Zero Rule Violations
+                    </span>
+
+                    <button
+                      onClick={() => setShowDailyPledgeModal(true)}
+                      style={{
+                        backgroundColor: claimedToday ? colors.accentGreen : '#2563eb',
+                        color: '#ffffff',
+                        padding: '7px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {claimedToday ? '✓ Checked-In Today (Pledge Signed)' : '📝 Sign Daily Discipline Pledge'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Interactive 30-Day Calendar Checklist Grid */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={16} color="#2563eb" /> Challenge Calendar Checklist (Click day for session details)
+                    </div>
+                    <span style={{ fontSize: '11px', color: colors.textMuted }}>Days 1–{challengeDay} Completed</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(10, 1fr)', gap: '8px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const day = i + 1;
+                      const isDone = day < challengeDay;
+                      const isCurrent = day === challengeDay;
+                      const isLocked = day > challengeDay;
+
+                      return (
+                        <div
+                          key={day}
+                          onClick={() => {
+                            setSelectedChallengeDayInfo({
+                              day,
+                              status: isDone ? 'COMPLETED' : (isCurrent ? 'ACTIVE_TODAY' : 'LOCKED'),
+                              adherence: isDone ? '100% (Zero Violations)' : (isCurrent ? '95% (In Progress)' : 'Upcoming'),
+                              pnl: isDone ? (day * 320 + 1200) : (isCurrent ? 4200 : 0),
+                              rulesObeyed: ['Pre-market checklist completed', 'Stop-loss respected immediately', 'Max 3 trades daily ceiling', 'Emotions documented in journal'],
+                              market: marketSegment
+                            });
+                          }}
+                          style={{
+                            backgroundColor: isDone ? 'rgba(16, 185, 129, 0.12)' : (isCurrent ? 'rgba(37, 99, 235, 0.15)' : colors.bgInner),
+                            border: isCurrent ? '2px solid #2563eb' : `1px solid ${isDone ? 'rgba(16, 185, 129, 0.3)' : colors.borderColor}`,
+                            borderRadius: '10px',
+                            padding: '10px 4px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            opacity: isLocked ? 0.45 : 1
+                          }}
+                        >
+                          <span style={{ fontSize: '10.5px', color: colors.textMuted, fontWeight: '700' }}>D{day}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '800', color: isDone ? colors.accentGreen : (isCurrent ? '#2563eb' : colors.textPrimary) }}>
+                            {isDone ? '✓' : (day === 30 ? '🏆' : (isCurrent ? '🎯' : '🔒'))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 5 Milestone Badges Progression Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px' }}>
+                  {[
+                    { name: 'Day 1 Kickoff', icon: '🔰', unlocked: true, reward: 'Basic Journal Access' },
+                    { name: '7-Day Zero FOMO', icon: '🛡️', unlocked: true, reward: 'AI Coach Audit' },
+                    { name: '14-Day Discipline', icon: '🎯', unlocked: true, reward: 'Monte Carlo Simulator' },
+                    { name: '21-Day Precision', icon: '⚡', unlocked: false, reward: 'Dark Pool Heatmaps' },
+                    { name: '30-Day Master Prop', icon: '🏆', unlocked: false, reward: 'Certified Diploma' }
+                  ].map((b, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        backgroundColor: colors.bgCard,
+                        border: `1px solid ${b.unlocked ? colors.borderColor : colors.borderColor}`,
+                        borderRadius: '12px',
+                        padding: '16px 12px',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: colors.cardShadow,
+                        opacity: b.unlocked ? 1 : 0.45
+                      }}
+                    >
+                      <div style={{ fontSize: '28px' }}>{b.icon}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{b.name}</div>
+                      <span style={{ fontSize: '9.5px', color: colors.textSecondary }}>{b.reward}</span>
+                      <div style={{ fontSize: '10px', color: b.unlocked ? colors.accentGreen : colors.textMuted, marginTop: '2px', fontWeight: '800' }}>
+                        {b.unlocked ? '✓ UNLOCKED' : 'LOCKED'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 12. CALENDAR SUB-VIEW                                          */}
@@ -9076,6 +9187,112 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 Post
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* 13. CHALLENGE DAY MILESTONE INSPECTOR MODAL */}
+      {selectedChallengeDayInfo && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '460px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Trophy size={18} color="#f59e0b" /> Challenge Session: Day {selectedChallengeDayInfo.day} of 30
+              </div>
+              <button onClick={() => setSelectedChallengeDayInfo(null)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: colors.bgInner, padding: '12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+              <div>
+                <span style={{ fontSize: '10px', color: colors.textMuted }}>STATUS</span>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: selectedChallengeDayInfo.status === 'COMPLETED' ? colors.accentGreen : '#2563eb' }}>
+                  {selectedChallengeDayInfo.status === 'COMPLETED' ? '✓ COMPLETED' : (selectedChallengeDayInfo.status === 'ACTIVE_TODAY' ? '● ACTIVE TODAY' : '🔒 LOCKED')}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '10px', color: colors.textMuted }}>NET SESSION P&L</span>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: selectedChallengeDayInfo.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
+                  {selectedChallengeDayInfo.pnl > 0 ? '+' : ''}{formatMoneyPlain(selectedChallengeDayInfo.pnl, selectedChallengeDayInfo.market)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '12px', color: colors.textSecondary, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <b>Rules Verified for this Session:</b>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {selectedChallengeDayInfo.rulesObeyed.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: colors.textPrimary }}>
+                    <CheckCircle size={13} color={colors.accentGreen} /> {r}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+              <button onClick={() => setSelectedChallengeDayInfo(null)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 14. DAILY DISCIPLINE PLEDGE SIGNING MODAL */}
+      {showDailyPledgeModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={18} color="#2563eb" /> Daily Trader Discipline Pledge (Day {challengeDay})
+              </div>
+              <button onClick={() => setShowDailyPledgeModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <p style={{ fontSize: '12px', color: colors.textSecondary, margin: 0 }}>
+              Affirm your professional execution standards before completing today's check-in:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[
+                { key: 'planFollowed', text: 'I honored my predetermined setup rules and pre-calculated position sizing.' },
+                { key: 'riskRespected', text: 'I never moved my stop-loss further away once the trade was active.' },
+                { key: 'noRevenge', text: 'I stayed emotionally neutral and executed zero revenge trades after stop-outs.' },
+                { key: 'loggedCompletely', text: 'I logged all session trades and documented emotional mistakes in my Trade Diary.' }
+              ].map((item) => (
+                <label key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: colors.textPrimary, backgroundColor: colors.bgInner, padding: '10px 12px', borderRadius: '8px', border: `1px solid ${colors.borderColor}`, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={dailyPledgeItems[item.key]}
+                    onChange={(e) => setDailyPledgeItems({ ...dailyPledgeItems, [item.key]: e.target.checked })}
+                    style={{ marginTop: '2px', cursor: 'pointer' }}
+                  />
+                  <span>{item.text}</span>
+                </label>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+              <button type="button" onClick={() => setShowDailyPledgeModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setClaimedToday(true);
+                  setShowDailyPledgeModal(false);
+                }}
+                disabled={!dailyPledgeItems.planFollowed || !dailyPledgeItems.riskRespected || !dailyPledgeItems.noRevenge}
+                style={{
+                  backgroundColor: (!dailyPledgeItems.planFollowed || !dailyPledgeItems.riskRespected || !dailyPledgeItems.noRevenge) ? colors.borderColor : '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '7px 16px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: (!dailyPledgeItems.planFollowed || !dailyPledgeItems.riskRespected || !dailyPledgeItems.noRevenge) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Sign Pledge & Check-In
+              </button>
+            </div>
           </div>
         </div>
       )}
