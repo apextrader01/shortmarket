@@ -29,6 +29,17 @@ function extractOptionStrike(symbol) {
   return 0;
 }
 
+const POPULAR_UNDERLYINGS = [
+  { label: 'NIFTY', symbol: 'NIFTY', indexKey: 'NSE:NIFTY50-INDEX', step: 50, lotsize: 25 },
+  { label: 'BANKNIFTY', symbol: 'BANKNIFTY', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100, lotsize: 15 },
+  { label: 'FINNIFTY', symbol: 'FINNIFTY', indexKey: 'NSE:FINNIFTY-INDEX', step: 50, lotsize: 25 },
+  { label: 'SENSEX', symbol: 'SENSEX', indexKey: 'BSE:SENSEX-INDEX', step: 100, lotsize: 10 },
+  { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25, lotsize: 50 },
+  { label: 'RELIANCE', symbol: 'RELIANCE', indexKey: 'NSE:RELIANCE-EQ', step: 20, lotsize: 250 },
+  { label: 'TCS', symbol: 'TCS', indexKey: 'NSE:TCS-EQ', step: 20, lotsize: 175 },
+  { label: 'HDFCBANK', symbol: 'HDFCBANK', indexKey: 'NSE:HDFCBANK-EQ', step: 20, lotsize: 550 }
+];
+
 export default function BasketModal() {
   const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
@@ -38,6 +49,7 @@ export default function BasketModal() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
 
   // Auto-subscribe to socket feed and fetch batch prices whenever basket opens or items change
   useEffect(() => {
@@ -274,19 +286,6 @@ export default function BasketModal() {
       alert("Failed to place basket orders. Please try again.");
     }
   };
-
-  const POPULAR_UNDERLYINGS = [
-    { label: 'NIFTY', symbol: 'NIFTY', indexKey: 'NSE:NIFTY50-INDEX', step: 50, lotsize: 25 },
-    { label: 'BANKNIFTY', symbol: 'BANKNIFTY', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100, lotsize: 15 },
-    { label: 'FINNIFTY', symbol: 'FINNIFTY', indexKey: 'NSE:FINNIFTY-INDEX', step: 50, lotsize: 25 },
-    { label: 'SENSEX', symbol: 'SENSEX', indexKey: 'BSE:SENSEX-INDEX', step: 100, lotsize: 10 },
-    { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25, lotsize: 50 },
-    { label: 'RELIANCE', symbol: 'RELIANCE', indexKey: 'NSE:RELIANCE-EQ', step: 20, lotsize: 250 },
-    { label: 'TCS', symbol: 'TCS', indexKey: 'NSE:TCS-EQ', step: 20, lotsize: 175 },
-    { label: 'HDFCBANK', symbol: 'HDFCBANK', indexKey: 'NSE:HDFCBANK-EQ', step: 20, lotsize: 550 }
-  ];
-
-  const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
 
   const applyPreset = (type, customUnderlying = null) => {
     const targetUnderlying = customUnderlying || selectedUnderlying;
