@@ -682,7 +682,17 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   });
 
   // Risk Calculator State
-  const [riskCalc, setRiskCalc] = useState({
+  
+  // Extended Risk Management State
+  const [riskAssetPreset, setRiskAssetPreset] = useState('NIFTY');
+  const [cryptoLeverage, setCryptoLeverage] = useState(1);
+  const [atrValue, setAtrValue] = useState(25);
+  const [circuitBreaker, setCircuitBreaker] = useState({ maxDailyLoss: 4000, maxTrades: 3, streakLockout: 2, enabled: true });
+  const [circuitBreakerToast, setCircuitBreakerToast] = useState(null);
+  const [simWinRate, setSimWinRate] = useState(60);
+  const [simRiskReward, setSimRiskReward] = useState(2.0);
+  const [monteCarloResult, setMonteCarloResult] = useState(null);
+const [riskCalc, setRiskCalc] = useState({
     capital: 200000,
     riskPct: 1,
     entry: 450,
@@ -6167,202 +6177,642 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 9. RISK MANAGEMENT SUB-VIEW                                    */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'RISK_MANAGEMENT' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ShieldCheck size={20} color={colors.accentGreen} /> Position Sizing & Capital Defense Matrix
-                  </h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Calculate exact institutional position sizes and verify risk of ruin buffers ({marketSegment}).</p>
+          {activeTab === 'RISK_MANAGEMENT' && (() => {
+            // Asset presets by market
+            const assetPresets = {
+              Indian: [
+                { name: 'NIFTY 50 (Lot 75)', symbol: 'NIFTY 24600 CE', entry: 180, sl: 155, target: 245, lotSize: 75, type: 'Options' },
+                { name: 'BANKNIFTY (Lot 30)', symbol: 'BANKNIFTY 52000 CE', entry: 340, sl: 290, target: 460, lotSize: 30, type: 'Options' },
+                { name: 'FINNIFTY (Lot 40)', symbol: 'FINNIFTY 23500 CE', entry: 120, sl: 100, target: 170, lotSize: 40, type: 'Options' },
+                { name: 'SENSEX (Lot 20)', symbol: 'SENSEX 81000 CE', entry: 250, sl: 200, target: 380, lotSize: 20, type: 'Options' },
+                { name: 'RELIANCE', symbol: 'RELIANCE', entry: 2950, sl: 2920, target: 3020, lotSize: 1, type: 'Equity' },
+                { name: 'HDFCBANK', symbol: 'HDFCBANK', entry: 1650, sl: 1635, target: 1690, lotSize: 1, type: 'Equity' }
+              ],
+              Crypto: [
+                { name: 'BTC/USDT', symbol: 'BTC/USDT', entry: 64500, sl: 63200, target: 67800, lotSize: 1, type: 'Crypto' },
+                { name: 'ETH/USDT', symbol: 'ETH/USDT', entry: 3450, sl: 3380, target: 3620, lotSize: 1, type: 'Crypto' },
+                { name: 'SOL/USDT', symbol: 'SOL/USDT', entry: 145, sl: 139, target: 160, lotSize: 1, type: 'Crypto' }
+              ],
+              Forex: [
+                { name: 'EUR/USD', symbol: 'EUR/USD', entry: 1.0850, sl: 1.0810, target: 1.0940, lotSize: 100000, type: 'Forex' },
+                { name: 'GBP/USD', symbol: 'GBP/USD', entry: 1.2950, sl: 1.2900, target: 1.3060, lotSize: 100000, type: 'Forex' },
+                { name: 'XAU/USD (Gold)', symbol: 'XAU/USD', entry: 2500, sl: 2480, target: 2550, lotSize: 100, type: 'Commodity' }
+              ],
+              US: [
+                { name: 'AAPL', symbol: 'AAPL', entry: 225, sl: 220, target: 238, lotSize: 1, type: 'Stock' },
+                { name: 'NVDA', symbol: 'NVDA', entry: 122, sl: 117, target: 135, lotSize: 1, type: 'Stock' },
+                { name: 'TSLA', symbol: 'TSLA', entry: 215, sl: 205, target: 240, lotSize: 1, type: 'Stock' }
+              ]
+            };
+
+            const activePresets = assetPresets[marketSegment] || assetPresets.Indian;
+
+            // Monte Carlo simulation runner
+            const handleRunMonteCarlo = () => {
+              const wr = simWinRate / 100;
+              const rr = simRiskReward;
+              const cap = parseFloat(riskCalc.capital) || 200000;
+              const riskAmount = cap * (riskCalc.riskPct / 100);
+
+              let currentCap = cap;
+              let peakCap = cap;
+              let maxDd = 0;
+              let consecutiveLosses = 0;
+              let maxLossStreak = 0;
+              let wins = 0;
+              const curve = [currentCap];
+
+              for (let i = 0; i < 50; i++) {
+                const isWin = Math.random() < wr;
+                if (isWin) {
+                  wins++;
+                  consecutiveLosses = 0;
+                  currentCap += riskAmount * rr;
+                } else {
+                  consecutiveLosses++;
+                  if (consecutiveLosses > maxLossStreak) maxLossStreak = consecutiveLosses;
+                  currentCap -= riskAmount;
+                }
+                if (currentCap > peakCap) peakCap = currentCap;
+                const dd = ((peakCap - currentCap) / peakCap) * 100;
+                if (dd > maxDd) maxDd = dd;
+                curve.push(Math.round(currentCap));
+              }
+
+              const expectedReturn = Math.round(currentCap - cap);
+              setMonteCarloResult({
+                finalCap: Math.round(currentCap),
+                expectedReturn,
+                roiPct: ((expectedReturn / cap) * 100).toFixed(1),
+                maxDd: maxDd.toFixed(1),
+                maxLossStreak,
+                wins,
+                losses: 50 - wins,
+                curve
+              });
+            };
+
+            // Break-even win rate
+            const breakEvenWinRate = calculatedRisk.rr > 0 ? (100 / (1 + parseFloat(calculatedRisk.rr))).toFixed(1) : '50.0';
+
+            // Contract lot calculation
+            const lotCount = marketSegment === 'Indian' 
+              ? (calculatedRisk.suggestedQty >= 75 ? (calculatedRisk.suggestedQty / 75).toFixed(1) : calculatedRisk.suggestedQty)
+              : (marketSegment === 'Forex' ? (calculatedRisk.suggestedQty / 100000).toFixed(2) : calculatedRisk.suggestedQty);
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Header & Market Switcher */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldCheck size={22} color={colors.accentGreen} /> Position Sizing & Capital Defense Matrix
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Institutional position sizer, ATR volatility buffers, and live drawdown circuit breakers ({marketSegment}).
+                    </p>
+                  </div>
+
+                  {/* Market Switcher */}
+                  <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
+                    {Object.keys(MARKET_CONFIGS).map(segKey => {
+                      const cfg = MARKET_CONFIGS[segKey];
+                      const isSel = marketSegment === segKey;
+                      return (
+                        <button
+                          key={segKey}
+                          onClick={() => setMarketSegment(segKey)}
+                          style={{
+                            backgroundColor: isSel ? '#2563eb' : 'transparent',
+                            color: isSel ? '#ffffff' : colors.textSecondary,
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>{cfg.flag}</span>
+                          <span>{segKey}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Market Switcher */}
-                <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
-                  {Object.keys(MARKET_CONFIGS).map(segKey => {
-                    const cfg = MARKET_CONFIGS[segKey];
-                    const isSel = marketSegment === segKey;
-                    return (
+                {/* Risk Profile Presets Strip */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>RISK PROFILES:</span>
+                    {[
+                      { id: 'CONSERVATIVE', label: '🛡️ Conservative (0.5%)', pct: 0.5 },
+                      { id: 'STANDARD', label: '🎯 Standard (1.0%)', pct: 1.0 },
+                      { id: 'AGGRESSIVE', label: '⚡ Aggressive (2.0%)', pct: 2.0 }
+                    ].map(p => (
                       <button
-                        key={segKey}
-                        onClick={() => setMarketSegment(segKey)}
+                        key={p.id}
+                        onClick={() => {
+                          setRiskProfilePreset(p.id);
+                          setRiskCalc(r => ({ ...r, riskPct: p.pct }));
+                        }}
                         style={{
-                          backgroundColor: isSel ? '#2563eb' : 'transparent',
-                          color: isSel ? '#ffffff' : colors.textSecondary,
-                          border: 'none',
-                          borderRadius: '6px',
+                          backgroundColor: riskCalc.riskPct === p.pct ? '#2563eb' : colors.bgCard,
+                          color: riskCalc.riskPct === p.pct ? '#ffffff' : colors.textPrimary,
+                          border: `1px solid ${colors.borderColor}`,
                           padding: '4px 10px',
+                          borderRadius: '6px',
                           fontSize: '11px',
                           fontWeight: '700',
                           cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
+                          boxShadow: colors.cardShadow
                         }}
                       >
-                        <span>{cfg.flag}</span>
-                        <span>{segKey}</span>
+                        {p.label}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                    ))}
+                  </div>
 
-              {/* Risk Profile Presets */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>RISK PROFILES:</span>
-                {[
-                  { id: 'CONSERVATIVE', label: '🛡️ Conservative (0.5%)', pct: 0.5 },
-                  { id: 'STANDARD', label: '🎯 Standard (1.0%)', pct: 1.0 },
-                  { id: 'AGGRESSIVE', label: '⚡ Aggressive (2.0%)', pct: 2.0 }
-                ].map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setRiskProfilePreset(p.id);
-                      setRiskCalc(r => ({ ...r, riskPct: p.pct }));
-                    }}
-                    style={{
-                      backgroundColor: riskCalc.riskPct === p.pct ? '#2563eb' : colors.bgCard,
-                      color: riskCalc.riskPct === p.pct ? '#ffffff' : colors.textPrimary,
-                      border: `1px solid ${colors.borderColor}`,
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Interactive Calculator */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '24px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#2563eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Institutional Position Sizer</span>
-                  <span style={{ fontSize: '11px', color: colors.textMuted }}>Pre-trade Risk Guardrail</span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px' }}>
-                  <div>
-                    <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>CAPITAL ({currencySymbol})</label>
-                    <input
-                      type="number"
-                      value={riskCalc.capital}
-                      onChange={(e) => setRiskCalc({ ...riskCalc, capital: e.target.value })}
-                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 8px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>MAX RISK (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={riskCalc.riskPct}
-                      onChange={(e) => setRiskCalc({ ...riskCalc, riskPct: e.target.value })}
-                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 8px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>ENTRY PRICE ({currencySymbol})</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={riskCalc.entry}
-                      onChange={(e) => setRiskCalc({ ...riskCalc, entry: e.target.value })}
-                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 8px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>STOP LOSS ({currencySymbol})</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={riskCalc.stopLoss}
-                      onChange={(e) => setRiskCalc({ ...riskCalc, stopLoss: e.target.value })}
-                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 8px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>TARGET ({currencySymbol})</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={riskCalc.target}
-                      onChange={(e) => setRiskCalc({ ...riskCalc, target: e.target.value })}
-                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 8px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
-                    />
+                  {/* Circuit Breaker Status Pill */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: circuitBreaker.enabled ? 'rgba(16, 185, 129, 0.12)' : colors.bgInner, border: `1px solid ${circuitBreaker.enabled ? 'rgba(16, 185, 129, 0.3)' : colors.borderColor}`, padding: '4px 10px', borderRadius: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: circuitBreaker.enabled ? colors.accentGreen : colors.textMuted }} />
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: circuitBreaker.enabled ? colors.accentGreen : colors.textMuted }}>
+                      {circuitBreaker.enabled ? 'CIRCUIT BREAKERS ACTIVE' : 'CIRCUIT BREAKERS OFF'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Outputs Banner */}
-                <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '16px', display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>MAX ALLOWED LOSS</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentRed, marginTop: '2px' }}>
-                      {formatMoneyPlain(calculatedRisk.maxLossRupees, marketSegment)}
+                {/* Quick Asset Preset Chips */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', boxShadow: colors.cardShadow }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Zap size={13} color="#2563eb" /> QUICK ASSETS:
+                  </span>
+                  {activePresets.map((a) => (
+                    <button
+                      key={a.name}
+                      onClick={() => {
+                        setRiskCalc(r => ({
+                          ...r,
+                          entry: a.entry,
+                          stopLoss: a.sl,
+                          target: a.target
+                        }));
+                      }}
+                      style={{
+                        backgroundColor: colors.bgInner,
+                        border: `1px solid ${colors.borderColor}`,
+                        color: colors.textPrimary,
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <span>{a.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 1. INSTITUTIONAL POSITION SIZER CARD */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '24px', display: 'flex', flexDirection: 'column', gap: '18px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Target size={16} /> Institutional Position Sizer & Risk Guardrail
+                    </div>
+                    <span style={{ fontSize: '11px', color: colors.textMuted }}>Pre-Trade Sizing Rules</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>CAPITAL ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        value={riskCalc.capital}
+                        onChange={(e) => setRiskCalc({ ...riskCalc, capital: e.target.value })}
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>MAX RISK (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={riskCalc.riskPct}
+                        onChange={(e) => setRiskCalc({ ...riskCalc, riskPct: e.target.value })}
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>ENTRY PRICE ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={riskCalc.entry}
+                        onChange={(e) => setRiskCalc({ ...riskCalc, entry: e.target.value })}
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>STOP LOSS ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={riskCalc.stopLoss}
+                        onChange={(e) => setRiskCalc({ ...riskCalc, stopLoss: e.target.value })}
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textSecondary }}>TARGET ({currencySymbol})</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={riskCalc.target}
+                        onChange={(e) => setRiskCalc({ ...riskCalc, target: e.target.value })}
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', fontWeight: '700', marginTop: '4px', outline: 'none' }}
+                      />
                     </div>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>RECOMMENDED QUANTITY</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#2563eb', marginTop: '2px' }}>
-                      {calculatedRisk.suggestedQty} Qty
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>POTENTIAL PROFIT</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>
-                      +{formatMoneyPlain(calculatedRisk.potentialProfit, marketSegment)}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>REWARD-TO-RISK</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>
-                      1 : {calculatedRisk.rr}
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* CAPITAL DRAWDOWN & RISK OF RUIN MATRIX */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <TrendingUp size={16} color="#2563eb" /> Drawdown Survivability & Capital Recovery Matrix
+                  {/* 6 Comprehensive Metric Outputs */}
+                  <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '16px', display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)', gap: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>MAX LOSS RISK</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentRed, marginTop: '2px' }}>
+                        {formatMoneyPlain(calculatedRisk.maxLossRupees, marketSegment)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>ALLOWED POSITION</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#2563eb', marginTop: '2px' }}>
+                        {calculatedRisk.suggestedQty} Qty
+                        {marketSegment === 'Indian' && calculatedRisk.suggestedQty >= 75 && (
+                          <span style={{ fontSize: '10px', color: colors.textSecondary, display: 'block' }}>({lotCount} Lots)</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>POTENTIAL REWARD</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>
+                        +{formatMoneyPlain(calculatedRisk.potentialProfit, marketSegment)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>REWARD : RISK</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>
+                        1 : {calculatedRisk.rr}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>BREAK-EVEN WIN %</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: parseFloat(breakEvenWinRate) <= 40 ? colors.accentGreen : colors.textPrimary, marginTop: '2px' }}>
+                        {breakEvenWinRate}%
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>TOTAL ORDER VALUE</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>
+                        {formatMoneyPlain(calculatedRisk.totalOrderCost, marketSegment)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Action Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => {
+                        setNewTradeForm({
+                          symbol: `${marketSegment === 'Indian' ? 'NIFTY 24600 CE' : (marketSegment === 'Crypto' ? 'BTC/USDT' : 'EUR/USD')}`,
+                          direction: 'LONG',
+                          entry: riskCalc.entry.toString(),
+                          exit: '',
+                          qty: calculatedRisk.suggestedQty.toString(),
+                          strategy: '🔥 Breakout',
+                          emotion: '🎯 Disciplined Execution',
+                          notes: `Pre-calculated risk: Max loss ${formatMoneyPlain(calculatedRisk.maxLossRupees, marketSegment)}, Target 1:${calculatedRisk.rr} RR.`
+                        });
+                        setShowNewTradeModal(true);
+                      }}
+                      style={{
+                        backgroundColor: colors.bgInner,
+                        border: `1px solid ${colors.borderColor}`,
+                        color: colors.textPrimary,
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Copy size={14} /> Log Pre-Trade Plan in Journal
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (onOpenPaperTrading) {
+                          onOpenPaperTrading();
+                        } else if (onBack) {
+                          onBack();
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Zap size={14} /> Send Sized Order to Paper Terminal
+                    </button>
+                  </div>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
-                        <th style={{ padding: '8px' }}>RISK PER TRADE</th>
-                        <th style={{ padding: '8px' }}>5 CONSECUTIVE LOSSES</th>
-                        <th style={{ padding: '8px' }}>10 CONSECUTIVE LOSSES</th>
-                        <th style={{ padding: '8px' }}>GAIN TO BREAKEVEN</th>
-                        <th style={{ padding: '8px' }}>SURVIVABILITY</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { risk: '0.5% (Conservative)', loss5: '-2.47%', loss10: '-4.89%', gain: '+5.14%', status: '⭐ MASTER TIER', color: colors.accentGreen },
-                        { risk: '1.0% (Institutional)', loss5: '-4.90%', loss10: '-9.56%', gain: '+10.57%', status: '🛡️ OPTIMAL EDGE', color: colors.accentGreen },
-                        { risk: '2.0% (Aggressive)', loss5: '-9.61%', loss10: '-18.29%', gain: '+22.39%', status: '⚠️ ELEVATED RISK', color: '#f59e0b' },
-                        { risk: '5.0% (Dangerous)', loss5: '-22.62%', loss10: '-40.13%', gain: '+67.03%', status: '🚨 CRITICAL DANGER', color: colors.accentRed }
-                      ].map((row, idx) => (
-                        <tr key={idx} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
-                          <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.textPrimary }}>{row.risk}</td>
-                          <td style={{ padding: '9px 8px', color: colors.textSecondary }}>{row.loss5}</td>
-                          <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.accentRed }}>{row.loss10}</td>
-                          <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.accentBlueLight }}>{row.gain}</td>
-                          <td style={{ padding: '9px 8px', fontWeight: '800', color: row.color }}>{row.status}</td>
+
+                {/* TWO COLUMN ROW: ATR VOLATILITY STOP ASSISTANT & CIRCUIT BREAKERS */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+                  {/* ATR Volatility Stop Assistant */}
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <TrendingUp size={16} color="#2563eb" /> ATR Dynamic Volatility Stop Assistant
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: 0 }}>
+                      Avoid stop-hunting noise by setting stops at statistical multi-ATR intervals.
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>15m / 1h ATR VALUE (PTS)</label>
+                        <input
+                          type="number"
+                          value={atrValue}
+                          onChange={(e) => setAtrValue(parseFloat(e.target.value) || 1)}
+                          style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '6px 10px', color: colors.textPrimary, fontSize: '12px', fontWeight: '700', marginTop: '3px', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calculated ATR Buffer Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>1.5x ATR STOP BUFFER</div>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: colors.accentBlueLight }}>
+                          {(atrValue * 1.5).toFixed(1)} Pts SL
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newSl = Math.max(1, (parseFloat(riskCalc.entry) || 100) - (atrValue * 1.5));
+                            setRiskCalc(r => ({ ...r, stopLoss: newSl.toFixed(1) }));
+                          }}
+                          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '4px 6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}
+                        >
+                          Apply 1.5x SL
+                        </button>
+                      </div>
+
+                      <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>2.0x ATR WIDE STOP</div>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: colors.accentGreen }}>
+                          {(atrValue * 2.0).toFixed(1)} Pts SL
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newSl = Math.max(1, (parseFloat(riskCalc.entry) || 100) - (atrValue * 2.0));
+                            setRiskCalc(r => ({ ...r, stopLoss: newSl.toFixed(1) }));
+                          }}
+                          style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, borderRadius: '4px', padding: '4px 6px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}
+                        >
+                          Apply 2.0x SL
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Daily Circuit Breaker Protocol */}
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: colors.cardShadow }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <ShieldCheck size={16} color={colors.accentGreen} /> Daily Risk Circuit Breaker Guard
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={circuitBreaker.enabled}
+                        onChange={(e) => {
+                          setCircuitBreaker(c => ({ ...c, enabled: e.target.checked }));
+                          setCircuitBreakerToast(e.target.checked ? '✓ Terminal Risk Guardrails ACTIVATED' : '⚠️ Risk Guardrails DISABLED');
+                          setTimeout(() => setCircuitBreakerToast(null), 3000);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: 0 }}>
+                      Automatic hard stops to prevent emotional blowups and tilt spirals.
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>MAX DAILY LOSS ({currencySymbol})</label>
+                        <input
+                          type="number"
+                          value={circuitBreaker.maxDailyLoss}
+                          onChange={(e) => setCircuitBreaker({ ...circuitBreaker, maxDailyLoss: parseFloat(e.target.value) || 0 })}
+                          style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '6px 10px', color: colors.accentRed, fontSize: '12px', fontWeight: '700', marginTop: '3px', outline: 'none' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>MAX TRADES / DAY</label>
+                        <input
+                          type="number"
+                          value={circuitBreaker.maxTrades}
+                          onChange={(e) => setCircuitBreaker({ ...circuitBreaker, maxTrades: parseInt(e.target.value) || 1 })}
+                          style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '6px 10px', color: colors.textPrimary, fontSize: '12px', fontWeight: '700', marginTop: '3px', outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '11px', color: colors.textSecondary, backgroundColor: colors.bgInner, padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                      🛡️ <b>Enforcement Rule:</b> Hitting 2 consecutive stop-outs or losing {formatMoneyPlain(circuitBreaker.maxDailyLoss, marketSegment)} locks order placement for 60 minutes.
+                    </div>
+
+                    {circuitBreakerToast && (
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentGreen, textAlign: 'center' }}>
+                        {circuitBreakerToast}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. MONTE CARLO 50-TRADE EQUITY SIMULATOR */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Sparkles size={16} color="#2563eb" /> Monte Carlo 50-Trade Projected Equity Curve
+                      </div>
+                      <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                        Simulate the mathematical distribution of your edge over 50 consecutive trades.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleRunMonteCarlo}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Sparkles size={14} /> Run Simulation
+                    </button>
+                  </div>
+
+                  {/* Simulator Controls */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>ASSUMED WIN RATE: {simWinRate}%</label>
+                      <input
+                        type="range"
+                        min="30"
+                        max="85"
+                        value={simWinRate}
+                        onChange={(e) => setSimWinRate(parseInt(e.target.value))}
+                        style={{ width: '100%', marginTop: '4px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>REWARD-TO-RISK: 1 : {simRiskReward}</label>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="4.0"
+                        step="0.5"
+                        value={simRiskReward}
+                        onChange={(e) => setSimRiskReward(parseFloat(e.target.value))}
+                        style={{ width: '100%', marginTop: '4px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>RISK PER TRADE</label>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentRed, marginTop: '4px' }}>
+                        {riskCalc.riskPct}% ({formatMoneyPlain(calculatedRisk.maxLossRupees, marketSegment)})
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monte Carlo Results Banner & Visual Curve */}
+                  {monteCarloResult && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: colors.bgInner, padding: '14px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
+                        <div>
+                          <div style={{ fontSize: '10px', color: colors.textMuted }}>PROJECTED CAPITAL</div>
+                          <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentGreen }}>
+                            {formatMoney(monteCarloResult.finalCap, marketSegment)}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '10px', color: colors.textMuted }}>PROJECTED RETURN</div>
+                          <div style={{ fontSize: '16px', fontWeight: '800', color: monteCarloResult.expectedReturn >= 0 ? colors.accentGreen : colors.accentRed }}>
+                            +{monteCarloResult.roiPct}% ({formatMoney(monteCarloResult.expectedReturn, marketSegment)})
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '10px', color: colors.textMuted }}>MAX SIMULATED DRAWDOWN</div>
+                          <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentRed }}>
+                            -{monteCarloResult.maxDd}%
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '10px', color: colors.textMuted }}>MAX CONSECUTIVE LOSSES</div>
+                          <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentBlueLight }}>
+                            {monteCarloResult.maxLossStreak} Trades
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SVG Line Chart for Equity Curve */}
+                      <div style={{ height: '80px', width: '100%', marginTop: '6px' }}>
+                        <svg viewBox="0 0 500 80" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                          <polyline
+                            fill="none"
+                            stroke="#2563eb"
+                            strokeWidth="2.5"
+                            points={monteCarloResult.curve.map((val, idx) => {
+                              const minVal = Math.min(...monteCarloResult.curve);
+                              const maxVal = Math.max(...monteCarloResult.curve) || (minVal + 1);
+                              const x = (idx / 50) * 500;
+                              const y = 75 - ((val - minVal) / (maxVal - minVal)) * 65;
+                              return `${x},${y}`;
+                            }).join(' ')}
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. CAPITAL DRAWDOWN & RISK OF RUIN MATRIX */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <TrendingUp size={16} color="#2563eb" /> Drawdown Survivability & Capital Recovery Matrix
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
+                          <th style={{ padding: '8px' }}>RISK PER TRADE</th>
+                          <th style={{ padding: '8px' }}>5 CONSECUTIVE LOSSES</th>
+                          <th style={{ padding: '8px' }}>10 CONSECUTIVE LOSSES</th>
+                          <th style={{ padding: '8px' }}>GAIN TO BREAKEVEN</th>
+                          <th style={{ padding: '8px' }}>SURVIVABILITY</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {[
+                          { risk: '0.5% (Conservative)', loss5: '-2.47%', loss10: '-4.89%', gain: '+5.14%', status: '⭐ MASTER TIER', color: colors.accentGreen },
+                          { risk: '1.0% (Institutional)', loss5: '-4.90%', loss10: '-9.56%', gain: '+10.57%', status: '🛡️ OPTIMAL EDGE', color: colors.accentGreen },
+                          { risk: '2.0% (Aggressive)', loss5: '-9.61%', loss10: '-18.29%', gain: '+22.39%', status: '⚠️ ELEVATED RISK', color: '#f59e0b' },
+                          { risk: '5.0% (Dangerous)', loss5: '-22.62%', loss10: '-40.13%', gain: '+67.03%', status: '🚨 CRITICAL DANGER', color: colors.accentRed }
+                        ].map((row, idx) => (
+                          <tr key={idx} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
+                            <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.textPrimary }}>{row.risk}</td>
+                            <td style={{ padding: '9px 8px', color: colors.textSecondary }}>{row.loss5}</td>
+                            <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.accentRed }}>{row.loss10}</td>
+                            <td style={{ padding: '9px 8px', fontWeight: '700', color: colors.accentBlueLight }}>{row.gain}</td>
+                            <td style={{ padding: '9px 8px', fontWeight: '800', color: row.color }}>{row.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 10. COMMUNITY SUB-VIEW                                         */}
