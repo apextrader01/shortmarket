@@ -366,6 +366,10 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   const [tradeSideFilter, setTradeSideFilter] = useState('ALL');
   const [rulesCategoryFilter, setRulesCategoryFilter] = useState('ALL');
 
+  // Paper Trading Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState(null);
+
   // Fetch backend journal data on mount
   const fetchJournalData = async () => {
     try {
@@ -374,14 +378,14 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       const headers = { 'Authorization': `Bearer ${token}` };
 
       // Fetch trades
-      const resTrades = await fetch(`${API}/api/journal/trades`, { headers });
+      const resTrades = await fetch(`${API}/api/journal/trades`, { credentials: 'include', headers });
       const dataTrades = await resTrades.json();
       if (dataTrades.success && Array.isArray(dataTrades.trades)) {
         setDbTrades(dataTrades.trades);
       }
 
       // Fetch checklists
-      const resChk = await fetch(`${API}/api/journal/checklists?date=${todayStr}`, { headers });
+      const resChk = await fetch(`${API}/api/journal/checklists?date=${todayStr}`, { credentials: 'include', headers });
       const dataChk = await resChk.json();
       if (dataChk.success && dataChk.checklists && dataChk.checklists[0]) {
         const c = dataChk.checklists[0];
@@ -394,21 +398,21 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       }
 
       // Fetch strategies
-      const resStrat = await fetch(`${API}/api/journal/strategies`, { headers });
+      const resStrat = await fetch(`${API}/api/journal/strategies`, { credentials: 'include', headers });
       const dataStrat = await resStrat.json();
       if (dataStrat.success && dataStrat.strategies && dataStrat.strategies.length > 0) {
         setStrategies(dataStrat.strategies);
       }
 
       // Fetch rules
-      const resRules = await fetch(`${API}/api/journal/rules`, { headers });
+      const resRules = await fetch(`${API}/api/journal/rules`, { credentials: 'include', headers });
       const dataRules = await resRules.json();
       if (dataRules.success && dataRules.rules && dataRules.rules.length > 0) {
         setRules(dataRules.rules);
       }
 
       // Fetch mistakes
-      const resMistakes = await fetch(`${API}/api/journal/mistakes`, { headers });
+      const resMistakes = await fetch(`${API}/api/journal/mistakes`, { credentials: 'include', headers });
       const dataMistakes = await resMistakes.json();
       if (dataMistakes.success && dataMistakes.mistakes && dataMistakes.mistakes.length > 0) {
         setMistakes(dataMistakes.mistakes);
@@ -421,6 +425,75 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   useEffect(() => {
     fetchJournalData();
   }, []);
+
+  // ── Sync Paper Trades from Terminal into Trade Diary ─────────────────────────
+  const handleSyncPaperTrades = async () => {
+    setIsSyncing(true);
+    setSyncNotice(null);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      
+      const res = await fetch(`${API}/api/positions`, { credentials: 'include', headers });
+      const posData = await res.json();
+      
+      const closedPos = (Array.isArray(posData) ? posData : (positions || [])).filter(
+        p => Number(p.quantity) === 0 || Number(p.closed_quantity || 0) > 0 || Number(p.realized_pnl || 0) !== 0
+      );
+
+      if (closedPos.length === 0) {
+        setSyncNotice({
+          type: 'info',
+          text: 'No closed positions found in Paper Trading terminal. Place and close trades in terminal to sync!'
+        });
+      } else {
+        if (token) {
+          for (const p of closedPos) {
+            const pnl = Number(p.realized_pnl || 0);
+            const body = {
+              symbol: p.symbol,
+              trade_type: p.side || 'BUY',
+              product_type: p.product_type || 'INT',
+              market_segment: 'Indian',
+              entry_price: Number(p.average_price || 0),
+              exit_price: Number(p.exit_price || p.average_price || 0),
+              quantity: Math.abs(Number(p.closed_quantity || p.quantity || 1)),
+              realized_pnl: pnl,
+              charges: 40,
+              strategy: '⚡ Paper Trading',
+              emotion: pnl >= 0 ? '🎯 Disciplined Execution' : '🛡️ Plan Followed',
+              setup_rating: 5,
+              trade_date: p.updated_at ? p.updated_at.split('T')[0] : todayStr,
+              notes: 'Auto-synced from Paper Trading Terminal'
+            };
+            try {
+              await fetch(`${API}/api/journal/trades`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body)
+              });
+            } catch (err) {
+              // Ignore single insert error
+            }
+          }
+        }
+        await fetchJournalData();
+        setSyncNotice({
+          type: 'success',
+          text: `✓ Successfully synced ${closedPos.length} closed paper trading positions to your journal!`
+        });
+      }
+    } catch (err) {
+      console.error('Sync paper trades error:', err);
+      setSyncNotice({
+        type: 'error',
+        text: 'Sync error: ' + (err.message || 'Could not connect to server')
+      });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncNotice(null), 5000);
+    }
+  };
 
   // Save checklist handler
   const handleToggleChecklistItem = async (section, key) => {
@@ -1259,12 +1332,42 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           padding: isMobile ? '12px 10px 24px 10px' : '24px 32px',
           WebkitOverflowScrolling: 'touch'
         }}>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+          {/* Sync Notification Toast Banner */}
+          {syncNotice && (
+            <div style={{
+              padding: isMobile ? '8px 12px' : '10px 16px',
+              borderRadius: '8px',
+              backgroundColor: syncNotice.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : (syncNotice.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)'),
+              border: `1px solid ${syncNotice.type === 'success' ? colors.accentGreen : (syncNotice.type === 'error' ? colors.accentRed : '#3b82f6')}`,
+              color: syncNotice.type === 'success' ? colors.accentGreen : (syncNotice.type === 'error' ? colors.accentRed : colors.accentBlueLight),
+              fontSize: isMobile ? '11px' : '12px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '14px',
+              maxWidth: '1400px',
+              margin: '0 auto 14px auto'
+            }}>
+              <span>{syncNotice.text}</span>
+              <button 
+                onClick={() => setSyncNotice(null)} 
+                aria-label="Dismiss alert"
+                style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '2px', display: 'flex' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 1. DASHBOARD VIEW                                              */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'DASHBOARD' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1400px', margin: '0 auto' }}>
-              {/* Top Filters & "+ New Trade" Row */}
+              {/* Top Filters & "+ New Trade" / "Sync Paper" Row */}
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -1334,29 +1437,59 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setShowNewTradeModal(true)}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    padding: isMobile ? '6px 12px' : '7px 14px',
-                    borderRadius: '8px',
-                    fontSize: isMobile ? '11px' : '12px',
-                    fontWeight: '700',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5px',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-                    transition: 'background 0.15s',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  <Plus size={14} /> {isTinyMobile ? 'Trade' : (isSmallMobile ? '+ Trade' : 'New Trade')}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  {/* Sync Paper Trades Button */}
+                  <button
+                    onClick={handleSyncPaperTrades}
+                    disabled={isSyncing}
+                    title="Sync closed positions from Paper Trading terminal"
+                    style={{
+                      backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.18)',
+                      color: colors.accentBlueLight,
+                      padding: isMobile ? '6px 9px' : '7px 12px',
+                      borderRadius: '8px',
+                      fontSize: isMobile ? '11px' : '12px',
+                      fontWeight: '700',
+                      border: `1px solid ${isLight ? 'rgba(37, 99, 235, 0.3)' : 'rgba(59, 130, 246, 0.4)'}`,
+                      cursor: isSyncing ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s',
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <RefreshCw size={13} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                    {isSyncing ? 'Syncing...' : (isTinyMobile ? 'Sync' : (isSmallMobile ? 'Sync' : 'Sync Paper'))}
+                  </button>
+
+                  {/* + New Trade Button */}
+                  <button
+                    onClick={() => setShowNewTradeModal(true)}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      padding: isMobile ? '6px 10px' : '7px 14px',
+                      borderRadius: '8px',
+                      fontSize: isMobile ? '11px' : '12px',
+                      fontWeight: '700',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
+                      transition: 'background 0.15s',
+                      flexShrink: 0,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Plus size={14} /> {isTinyMobile ? 'Trade' : (isSmallMobile ? '+ Trade' : 'New Trade')}
+                  </button>
+                </div>
               </div>
 
               {/* 4 KPI METRIC CARDS (2x2 on Mobile, 4-col on Desktop) */}
@@ -2050,6 +2183,29 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                   <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Detailed trade history with strategies, emotions, charges, and shareable cards.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={handleSyncPaperTrades}
+                    disabled={isSyncing}
+                    title="Sync closed positions from Paper Trading terminal"
+                    style={{
+                      backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.18)',
+                      color: colors.accentBlueLight,
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      border: `1px solid ${isLight ? 'rgba(37, 99, 235, 0.3)' : 'rgba(59, 130, 246, 0.4)'}`,
+                      cursor: isSyncing ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <RefreshCw size={14} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                    {isSyncing ? 'Syncing...' : 'Sync Paper Trades'}
+                  </button>
+
                   <button
                     onClick={() => setShowNewTradeModal(true)}
                     style={{
