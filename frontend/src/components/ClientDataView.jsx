@@ -3,7 +3,7 @@ import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine } from 'lucide-react';
 import ReferralsView from './ReferralsView';
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -154,7 +154,74 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       alert('Test push error: ' + err.message);
     }
   };
-  
+
+  // 💰 Real Money Rewards & Withdrawal State
+  const [rewardStats, setRewardStats] = useState({ availableRewardBalance: 0, totalEarned: 0 });
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState({ type: '', text: '' });
+
+  const fetchRewardStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${API}/api/referrals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json && json.success && json.stats) {
+        setRewardStats(json.stats);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchRewardStats();
+  }, []);
+
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+      setWithdrawMsg({ type: 'error', text: 'Please enter a valid withdrawal amount.' });
+      return;
+    }
+    if (Number(withdrawAmount) > (rewardStats.availableRewardBalance || 0)) {
+      setWithdrawMsg({ type: 'error', text: `Amount exceeds available reward balance (₹${rewardStats.availableRewardBalance?.toFixed(2) || '0.00'})` });
+      return;
+    }
+    if (!user?.upi_id && (!user?.bank_account_no || !user?.bank_ifsc)) {
+      setWithdrawMsg({ type: 'error', text: 'Please add your UPI ID or Bank Details in Profile Settings first.' });
+      return;
+    }
+
+    setWithdrawLoading(true);
+    setWithdrawMsg({ type: '', text: '' });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/withdrawals/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount: parseFloat(withdrawAmount) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Withdrawal request failed');
+      setWithdrawMsg({ type: 'success', text: '✅ Real money withdrawal request submitted! Admin will credit your UPI/Bank.' });
+      setWithdrawAmount('');
+      fetchRewardStats();
+      setTimeout(() => {
+        setShowWithdrawModal(false);
+        setWithdrawMsg({ type: '', text: '' });
+      }, 2500);
+    } catch (err) {
+      setWithdrawMsg({ type: 'error', text: err.message || 'Withdrawal failed' });
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   const handleResetAccount = async () => {
     if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to Rs. 10,00,000. This cannot be undone.')) {
@@ -312,6 +379,104 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         </div>
       </div>
 
+
+      {/* Real Money Withdrawal & Referral Rewards Card */}
+      <div className="glass-panel" style={{ 
+        padding: '20px 24px', 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column' : 'row', 
+        justifyContent: 'space-between', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        gap: '20px', 
+        marginBottom: '36px', 
+        borderLeft: '4px solid #10b981', 
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
+        width: '100%', 
+        boxSizing: 'border-box' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+          <div style={{ 
+            width: '48px', 
+            height: '48px', 
+            borderRadius: '12px', 
+            background: 'rgba(16, 185, 129, 0.18)', 
+            border: '1px solid rgba(16, 185, 129, 0.4)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            color: '#34d399', 
+            flexShrink: 0 
+          }}>
+            <Wallet size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                Real Cash Earnings
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Total Earned: <strong style={{ color: 'var(--text-primary)' }}>₹{Number(rewardStats?.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              </span>
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span>Available to Withdraw:</span>
+              <span style={{ color: '#10b981', fontSize: '20px', fontWeight: '900' }}>
+                ₹{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Cashout referral rewards, commissions & affiliate earnings directly to your UPI / Bank Account.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '300px' }}>
+          <button 
+            onClick={() => { setShowWithdrawModal(true); setWithdrawMsg({ type: '', text: '' }); }}
+            style={{ 
+              flex: 1, 
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+              color: '#ffffff', 
+              border: 'none', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              fontSize: '12px', 
+              fontWeight: '800', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.15s' 
+            }}
+          >
+            <ArrowDownToLine size={15} /> WITHDRAW CASH 💸
+          </button>
+          <button 
+            onClick={() => setShowReferrals(true)} 
+            style={{ 
+              flex: 1, 
+              background: 'rgba(255, 255, 255, 0.05)', 
+              color: 'var(--text-primary)', 
+              border: '1px solid var(--border-color)', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              fontSize: '12px', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px',
+              transition: 'background 0.15s' 
+            }}
+          >
+            <Gift size={15} color="#fbbf24" /> INVITE & EARN 🎁
+          </button>
+        </div>
+      </div>
 
       {/* Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
@@ -740,6 +905,262 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                 <span style={{ fontSize: '13px', background: 'var(--color-red)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real Money Withdrawal Modal */}
+      {showWithdrawModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ 
+            width: '100%', 
+            maxWidth: '460px', 
+            padding: '24px', 
+            position: 'relative', 
+            borderRadius: '16px',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <button 
+              onClick={() => { setShowWithdrawModal(false); setWithdrawMsg({ type: '', text: '' }); }}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '8px', borderRadius: '8px', color: '#10b981' }}>
+                <Wallet size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+                  Real Money Cashout
+                </h3>
+                <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                  Direct Payout to UPI / Bank Account
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Withdraw your real cash referral commissions & rewards directly to your bank.
+            </p>
+
+            {/* Available Balance Box */}
+            <div style={{ 
+              background: 'rgba(16, 185, 129, 0.08)', 
+              border: '1px solid rgba(16, 185, 129, 0.25)', 
+              borderRadius: '10px', 
+              padding: '14px 16px', 
+              marginBottom: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Available Cash Balance:</span>
+              <span style={{ fontSize: '18px', fontWeight: '900', color: '#10b981' }}>
+                ₹{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* Destination Payout Account */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                Payout Destination
+              </div>
+              {user?.upi_id || user?.bank_account_no ? (
+                <div style={{ 
+                  background: 'var(--bg-hover)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '8px', 
+                  padding: '12px 14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    {user?.upi_id ? (
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        UPI ID: <span style={{ color: '#34d399' }}>{user.upi_id}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        Bank A/C: <span style={{ color: '#34d399' }}>{user.bank_account_no}</span> ({user.bank_ifsc})
+                      </div>
+                    )}
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Auto-credited upon approval
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div style={{ 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  border: '1px solid rgba(239, 68, 68, 0.3)', 
+                  borderRadius: '8px', 
+                  padding: '12px 14px' 
+                }}>
+                  <div style={{ fontSize: '12px', color: '#f87171', fontWeight: '600', marginBottom: '6px' }}>
+                    ⚠️ No Bank or UPI details found!
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                    Please add your UPI ID or Bank Account in Profile Settings to receive payouts.
+                  </div>
+                  <button 
+                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    style={{ 
+                      background: 'var(--color-blue)', 
+                      color: '#fff', 
+                      border: 'none', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      fontSize: '11px', 
+                      fontWeight: '700', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Add Bank / UPI Details &rarr;
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Withdrawal Form */}
+            <form onSubmit={handleWithdrawSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Withdrawal Amount (₹)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', fontWeight: '700', color: 'var(--text-secondary)' }}>₹</span>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max={rewardStats?.availableRewardBalance || 0}
+                    step="any"
+                    placeholder="Enter amount"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px 12px 32px',
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      color: 'var(--text-primary)',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Preset Fast Select Buttons */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  {[100, 500, 1000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setWithdrawAmount(String(val))}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      +₹{val}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(String(rewardStats?.availableRewardBalance || 0))}
+                    style={{
+                      padding: '4px 10px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      color: '#34d399',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              {withdrawMsg.text && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  marginBottom: '16px',
+                  background: withdrawMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  color: withdrawMsg.type === 'success' ? '#34d399' : '#f87171',
+                  border: `1px solid ${withdrawMsg.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                }}>
+                  {withdrawMsg.text}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)}
+                  style={{
+                    flex: 2,
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: (withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)) ? 'not-allowed' : 'pointer',
+                    opacity: (withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)) ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowDownToLine size={16} />}
+                  {withdrawLoading ? 'Processing...' : 'Request Cashout'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
