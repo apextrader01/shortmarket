@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -14,6 +14,14 @@ import {
   getAutoLockDuration,
   setAutoLockDuration
 } from '../utils/biometricAuth';
+import {
+  isSoundEnabled,
+  setSoundEnabled,
+  playTargetHitSound,
+  playStopLossHitSound,
+  playOrderExecutedSound,
+  playRiskAlertSound
+} from '../utils/soundManager';
 
 export default function SettingsView() {
   const { 
@@ -40,6 +48,7 @@ export default function SettingsView() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+  const [soundActive, setSoundActive] = useState(() => isSoundEnabled());
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -349,6 +358,141 @@ export default function SettingsView() {
               <Save size={16} /> {loading ? 'Updating...' : 'Update Password'}
             </button>
           </form>
+        </div>
+
+        {/* Audio Cues & Sound Engine Card */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 size={20} color="var(--color-blue)" /> Audio Cues & Sound Engine (Only When Hit)
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                Synthesizes instant real-time sound effects when your orders execute, stop-loss triggers, or target prices are hit.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = !soundActive;
+                setSoundActive(next);
+                setSoundEnabled(next);
+                if (next) playOrderExecutedSound();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: soundActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                border: soundActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
+                color: soundActive ? '#4ade80' : '#ef4444',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              {soundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {soundActive ? 'Audio Enabled (Active)' : 'Audio Muted (Off)'}
+            </button>
+          </div>
+
+          {/* Audio Test Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
+            <button
+              type="button"
+              onClick={() => playTargetHitSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(34, 197, 94, 0.08)',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                color: '#4ade80',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🎯 Test Target Hit</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playStopLossHitSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🛑 Test Stop Loss Hit</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playOrderExecutedSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                color: 'var(--color-blue-light)',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🔔 Test Order Executed</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playRiskAlertSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                color: '#fbbf24',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>⚠️ Test Risk Guardian Alert</span>
+              <Play size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Biometric & 4-Digit PIN Security Card */}
