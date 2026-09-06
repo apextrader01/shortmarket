@@ -439,8 +439,13 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   ]);
 
   // Trade Search & Filter State in TRADES tab
+    // Trade Search, Outcome, Edit & Details State
   const [tradeSearch, setTradeSearch] = useState('');
   const [tradeSideFilter, setTradeSideFilter] = useState('ALL');
+  const [tradeOutcomeFilter, setTradeOutcomeFilter] = useState('ALL');
+  const [editingTrade, setEditingTrade] = useState(null);
+  const [viewingTrade, setViewingTrade] = useState(null);
+  const [tradeActionNotice, setTradeActionNotice] = useState(null);
   const [rulesCategoryFilter, setRulesCategoryFilter] = useState('ALL');
 
   // Fetch backend journal data on mount
@@ -776,6 +781,109 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       topTrades
     };
   }, [filteredTrades, marketSegment]);
+
+  // Delete Trade Handler
+  const handleDeleteTrade = async (tradeId) => {
+    if (!window.confirm('Are you sure you want to delete this trade from your journal?')) return;
+    
+    setDbTrades(prev => prev.filter(t => (t.id || t.trade_id) !== tradeId));
+    setTradeActionNotice('✓ Trade deleted successfully!');
+    setTimeout(() => setTradeActionNotice(null), 3000);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token && !String(tradeId).startsWith('MANUAL-') && !String(tradeId).startsWith('POS-')) {
+        await fetch(`${API}/api/journal/trades/${tradeId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+    } catch (e) {
+      console.warn('Trade deletion error:', e);
+    }
+  };
+
+  // Save Edited Trade Handler
+  const handleSaveEditedTrade = async (e) => {
+    e.preventDefault();
+    if (!editingTrade) return;
+
+    const entry = parseFloat(editingTrade.entry_price);
+    const exit = parseFloat(editingTrade.exit_price);
+    const qty = parseFloat(editingTrade.quantity);
+    const charges = parseFloat(editingTrade.charges) || 0;
+
+    let realizedPnl = 0;
+    if (!isNaN(entry) && !isNaN(exit) && !isNaN(qty)) {
+      realizedPnl = editingTrade.trade_type === 'BUY'
+        ? (exit - entry) * qty
+        : (entry - exit) * qty;
+    }
+    const netPnl = realizedPnl - charges;
+
+    const updated = {
+      ...editingTrade,
+      entry_price: entry,
+      exit_price: exit,
+      quantity: qty,
+      charges,
+      realized_pnl: realizedPnl,
+      net_pnl: netPnl
+    };
+
+    setDbTrades(prev => prev.map(t => (t.id || t.trade_id) === (updated.id || updated.trade_id) ? updated : t));
+    setEditingTrade(null);
+    setTradeActionNotice('✓ Trade updated successfully!');
+    setTimeout(() => setTradeActionNotice(null), 3000);
+
+    try {
+      const token = localStorage.getItem('token');
+      const id = updated.id || updated.trade_id;
+      if (token && !String(id).startsWith('MANUAL-') && !String(id).startsWith('POS-')) {
+        await fetch(`${API}/api/journal/trades/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(updated)
+        });
+      }
+    } catch (e) {
+      console.warn('Trade update error:', e);
+    }
+  };
+
+  // Export CSV Handler
+  const handleExportTradesCSV = () => {
+    if (filteredTrades.length === 0) {
+      alert('No trades available to export in this market view.');
+      return;
+    }
+
+    const headers = ['Date', 'Symbol', 'Market', 'Side', 'Quantity', 'Entry Price', 'Exit Price', 'Gross PnL', 'Charges', 'Net PnL', 'Strategy', 'Emotion', 'Notes'];
+    const rows = filteredTrades.map(t => [
+      `"${t.trade_date || todayStr}"`,
+      `"${t.symbol}"`,
+      `"${t.market_segment || marketSegment}"`,
+      `"${t.trade_type}"`,
+      t.quantity,
+      t.entry_price || 0,
+      t.exit_price || 0,
+      t.realized_pnl || 0,
+      t.charges || 0,
+      t.net_pnl || 0,
+      `"${t.strategy || ''}"`,
+      `"${t.emotion || ''}"`,
+      `"${(t.notes || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `TradeDiary_${marketSegment}_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Handle Save New Trade Form
   const handleSaveNewTrade = async (e) => {
@@ -2758,87 +2866,255 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
           {/* 3. TRADES TABLE & MOBILE CARDS SUB-VIEW                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'TRADES' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px' }}>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Logged Trades Journal</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Detailed trade history with strategies, emotions, charges, and shareable cards.</p>
+          {activeTab === 'TRADES' && (() => {
+            // Apply all filters: search, side, and outcome
+            const displayTrades = filteredTrades.filter(t => {
+              const matchesSearch = !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()) || (t.strategy && t.strategy.toLowerCase().includes(tradeSearch.toLowerCase()));
+              const matchesSide = tradeSideFilter === 'ALL' || t.trade_type === tradeSideFilter;
+              const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+              const matchesOutcome = tradeOutcomeFilter === 'ALL' 
+                ? true 
+                : (tradeOutcomeFilter === 'WIN' ? net >= 0 : net < 0);
+
+              return matchesSearch && matchesSide && matchesOutcome;
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '18px', maxWidth: '1200px', margin: '0 auto' }}>
+                {/* Header with Title & Market Switcher Tabs */}
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ListOrdered size={22} color="#2563eb" /> Logged Trades Journal
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Detailed trade history, execution emotions, charges, and CSV export.
+                    </p>
+                  </div>
+
+                  {/* Top Actions: Market Tabs & + Add Trade */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
+                    {/* Market Switcher */}
+                    <div style={{ display: 'flex', gap: '4px', backgroundColor: colors.bgCard, padding: '3px', borderRadius: '8px', border: `1px solid ${colors.borderColor}`, boxShadow: colors.cardShadow }}>
+                      {Object.entries(MARKET_CONFIGS).map(([key, cfg]) => {
+                        const isSelected = marketSegment === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setMarketSegment(key)}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              backgroundColor: isSelected ? '#2563eb' : 'transparent',
+                              color: isSelected ? '#ffffff' : colors.textSecondary,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>{cfg.flag}</span>
+                            <span>{key}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setNewTradeForm(prev => ({
+                          ...prev,
+                          market_segment: marketSegment,
+                          symbol: MARKET_CONFIGS[marketSegment]?.suggestions[0] || 'NIFTY 24500 CE'
+                        }));
+                        setShowNewTradeModal(true);
+                      }}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 10px rgba(37, 99, 235, 0.4)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      <Plus size={15} /> Add Trade
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+
+                {/* Toast Notification Banner */}
+                {tradeActionNotice && (
+                  <div style={{ padding: '8px 14px', borderRadius: '8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', border: `1px solid ${colors.accentGreen}`, color: colors.accentGreen, fontSize: '12px', fontWeight: '700' }}>
+                    {tradeActionNotice}
+                  </div>
+                )}
+
+                {/* SUMMARY METRICS STRIP */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+                  gap: '10px'
+                }}>
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>NET RETURN ({marketSegment})</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                      {formatMoney(metrics.totalPnL, marketSegment)}
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>WIN RATE</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: metrics.winRate >= 50 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                      {metrics.winRate}% ({metrics.wins}W / {metrics.losses}L)
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>LOGGED TRADES</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>
+                      {metrics.tradesCount} Trades
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>CHARGES & TAXES</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: colors.textMuted, marginTop: '2px' }}>
+                      {formatMoneyPlain(metrics.totalCharges, marketSegment)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filters, Search & Export Bar */}
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  backgroundColor: colors.bgCard,
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: `1px solid ${colors.borderColor}`,
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px', flexWrap: 'wrap' }}>
+                    {/* Search Input */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '160px', backgroundColor: colors.bgInner, padding: '6px 10px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                      <Search size={14} color={colors.textMuted} />
+                      <input
+                        type="text"
+                        placeholder="Search by symbol or strategy..."
+                        value={tradeSearch}
+                        onChange={(e) => setTradeSearch(e.target.value)}
+                        style={{ background: 'transparent', border: 'none', color: colors.textPrimary, fontSize: '12px', outline: 'none', width: '100%' }}
+                      />
+                    </div>
+
+                    {/* Outcome Filter Pills */}
+                    <div style={{ display: 'flex', gap: '3px', backgroundColor: colors.bgInner, padding: '2px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                      {[
+                        { id: 'ALL', label: 'All' },
+                        { id: 'WIN', label: '🟢 Wins' },
+                        { id: 'LOSS', label: '🔴 Losses' }
+                      ].map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setTradeOutcomeFilter(opt.id)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            backgroundColor: tradeOutcomeFilter === opt.id ? '#2563eb' : 'transparent',
+                            color: tradeOutcomeFilter === opt.id ? '#ffffff' : colors.textSecondary,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Side Select */}
+                    <select
+                      value={tradeSideFilter}
+                      onChange={(e) => setTradeSideFilter(e.target.value)}
+                      style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', outline: 'none' }}
+                    >
+                      <option value="ALL">All Sides</option>
+                      <option value="BUY">BUY / LONG</option>
+                      <option value="SELL">SELL / SHORT</option>
+                    </select>
+                  </div>
+
+                  {/* CSV Export */}
                   <button
-                    onClick={() => setShowNewTradeModal(true)}
+                    onClick={handleExportTradesCSV}
+                    title="Export trades as CSV spreadsheet"
                     style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      padding: '8px 14px',
+                      backgroundColor: isLight ? '#f1f5f9' : '#1e293b',
+                      border: `1px solid ${colors.borderColor}`,
+                      color: colors.textPrimary,
+                      padding: '6px 12px',
                       borderRadius: '8px',
-                      fontSize: '12px',
+                      fontSize: '11px',
                       fontWeight: '700',
-                      border: 'none',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-                      whiteSpace: 'nowrap'
+                      gap: '5px'
                     }}
                   >
-                    <Plus size={15} /> Add Trade
+                    <Download size={13} /> Export CSV
                   </button>
                 </div>
-              </div>
 
-              {/* Filters & Search Row */}
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '8px',
-                backgroundColor: colors.bgCard,
-                padding: '10px 14px',
-                borderRadius: '10px',
-                border: `1px solid ${colors.borderColor}`
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '180px', backgroundColor: colors.bgInner, padding: '6px 10px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
-                  <Search size={14} color={colors.textMuted} />
-                  <input
-                    type="text"
-                    placeholder="Search by symbol..."
-                    value={tradeSearch}
-                    onChange={(e) => setTradeSearch(e.target.value)}
-                    style={{ background: 'transparent', border: 'none', color: colors.textPrimary, fontSize: '12px', outline: 'none', width: '100%' }}
-                  />
-                </div>
-                <select
-                  value={tradeSideFilter}
-                  onChange={(e) => setTradeSideFilter(e.target.value)}
-                  style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, color: colors.textPrimary, padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', outline: 'none' }}
-                >
-                  <option value="ALL">All Sides</option>
-                  <option value="BUY">BUY Only</option>
-                  <option value="SELL">SELL Only</option>
-                </select>
-              </div>
-
-              {/* TRADES LIST */}
-              {filteredTrades.length === 0 ? (
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, boxShadow: colors.cardShadow }}>
-                  No trades logged yet. Click "+ Add Trade" or trade in the Paper Trading terminal!
-                </div>
-              ) : (
-                <>
-                  {/* MOBILE CARD VIEW FOR SMARTPHONES */}
-                  {isMobile ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {filteredTrades.filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
-                        .filter(t => tradeSideFilter === 'ALL' || t.trade_type === tradeSideFilter)
-                        .map((t, idx) => {
-                          const net = Number(t.net_pnl || t.realized_pnl || 0);
+                {/* TRADES LIST */}
+                {displayTrades.length === 0 ? (
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary, marginBottom: '4px' }}>
+                      No {marketSegment} trades found matching your filters.
+                    </div>
+                    <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>
+                      Log a new trade to build your performance history.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setNewTradeForm(prev => ({
+                          ...prev,
+                          market_segment: marketSegment,
+                          symbol: MARKET_CONFIGS[marketSegment]?.suggestions[0] || 'NIFTY 24500 CE'
+                        }));
+                        setShowNewTradeModal(true);
+                      }}
+                      style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      + Log First {marketSegment} Trade
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* MOBILE CARD VIEW FOR SMARTPHONES */}
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {displayTrades.map((t, idx) => {
+                          const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
                           const isWin = net >= 0;
 
                           return (
                             <div 
-                              key={t.id || idx}
+                              key={t.id || t.trade_id || idx}
                               style={{
                                 backgroundColor: colors.bgCard,
                                 border: `1px solid ${colors.borderColor}`,
@@ -2864,67 +3140,86 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                                   </span>
                                   <span style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>{t.symbol}</span>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ fontSize: '14px', fontWeight: '800', color: isWin ? colors.accentGreen : colors.accentRed }}>
                                     {formatMoney(net, t.market_segment || marketSegment)}
                                   </span>
-                                  <button
-                                    onClick={() => setSelectedTradeForShare(t)}
-                                    title="Share P&L Card"
-                                    style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px' }}
-                                  >
-                                    <Share2 size={16} />
-                                  </button>
                                 </div>
                               </div>
 
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: colors.textSecondary }}>
                                 <div>
-                                  Entry: <strong style={{ color: colors.textPrimary }}>₹{Number(t.entry_price || 0).toFixed(2)}</strong> → Exit: <strong style={{ color: colors.textPrimary }}>₹{Number(t.exit_price || 0).toFixed(2)}</strong>
+                                  Entry: <strong style={{ color: colors.textPrimary }}>{formatMoneyPlain(t.entry_price || 0, t.market_segment || marketSegment)}</strong> → Exit: <strong style={{ color: colors.textPrimary }}>{formatMoneyPlain(t.exit_price || 0, t.market_segment || marketSegment)}</strong>
                                 </div>
                                 <div>
                                   Qty: <strong style={{ color: colors.textPrimary }}>{t.quantity}</strong>
                                 </div>
                               </div>
 
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: `1px solid ${colors.borderColor}`, fontSize: '10px', color: colors.textMuted }}>
-                                <span>{t.trade_date || todayStr}</span>
-                                <span style={{ padding: '2px 6px', borderRadius: '8px', backgroundColor: colors.bgInner, color: colors.accentBlueLight, border: `1px solid ${colors.borderColor}` }}>
-                                  {t.strategy || 'Breakout'}
-                                </span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: `1px solid ${colors.borderColor}`, fontSize: '10px', color: colors.textMuted }}>
+                                <span>{t.trade_date || todayStr} • {t.strategy || 'Breakout'}</span>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                  <button
+                                    onClick={() => setViewingTrade(t)}
+                                    title="View Trade Details"
+                                    style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '3px', display: 'flex' }}
+                                  >
+                                    <BookOpen size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTrade(t)}
+                                    title="Edit Trade"
+                                    style={{ background: 'none', border: 'none', color: colors.accentBlueLight, cursor: 'pointer', padding: '3px', display: 'flex' }}
+                                  >
+                                    <Edit3 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setSelectedTradeForShare(t)}
+                                    title="Share P&L Card"
+                                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '3px', display: 'flex' }}
+                                  >
+                                    <Share2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTrade(t.id || t.trade_id)}
+                                    title="Delete Trade"
+                                    style={{ background: 'none', border: 'none', color: colors.accentRed, cursor: 'pointer', padding: '3px', display: 'flex' }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
                         })}
-                    </div>
-                  ) : (
-                    /* DESKTOP RESPONSIVE TABLE */
-                    <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', overflow: 'hidden', boxShadow: colors.cardShadow }}>
-                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', minWidth: '700px' }}>
-                          <thead>
-                            <tr style={{ backgroundColor: colors.bgInner, color: colors.textMuted, borderBottom: `1px solid ${colors.borderColor}` }}>
-                              <th style={{ padding: '10px 14px' }}>Date</th>
-                              <th style={{ padding: '10px 14px' }}>Symbol</th>
-                              <th style={{ padding: '10px 14px' }}>Side</th>
-                              <th style={{ padding: '10px 14px' }}>Qty</th>
-                              <th style={{ padding: '10px 14px' }}>Entry</th>
-                              <th style={{ padding: '10px 14px' }}>Exit</th>
-                              <th style={{ padding: '10px 14px' }}>Gross P&L</th>
-                              <th style={{ padding: '10px 14px' }}>Net P&L</th>
-                              <th style={{ padding: '10px 14px' }}>Strategy</th>
-                              <th style={{ padding: '10px 14px' }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredTrades.filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
-                              .filter(t => tradeSideFilter === 'ALL' || t.trade_type === tradeSideFilter)
-                              .map((t, idx) => {
-                                const net = Number(t.net_pnl || t.realized_pnl || 0);
+                      </div>
+                    ) : (
+                      /* DESKTOP RESPONSIVE TABLE */
+                      <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', overflow: 'hidden', boxShadow: colors.cardShadow }}>
+                        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px', minWidth: '780px' }}>
+                            <thead>
+                              <tr style={{ backgroundColor: colors.bgInner, color: colors.textMuted, borderBottom: `1px solid ${colors.borderColor}` }}>
+                                <th style={{ padding: '10px 14px' }}>Date</th>
+                                <th style={{ padding: '10px 14px' }}>Symbol</th>
+                                <th style={{ padding: '10px 14px' }}>Side</th>
+                                <th style={{ padding: '10px 14px' }}>Qty</th>
+                                <th style={{ padding: '10px 14px' }}>Entry</th>
+                                <th style={{ padding: '10px 14px' }}>Exit</th>
+                                <th style={{ padding: '10px 14px' }}>Gross P&L</th>
+                                <th style={{ padding: '10px 14px' }}>Net P&L</th>
+                                <th style={{ padding: '10px 14px' }}>Strategy</th>
+                                <th style={{ padding: '10px 14px', textAlign: 'center' }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {displayTrades.map((t, idx) => {
+                                const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+                                const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
                                 const isWin = net >= 0;
 
                                 return (
-                                  <tr key={t.id || idx} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
+                                  <tr key={t.id || t.trade_id || idx} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
                                     <td style={{ padding: '10px 14px', color: colors.textSecondary }}>{t.trade_date || todayStr}</td>
                                     <td style={{ padding: '10px 14px', fontWeight: '700', color: colors.textPrimary }}>{t.symbol}</td>
                                     <td style={{ padding: '10px 14px' }}>
@@ -2940,10 +3235,10 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                                       </span>
                                     </td>
                                     <td style={{ padding: '10px 14px', color: colors.textPrimary }}>{t.quantity}</td>
-                                    <td style={{ padding: '10px 14px', color: colors.textPrimary }}>₹{Number(t.entry_price || 0).toFixed(2)}</td>
-                                    <td style={{ padding: '10px 14px', color: colors.textPrimary }}>₹{Number(t.exit_price || 0).toFixed(2)}</td>
-                                    <td style={{ padding: '10px 14px', color: isWin ? colors.accentGreen : colors.accentRed, fontWeight: '700' }}>
-                                      {isWin ? '+' : ''}₹{Number(t.realized_pnl || 0).toLocaleString('en-IN')}
+                                    <td style={{ padding: '10px 14px', color: colors.textPrimary }}>{formatMoneyPlain(t.entry_price || 0, t.market_segment || marketSegment)}</td>
+                                    <td style={{ padding: '10px 14px', color: colors.textPrimary }}>{formatMoneyPlain(t.exit_price || 0, t.market_segment || marketSegment)}</td>
+                                    <td style={{ padding: '10px 14px', color: gross >= 0 ? colors.accentGreen : colors.accentRed, fontWeight: '700' }}>
+                                      {formatMoney(gross, t.market_segment || marketSegment)}
                                     </td>
                                     <td style={{ padding: '10px 14px', color: isWin ? colors.accentGreen : colors.accentRed, fontWeight: '800' }}>
                                       {formatMoney(net, t.market_segment || marketSegment)}
@@ -2954,28 +3249,51 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                                       </span>
                                     </td>
                                     <td style={{ padding: '10px 14px' }}>
-                                      <button
-                                        onClick={() => setSelectedTradeForShare(t)}
-                                        title="Share P&L Card"
-                                        style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '4px' }}
-                                      >
-                                        <Share2 size={15} />
-                                      </button>
+                                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
+                                        <button
+                                          onClick={() => setViewingTrade(t)}
+                                          title="View Trade Notes & Details"
+                                          style={{ background: 'transparent', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '4px' }}
+                                        >
+                                          <BookOpen size={15} />
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingTrade(t)}
+                                          title="Edit Trade"
+                                          style={{ background: 'transparent', border: 'none', color: colors.accentBlueLight, cursor: 'pointer', padding: '4px' }}
+                                        >
+                                          <Edit3 size={15} />
+                                        </button>
+                                        <button
+                                          onClick={() => setSelectedTradeForShare(t)}
+                                          title="Share P&L Card"
+                                          style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '4px' }}
+                                        >
+                                          <Share2 size={15} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteTrade(t.id || t.trade_id)}
+                                          title="Delete Trade Log"
+                                          style={{ background: 'transparent', border: 'none', color: colors.accentRed, cursor: 'pointer', padding: '4px' }}
+                                        >
+                                          <Trash2 size={15} />
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
                               })}
-                          </tbody>
-                        </table>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
-          {/* ══════════════════════════════════════════════════════════════ */}
           {/* 4. STRATEGIES SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'STRATEGIES' && (
@@ -4383,6 +4701,174 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                 </form>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TRADE MODAL */}
+      {editingTrade && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
+                <Edit3 size={18} color="#2563eb" /> Edit Logged Trade
+              </div>
+              <button onClick={() => setEditingTrade(null)} aria-label="Close modal" style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedTrade} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Symbol</label>
+                  <input type="text" required value={editingTrade.symbol} onChange={e => setEditingTrade({ ...editingTrade, symbol: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Side</label>
+                  <select value={editingTrade.trade_type} onChange={e => setEditingTrade({ ...editingTrade, trade_type: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
+                    <option value="BUY">BUY</option>
+                    <option value="SELL">SELL</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Entry Price</label>
+                  <input type="number" step="any" required value={editingTrade.entry_price} onChange={e => setEditingTrade({ ...editingTrade, entry_price: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Exit Price</label>
+                  <input type="number" step="any" required value={editingTrade.exit_price} onChange={e => setEditingTrade({ ...editingTrade, exit_price: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Quantity</label>
+                  <input type="number" step="any" required value={editingTrade.quantity} onChange={e => setEditingTrade({ ...editingTrade, quantity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Charges</label>
+                  <input type="number" step="any" value={editingTrade.charges} onChange={e => setEditingTrade({ ...editingTrade, charges: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Date</label>
+                  <input type="date" value={editingTrade.trade_date} onChange={e => setEditingTrade({ ...editingTrade, trade_date: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Strategy</label>
+                  <select value={editingTrade.strategy} onChange={e => setEditingTrade({ ...editingTrade, strategy: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
+                    {STRATEGY_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Emotion</label>
+                  <select value={editingTrade.emotion} onChange={e => setEditingTrade({ ...editingTrade, emotion: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
+                    {EMOTION_TAGS.map(em => <option key={em} value={em}>{em}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Notes & Reflections</label>
+                <textarea rows={2} value={editingTrade.notes || ''} onChange={e => setEditingTrade({ ...editingTrade, notes: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <button type="button" onClick={() => setEditingTrade(null)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>Update Trade</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW TRADE DETAILS MODAL */}
+      {viewingTrade && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
+                <BookOpen size={18} color="#2563eb" /> Trade Log Details
+              </div>
+              <button onClick={() => setViewingTrade(null)} aria-label="Close modal" style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: '10px', backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}` }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: colors.textPrimary }}>{viewingTrade.symbol}</div>
+                <div style={{ fontSize: '11px', color: colors.textSecondary }}>{viewingTrade.trade_date || todayStr} • {viewingTrade.trade_type}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: '800', color: Number(viewingTrade.net_pnl || viewingTrade.realized_pnl) >= 0 ? colors.accentGreen : colors.accentRed }}>
+                  {formatMoney(Number(viewingTrade.net_pnl || viewingTrade.realized_pnl), viewingTrade.market_segment || marketSegment)}
+                </div>
+                <span style={{ fontSize: '10px', color: colors.textMuted }}>Net Return</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '11px' }}>
+              <div style={{ backgroundColor: colors.bgInner, padding: '8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                <div style={{ color: colors.textMuted }}>Entry Price</div>
+                <div style={{ fontWeight: '700', color: colors.textPrimary, marginTop: '2px' }}>{formatMoneyPlain(viewingTrade.entry_price, viewingTrade.market_segment || marketSegment)}</div>
+              </div>
+              <div style={{ backgroundColor: colors.bgInner, padding: '8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                <div style={{ color: colors.textMuted }}>Exit Price</div>
+                <div style={{ fontWeight: '700', color: colors.textPrimary, marginTop: '2px' }}>{formatMoneyPlain(viewingTrade.exit_price, viewingTrade.market_segment || marketSegment)}</div>
+              </div>
+              <div style={{ backgroundColor: colors.bgInner, padding: '8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                <div style={{ color: colors.textMuted }}>Quantity</div>
+                <div style={{ fontWeight: '700', color: colors.textPrimary, marginTop: '2px' }}>{viewingTrade.quantity}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.borderColor}` }}>
+                <span style={{ color: colors.textSecondary }}>Strategy:</span>
+                <span style={{ fontWeight: '700', color: colors.accentBlueLight }}>{viewingTrade.strategy || '🔥 General Setup'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.borderColor}` }}>
+                <span style={{ color: colors.textSecondary }}>Mindset / Emotion:</span>
+                <span style={{ fontWeight: '700', color: colors.textPrimary }}>{viewingTrade.emotion || '🎯 Disciplined Execution'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.borderColor}` }}>
+                <span style={{ color: colors.textSecondary }}>Brokerage & Charges:</span>
+                <span style={{ fontWeight: '700', color: colors.textMuted }}>{formatMoneyPlain(viewingTrade.charges || 40, viewingTrade.market_segment || marketSegment)}</span>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginBottom: '4px' }}>Notes & Reflections:</div>
+              <div style={{ padding: '10px 12px', borderRadius: '8px', backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, fontSize: '12px', color: colors.textPrimary, minHeight: '50px', lineHeight: 1.4 }}>
+                {viewingTrade.notes || 'No reflections recorded for this trade.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  const t = viewingTrade;
+                  setViewingTrade(null);
+                  setSelectedTradeForShare(t);
+                }}
+                style={{ backgroundColor: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(37,99,235,0.2)', border: '1px solid #2563eb', color: colors.accentBlueLight, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Share2 size={14} /> Share P&L Card
+              </button>
+              <button
+                onClick={() => setViewingTrade(null)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
