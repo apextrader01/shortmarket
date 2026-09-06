@@ -201,7 +201,8 @@ export default function BasketModal() {
         
         const expList = Object.keys(chain)
           .filter(exp => new Date(exp) >= today)
-          .sort((a, b) => new Date(a) - new Date(b));
+          .sort((a, b) => new Date(a) - new Date(b))
+          .slice(0, 5);
 
         setAvailableExpiries(expList);
         
@@ -722,7 +723,7 @@ export default function BasketModal() {
     const today = new Date();
     today.setHours(0,0,0,0);
     const expList = chain 
-      ? Object.keys(chain).filter(exp => new Date(exp) >= today).sort((a,b) => new Date(a) - new Date(b))
+      ? Object.keys(chain).filter(exp => new Date(exp) >= today).sort((a,b) => new Date(a) - new Date(b)).slice(0, 5)
       : [];
     
     const activeExpiry = (selectedExpiry && expList.includes(selectedExpiry)) 
@@ -1338,9 +1339,9 @@ export default function BasketModal() {
                 const legChain = chainsCacheRef.current[legUnderlying];
                 const today = new Date();
                 today.setHours(0,0,0,0);
-                const legExpiries = legChain 
+                const legExpiries = (legChain 
                   ? Object.keys(legChain).filter(e => new Date(e) >= today).sort((a,b) => new Date(a) - new Date(b))
-                  : (availableExpiries.length > 0 ? availableExpiries : [item.expiry].filter(Boolean));
+                  : (availableExpiries.length > 0 ? availableExpiries : [item.expiry].filter(Boolean))).slice(0, 5);
 
                 return (
                   <div key={index} style={{
