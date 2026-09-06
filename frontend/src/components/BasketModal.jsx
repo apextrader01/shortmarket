@@ -44,6 +44,19 @@ export default function BasketModal() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
+  const [globalMultiplier, setGlobalMultiplier] = useState(1);
+
+  const handleGlobalMultiplierChange = (newMultiplier) => {
+    const val = Math.max(1, isNaN(newMultiplier) ? 1 : newMultiplier);
+    setGlobalMultiplier(val);
+    if (basketItems.length > 0) {
+      const updated = basketItems.map(item => ({
+        ...item,
+        quantity: val
+      }));
+      useStore.setState({ basketItems: updated });
+    }
+  };
 
   const [underlyingCategory, setUnderlyingCategory] = useState('ALL'); // 'ALL' | 'INDICES' | 'MCX' | 'STOCKS'
   const [underlyingSearch, setUnderlyingSearch] = useState('');
@@ -432,30 +445,30 @@ export default function BasketModal() {
     let newItems = [];
     if (type === 'BULL_CALL_SPREAD') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'BEAR_PUT_SPREAD') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'STRADDLE') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'STRANGLE') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike + (step * 3)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - (step * 3)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike + (step * 3)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 3)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'IRON_CONDOR') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike + (step * 4)}CE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - (step * 4)}PE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike + (step * 4)}CE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 4)}PE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '' }
       ];
     }
 
@@ -650,18 +663,80 @@ export default function BasketModal() {
           <button type="button" onClick={() => applyPreset('IRON_CONDOR')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🦅 Iron Condor</button>
         </div>
 
-        {/* Product Type Selection */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>Product Type:</span>
-            <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div onClick={() => setProductType('INT')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-              <div onClick={() => setProductType('DEL')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
+        {/* Product Type & Global Basket Multiplier Selection */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Product Type (INT / DEL) */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Product:</span>
+              <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div onClick={() => setProductType('INT')} style={{ width: '50px', textAlign: 'center', padding: '5px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.15)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
+                <div onClick={() => setProductType('DEL')} style={{ width: '50px', textAlign: 'center', padding: '5px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.15)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
+              </div>
+            </div>
+
+            {/* Global All Legs Multiplier */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#60a5fa', fontWeight: '700' }}>Basket Lots:</span>
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-panel)', overflow: 'hidden' }}>
+                <button
+                  type="button"
+                  onClick={() => handleGlobalMultiplierChange(Math.max(1, globalMultiplier - 1))}
+                  style={{ width: '26px', height: '26px', background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Decrease all lots"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={globalMultiplier}
+                  onChange={e => handleGlobalMultiplierChange(parseInt(e.target.value, 10) || 1)}
+                  style={{ width: '38px', height: '26px', textAlign: 'center', background: 'var(--bg-dark)', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', color: '#60a5fa', fontSize: '12px', fontWeight: '800', outline: 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleGlobalMultiplierChange(globalMultiplier + 1)}
+                  style={{ width: '26px', height: '26px', background: 'transparent', border: 'none', color: '#fff', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Increase all lots"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Quick Multiplier Buttons */}
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[1, 2, 3, 5, 10].map(m => {
+                  const isAct = globalMultiplier === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => handleGlobalMultiplierChange(m)}
+                      style={{
+                        padding: '3px 7px',
+                        borderRadius: '4px',
+                        background: isAct ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
+                        border: isAct ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                        color: isAct ? '#fff' : 'var(--text-secondary)',
+                        fontSize: '10.5px',
+                        fontWeight: isAct ? '800' : '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {m}x
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
+
           {hedgedMargin > 0 && (
-            <div style={{ fontSize: '11.5px', color: '#4ade80', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '4px 10px', borderRadius: '12px', fontWeight: '700' }}>
-              🛡️ Hedge Benefit Applied (Margin Discount)
+            <div style={{ fontSize: '11px', color: '#4ade80', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '3px 9px', borderRadius: '12px', fontWeight: '700' }}>
+              🛡️ Hedge Benefit Applied
             </div>
           )}
         </div>
