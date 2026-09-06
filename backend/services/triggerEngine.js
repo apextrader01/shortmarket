@@ -8,6 +8,7 @@ class TriggerEngine {
     constructor() {
         this.activeTriggers = new Map(); // symbol -> [order_objects]
         this.activeTriggerSymbols = new Set(); // ⚡ In-memory active trigger symbols filter
+        this.trailingOrders = new Map(); // ⚡ orderId -> orderObj for real-time Trailing Stop Loss (TSL)
         this.isProcessing = false;
         this.io = null;
         console.log('Real-Time WebSocket Trigger Engine Initialized.');
@@ -34,11 +35,12 @@ class TriggerEngine {
             }
             
             this.activeTriggerSymbols.clear();
+            this.trailingOrders.clear();
             for (const order of orders) {
                 await this.addOrderToMemory(order);
                 if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
             }
-            console.log(`Loaded ${orders.length} active triggers into Redis ZSETs across ${this.activeTriggerSymbols.size} symbols.`);
+            console.log(`Loaded ${orders.length} active triggers into Redis ZSETs (${this.trailingOrders.size} trailing SL) across ${this.activeTriggerSymbols.size} symbols.`);
         } catch (err) {
             console.error('Failed to load pending orders into TriggerEngine:', err);
         }
@@ -47,6 +49,10 @@ class TriggerEngine {
     async addOrderToMemory(order) {
         const { generalClient } = require('./redisClient');
         if (!generalClient || !generalClient.isReady || !order) return;
+        
+        if (Number(order.trail_amount) > 0 || order.is_trailing) {
+            this.trailingOrders.set(order.id.toString(), { ...order });
+        }
         
         let key = null;
         let score = null;
@@ -72,10 +78,6 @@ class TriggerEngine {
             const trigger = Number(order.trigger_price || order.price);
             if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'GTT' || order.type === 'TRAILING_STOP')) {
                 // Determine if this leg triggers on >= or <=
-                // Buy SL triggers when LTP >= Trigger
-                // Sell SL triggers when LTP <= Trigger
-                // Buy Target (LIMIT) triggers when LTP <= Target
-                // Sell Target (LIMIT) triggers when LTP >= Target
                 let isGreaterOrEqual = false;
                 if (order.side === 'BUY' && order.type.startsWith('SL')) isGreaterOrEqual = true;
                 if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
@@ -92,6 +94,9 @@ class TriggerEngine {
         if (key && score !== null && !isNaN(score)) {
             // Remove from any other sets first to prevent duplicates
             await this.removeOrderFromMemory(order.id, order.symbol);
+            if (Number(order.trail_amount) > 0 || order.is_trailing) {
+                this.trailingOrders.set(order.id.toString(), { ...order });
+            }
             await generalClient.zAdd(key, [{ score: score, value: order.id.toString() }]);
             if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
         }
@@ -99,6 +104,7 @@ class TriggerEngine {
 
     async removeOrderFromMemory(orderId, symbol) {
         const { generalClient } = require('./redisClient');
+        this.trailingOrders.delete(orderId.toString());
         if (!generalClient || !generalClient.isReady) return;
         
         // We just attempt to remove it from all 4 possible sets to be safe
@@ -123,10 +129,72 @@ class TriggerEngine {
 
     /**
      * Evaluates a live LTP tick using a blazing fast O(log N) Redis Lua Script.
-     * This atomically finds triggered orders and removes them from Redis.
+     * Also ratchets in-memory Dynamic Trailing Stop Loss (TSL) orders in real-time.
      */
     async evaluateTick(symbol, ltp) {
         if (!ltp || !symbol) return;
+
+        // ⚡ Ratchet Trailing Stop Loss (TSL) orders in-memory
+        if (this.trailingOrders.size > 0) {
+            for (const [orderId, tOrder] of this.trailingOrders.entries()) {
+                if (tOrder.symbol !== symbol) continue;
+                const trailAmount = Number(tOrder.trail_amount || 0);
+                if (trailAmount <= 0) continue;
+
+                let updated = false;
+                let newTriggerPrice = Number(tOrder.trigger_price || tOrder.sl_price || tOrder.price);
+
+                if (tOrder.side === 'SELL') {
+                    // Long position SL: trails upward as LTP increases
+                    const highWater = Number(tOrder.high_water_mark || tOrder.price || ltp);
+                    if (ltp > highWater) {
+                        const gain = ltp - highWater;
+                        if (gain >= 0.5) {
+                            tOrder.high_water_mark = ltp;
+                            newTriggerPrice = Number((newTriggerPrice + gain).toFixed(2));
+                            tOrder.trigger_price = newTriggerPrice;
+                            tOrder.sl_price = newTriggerPrice;
+                            updated = true;
+                        }
+                    }
+                } else if (tOrder.side === 'BUY') {
+                    // Short position SL: trails downward as LTP decreases
+                    const lowWater = Number(tOrder.low_water_mark || tOrder.price || ltp);
+                    if (ltp < lowWater) {
+                        const drop = lowWater - ltp;
+                        if (drop >= 0.5) {
+                            tOrder.low_water_mark = ltp;
+                            newTriggerPrice = Number((newTriggerPrice - drop).toFixed(2));
+                            tOrder.trigger_price = newTriggerPrice;
+                            tOrder.sl_price = newTriggerPrice;
+                            updated = true;
+                        }
+                    }
+                }
+
+                if (updated) {
+                    this.addOrderToMemory(tOrder).catch(() => {});
+                    db('orders').where({ id: orderId }).update({
+                        trigger_price: newTriggerPrice,
+                        sl_price: newTriggerPrice,
+                        high_water_mark: tOrder.high_water_mark,
+                        low_water_mark: tOrder.low_water_mark,
+                        updated_at: new Date()
+                    }).catch(err => console.error('TSL DB update error:', err.message));
+
+                    if (this.io) {
+                        this.io.emit('order_update', {
+                            id: orderId,
+                            trigger_price: newTriggerPrice,
+                            sl_price: newTriggerPrice,
+                            status: tOrder.status,
+                            is_trailing: true
+                        });
+                    }
+                }
+            }
+        }
+
         // ⚡ Blazing fast O(1) in-memory check: skip Redis if NO triggers exist for this symbol!
         if (!this.activeTriggerSymbols.has(symbol)) return;
         const { generalClient } = require('./redisClient');

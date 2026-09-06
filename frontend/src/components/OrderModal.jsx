@@ -582,6 +582,31 @@ export default function OrderModal() {
             )}
           </div>
 
+          {/* Trailing Stop Loss (TSL) Jump Input */}
+          {(tab === 'Stop Loss' || isCO || isBO) && (
+            <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--color-blue-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📈 Trailing Stop Loss (TSL Jump)</span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  SL price auto-ratchets upward as LTP moves in your favor
+                </div>
+              </div>
+              <div style={{ width: '110px' }}>
+                <input 
+                  type="number" 
+                  step="0.5" 
+                  min="0.5" 
+                  placeholder="₹ Trail Jump" 
+                  value={trailingJump} 
+                  onChange={e => setTrailingJump(e.target.value)} 
+                  style={{ width: '100%', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 10px', color: '#fff', fontSize: '12.5px', outline: 'none' }} 
+                />
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
             <div 
               onClick={() => {

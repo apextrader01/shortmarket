@@ -1,4 +1,4 @@
-﻿const db = require('../database/db');
+const db = require('../database/db');
 
 // Global System Configuration for Telegram Engine
 let systemConfig = {
@@ -262,6 +262,145 @@ async function broadcastTelegramMessage(messageText) {
   }
 }
 
+/**
+ * 2-Way Interactive Bot Command Processor (/pnl, /positions, /exitall, /start, /help)
+ */
+async function handleIncomingTelegramUpdate(update) {
+  const message = update.message || update.edited_message;
+  if (!message || !message.text) return { handled: false };
+
+  const chatId = String(message.chat.id);
+  const text = message.text.trim();
+  const command = text.split(' ')[0].toLowerCase();
+
+  const user = await db('users').where({ telegram_chat_id: chatId }).first();
+
+  if (command === '/start') {
+    const welcome = `<b>👋 Welcome to Short Edge Trading Bot!</b>\n\n` +
+      `Your Telegram Chat ID: <code>${chatId}</code>\n\n` +
+      (user 
+        ? `✅ <b>Account Linked:</b> ${user.username} (${user.client_id || 'ID: ' + user.id})\n\n` +
+          `<b>Available Interactive Commands:</b>\n` +
+          `📊 <code>/pnl</code> - View today's live Realized P&L & Win Rate\n` +
+          `📈 <code>/positions</code> - View your current open positions\n` +
+          `🛑 <code>/exitall</code> - Emergency square-off all open positions\n` +
+          `ℹ️ <code>/help</code> - Show command list`
+        : `⚠️ <b>Not Linked Yet:</b> Copy your Chat ID (<code>${chatId}</code>) and paste it into <b>Settings → Telegram Alerts</b> in your Short Edge app to link your account.`);
+    await callTelegramApi(chatId, welcome);
+    return { handled: true, command };
+  }
+
+  if (!user) {
+    await callTelegramApi(chatId, `⚠️ Your Telegram Chat ID (<code>${chatId}</code>) is not linked to any Short Edge account.\n\nPlease link it in <b>Settings → Telegram Alerts</b> on your web platform.`);
+    return { handled: true, command };
+  }
+
+  if (command === '/pnl') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const completedOrders = await db('orders')
+      .where({ user_id: user.id })
+      .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
+      .where('created_at', '>=', today);
+
+    let realizedPnl = 0;
+    let winCount = 0;
+    completedOrders.forEach(o => {
+      const p = parseFloat(o.realized_pnl || 0);
+      realizedPnl += p;
+      if (p > 0) winCount++;
+    });
+
+    const winRate = completedOrders.length > 0 ? Math.round((winCount / completedOrders.length) * 100) : 0;
+    const pnlSymbol = realizedPnl >= 0 ? '🟢 +₹' : '🔴 -₹';
+
+    const reply = `<b>📊 Today's P&L Summary (${user.username})</b>\n\n` +
+      `💰 <b>Net Realized P&L:</b> ${pnlSymbol}${Math.abs(realizedPnl).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `🎯 <b>Completed Trades:</b> ${completedOrders.length}\n` +
+      `🏆 <b>Win Rate:</b> ${winRate}%\n` +
+      `💼 <b>Available Margin:</b> ₹${Number(user.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `🕒 <i>Updated: ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</i>`;
+
+    await callTelegramApi(chatId, reply);
+    return { handled: true, command };
+  }
+
+  if (command === '/positions') {
+    const positions = await db('positions')
+      .where({ user_id: user.id })
+      .whereNot({ quantity: 0 });
+
+    if (positions.length === 0) {
+      await callTelegramApi(chatId, `ℹ️ <b>Open Positions:</b> None\nYou have 0 active positions right now.`);
+      return { handled: true, command };
+    }
+
+    let posText = `<b>📈 Open Positions (${positions.length})</b>\n\n`;
+    positions.forEach((p, idx) => {
+      const side = Number(p.quantity) > 0 ? 'BUY 🟢' : 'SELL 🔴';
+      const cleanSym = p.symbol.includes(':') ? p.symbol.split(':')[1] : p.symbol;
+      posText += `${idx + 1}. <b>${cleanSym}</b> (${p.product_type || 'INT'})\n` +
+        `   • Side: ${side} | Qty: ${Math.abs(p.quantity)}\n` +
+        `   • Avg Price: ₹${Number(p.average_price || 0).toFixed(2)}\n\n`;
+    });
+    posText += `<i>Tip: Send <code>/exitall</code> to emergency square-off.</i>`;
+
+    await callTelegramApi(chatId, posText);
+    return { handled: true, command };
+  }
+
+  if (command === '/exitall') {
+    const positions = await db('positions')
+      .where({ user_id: user.id })
+      .whereNot({ quantity: 0 });
+
+    if (positions.length === 0) {
+      await callTelegramApi(chatId, `ℹ️ No open positions to exit.`);
+      return { handled: true, command };
+    }
+
+    // Cancel pending orders and square off positions
+    await db('orders')
+      .where({ user_id: user.id, status: 'PENDING' })
+      .update({ status: 'CANCELLED', updated_at: new Date() });
+
+    for (const pos of positions) {
+      const exitSide = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
+      const exitQty = Math.abs(Number(pos.quantity));
+      const execPrice = Number(pos.average_price || 0);
+
+      await db('orders').insert({
+        user_id: user.id,
+        symbol: pos.symbol,
+        type: 'MARKET',
+        side: exitSide,
+        quantity: exitQty,
+        price: execPrice,
+        status: 'EXECUTED',
+        product_type: pos.product_type || 'INT',
+        remarks: 'Emergency Exit via Telegram /exitall'
+      });
+
+      await db('positions').where({ id: pos.id }).update({ quantity: 0, updated_at: new Date() });
+    }
+
+    await callTelegramApi(chatId, `🚨 <b>Emergency Square-Off Complete!</b>\n\nAll ${positions.length} active positions squared off and pending orders cancelled.`);
+    return { handled: true, command };
+  }
+
+  if (command === '/help') {
+    const help = `<b>📱 Short Edge Telegram Commands:</b>\n\n` +
+      `📊 <code>/pnl</code> - View today's Realized P&L, Win Rate, and Margin\n` +
+      `📈 <code>/positions</code> - View all active open positions\n` +
+      `🛑 <code>/exitall</code> - Emergency square off all positions\n` +
+      `🆔 <code>/start</code> - Display your Chat ID and connection status`;
+    await callTelegramApi(chatId, help);
+    return { handled: true, command };
+  }
+
+  return { handled: false };
+}
+
 function getSystemConfig() {
   return {
     ...systemConfig,
@@ -283,6 +422,7 @@ module.exports = {
   sendTelegramAlert,
   sendTestAlert,
   broadcastTelegramMessage,
+  handleIncomingTelegramUpdate,
   getSystemConfig,
   updateSystemConfig
 };

@@ -1,10 +1,10 @@
 import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
 import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
-import ReferralsView from './ReferralsView';
+const ReferralsView = lazy(() => import('./ReferralsView'));
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -1245,7 +1245,9 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {/* Referrals Full-Screen Overlay - no routing needed */}
       {showReferrals && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-dark)', zIndex: 200, overflowY: 'auto' }}>
-          <ReferralsView setActiveTab={() => setShowReferrals(false)} />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading referrals...</div>}>
+            <ReferralsView setActiveTab={() => setShowReferrals(false)} />
+          </Suspense>
         </div>
       )}
 

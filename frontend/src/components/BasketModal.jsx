@@ -227,6 +227,50 @@ export default function BasketModal() {
     }
   };
 
+  const applyPreset = (type) => {
+    const atmPrice = prices['NSE:NIFTY50-INDEX']?.ltp || 23900;
+    const roundedStrike = Math.round(atmPrice / 50) * 50;
+
+    if (type === 'BULL_CALL_SPREAD') {
+      useStore.setState({
+        basketItems: [
+          { symbol: `NSE:NIFTY24SEP${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        ]
+      });
+    } else if (type === 'BEAR_PUT_SPREAD') {
+      useStore.setState({
+        basketItems: [
+          { symbol: `NSE:NIFTY24SEP${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        ]
+      });
+    } else if (type === 'STRADDLE') {
+      useStore.setState({
+        basketItems: [
+          { symbol: `NSE:NIFTY24SEP${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        ]
+      });
+    } else if (type === 'STRANGLE') {
+      useStore.setState({
+        basketItems: [
+          { symbol: `NSE:NIFTY24SEP${roundedStrike + 150}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike - 150}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        ]
+      });
+    } else if (type === 'IRON_CONDOR') {
+      useStore.setState({
+        basketItems: [
+          { symbol: `NSE:NIFTY24SEP${roundedStrike + 200}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+          { symbol: `NSE:NIFTY24SEP${roundedStrike - 200}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        ]
+      });
+    }
+  };
+
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -234,27 +278,45 @@ export default function BasketModal() {
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
-        width: '600px', background: 'var(--bg-dark)', borderRadius: '8px', 
+        width: '680px', background: 'var(--bg-dark)', borderRadius: '10px', 
         border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-        display: 'flex', flexDirection: 'column', maxHeight: '80vh'
+        display: 'flex', flexDirection: 'column', maxHeight: '85vh'
       }}>
         
         {/* Header */}
         <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShoppingBag size={20} color="var(--color-blue)" />
-            <h2 style={{ fontSize: '16px', fontWeight: '800' }}>Basket Order ({basketItems.length})</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Basket & Multi-Leg Strategy Builder ({basketItems.length})</h2>
           </div>
           <button onClick={() => setBasketModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
+        {/* 1-Click Strategy Presets Bar */}
+        <div style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap' }}>1-CLICK PRESETS:</span>
+          <button type="button" onClick={() => applyPreset('BULL_CALL_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐂 Bull Call Spread</button>
+          <button type="button" onClick={() => applyPreset('BEAR_PUT_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐻 Bear Put Spread</button>
+          <button type="button" onClick={() => applyPreset('STRADDLE')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>⚡ Straddle</button>
+          <button type="button" onClick={() => applyPreset('STRANGLE')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🎯 Strangle</button>
+          <button type="button" onClick={() => applyPreset('IRON_CONDOR')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🦅 Iron Condor</button>
+        </div>
+
         {/* Product Type Selection */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Product Type:</span>
-          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div onClick={() => setProductType('INT')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-            <div onClick={() => setProductType('DEL')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>Product Type:</span>
+            <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div onClick={() => setProductType('INT')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
+              <div onClick={() => setProductType('DEL')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
+            </div>
           </div>
+
+          {hedgedMargin > 0 && (
+            <div style={{ fontSize: '11.5px', color: '#4ade80', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '4px 10px', borderRadius: '12px', fontWeight: '700' }}>
+              🛡️ Hedge Benefit Applied (Margin Discount)
+            </div>
+          )}
         </div>
 
         {/* Item List */}

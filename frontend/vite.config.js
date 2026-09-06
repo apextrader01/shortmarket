@@ -48,6 +48,29 @@ export default defineConfig({
     })
   ],
   build: {
-    emptyOutDir: false
+    emptyOutDir: false,
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('lightweight-charts') || id.includes('recharts') || id.includes('technicalindicators') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('socket.io-client') || id.includes('zustand') || id.includes('firebase')) {
+              return 'vendor-core';
+            }
+            return 'vendor-libs';
+          }
+        }
+      }
+    }
   }
 })
+

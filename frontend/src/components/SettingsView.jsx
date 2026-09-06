@@ -17,6 +17,10 @@ import {
 import {
   isSoundEnabled,
   setSoundEnabled,
+  getSoundVolume,
+  setSoundVolume,
+  getSoundConfig,
+  setSoundConfig,
   playTargetHitSound,
   playStopLossHitSound,
   playOrderExecutedSound,
@@ -55,6 +59,8 @@ export default function SettingsView() {
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
   const [soundActive, setSoundActive] = useState(() => isSoundEnabled());
+  const [soundVolume, setSoundVolumeState] = useState(() => Math.round(getSoundVolume() * 100));
+  const [soundConfig, setSoundConfigState] = useState(() => getSoundConfig());
 
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramEnabled, setTelegramEnabled] = useState(false);
@@ -428,6 +434,93 @@ export default function SettingsView() {
               {soundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
               {soundActive ? 'Audio Enabled (Active)' : 'Audio Muted (Off)'}
             </button>
+          </div>
+
+          {/* Master Volume Slider */}
+          <div style={{ marginTop: '16px', padding: '14px 18px', background: 'var(--bg-dark)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 size={16} color="var(--color-blue-light)" /> Master Audio Volume: {soundVolume}%
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Adjust synthesized chime and alert volume for order fills and triggers
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : '240px' }}>
+              <VolumeX size={16} color="var(--text-secondary)" />
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={soundVolume} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  setSoundVolumeState(val);
+                  setSoundVolume(val / 100);
+                }}
+                style={{ flex: 1, accentColor: 'var(--color-blue)' }} 
+              />
+              <Volume2 size={16} color="var(--color-blue-light)" />
+            </div>
+          </div>
+
+          {/* Granular Sound Triggers */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '14px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.targetHit} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('target', val);
+                  setSoundConfigState(prev => ({ ...prev, targetHit: val }));
+                }}
+                style={{ accentColor: '#4ade80' }}
+              />
+              <span>🎯 Target Hit</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.stopLoss} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('sl', val);
+                  setSoundConfigState(prev => ({ ...prev, stopLoss: val }));
+                }}
+                style={{ accentColor: '#ef4444' }}
+              />
+              <span>🛑 Stop Loss</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.orderExecuted} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('exec', val);
+                  setSoundConfigState(prev => ({ ...prev, orderExecuted: val }));
+                }}
+                style={{ accentColor: 'var(--color-blue)' }}
+              />
+              <span>🔔 Order Fill</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.riskAlert} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('risk', val);
+                  setSoundConfigState(prev => ({ ...prev, riskAlert: val }));
+                }}
+                style={{ accentColor: '#fbbf24' }}
+              />
+              <span>⚠️ Risk Limit</span>
+            </label>
           </div>
 
           {/* Audio Test Buttons */}

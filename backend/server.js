@@ -3640,9 +3640,21 @@ const {
   sendTelegramAlert, 
   sendTestAlert, 
   broadcastTelegramMessage, 
+  handleIncomingTelegramUpdate,
   getSystemConfig: getTelegramSystemConfig, 
   updateSystemConfig: updateTelegramSystemConfig 
 } = require('./services/telegramService');
+
+// 📱 Telegram Webhook Endpoint for Interactive 2-Way Bot Commands (/pnl, /positions, /exitall)
+app.post('/api/telegram/webhook', async (req, res) => {
+  try {
+    const result = await handleIncomingTelegramUpdate(req.body);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Telegram webhook error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/telegram/settings', authenticateToken, async (req, res) => {
   try {
@@ -4000,11 +4012,18 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           .update({ balance: parseFloat(user.balance) - requiredMargin });
       }
 
-      // 3. Process each item
+      // 3. Process each item (Hedge-Aware Sequence: BUY legs first)
+      const sortedItems = [...items].sort((a, b) => {
+        if (a.side === 'BUY' && b.side === 'SELL') return -1;
+        if (a.side === 'SELL' && b.side === 'BUY') return 1;
+        return 0;
+      });
+
+      const basketGroupId = 'BSK_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
       const executedOrders = [];
 
-      for (const item of items) {
-        const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin } = item;
+      for (const item of sortedItems) {
+        const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin, trail_amount } = item;
         const status = 'PENDING';
         const isMarket = type === 'MARKET';
         const effectiveProductType = product_type || 'INT';
@@ -4015,12 +4034,14 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           symbol, type, side, quantity, price: execPrice || null, sl_price, tgt_price,
           status,
           margin: margin || 0, // Individual margin recorded for cancellations
-          product_type: effectiveProductType
+          product_type: effectiveProductType,
+          basket_group_id: basketGroupId,
+          trail_amount: trail_amount ? parseFloat(trail_amount) : null
         }).returning('id');
 
         const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
         executedOrders.push({
-          id: orderIdVal, symbol, status, isMarket, execPrice, type, side, quantity, sl_price, tgt_price, margin: margin || 0, product_type: effectiveProductType
+          id: orderIdVal, symbol, status, isMarket, execPrice, type, side, quantity, sl_price, tgt_price, margin: margin || 0, product_type: effectiveProductType, basket_group_id: basketGroupId, trail_amount: trail_amount ? parseFloat(trail_amount) : null
         });
       }
       

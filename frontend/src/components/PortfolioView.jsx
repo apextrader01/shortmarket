@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense, lazy } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import AnalyticsView from './AnalyticsView';
+const AnalyticsView = lazy(() => import('./AnalyticsView'));
 import { 
   Briefcase, 
   BarChart3, 
@@ -313,7 +313,9 @@ export default function PortfolioView() {
 
       {activeTab === 'Analytics' ? (
         <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
-          <AnalyticsView />
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading analytics...</div>}>
+            <AnalyticsView />
+          </Suspense>
         </div>
       ) : (
         <div style={{ padding: isMobile ? '14px' : '24px', paddingBottom: '120px', display: 'flex', flexDirection: 'column', gap: '22px' }}>

@@ -575,6 +575,12 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS basket_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trail_amount DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS high_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS low_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_trailing BOOLEAN DEFAULT FALSE');
 
     // Retroactively assign professional client IDs to existing users who don't have one
     const usersWithoutClientId = await db('users').whereNull('client_id');
@@ -583,15 +589,20 @@ async function ensureCriticalColumns() {
       await db('users').where({ id: u.id }).update({ client_id: clientId });
     }
 
-    // Performance: Add critical indexes to prevent full table scans at scale
+    // Performance: Add critical composite indexes to prevent full table scans at scale (100k+ users)
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_symbol ON orders(symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_slice_group_id ON orders(slice_group_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_basket_group_id ON orders(basket_group_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_status_created ON orders(user_id, status, created_at DESC)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_user_id ON sips(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
-    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at DESC)');
     
     // System Settings Table (for Admin market toggles, maintenance mode, etc.)
     await db.raw(`
