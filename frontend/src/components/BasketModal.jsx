@@ -433,23 +433,70 @@ export default function BasketModal() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {enhancedItems.map((item, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', padding: '12px', background: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ width: '8px', height: '40px', background: item.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)', borderRadius: '4px', marginRight: '12px' }}></div>
+                <div key={index} style={{ display: 'flex', alignItems: 'center', padding: '12px', background: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border-color)', gap: '12px' }}>
+                  {/* Side Switch Button */}
+                  <button
+                    type="button"
+                    onClick={() => updateBasketItem(index, { side: item.side === 'BUY' ? 'SELL' : 'BUY' })}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '4px',
+                      background: item.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                    title="Click to toggle BUY / SELL"
+                  >
+                    {item.side === 'BUY' ? 'B' : 'S'}
+                  </button>
                   
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>{item.symbol}</div>
-                    <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      <span style={{ color: item.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)' }}>{item.side}</span>
+                  {/* Symbol Details */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: '700', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.symbol}</div>
+                    <div style={{ display: 'flex', gap: '8px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                      <span style={{ color: item.side === 'BUY' ? 'var(--color-blue)' : 'var(--color-red)', fontWeight: '600' }}>{item.side}</span>
                       <span>•</span>
-                      <span>Qty: {item.quantity} {item.lotsize > 1 ? `x ${item.lotsize}` : ''}</span>
+                      <span>Total Qty: {item.totalQuantity}</span>
                     </div>
                   </div>
 
-                  <div style={{ width: '120px', display: 'flex', flexDirection: 'column', gap: '4px', marginRight: '16px' }}>
+                  {/* Lots Input */}
+                  <div style={{ width: '75px', flexShrink: 0 }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Lots (×{item.lotsize || 1})</div>
+                    <input 
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={item.quantity || 1}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        updateBasketItem(index, { quantity: isNaN(val) || val < 1 ? 1 : val });
+                      }}
+                      style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', width: '100%', outline: 'none' }}
+                    />
+                  </div>
+
+                  {/* Order Type & Limit Price */}
+                  <div style={{ width: '130px', display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
                     <select 
                       value={item.orderType} 
-                      onChange={(e) => updateBasketItem(index, { orderType: e.target.value })}
-                      style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '4px', borderRadius: '4px', fontSize: '12px', width: '100%', outline: 'none' }}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        const defaultPrice = (item.price || (item.livePrice > 0 ? item.livePrice.toFixed(2) : ''));
+                        updateBasketItem(index, { 
+                          orderType: newType,
+                          price: newType === 'LIMIT' ? defaultPrice : ''
+                        });
+                      }}
+                      style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', width: '100%', outline: 'none', cursor: 'pointer' }}
                     >
                       <option value="MARKET">Market</option>
                       <option value="LIMIT">Limit</option>
@@ -457,19 +504,23 @@ export default function BasketModal() {
                     {item.orderType === 'LIMIT' && (
                       <input 
                         type="number" 
+                        step="0.05"
+                        placeholder="Limit Price"
                         value={item.price} 
                         onChange={(e) => updateBasketItem(index, { price: e.target.value })}
-                        style={{ background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '4px', borderRadius: '4px', fontSize: '12px', width: '100%', outline: 'none' }}
+                        style={{ background: 'var(--bg-dark)', border: '1px solid var(--color-blue)', color: '#fff', padding: '5px 8px', borderRadius: '4px', fontSize: '12px', width: '100%', outline: 'none' }}
                       />
                     )}
                   </div>
 
-                  <div style={{ textAlign: 'right', width: '80px', marginRight: '16px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>LTP</div>
-                    <div style={{ fontSize: '13px', fontWeight: '600' }}>₹{item.livePrice.toFixed(2)}</div>
+                  {/* Live LTP */}
+                  <div style={{ textAlign: 'right', width: '75px', flexShrink: 0 }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '3px' }}>LTP</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>₹{item.livePrice.toFixed(2)}</div>
                   </div>
 
-                  <button onClick={() => removeFromBasket(index)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>
+                  {/* Remove Button */}
+                  <button onClick={() => removeFromBasket(index)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px', borderRadius: '4px', flexShrink: 0 }} title="Remove item">
                     <Trash2 size={16} />
                   </button>
                 </div>
