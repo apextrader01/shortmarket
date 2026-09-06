@@ -352,13 +352,94 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       ]
     }
   ]);
+  // Trading Rules State & Discipline Controls
+  const [editingRule, setEditingRule] = useState(null);
+  const [rulesCategoryFilter, setRulesCategoryFilter] = useState('ALL');
+  const [rulesAdherenceFilter, setRulesAdherenceFilter] = useState('ALL');
+  const [disciplinePledgeSigned, setDisciplinePledgeSigned] = useState(false);
+  const [ruleToast, setRuleToast] = useState(null);
+
   const [rules, setRules] = useState([
-    { id: 1, text: 'Maximum risk per trade is strictly 1% of total portfolio capital', category: 'RISK', followed: 42, broken: 2, active: true },
-    { id: 2, text: 'Never take a trade without a predefined Stop-Loss order in system', category: 'RISK', followed: 48, broken: 0, active: true },
-    { id: 3, text: 'Maximum 3 trades per trading day to avoid overtrading & emotional tilt', category: 'DISCIPLINE', followed: 38, broken: 5, active: true },
-    { id: 4, text: 'Wait for 5-minute candle close confirmation before breakout entry', category: 'EXECUTION', followed: 31, broken: 4, active: true },
-    { id: 5, text: 'No revenge trading after a red trade; step away from screens for 15 mins', category: 'PSYCHOLOGY', followed: 29, broken: 3, active: true },
-    { id: 6, text: 'Never average down into a losing intraday position', category: 'RISK', followed: 35, broken: 1, active: true }
+    {
+      id: 1,
+      text: 'Maximum risk per trade is strictly 1% of total portfolio capital',
+      category: 'RISK',
+      severity: 'CRITICAL',
+      consequence: 'Prevents catastrophic drawdowns and ensures long-term account survival.',
+      followed: 45,
+      broken: 2,
+      active: true
+    },
+    {
+      id: 2,
+      text: 'Never take a trade without a predefined Stop-Loss order in system',
+      category: 'RISK',
+      severity: 'CRITICAL',
+      consequence: 'Eliminates open-ended downside risk from sudden market crashes or flash spikes.',
+      followed: 48,
+      broken: 0,
+      active: true
+    },
+    {
+      id: 3,
+      text: 'Maximum 3 trades per trading day to avoid overtrading & emotional tilt',
+      category: 'DISCIPLINE',
+      severity: 'HIGH',
+      consequence: 'Stops revenge trading spirals and excessive brokerage fee erosion.',
+      followed: 38,
+      broken: 5,
+      active: true
+    },
+    {
+      id: 4,
+      text: 'Wait for 5-minute candle close confirmation before breakout entry',
+      category: 'EXECUTION',
+      severity: 'HIGH',
+      consequence: 'Filters out false breakouts and prevents chasing intraday wick traps.',
+      followed: 31,
+      broken: 4,
+      active: true
+    },
+    {
+      id: 5,
+      text: 'No revenge trading after a red trade; step away from screens for 15 mins',
+      category: 'PSYCHOLOGY',
+      severity: 'CRITICAL',
+      consequence: 'Resets dopamine and emotional state to prevent tilt-induced capital destruction.',
+      followed: 29,
+      broken: 3,
+      active: true
+    },
+    {
+      id: 6,
+      text: 'Never average down into a losing intraday position',
+      category: 'RISK',
+      severity: 'CRITICAL',
+      consequence: 'Avoids turning a calculated small loss into an unrecoverable portfolio blowout.',
+      followed: 35,
+      broken: 1,
+      active: true
+    },
+    {
+      id: 7,
+      text: 'Lock profits and reduce position size on high-impact news days (RBI, Fed, CPI)',
+      category: 'RISK',
+      severity: 'HIGH',
+      consequence: 'Protects equity against extreme slippage and wide bid-ask spread widening.',
+      followed: 22,
+      broken: 1,
+      active: true
+    },
+    {
+      id: 8,
+      text: 'Conduct pre-market prep and key level marking prior to 9:00 AM',
+      category: 'DISCIPLINE',
+      severity: 'STANDARD',
+      consequence: 'Ensures calm, structured decision-making before market bell rings.',
+      followed: 40,
+      broken: 2,
+      active: true
+    }
   ]);
   const [mistakes, setMistakes] = useState([
     { id: 1, name: 'FOMO Entry on extended green candle', category: 'PSYCHOLOGY', loss: 14500, count: 4, note: 'Wait for pullback to 20 EMA before entering' },
@@ -401,7 +482,9 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
   const [newRuleForm, setNewRuleForm] = useState({
     text: '',
-    category: 'RISK'
+    category: 'RISK',
+    severity: 'CRITICAL',
+    consequence: ''
   });
 
   const [newMistakeForm, setNewMistakeForm] = useState({
@@ -567,7 +650,6 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   const [editingTrade, setEditingTrade] = useState(null);
   const [viewingTrade, setViewingTrade] = useState(null);
   const [tradeActionNotice, setTradeActionNotice] = useState(null);
-  const [rulesCategoryFilter, setRulesCategoryFilter] = useState('ALL');
 
   // Fetch backend journal data on mount
   const fetchJournalData = async () => {
@@ -1054,6 +1136,8 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   // Rule Follow/Broken Handlers
   const handleRuleFollow = async (ruleId) => {
     setRules(prev => prev.map(r => r.id === ruleId ? { ...r, followed: (r.followed || 0) + 1 } : r));
+    setRuleToast('✓ Rule followed logged! Keep up the discipline.');
+    setTimeout(() => setRuleToast(null), 3000);
     try {
       const token = localStorage.getItem('token');
       if (token) {
@@ -1070,6 +1154,8 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
   const handleRuleBreak = async (ruleId) => {
     setRules(prev => prev.map(r => r.id === ruleId ? { ...r, broken: (r.broken || 0) + 1 } : r));
+    setRuleToast('⚠️ Rule breach recorded. Step back and reset your discipline!');
+    setTimeout(() => setRuleToast(null), 3000);
     try {
       const token = localStorage.getItem('token');
       if (token) {
@@ -1082,6 +1168,41 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
     } catch (e) {
       console.warn('Rule update error:', e);
     }
+  };
+
+  // Save Edited Rule
+  const handleSaveEditedRule = (e) => {
+    e.preventDefault();
+    if (!editingRule) return;
+    const updated = {
+      ...editingRule,
+      text: editingRule.text.trim(),
+      category: editingRule.category,
+      severity: editingRule.severity || 'HIGH',
+      consequence: editingRule.consequence || ''
+    };
+    setRules(prev => prev.map(r => r.id === updated.id ? updated : r));
+    setEditingRule(null);
+    setRuleToast('✓ Rule updated successfully!');
+    setTimeout(() => setRuleToast(null), 3000);
+  };
+
+  // Delete Rule
+  const handleDeleteRule = (ruleId) => {
+    if (!window.confirm('Are you sure you want to delete this trading rule from your matrix?')) return;
+    setRules(prev => prev.filter(r => r.id !== ruleId));
+    if (editingRule && editingRule.id === ruleId) {
+      setEditingRule(null);
+    }
+    setRuleToast('✓ Rule removed from matrix.');
+    setTimeout(() => setRuleToast(null), 3000);
+  };
+
+  // Sign Daily Discipline Pledge
+  const handleSignDisciplinePledge = () => {
+    setDisciplinePledgeSigned(true);
+    setRuleToast('🏆 Daily Trader Discipline Pledge Signed & Active!');
+    setTimeout(() => setRuleToast(null), 4000);
   };
 
   // Add Strategy Handler
@@ -1167,18 +1288,22 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   // Add Rule Handler
   const handleAddRule = (e) => {
     e.preventDefault();
-    if (!newRuleForm.text) return;
+    if (!newRuleForm.text.trim()) return;
     const newR = {
       id: Date.now(),
-      text: newRuleForm.text,
-      category: newRuleForm.category,
+      text: newRuleForm.text.trim(),
+      category: newRuleForm.category || 'RISK',
+      severity: newRuleForm.severity || 'CRITICAL',
+      consequence: newRuleForm.consequence.trim() || 'Capital preservation boundary.',
       followed: 1,
       broken: 0,
       active: true
     };
     setRules(prev => [...prev, newR]);
     setShowAddRuleModal(false);
-    setNewRuleForm({ text: '', category: 'RISK' });
+    setRuleToast('✓ New Rule added to Matrix!');
+    setTimeout(() => setRuleToast(null), 3000);
+    setNewRuleForm({ text: '', category: 'RISK', severity: 'CRITICAL', consequence: '' });
   };
 
   // Add Mistake Handler
@@ -3916,117 +4041,538 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 5. RULES SUB-VIEW                                              */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'RULES' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Trading Rules Matrix</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>The hard boundaries that protect your capital and ensure consistency.</p>
-                </div>
-                <button
-                  onClick={() => setShowAddRuleModal(true)}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    padding: '8px 14px',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Plus size={15} /> Add Rule
-                </button>
-              </div>
+          {activeTab === 'RULES' && (() => {
+            // Compute Global Discipline & Adherence Stats
+            let totalFollowed = 0;
+            let totalBroken = 0;
+            let flawlessCount = 0;
 
-              {/* Category Filter Tabs */}
-              <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
-                {['ALL', 'RISK', 'DISCIPLINE', 'EXECUTION', 'PSYCHOLOGY'].map(cat => (
+            rules.forEach(r => {
+              const f = r.followed || 0;
+              const b = r.broken || 0;
+              totalFollowed += f;
+              totalBroken += b;
+              if (b === 0 && f > 0) flawlessCount += 1;
+            });
+
+            const totalChecks = totalFollowed + totalBroken;
+            const globalAdherence = totalChecks > 0 ? ((totalFollowed / totalChecks) * 100).toFixed(1) : '100.0';
+
+            // Filter Rules
+            const filteredRules = rules.filter(rule => {
+              if (rulesCategoryFilter === 'CRITICAL' && rule.severity !== 'CRITICAL') return false;
+              if (rulesCategoryFilter !== 'ALL' && rulesCategoryFilter !== 'CRITICAL' && rule.category !== rulesCategoryFilter) return false;
+              
+              const f = rule.followed || 0;
+              const b = rule.broken || 0;
+              if (rulesAdherenceFilter === 'FLAWLESS' && b > 0) return false;
+              if (rulesAdherenceFilter === 'BREACHED' && b === 0) return false;
+
+              return true;
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
+                {/* Header with Title & Action */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ShieldCheck size={22} color="#2563eb" /> Trading Rules Matrix & Capital Protection
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '3px 0 0 0' }}>
+                      The hard boundaries that protect your capital and ensure consistency.
+                    </p>
+                  </div>
                   <button
-                    key={cat}
-                    onClick={() => setRulesCategoryFilter(cat)}
+                    onClick={() => setShowAddRuleModal(true)}
                     style={{
-                      padding: '6px 12px',
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      padding: '9px 16px',
                       borderRadius: '8px',
-                      fontSize: '11px',
+                      fontSize: '12px',
                       fontWeight: '700',
-                      border: `1px solid ${colors.borderColor}`,
-                      backgroundColor: rulesCategoryFilter === cat ? '#2563eb' : colors.bgCard,
-                      color: rulesCategoryFilter === cat ? '#ffffff' : colors.textSecondary,
-                      cursor: 'pointer'
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                      alignSelf: isMobile ? 'flex-start' : 'auto'
                     }}
                   >
-                    {cat}
+                    <Plus size={16} /> + Add Rule
                   </button>
-                ))}
-              </div>
+                </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {rules
-                  .filter(r => rulesCategoryFilter === 'ALL' || r.category === rulesCategoryFilter)
-                  .map((rule) => (
-                    <div key={rule.id} style={{ 
-                      backgroundColor: colors.bgCard, 
-                      border: `1px solid ${colors.borderColor}`, 
-                      borderRadius: '12px', 
-                      padding: isMobile ? '12px 14px' : '16px 20px', 
-                      display: 'flex', 
-                      flexDirection: isMobile ? 'column' : 'row',
-                      alignItems: isMobile ? 'flex-start' : 'center', 
-                      justifyContent: 'space-between',
-                      gap: isMobile ? '8px' : '14px',
-                      boxShadow: colors.cardShadow
+                {/* Toast Notification */}
+                {ruleToast && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    border: `1px solid ${colors.accentGreen}`,
+                    color: colors.accentGreen,
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <CheckCircle size={16} /> {ruleToast}
+                  </div>
+                )}
+
+                {/* Discipline Adherence KPI Banner */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                  gap: isMobile ? '8px' : '12px'
+                }}>
+                  {/* Discipline Adherence Score */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🛡️ DISCIPLINE ADHERENCE</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: Number(globalAdherence) >= 90 ? colors.accentGreen : colors.accentRed }}>
+                      {globalAdherence}%
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>{totalFollowed} Followed / {totalBroken} Broken</div>
+                  </div>
+
+                  {/* Flawless Rules */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🏆 100% FLAWLESS RULES</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentGreen }}>
+                      {flawlessCount} Rules
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>0 rule breaches logged</div>
+                  </div>
+
+                  {/* High Risk Leaks */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>⚠️ TOTAL RULE BREACHES</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: totalBroken > 0 ? colors.accentRed : colors.accentGreen }}>
+                      {totalBroken}
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Discipline leak events</div>
+                  </div>
+
+                  {/* Active Matrix Rules */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>📋 ACTIVE MATRIX RULES</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentBlueLight }}>
+                      {rules.length} Rules
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Guarding trading capital</div>
+                  </div>
+                </div>
+
+                {/* Daily Discipline Pledge Card */}
+                <div style={{
+                  backgroundColor: disciplinePledgeSigned ? 'rgba(16, 185, 129, 0.1)' : (isLight ? 'rgba(37, 99, 235, 0.06)' : 'rgba(37, 99, 235, 0.12)'),
+                  border: `1px solid ${disciplinePledgeSigned ? colors.accentGreen : 'rgba(37, 99, 235, 0.3)'}`,
+                  borderRadius: '12px',
+                  padding: isMobile ? '12px 14px' : '14px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      backgroundColor: disciplinePledgeSigned ? 'rgba(16, 185, 129, 0.2)' : 'rgba(37, 99, 235, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: disciplinePledgeSigned ? colors.accentGreen : '#2563eb',
+                      flexShrink: 0
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                        <div style={{ width: '30px', height: '30px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
-                          <Scale size={16} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: '600', color: colors.textPrimary, lineHeight: 1.35 }}>{rule.text || rule.rule_text}</div>
-                          <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '2px' }}>Category: {rule.category}</div>
-                        </div>
+                      <ShieldAlert size={20} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>
+                        {disciplinePledgeSigned ? '🏆 Daily Discipline Commitment Active' : 'Daily Capital Preservation Pledge'}
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', alignSelf: isMobile ? 'flex-end' : 'center' }}>
-                        <button
-                          onClick={() => handleRuleFollow(rule.id)}
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            color: colors.accentGreen,
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ✓ {rule.followed || 0} Followed
-                        </button>
-                        <button
-                          onClick={() => handleRuleBreak(rule.id)}
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            color: colors.accentRed,
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            padding: '4px 10px',
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ✕ {rule.broken || 0} Broken
-                        </button>
+                      <div style={{ fontSize: '11.5px', color: colors.textSecondary, marginTop: '2px', lineHeight: 1.35 }}>
+                        {disciplinePledgeSigned
+                          ? 'You have committed to executing strictly according to your defined risk boundaries today.'
+                          : 'I commit to protecting my capital first, respecting stop-loss orders, and executing only high-probability setups.'}
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {!disciplinePledgeSigned ? (
+                    <button
+                      onClick={handleSignDisciplinePledge}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        padding: '8px 16px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        border: 'none',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(37,99,235,0.4)',
+                        alignSelf: isMobile ? 'flex-end' : 'center'
+                      }}
+                    >
+                      ✓ Sign Today's Pledge
+                    </button>
+                  ) : (
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      color: colors.accentGreen,
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      ✓ PLEDGE SIGNED
+                    </div>
+                  )}
+                </div>
+
+                {/* Filter Tabs & Adherence Filter Pills */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  {/* Category Filter Tabs */}
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {[
+                      { id: 'ALL', label: '🎯 All Rules' },
+                      { id: 'RISK', label: '🛡️ Risk & Capital' },
+                      { id: 'DISCIPLINE', label: '🧘 Discipline' },
+                      { id: 'EXECUTION', label: '⚡ Execution' },
+                      { id: 'PSYCHOLOGY', label: '🧠 Psychology' },
+                      { id: 'CRITICAL', label: '🚨 Critical' }
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setRulesCategoryFilter(cat.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          border: `1px solid ${rulesCategoryFilter === cat.id ? '#2563eb' : colors.borderColor}`,
+                          backgroundColor: rulesCategoryFilter === cat.id ? '#2563eb' : colors.bgCard,
+                          color: rulesCategoryFilter === cat.id ? '#ffffff' : colors.textSecondary,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Adherence Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[
+                      { id: 'ALL', label: 'All Status' },
+                      { id: 'FLAWLESS', label: '🏆 Flawless (0 Broken)' },
+                      { id: 'BREACHED', label: '⚠️ Breached' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setRulesAdherenceFilter(f.id)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          border: `1px solid ${rulesAdherenceFilter === f.id ? (isLight ? '#334155' : '#64748b') : colors.borderColor}`,
+                          backgroundColor: rulesAdherenceFilter === f.id ? (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)') : 'transparent',
+                          color: rulesAdherenceFilter === f.id ? colors.textPrimary : colors.textMuted,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rules Cards List */}
+                {filteredRules.length === 0 ? (
+                  <div style={{
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    backgroundColor: colors.bgCard,
+                    borderRadius: '12px',
+                    border: `1px dashed ${colors.borderColor}`
+                  }}>
+                    <Scale size={32} color={colors.textMuted} style={{ margin: '0 auto 10px auto' }} />
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>No rules match your filter</div>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '4px 0 14px 0' }}>Try switching category or resetting filter pills</p>
+                    <button
+                      onClick={() => { setRulesCategoryFilter('ALL'); setRulesAdherenceFilter('ALL'); }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {filteredRules.map((rule) => {
+                      const f = rule.followed || 0;
+                      const b = rule.broken || 0;
+                      const total = f + b;
+                      const adherencePct = total > 0 ? Math.round((f / total) * 100) : 100;
+                      const isFlawless = b === 0;
+                      const isGood = adherencePct >= 90;
+                      const severity = rule.severity || 'HIGH';
+
+                      return (
+                        <div
+                          key={rule.id}
+                          style={{
+                            backgroundColor: colors.bgCard,
+                            border: `1px solid ${colors.borderColor}`,
+                            borderRadius: '12px',
+                            padding: isMobile ? '12px 14px' : '16px 20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            boxShadow: colors.cardShadow,
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Severity Accent Left Bar */}
+                          <div style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '4px',
+                            backgroundColor: severity === 'CRITICAL' ? colors.accentRed : (severity === 'HIGH' ? '#f59e0b' : '#2563eb')
+                          }} />
+
+                          {/* Rule Header Row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {/* Severity Badge */}
+                              <span style={{
+                                fontSize: '9px',
+                                fontWeight: '800',
+                                color: severity === 'CRITICAL' ? colors.accentRed : (severity === 'HIGH' ? '#f59e0b' : colors.accentBlueLight),
+                                backgroundColor: severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.12)' : (severity === 'HIGH' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(37, 99, 235, 0.1)'),
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase'
+                              }}>
+                                {severity === 'CRITICAL' ? '🔴 CRITICAL RULE' : (severity === 'HIGH' ? '🟠 HIGH PRIORITY' : '🔵 STANDARD')}
+                              </span>
+
+                              {/* Category Badge */}
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                color: colors.textMuted,
+                                backgroundColor: colors.bgInner,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                border: `1px solid ${colors.borderColor}`
+                              }}>
+                                {rule.category}
+                              </span>
+                            </div>
+
+                            {/* Adherence Compliance Badge */}
+                            <div style={{
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              color: isFlawless ? colors.accentGreen : (isGood ? colors.accentGreen : colors.accentRed),
+                              backgroundColor: isFlawless ? 'rgba(16, 185, 129, 0.12)' : (isGood ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.12)'),
+                              padding: '2px 10px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              {isFlawless ? '🏆 100% FLAWLESS' : `${isGood ? '🛡️' : '⚠️'} ${adherencePct}% ADHERENCE`}
+                            </div>
+                          </div>
+
+                          {/* Rule Content & Consequence */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#2563eb',
+                              flexShrink: 0,
+                              marginTop: '2px'
+                            }}>
+                              <Scale size={16} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary, lineHeight: 1.35 }}>
+                                {rule.text || rule.rule_text}
+                              </div>
+                              {rule.consequence && (
+                                <div style={{ fontSize: '11.5px', color: colors.textSecondary, marginTop: '4px', lineHeight: 1.35 }}>
+                                  💡 Purpose: {rule.consequence}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Visual Adherence Bar */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', fontWeight: '700', marginBottom: '4px' }}>
+                              <span style={{ color: colors.accentGreen }}>{f} Followed ({adherencePct}%)</span>
+                              <span style={{ color: colors.accentRed }}>{b} Breached ({100 - adherencePct}%)</span>
+                            </div>
+                            <div style={{ height: '5px', width: '100%', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.25)', overflow: 'hidden', display: 'flex' }}>
+                              <div style={{ width: `${adherencePct}%`, backgroundColor: colors.accentGreen, height: '100%', borderRadius: '4px 0 0 4px', transition: 'width 0.4s ease' }} />
+                            </div>
+                          </div>
+
+                          {/* Action Buttons Row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '6px', borderTop: `1px solid ${colors.borderColor}` }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => handleRuleFollow(rule.id)}
+                                title="Log Rule Followed (+1)"
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  color: colors.accentGreen,
+                                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                                  border: `1px solid rgba(16, 185, 129, 0.3)`,
+                                  padding: '5px 12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                ✓ {f} Followed
+                              </button>
+                              <button
+                                onClick={() => handleRuleBreak(rule.id)}
+                                title="Log Rule Broken (+1)"
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  color: colors.accentRed,
+                                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                                  border: `1px solid rgba(239, 68, 68, 0.3)`,
+                                  padding: '5px 12px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                ✕ {b} Broken
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                onClick={() => setEditingRule(rule)}
+                                title="Edit Rule"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.textSecondary,
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Edit3 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRule(rule.id)}
+                                title="Delete Rule"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.accentRed,
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 6. MISTAKES TRACKER SUB-VIEW                                   */}
@@ -5821,29 +6367,92 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
         </div>
       )}
 
-      {/* 3. ADD RULE MODAL */}
+      {/* 3. EDIT RULE MODAL */}
+      {editingRule && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Edit3 size={16} color="#2563eb" /> Edit Trading Rule
+              </div>
+              <button onClick={() => setEditingRule(null)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveEditedRule} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Rule Statement</label>
+                <textarea rows={2} required value={editingRule.text} onChange={e => setEditingRule({ ...editingRule, text: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
+                  <select value={editingRule.category} onChange={e => setEditingRule({ ...editingRule, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="RISK">RISK</option>
+                    <option value="DISCIPLINE">DISCIPLINE</option>
+                    <option value="EXECUTION">EXECUTION</option>
+                    <option value="PSYCHOLOGY">PSYCHOLOGY</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Severity Level</label>
+                  <select value={editingRule.severity || 'HIGH'} onChange={e => setEditingRule({ ...editingRule, severity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="CRITICAL">🔴 CRITICAL</option>
+                    <option value="HIGH">🟠 HIGH PRIORITY</option>
+                    <option value="STANDARD">🔵 STANDARD</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Consequence / Purpose</label>
+                <textarea rows={2} placeholder="Why does this rule protect your account?" value={editingRule.consequence || ''} onChange={e => setEditingRule({ ...editingRule, consequence: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button type="button" onClick={() => setEditingRule(null)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Update Rule</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. ADD NEW RULE MODAL */}
       {showAddRuleModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Add Trading Rule</div>
-              <button onClick={() => setShowAddRuleModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} color="#2563eb" /> Add Trading Matrix Rule
+              </div>
+              <button onClick={() => setShowAddRuleModal(false)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <form onSubmit={handleAddRule} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Rule Description</label>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Rule Statement</label>
                 <textarea rows={2} required placeholder="e.g. Never risk more than 1.5% on expiry days" value={newRuleForm.text} onChange={e => setNewRuleForm({ ...newRuleForm, text: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
               </div>
-              <div>
-                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
-                <select value={newRuleForm.category} onChange={e => setNewRuleForm({ ...newRuleForm, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
-                  <option value="RISK">RISK</option>
-                  <option value="DISCIPLINE">DISCIPLINE</option>
-                  <option value="EXECUTION">EXECUTION</option>
-                  <option value="PSYCHOLOGY">PSYCHOLOGY</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
+                  <select value={newRuleForm.category} onChange={e => setNewRuleForm({ ...newRuleForm, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="RISK">RISK</option>
+                    <option value="DISCIPLINE">DISCIPLINE</option>
+                    <option value="EXECUTION">EXECUTION</option>
+                    <option value="PSYCHOLOGY">PSYCHOLOGY</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Severity Level</label>
+                  <select value={newRuleForm.severity} onChange={e => setNewRuleForm({ ...newRuleForm, severity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="CRITICAL">🔴 CRITICAL</option>
+                    <option value="HIGH">🟠 HIGH PRIORITY</option>
+                    <option value="STANDARD">🔵 STANDARD</option>
+                  </select>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Consequence / Purpose</label>
+                <textarea rows={2} placeholder="Why does this rule protect your account?" value={newRuleForm.consequence} onChange={e => setNewRuleForm({ ...newRuleForm, consequence: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
                 <button type="button" onClick={() => setShowAddRuleModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Save Rule</button>
               </div>
