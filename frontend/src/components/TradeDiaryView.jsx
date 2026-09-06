@@ -741,6 +741,8 @@ const [challengeDay, setChallengeDay] = useState(14);
   const [communityAuthorFilter, setCommunityAuthorFilter] = useState('ALL');
 const [communityFilter, setCommunityFilter] = useState('ALL');
   const [quizTopicFilter, setQuizTopicFilter] = useState('ALL');
+  const [quizMode, setQuizMode] = useState('STUDY'); // 'STUDY' | 'EXAM'
+  const [showQuizReview, setShowQuizReview] = useState(false);
   const [affiliateSubTab, setAffiliateSubTab] = useState('REFERRALS'); // REFERRALS | PAYOUTS | MARKETING | TERMS
   const [affiliateStatusFilter, setAffiliateStatusFilter] = useState('ALL');
   const [copiedPromoKey, setCopiedPromoKey] = useState(null);
@@ -8265,118 +8267,487 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 14. TRADING QUIZ SUB-VIEW                                      */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'TRADING_QUIZ' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <HelpCircle size={20} color="#3b82f6" /> Trading Psychology & Execution Quiz
-                  </h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Test your risk discipline and execution mastery with 10 institutional questions.</p>
+          {activeTab === 'TRADING_QUIZ' && (() => {
+            const answeredCount = Object.keys(quizAnswers).length;
+            const progressPct = Math.round((answeredCount / QUIZ_QUESTIONS.length) * 100);
+
+            // Category score calculations for evaluation view
+            const categoryScores = {
+              'Risk Management': { correct: 0, total: 0 },
+              'Trading Psychology': { correct: 0, total: 0 },
+              'Options & Mechanics': { correct: 0, total: 0 }
+            };
+
+            QUIZ_QUESTIONS.forEach(q => {
+              if (categoryScores[q.category]) {
+                categoryScores[q.category].total++;
+                if (quizAnswers[q.id] === q.correctIndex) {
+                  categoryScores[q.category].correct++;
+                }
+              }
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
+                
+                {/* Header & Controls Strip */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <HelpCircle size={22} color="#2563eb" /> Trading Psychology & Execution Quiz
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Test your risk discipline, probability math, and execution mastery with 10 institutional questions.
+                    </p>
+                  </div>
+
+                  {/* Mode Selector & Reset */}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
+                      <button
+                        onClick={() => setQuizMode('STUDY')}
+                        style={{
+                          backgroundColor: quizMode === 'STUDY' ? '#2563eb' : 'transparent',
+                          color: quizMode === 'STUDY' ? '#ffffff' : colors.textSecondary,
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <BookOpen size={12} /> Study Mode
+                      </button>
+                      <button
+                        onClick={() => setQuizMode('EXAM')}
+                        style={{
+                          backgroundColor: quizMode === 'EXAM' ? '#2563eb' : 'transparent',
+                          color: quizMode === 'EXAM' ? '#ffffff' : colors.textSecondary,
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Award size={12} /> Exam Mode
+                      </button>
+                    </div>
+
+                    {(answeredCount > 0 || quizScore !== null) && (
+                      <button
+                        onClick={() => {
+                          setQuizAnswers({});
+                          setQuizScore(null);
+                          setShowQuizReview(false);
+                        }}
+                        style={{
+                          backgroundColor: colors.bgCard,
+                          color: colors.textSecondary,
+                          border: `1px solid ${colors.borderColor}`,
+                          borderRadius: '8px',
+                          padding: '5px 10px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <RefreshCw size={12} /> Reset Quiz
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {/* Topic Filters */}
-                <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
-                  {['ALL', 'Risk Management', 'Trading Psychology', 'Options & Mechanics'].map(top => (
-                    <button
-                      key={top}
-                      onClick={() => setQuizTopicFilter(top)}
-                      style={{
-                        backgroundColor: quizTopicFilter === top ? '#2563eb' : 'transparent',
-                        color: quizTopicFilter === top ? '#ffffff' : colors.textSecondary,
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '4px 8px',
-                        fontSize: '11px',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {top === 'ALL' ? 'All (10)' : top}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {quizScore !== null ? (
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '28px 20px', textAlign: 'center', boxShadow: colors.cardShadow }}>
-                  <div style={{ fontSize: '36px', marginBottom: '8px' }}>🏆</div>
-                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: colors.textPrimary, margin: '0 0 4px 0' }}>
-                    Quiz Evaluation: {quizScore} / {QUIZ_QUESTIONS.length} Correct ({Math.round((quizScore / QUIZ_QUESTIONS.length) * 100)}%)
-                  </h3>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '0 0 16px 0' }}>
-                    {quizScore >= 8 ? '🌟 Master of Execution Discipline! You possess institutional risk foundations.' : 'Keep practicing risk rules and journaling to eliminate unforced trading errors.'}
-                  </p>
-                  <button onClick={() => { setQuizAnswers({}); setQuizScore(null); }} style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>
-                    Retake Quiz
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {QUIZ_QUESTIONS
-                    .filter(q => quizTopicFilter === 'ALL' || q.category === quizTopicFilter)
-                    .map((q, idx) => (
-                      <div key={q.id} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: colors.cardShadow }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#2563eb', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
-                            {q.category}
+                {/* Progress & Category Filter Banner */}
+                {quizScore === null && (
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '12px' : '16px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textPrimary }}>
+                          QUIZ PROGRESS: {answeredCount} / {QUIZ_QUESTIONS.length} Answered ({progressPct}%)
+                        </span>
+                        {quizMode === 'STUDY' && (
+                          <span style={{ fontSize: '10px', fontWeight: '700', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: colors.accentGreen, padding: '2px 6px', borderRadius: '4px' }}>
+                            ✓ Instant Explanations Active
                           </span>
-                          <span style={{ fontSize: '10px', color: colors.textMuted }}>Question #{q.id}</span>
-                        </div>
-
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>
-                          {q.question}
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {q.options.map((opt, optIdx) => {
-                            const isSelected = quizAnswers[q.id] === optIdx;
-                            return (
-                              <button
-                                key={optIdx}
-                                onClick={() => handleSelectQuizAnswer(q.id, optIdx)}
-                                style={{
-                                  textAlign: 'left',
-                                  padding: '9px 12px',
-                                  borderRadius: '8px',
-                                  border: isSelected ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                                  backgroundColor: isSelected ? (isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)') : colors.bgInner,
-                                  color: isSelected ? colors.accentBlueLight : colors.textPrimary,
-                                  fontSize: '12px',
-                                  fontWeight: isSelected ? '700' : '500',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        )}
                       </div>
-                    ))}
 
-                  <button
-                    onClick={handleFinishQuiz}
-                    disabled={Object.keys(quizAnswers).length < 5}
-                    style={{
-                      backgroundColor: Object.keys(quizAnswers).length < 5 ? colors.borderColor : '#2563eb',
-                      color: '#ffffff',
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      border: 'none',
-                      cursor: Object.keys(quizAnswers).length < 5 ? 'not-allowed' : 'pointer',
-                      alignSelf: 'center',
-                      marginTop: '6px'
-                    }}
-                  >
-                    Submit Quiz Answers ({Object.keys(quizAnswers).length}/{QUIZ_QUESTIONS.length} Answered)
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                      {/* Topic Filter Pills */}
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {['ALL', 'Risk Management', 'Trading Psychology', 'Options & Mechanics'].map(top => (
+                          <button
+                            key={top}
+                            onClick={() => setQuizTopicFilter(top)}
+                            style={{
+                              backgroundColor: quizTopicFilter === top ? '#2563eb' : colors.bgInner,
+                              color: quizTopicFilter === top ? '#ffffff' : colors.textSecondary,
+                              border: `1px solid ${colors.borderColor}`,
+                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              fontSize: '10.5px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {top === 'ALL' ? 'All (10)' : top}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div style={{ width: '100%', height: '6px', backgroundColor: colors.bgInner, borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ width: `${progressPct}%`, height: '100%', backgroundColor: progressPct === 100 ? colors.accentGreen : '#2563eb', transition: 'width 0.25s ease' }} />
+                    </div>
+
+                    {/* Question Jump Chips */}
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', paddingTop: '4px' }}>
+                      <span style={{ fontSize: '10.5px', fontWeight: '700', color: colors.textMuted }}>JUMP TO:</span>
+                      {QUIZ_QUESTIONS.map(q => {
+                        const isAns = quizAnswers[q.id] !== undefined;
+                        const isCorrectInStudy = quizMode === 'STUDY' && isAns && quizAnswers[q.id] === q.correctIndex;
+                        const isWrongInStudy = quizMode === 'STUDY' && isAns && quizAnswers[q.id] !== q.correctIndex;
+
+                        return (
+                          <a
+                            key={q.id}
+                            href={`#quiz-q-${q.id}`}
+                            style={{
+                              textDecoration: 'none',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '6px',
+                              backgroundColor: isCorrectInStudy ? 'rgba(16, 185, 129, 0.2)' : (isWrongInStudy ? 'rgba(239, 68, 68, 0.2)' : (isAns ? '#2563eb' : colors.bgInner)),
+                              border: `1px solid ${isAns ? '#2563eb' : colors.borderColor}`,
+                              color: isCorrectInStudy ? colors.accentGreen : (isWrongInStudy ? colors.accentRed : (isAns ? '#ffffff' : colors.textSecondary)),
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            {q.id}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* EVALUATION RESULTS VIEW */}
+                {quizScore !== null ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* Score Summary Card */}
+                    <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', padding: isMobile ? '20px' : '32px', textAlign: 'center', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: quizScore >= 8 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(37, 99, 235, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>
+                        {quizScore >= 8 ? '🏆' : (quizScore >= 6 ? '⭐' : '📚')}
+                      </div>
+
+                      <h3 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '900', color: colors.textPrimary, margin: 0 }}>
+                        Score: {quizScore} / {QUIZ_QUESTIONS.length} ({Math.round((quizScore / QUIZ_QUESTIONS.length) * 100)}%)
+                      </h3>
+
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: quizScore >= 8 ? colors.accentGreen : '#2563eb' }}>
+                        {quizScore >= 8 ? '🌟 Master of Execution Discipline & Risk' : (quizScore >= 6 ? '📈 Competent Trader — Refine Edge & Sizing' : '⚠️ Foundation Building Needed')}
+                      </div>
+
+                      <p style={{ fontSize: '12px', color: colors.textSecondary, maxWidth: '560px', margin: 0, lineHeight: 1.5 }}>
+                        {quizScore >= 8
+                          ? 'Outstanding performance! You have internalized the mathematical laws of probability, asymmetric risk-to-reward ratios, and emotional control required for institutional longevity.'
+                          : 'Good effort! Review the questions below to eliminate subtle cognitive leaks and ensure you never risk more than 1-2% per trade.'}
+                      </p>
+
+                      {/* Category Breakdown Matrix */}
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px', width: '100%', maxWidth: '700px', marginTop: '8px' }}>
+                        {Object.entries(categoryScores).map(([cat, val]) => {
+                          const pct = Math.round((val.correct / (val.total || 1)) * 100);
+                          return (
+                            <div key={cat} style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px', textAlign: 'left' }}>
+                              <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{cat.toUpperCase()}</div>
+                              <div style={{ fontSize: '16px', fontWeight: '800', color: pct >= 75 ? colors.accentGreen : colors.accentBlueLight, marginTop: '2px' }}>
+                                {val.correct} / {val.total} ({pct}%)
+                              </div>
+                              <div style={{ width: '100%', height: '4px', backgroundColor: colors.bgCard, borderRadius: '2px', overflow: 'hidden', marginTop: '6px' }}>
+                                <div style={{ width: `${pct}%`, height: '100%', backgroundColor: pct >= 75 ? colors.accentGreen : '#2563eb' }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Action Buttons Strip */}
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '8px' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedTradeForShare({
+                              symbol: 'ShortEdge Risk Mastery Quiz',
+                              strategy: `🏆 Graded ${quizScore}/10 (${Math.round((quizScore / QUIZ_QUESTIONS.length) * 100)}%)`,
+                              net_pnl: quizScore * 2500,
+                              realized_pnl: quizScore * 2500,
+                              entry_price: 100,
+                              exit_price: 200,
+                              qty: 10,
+                              market_segment: marketSegment
+                            });
+                          }}
+                          style={{ backgroundColor: colors.bgInner, color: colors.accentBlueLight, border: `1px solid ${colors.borderColor}`, padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <Share2 size={14} /> Share Score Card
+                        </button>
+
+                        <button
+                          onClick={() => setShowCertificateModal(true)}
+                          style={{ backgroundColor: colors.bgInner, color: '#f59e0b', border: `1px solid ${colors.borderColor}`, padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <Award size={14} /> View Discipline Diploma
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setQuizAnswers({});
+                            setQuizScore(null);
+                            setShowQuizReview(false);
+                          }}
+                          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          <RefreshCw size={14} /> Retake Quiz
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detailed Question Review List */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>Complete Question Review & Explanations</div>
+                      {QUIZ_QUESTIONS.map((q) => {
+                        const userAns = quizAnswers[q.id];
+                        const isCorrect = userAns === q.correctIndex;
+
+                        return (
+                          <div key={q.id} style={{ backgroundColor: colors.bgCard, border: `1px solid ${isCorrect ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: colors.cardShadow }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
+                                {q.category}
+                              </span>
+                              <span style={{ fontSize: '11px', fontWeight: '800', color: isCorrect ? colors.accentGreen : colors.accentRed }}>
+                                {isCorrect ? '✓ Correct (+1)' : '✗ Incorrect (0)'}
+                              </span>
+                            </div>
+
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>
+                              #{q.id}. {q.question}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {q.options.map((opt, optIdx) => {
+                                const isUserChoice = userAns === optIdx;
+                                const isRealCorrect = q.correctIndex === optIdx;
+
+                                let optBg = colors.bgInner;
+                                let optBorder = colors.borderColor;
+                                let optColor = colors.textPrimary;
+
+                                if (isRealCorrect) {
+                                  optBg = 'rgba(16, 185, 129, 0.12)';
+                                  optBorder = colors.accentGreen;
+                                  optColor = colors.accentGreen;
+                                } else if (isUserChoice && !isRealCorrect) {
+                                  optBg = 'rgba(239, 68, 68, 0.12)';
+                                  optBorder = colors.accentRed;
+                                  optColor = colors.accentRed;
+                                }
+
+                                return (
+                                  <div
+                                    key={optIdx}
+                                    style={{
+                                      padding: '8px 12px',
+                                      borderRadius: '8px',
+                                      border: `1px solid ${optBorder}`,
+                                      backgroundColor: optBg,
+                                      color: optColor,
+                                      fontSize: '11.5px',
+                                      fontWeight: isUserChoice || isRealCorrect ? '700' : '500',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}
+                                  >
+                                    <span>{String.fromCharCode(65 + optIdx)}. {opt}</span>
+                                    {isRealCorrect && <span style={{ fontSize: '10px', fontWeight: '800' }}>✓ Correct Answer</span>}
+                                    {isUserChoice && !isRealCorrect && <span style={{ fontSize: '10px', fontWeight: '800' }}>✗ Your Pick</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Deep Explanation */}
+                            <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '10px 12px', fontSize: '11.5px', color: colors.textSecondary, lineHeight: 1.45 }}>
+                              <b style={{ color: '#2563eb' }}>💡 Institutional Protocol:</b> {q.explanation}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* ACTIVE QUIZ QUESTION LIST */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {QUIZ_QUESTIONS
+                      .filter(q => quizTopicFilter === 'ALL' || q.category === quizTopicFilter)
+                      .map((q) => {
+                        const isAns = quizAnswers[q.id] !== undefined;
+                        const userChoice = quizAnswers[q.id];
+
+                        return (
+                          <div
+                            key={q.id}
+                            id={`quiz-q-${q.id}`}
+                            style={{
+                              backgroundColor: colors.bgCard,
+                              border: `1px solid ${colors.borderColor}`,
+                              borderRadius: '12px',
+                              padding: isMobile ? '14px' : '18px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '12px',
+                              boxShadow: colors.cardShadow
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
+                                {q.category}
+                              </span>
+                              <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600' }}>
+                                Question #{q.id} of {QUIZ_QUESTIONS.length}
+                              </span>
+                            </div>
+
+                            <div style={{ fontSize: '13.5px', fontWeight: '700', color: colors.textPrimary, lineHeight: 1.35 }}>
+                              {q.question}
+                            </div>
+
+                            {/* Options List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {q.options.map((opt, optIdx) => {
+                                const isSelected = userChoice === optIdx;
+                                const isCorrectOpt = q.correctIndex === optIdx;
+
+                                let btnBg = colors.bgInner;
+                                let btnBorder = colors.borderColor;
+                                let btnColor = colors.textPrimary;
+
+                                if (quizMode === 'STUDY' && isAns) {
+                                  if (isCorrectOpt) {
+                                    btnBg = 'rgba(16, 185, 129, 0.12)';
+                                    btnBorder = colors.accentGreen;
+                                    btnColor = colors.accentGreen;
+                                  } else if (isSelected && !isCorrectOpt) {
+                                    btnBg = 'rgba(239, 68, 68, 0.12)';
+                                    btnBorder = colors.accentRed;
+                                    btnColor = colors.accentRed;
+                                  }
+                                } else if (isSelected) {
+                                  btnBg = isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.18)';
+                                  btnBorder = '#2563eb';
+                                  btnColor = colors.accentBlueLight;
+                                }
+
+                                return (
+                                  <button
+                                    key={optIdx}
+                                    onClick={() => handleSelectQuizAnswer(q.id, optIdx)}
+                                    style={{
+                                      textAlign: 'left',
+                                      padding: '10px 14px',
+                                      borderRadius: '8px',
+                                      border: `1px solid ${btnBorder}`,
+                                      backgroundColor: btnBg,
+                                      color: btnColor,
+                                      fontSize: '12px',
+                                      fontWeight: isSelected ? '700' : '500',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span style={{ width: '20px', height: '20px', borderRadius: '4px', backgroundColor: isSelected ? '#2563eb' : colors.bgCard, color: isSelected ? '#ffffff' : colors.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800' }}>
+                                        {String.fromCharCode(65 + optIdx)}
+                                      </span>
+                                      <span>{opt}</span>
+                                    </div>
+
+                                    {quizMode === 'STUDY' && isAns && isCorrectOpt && (
+                                      <span style={{ fontSize: '10px', fontWeight: '800', color: colors.accentGreen }}>✓ Correct</span>
+                                    )}
+                                    {quizMode === 'STUDY' && isAns && isSelected && !isCorrectOpt && (
+                                      <span style={{ fontSize: '10px', fontWeight: '800', color: colors.accentRed }}>✗ Incorrect</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Study Mode Instant Explanation Strip */}
+                            {quizMode === 'STUDY' && isAns && (
+                              <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${userChoice === q.correctIndex ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`, borderRadius: '8px', padding: '10px 12px', fontSize: '11.5px', color: colors.textSecondary, lineHeight: 1.45, marginTop: '2px' }}>
+                                <b style={{ color: userChoice === q.correctIndex ? colors.accentGreen : colors.accentRed }}>
+                                  {userChoice === q.correctIndex ? '✓ Correct Analysis:' : '💡 Institutional Explanation:'}
+                                </b>{' '}
+                                {q.explanation}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                    {/* Submit Quiz Action Button */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', margin: '10px 0' }}>
+                      <button
+                        onClick={handleFinishQuiz}
+                        disabled={answeredCount === 0}
+                        style={{
+                          backgroundColor: answeredCount === 0 ? colors.borderColor : '#2563eb',
+                          color: '#ffffff',
+                          padding: '12px 28px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          fontWeight: '800',
+                          border: 'none',
+                          cursor: answeredCount === 0 ? 'not-allowed' : 'pointer',
+                          boxShadow: answeredCount > 0 ? '0 4px 14px rgba(37, 99, 235, 0.3)' : 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Award size={16} /> Submit & Evaluate Quiz ({answeredCount}/{QUIZ_QUESTIONS.length} Answered)
+                      </button>
+                      <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                        {answeredCount < QUIZ_QUESTIONS.length ? `You have ${QUIZ_QUESTIONS.length - answeredCount} unanswered questions remaining.` : 'All questions answered! Click to view your institutional score.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 15. TUTORIALS SUB-VIEW                                         */}
