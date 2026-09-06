@@ -728,7 +728,12 @@ const [riskCalc, setRiskCalc] = useState({
   const [selectedTutorialForPlayer, setSelectedTutorialForPlayer] = useState(null);
   const [selectedCalendarSession, setSelectedCalendarSession] = useState(null);
   const [showStatementAuditModal, setShowStatementAuditModal] = useState(false);
-  const [communityFilter, setCommunityFilter] = useState('ALL');
+  
+  const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [communitySortBy, setCommunitySortBy] = useState('HOT'); // HOT | LATEST | RR
+  const [communityAuthorFilter, setCommunityAuthorFilter] = useState('ALL');
+const [communityFilter, setCommunityFilter] = useState('ALL');
   const [quizTopicFilter, setQuizTopicFilter] = useState('ALL');
   const [payoutForm, setPayoutForm] = useState({ method: 'UPI', address: '', amount: '4800' });
   const [payoutSuccess, setPayoutSuccess] = useState(false);
@@ -746,6 +751,7 @@ const [riskCalc, setRiskCalc] = useState({
       sl: 160,
       target: 245,
       strategy: '🔥 Breakout Momentum',
+      market: 'Indian',
       pnl: '+₹14,200',
       likes: 24,
       comments: 6,
@@ -763,6 +769,7 @@ const [riskCalc, setRiskCalc] = useState({
       sl: 455,
       target: 330,
       strategy: '🛡️ Option Selling (Theta Decay)',
+      market: 'Indian',
       pnl: '+₹9,800',
       likes: 18,
       comments: 3,
@@ -773,18 +780,91 @@ const [riskCalc, setRiskCalc] = useState({
       id: 3,
       author: 'Ananya Roy',
       avatar: 'A',
-      time: '6 hours ago',
+      time: '8 hours ago',
       symbol: 'RELIANCE',
       direction: 'LONG',
       entry: 2980,
       sl: 2955,
       target: 3040,
       strategy: '📊 Support & Resistance',
+      market: 'Indian',
       pnl: '+₹8,400',
       likes: 31,
       comments: 9,
       liked: false,
       rationale: 'Daily 200 EMA double-bottom bounce confirmation with RSI bullish divergence.'
+    },
+    {
+      id: 4,
+      author: 'Elena Rostova',
+      avatar: 'E',
+      time: '3 hours ago',
+      symbol: 'BTC/USDT',
+      direction: 'LONG',
+      entry: 64200,
+      sl: 63100,
+      target: 67500,
+      strategy: '🔥 Breakout Momentum',
+      market: 'Crypto',
+      pnl: '+$4,200',
+      likes: 56,
+      comments: 12,
+      liked: false,
+      rationale: 'Ascending triangle breakout on 4h timeframe above $64k with negative funding rate squeeze.'
+    },
+    {
+      id: 5,
+      author: 'Alex Chen',
+      avatar: 'A',
+      time: '5 hours ago',
+      symbol: 'SOL/USDT',
+      direction: 'LONG',
+      entry: 142.50,
+      sl: 137.00,
+      target: 156.00,
+      strategy: '⚡ Scalping Edge',
+      market: 'Crypto',
+      pnl: '+$2,850',
+      likes: 29,
+      comments: 5,
+      liked: false,
+      rationale: '15m liquidity sweep followed by sharp displacement and VWAP reclaim.'
+    },
+    {
+      id: 6,
+      author: 'Marcus Vance',
+      avatar: 'M',
+      time: '6 hours ago',
+      symbol: 'EUR/USD',
+      direction: 'SHORT',
+      entry: 1.0880,
+      sl: 1.0920,
+      target: 1.0790,
+      strategy: '🔄 Mean Reversion',
+      market: 'Forex',
+      pnl: '+$2,100',
+      likes: 34,
+      comments: 7,
+      liked: false,
+      rationale: 'Clean rejection at major 4h supply block during London-NY session overlap.'
+    },
+    {
+      id: 7,
+      author: 'David Miller',
+      avatar: 'D',
+      time: '7 hours ago',
+      symbol: 'NVDA',
+      direction: 'LONG',
+      entry: 122.50,
+      sl: 118.00,
+      target: 134.00,
+      strategy: '📈 Price Action / Volume Spread',
+      market: 'US',
+      pnl: '+$3,600',
+      likes: 52,
+      comments: 14,
+      liked: false,
+      rationale: 'Cup-and-handle breakout on 1h chart with above-average institutional dark pool volume.'
     }
   ]);
 
@@ -6817,153 +6897,342 @@ const [riskCalc, setRiskCalc] = useState({
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 10. COMMUNITY SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'COMMUNITY' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Community Trade Setups</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Verified technical setups and ideas shared by disciplined community traders.</p>
+          {activeTab === 'COMMUNITY' && (() => {
+            // Filter and sort community setups
+            let list = communityPosts.filter(p => {
+              if (communityFilter !== 'ALL') {
+                const m = p.market || 'Indian';
+                if (m.toLowerCase() !== communityFilter.toLowerCase()) return false;
+              }
+              if (communityAuthorFilter && communityAuthorFilter !== 'ALL') {
+                if (p.author !== communityAuthorFilter) return false;
+              }
+              return true;
+            });
+
+            // Sort
+            if (communitySortBy === 'HOT') {
+              list = [...list].sort((a, b) => b.likes - a.likes);
+            } else if (communitySortBy === 'LATEST') {
+              list = [...list].sort((a, b) => b.id - a.id);
+            } else if (communitySortBy === 'RR') {
+              list = [...list].sort((a, b) => {
+                const rrA = Math.abs((a.target || a.entry * 1.1) - a.entry) / Math.max(1, Math.abs(a.entry - a.sl));
+                const rrB = Math.abs((b.target || b.entry * 1.1) - b.entry) / Math.max(1, Math.abs(b.entry - b.sl));
+                return rrB - rrA;
+              });
+            }
+
+            const topTraders = [
+              { name: 'Vikram Sharma', rank: '🥇', winRate: '84%', pnl: '+₹1.42L', market: 'Indian', avatar: 'V' },
+              { name: 'Elena Rostova', rank: '🥈', winRate: '78%', pnl: '+$12.4K', market: 'Crypto', avatar: 'E' },
+              { name: 'Priya Patel', rank: '🥉', winRate: '76%', pnl: '+₹98K', market: 'Indian', avatar: 'P' },
+              { name: 'David Miller', rank: '🏅', winRate: '74%', pnl: '+$8.6K', market: 'US', avatar: 'D' }
+            ];
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Header & Main Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Users size={22} color="#2563eb" /> Community Trade Setups & Alpha Feed
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Verified trade setups with exact R:R models shared by top disciplined community traders.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Market Segment Filters */}
+                    <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
+                      {['ALL', 'Indian', 'Crypto', 'Forex', 'US'].map(seg => (
+                        <button
+                          key={seg}
+                          onClick={() => {
+                            setCommunityFilter(seg);
+                            setCommunityAuthorFilter('ALL');
+                          }}
+                          style={{
+                            backgroundColor: communityFilter === seg ? '#2563eb' : 'transparent',
+                            color: communityFilter === seg ? '#ffffff' : colors.textSecondary,
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 9px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {seg === 'ALL' ? 'ALL' : (seg === 'Indian' ? '🇮🇳 Indian' : (seg === 'Crypto' ? '⚡ Crypto' : (seg === 'Forex' ? '💱 Forex' : '🇺🇸 US')))}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setShowShareSetupModal(true)}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        padding: '7px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={15} /> Share Setup
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {/* Segment Filters */}
-                  <div style={{ display: 'flex', backgroundColor: colors.bgInner, borderRadius: '8px', padding: '3px', border: `1px solid ${colors.borderColor}` }}>
-                    {['ALL', 'Indian', 'Crypto', 'Forex', 'US'].map(seg => (
+
+                {/* Top Community Alphas Leaderboard Strip */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: colors.textMuted, letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Trophy size={13} color="#f59e0b" /> TOP COMMUNITY ALPHAS & PROP TRADERS
+                    </span>
+                    {communityAuthorFilter !== 'ALL' && (
                       <button
-                        key={seg}
-                        onClick={() => setCommunityFilter(seg)}
+                        onClick={() => setCommunityAuthorFilter('ALL')}
+                        style={{ backgroundColor: 'transparent', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Reset Filter ({communityAuthorFilter})
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '8px' }}>
+                    {topTraders.map((t) => {
+                      const isSelected = communityAuthorFilter === t.name;
+                      return (
+                        <div
+                          key={t.name}
+                          onClick={() => setCommunityAuthorFilter(isSelected ? 'ALL' : t.name)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 10px',
+                            backgroundColor: isSelected ? (isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.2)') : colors.bgInner,
+                            border: `1px solid ${isSelected ? '#2563eb' : colors.borderColor}`,
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span style={{ fontSize: '16px' }}>{t.rank}</span>
+                          <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '800' }}>
+                            {t.avatar}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '11.5px', fontWeight: '700', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {t.name}
+                            </div>
+                            <div style={{ fontSize: '10px', color: colors.textSecondary }}>
+                              {t.winRate} WR • <b style={{ color: colors.accentGreen }}>{t.pnl}</b>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sort Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>SORT BY:</span>
+                    {[
+                      { id: 'HOT', label: '🔥 Top Liked' },
+                      { id: 'LATEST', label: '⚡ Latest Setups' },
+                      { id: 'RR', label: '🎯 High R:R' }
+                    ].map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => setCommunitySortBy(s.id)}
                         style={{
-                          backgroundColor: communityFilter === seg ? '#2563eb' : 'transparent',
-                          color: communityFilter === seg ? '#ffffff' : colors.textSecondary,
-                          border: 'none',
+                          backgroundColor: communitySortBy === s.id ? '#2563eb' : colors.bgCard,
+                          color: communitySortBy === s.id ? '#ffffff' : colors.textSecondary,
+                          border: `1px solid ${colors.borderColor}`,
                           borderRadius: '6px',
-                          padding: '4px 8px',
+                          padding: '4px 9px',
                           fontSize: '11px',
                           fontWeight: '700',
                           cursor: 'pointer'
                         }}
                       >
-                        {seg}
+                        {s.label}
                       </button>
                     ))}
                   </div>
 
-                  <button
-                    onClick={() => setShowShareSetupModal(true)}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      padding: '7px 14px',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Plus size={15} /> Share Setup
-                  </button>
+                  <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                    Showing <b>{list.length}</b> verified setups
+                  </span>
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {communityPosts
-                  .filter(p => communityFilter === 'ALL' || (p.market && p.market.toLowerCase() === communityFilter.toLowerCase()) || (communityFilter === 'Indian' && !p.market))
-                  .map((post) => (
-                    <div key={post.id} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: colors.cardShadow }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700' }}>
-                            {post.avatar}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>{post.author}</span>
-                              <span style={{ fontSize: '10px', color: colors.accentGreen, fontWeight: '800' }}>✓ VERIFIED</span>
+                {/* Feed Cards List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {list.map((post) => {
+                    const entryVal = parseFloat(post.entry) || 100;
+                    const slVal = parseFloat(post.sl) || 90;
+                    const targetVal = parseFloat(post.target) || (post.direction === 'LONG' ? entryVal * 1.15 : entryVal * 0.85);
+                    const riskPts = Math.abs(entryVal - slVal) || 1;
+                    const rewardPts = Math.abs(targetVal - entryVal) || 2;
+                    const rrRatio = (rewardPts / riskPts).toFixed(1);
+
+                    return (
+                      <div key={post.id} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '14px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: colors.cardShadow }}>
+                        {/* Post Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800' }}>
+                              {post.avatar || post.author.charAt(0)}
                             </div>
-                            <div style={{ fontSize: '10px', color: colors.textMuted }}>{post.time}</div>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{post.author}</span>
+                                <span style={{ fontSize: '10px', color: colors.accentGreen, backgroundColor: 'rgba(16, 185, 129, 0.12)', padding: '1px 6px', borderRadius: '4px', fontWeight: '800' }}>✓ VERIFIED</span>
+                              </div>
+                              <div style={{ fontSize: '10px', color: colors.textMuted }}>{post.time} • {post.market || 'Indian'}</div>
+                            </div>
                           </div>
-                        </div>
-                        <span style={{ fontSize: '11px', fontWeight: '800', color: colors.accentGreen, backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '3px 8px', borderRadius: '6px' }}>
-                          {post.pnl}
-                        </span>
-                      </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span>{post.symbol}</span>
-                            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', backgroundColor: post.direction === 'LONG' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: post.direction === 'LONG' ? colors.accentGreen : colors.accentRed }}>
-                              {post.direction}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, backgroundColor: 'rgba(16, 185, 129, 0.12)', padding: '4px 10px', borderRadius: '8px' }}>
+                              {post.pnl}
                             </span>
                           </div>
-                          <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                            {post.rationale}
-                          </p>
                         </div>
 
-                        {/* Trade Parameters Pill */}
-                        <div style={{ display: 'flex', gap: '6px', fontSize: '11px', backgroundColor: colors.bgInner, padding: '6px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                          <div><span style={{ color: colors.textMuted }}>Entry:</span> <b>{post.entry}</b></div>
-                          <div><span style={{ color: colors.textMuted }}>SL:</span> <b style={{ color: colors.accentRed }}>{post.sl}</b></div>
-                          <div><span style={{ color: colors.textMuted }}>TP:</span> <b style={{ color: colors.accentGreen }}>{post.target || (post.entry * 1.05).toFixed(1)}</b></div>
+                        {/* Trade Setup Symbol & Direction */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{post.symbol}</span>
+                              <span style={{ fontSize: '10.5px', padding: '2px 8px', borderRadius: '4px', backgroundColor: post.direction === 'LONG' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: post.direction === 'LONG' ? colors.accentGreen : colors.accentRed, fontWeight: '800' }}>
+                                {post.direction}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '6px 0 0 0', lineHeight: 1.45 }}>
+                              {post.rationale}
+                            </p>
+                          </div>
+
+                          {/* Trade Parameters Pill Matrix */}
+                          <div style={{ display: 'flex', gap: '10px', fontSize: '11.5px', backgroundColor: colors.bgInner, padding: '8px 12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+                            <div><span style={{ color: colors.textMuted }}>Entry:</span> <b>{post.entry}</b></div>
+                            <div><span style={{ color: colors.textMuted }}>SL:</span> <b style={{ color: colors.accentRed }}>{post.sl}</b></div>
+                            <div><span style={{ color: colors.textMuted }}>TP:</span> <b style={{ color: colors.accentGreen }}>{targetVal}</b></div>
+                            <div style={{ borderLeft: `1px solid ${colors.borderColor}`, paddingLeft: '8px' }}>
+                              <span style={{ color: colors.textMuted }}>R:R:</span> <b style={{ color: colors.accentBlueLight }}>1:{rrRatio}</b>
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: `1px solid ${colors.borderColor}` }}>
-                        <span style={{ fontSize: '10px', color: colors.accentBlueLight, fontWeight: '600' }}>
-                          {post.strategy}
-                        </span>
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                          <button
-                            onClick={() => {
-                              setNewTradeForm({
-                                symbol: post.symbol,
-                                direction: post.direction,
-                                entry: post.entry.toString(),
-                                exit: '',
-                                qty: '50',
-                                strategy: post.strategy || '🔥 Breakout',
-                                emotion: '🎯 Disciplined Execution',
-                                notes: `Copied from community setup by ${post.author}: ${post.rationale}`
-                              });
-                              setShowNewTradeModal(true);
-                            }}
-                            style={{
-                              backgroundColor: colors.bgInner,
-                              border: `1px solid ${colors.borderColor}`,
-                              color: '#2563eb',
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              fontSize: '11px',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Copy size={12} /> Copy to Journal
-                          </button>
+                        {/* Visual R:R Distribution Bar */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>
+                            <span style={{ color: colors.accentRed }}>RISK: {riskPts.toFixed(1)} PTS (1.0R)</span>
+                            <span style={{ color: colors.accentGreen }}>REWARD: {rewardPts.toFixed(1)} PTS ({rrRatio}R)</span>
+                          </div>
+                          <div style={{ height: '6px', backgroundColor: colors.bgInner, borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ width: '30%', backgroundColor: colors.accentRed, height: '100%' }} />
+                            <div style={{ width: '70%', backgroundColor: colors.accentGreen, height: '100%' }} />
+                          </div>
+                        </div>
 
-                          <button
-                            onClick={() => handleLikePost(post.id)}
-                            style={{ background: 'none', border: 'none', color: post.liked ? '#2563eb' : colors.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '600' }}
-                          >
-                            <ThumbsUp size={13} /> {post.likes}
-                          </button>
-                          <span style={{ color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                            <MessageSquare size={13} /> {post.comments}
+                        {/* Post Footer & Actions */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: `1px solid ${colors.borderColor}`, flexWrap: 'wrap', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: colors.accentBlueLight, fontWeight: '700' }}>
+                            {post.strategy}
                           </span>
+
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                              onClick={() => {
+                                setNewTradeForm({
+                                  symbol: post.symbol,
+                                  direction: post.direction,
+                                  entry: post.entry.toString(),
+                                  exit: '',
+                                  qty: '50',
+                                  strategy: post.strategy || '🔥 Breakout',
+                                  emotion: '🎯 Disciplined Execution',
+                                  notes: `Copied from community setup by ${post.author}: ${post.rationale}`
+                                });
+                                setShowNewTradeModal(true);
+                              }}
+                              style={{
+                                backgroundColor: colors.bgInner,
+                                border: `1px solid ${colors.borderColor}`,
+                                color: colors.textPrimary,
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Copy size={13} /> Copy to Journal
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (onOpenPaperTrading) {
+                                  onOpenPaperTrading();
+                                } else if (onBack) {
+                                  onBack();
+                                }
+                              }}
+                              style={{
+                                backgroundColor: '#2563eb',
+                                border: 'none',
+                                color: '#ffffff',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Zap size={13} /> Trade on Terminal
+                            </button>
+
+                            <button
+                              onClick={() => handleLikePost(post.id)}
+                              style={{ background: 'none', border: 'none', color: post.liked ? '#2563eb' : colors.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700', padding: '4px 6px' }}
+                            >
+                              <ThumbsUp size={14} /> {post.likes}
+                            </button>
+
+                            <button
+                              onClick={() => setSelectedPostForComments(post)}
+                              style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '700', padding: '4px 6px' }}
+                            >
+                              <MessageSquare size={14} /> {post.comments}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 11. CHALLENGE SUB-VIEW                                         */}
@@ -8726,6 +8995,87 @@ const [riskCalc, setRiskCalc] = useState({
               </button>
               <button onClick={() => setShowStatementAuditModal(false)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* 12. COMMUNITY DISCUSSION & COMMENTS MODAL */}
+      {selectedPostForComments && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            {/* Modal Header */}
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${colors.borderColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MessageSquare size={18} color="#2563eb" /> Trade Discussion: {selectedPostForComments.symbol}
+              </div>
+              <button onClick={() => setSelectedPostForComments(null)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            {/* Post Summary Header */}
+            <div style={{ padding: '14px 20px', backgroundColor: colors.bgInner, borderBottom: `1px solid ${colors.borderColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>
+                  Setup by {selectedPostForComments.author} ({selectedPostForComments.direction})
+                </div>
+                <div style={{ fontSize: '11px', color: colors.textSecondary, marginTop: '2px' }}>
+                  Entry: {selectedPostForComments.entry} • SL: {selectedPostForComments.sl} • Target: {selectedPostForComments.target || (selectedPostForComments.entry * 1.15).toFixed(1)}
+                </div>
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen }}>
+                {selectedPostForComments.pnl}
+              </span>
+            </div>
+
+            {/* Comments List */}
+            <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[
+                { id: 1, author: 'Karan Mehra', time: '1 hour ago', avatar: 'K', text: 'Clean 15m breakout! Did you wait for the full candle close above the opening range high?' },
+                { id: 2, author: selectedPostForComments.author, isAuthor: true, time: '45 mins ago', avatar: selectedPostForComments.author.charAt(0), text: 'Yes, entered on the 5m retest with stop below the breakout candle base.' },
+                { id: 3, author: 'Priya Patel', time: '20 mins ago', avatar: 'P', text: 'The risk-reward on this setup is super solid. Following your plan on the terminal.' }
+              ].map((c) => (
+                <div key={c.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: c.isAuthor ? '#2563eb' : colors.bgCard, border: `1px solid ${colors.borderColor}`, color: c.isAuthor ? '#ffffff' : colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>
+                    {c.avatar}
+                  </div>
+                  <div style={{ flex: 1, backgroundColor: colors.bgInner, padding: '8px 12px', borderRadius: '10px', border: `1px solid ${colors.borderColor}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: '700', color: colors.textPrimary }}>
+                        {c.author} {c.isAuthor && <span style={{ fontSize: '9.5px', color: '#2563eb', marginLeft: '4px', fontWeight: '800' }}>● AUTHOR</span>}
+                      </span>
+                      <span style={{ fontSize: '10px', color: colors.textMuted }}>{c.time}</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: colors.textSecondary, lineHeight: 1.4 }}>{c.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Reply Input Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newCommentText.trim()) return;
+                setNewCommentText('');
+                // Increment comments counter
+                setCommunityPosts(prev => prev.map(p => p.id === selectedPostForComments.id ? { ...p, comments: p.comments + 1 } : p));
+              }}
+              style={{ padding: '14px 20px', borderTop: `1px solid ${colors.borderColor}`, display: 'flex', gap: '8px' }}
+            >
+              <input
+                type="text"
+                placeholder="Write a technical comment or question..."
+                value={newCommentText}
+                onChange={e => setNewCommentText(e.target.value)}
+                style={{ flex: 1, backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 12px', color: colors.textPrimary, fontSize: '12px', outline: 'none' }}
+              />
+              <button
+                type="submit"
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Post
+              </button>
+            </form>
           </div>
         </div>
       )}
