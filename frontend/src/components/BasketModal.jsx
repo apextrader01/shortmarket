@@ -3,6 +3,32 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Plus } from 'lucide-react';
 
+function extractOptionStrike(symbol) {
+  if (!symbol) return 0;
+  const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+  
+  // Format 1: Monthly format with 3-letter month e.g. NIFTY26SEP24550CE
+  const monthlyMatch = clean.match(/^[A-Z]+\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
+  if (monthlyMatch) return parseFloat(monthlyMatch[2]);
+
+  // Format 2: Weekly expiry e.g. NIFTY2690824200PE (Year 26, Month 1-9/O/N/D, Day 08, Strike 24200)
+  const weeklyMatch = clean.match(/^[A-Z]+\d{2}[1-9OND]\d{2}(\d+)(CE|PE)$/i);
+  if (weeklyMatch) return parseFloat(weeklyMatch[1]);
+
+  // Format 3: Commodity / other derivative: 3-letter month followed by strike digits
+  const monthMatch = clean.match(/[A-Z]{3}(\d+)(CE|PE)$/i);
+  if (monthMatch) return parseFloat(monthMatch[1]);
+
+  // Format 4: General fallback
+  const generalMatch = clean.match(/(\d+)(CE|PE)$/i);
+  if (generalMatch) {
+    let s = generalMatch[1];
+    if (s.length > 5) s = s.slice(-5);
+    return parseFloat(s);
+  }
+  return 0;
+}
+
 export default function BasketModal() {
   const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
@@ -55,26 +81,10 @@ export default function BasketModal() {
   // Enhance basket items with live price and calculated individual margin
   const enhancedItems = basketItems.map(item => {
     const symbol = item.symbol;
-    const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
-    
-    // Parse strike
-    let optionStrike = 0;
+    const livePrice = symbol ? (prices[symbol]?.ltp || 0) : 0;
     const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
     const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
-    if (isOption) {
-      const robustMatch = symbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
-      if (robustMatch) {
-        optionStrike = parseFloat(robustMatch[1]);
-      } else {
-        const strikeMatch = symbol.match(/(\d+)(CE|PE)$/i);
-        if (strikeMatch) {
-           let rawStrikeStr = strikeMatch[1];
-           if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
-           optionStrike = parseFloat(rawStrikeStr);
-        }
-      }
-    }
-
+    const optionStrike = isOption ? extractOptionStrike(symbol) : 0;
     const typeStr = isOption ? (/(?:\d+|[-_\s])CE/i.test(cleanSym) || cleanSym.endsWith('CE') ? 'CE' : 'PE') : 'OTHER';
     const totalQuantity = item.quantity * (item.lotsize || 1);
     
@@ -490,12 +500,12 @@ export default function BasketModal() {
             </div>
             <button 
               onClick={handleExecute}
-              disabled={isInsufficient || isIntradayBlocked || isSubmitting || basketItems.length === 0}
+              disabled={isInsufficient || isSubmitting || basketItems.length === 0}
               style={{ 
-                background: (isInsufficient || isIntradayBlocked || basketItems.length === 0) ? 'var(--bg-panel)' : 'var(--color-blue)', 
-                color: (isInsufficient || isIntradayBlocked || basketItems.length === 0) ? 'var(--text-secondary)' : '#fff', 
+                background: (isInsufficient || basketItems.length === 0) ? 'var(--bg-panel)' : 'var(--color-blue)', 
+                color: (isInsufficient || basketItems.length === 0) ? 'var(--text-secondary)' : '#fff', 
                 padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-                border: 'none', cursor: (isInsufficient || isIntradayBlocked || basketItems.length === 0) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
+                border: 'none', cursor: (isInsufficient || basketItems.length === 0) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'
               }}
             >
               {isSubmitting ? 'EXECUTING...' : 'EXECUTE BASKET'}
