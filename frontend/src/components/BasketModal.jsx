@@ -308,56 +308,64 @@ export default function BasketModal() {
   });
 
   // Calculate Margin with Hedging Benefit
-  let requiredMargin = 0;
-
-  // Separate legs
   const buys = enhancedItems.filter(item => item.side === 'BUY');
   const sells = enhancedItems.filter(item => item.side === 'SELL');
 
+  const unhedgedBuys = buys.map(b => ({ ...b, remainingQty: b.totalQuantity }));
+  const unhedgedSells = sells.map(s => ({ ...s, remainingQty: s.totalQuantity }));
+
   let totalPremiumPaid = 0;
-  let unhedgedSells = [...sells];
   let hedgedMargin = 0;
 
+  // 1. Calculate premium paid for all buy legs
   buys.forEach(buy => {
     const premium = buy.totalQuantity * (buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0));
     totalPremiumPaid += premium;
-
-    // Try to pair with a sell of the SAME TYPE (CE with CE, PE with PE)
-    if (buy.isOption && buy.optionStrike > 0) {
-      const pairIndex = unhedgedSells.findIndex(sell => sell.isOption && sell.typeStr === buy.typeStr && sell.optionStrike > 0);
-      if (pairIndex !== -1) {
-        const sell = unhedgedSells[pairIndex];
-        // Calculate max loss for the spread
-        const strikeDiff = Math.abs(sell.optionStrike - buy.optionStrike);
-        // We use min quantity to hedge
-        const hedgedQty = Math.min(buy.totalQuantity, sell.totalQuantity);
-        
-        hedgedMargin += strikeDiff * hedgedQty;
-        
-        // Remove from unhedged list
-        unhedgedSells.splice(pairIndex, 1);
-      }
-    }
   });
 
+  // 2. Match Buy Options with Sell Options of same type (CE with CE, PE with PE) for hedge benefit
+  for (const buy of unhedgedBuys) {
+    if (!buy.isOption || buy.optionStrike <= 0 || buy.remainingQty <= 0) continue;
+
+    for (const sell of unhedgedSells) {
+      if (buy.remainingQty <= 0) break;
+      if (!sell.isOption || sell.optionStrike <= 0 || sell.remainingQty <= 0) continue;
+      if (sell.typeStr !== buy.typeStr) continue;
+
+      // Match quantities between buy and sell
+      const matchQty = Math.min(buy.remainingQty, sell.remainingQty);
+      if (matchQty > 0) {
+        const strikeDiff = Math.abs(sell.optionStrike - buy.optionStrike);
+        hedgedMargin += strikeDiff * matchQty;
+        buy.remainingQty -= matchQty;
+        sell.remainingQty -= matchQty;
+      }
+    }
+  }
+
+  // 3. Calculate margin for any remaining unhedged (naked) Sell quantities
+  let requiredMargin = 0;
   unhedgedSells.forEach(sell => {
+    if (sell.remainingQty <= 0) return;
+
     const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => sell.symbol.includes(idx));
+    const price = sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0);
+    const premium = sell.remainingQty * price;
     let baseMargin = 0;
-    const premium = sell.totalQuantity * (sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0));
 
     if (sell.isOption) {
       const marginRate = isIndex ? 0.10 : 0.20; 
       if (sell.optionStrike > 0) {
-        const grossMargin = sell.optionStrike * sell.totalQuantity * marginRate;
+        const grossMargin = sell.optionStrike * sell.remainingQty * marginRate;
         baseMargin = Math.max(grossMargin - premium, 0); 
       } else {
-        baseMargin = sell.totalQuantity * (isIndex ? 4000 : 8000);
+        baseMargin = sell.remainingQty * (isIndex ? 4000 : 8000);
       }
     } else if (sell.symbol.includes('FUT')) {
       const marginRate = isIndex ? 0.10 : 0.15;
-      baseMargin = sell.totalQuantity * (sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0)) * marginRate;
+      baseMargin = sell.remainingQty * price * marginRate;
     } else {
-      baseMargin = sell.totalQuantity * (sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0));
+      baseMargin = sell.remainingQty * price;
     }
     
     const leverageMultiplier = (productType === 'INT' && !sell.isOption) ? 0.25 : 1.0;
