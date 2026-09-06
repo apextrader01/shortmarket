@@ -370,98 +370,185 @@ export default function OrderModal() {
   };
 
   return (
-    <div className="modal-backdrop" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-    }}>
+    <div 
+      className="modal-backdrop" 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeOrderModal();
+      }}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+      }}
+    >
       <div style={{
-        width: '520px', background: 'var(--bg-dark)', borderRadius: '8px', 
-        border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        width: '520px', 
+        background: '#161b26', 
+        borderRadius: '10px', 
+        border: '1px solid rgba(255, 255, 255, 0.1)', 
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)',
+        overflow: 'hidden', 
+        display: 'flex', 
+        flexDirection: 'column',
         transform: marketDepthModal?.isOpen ? 'translateX(-260px)' : 'none',
-        transition: 'transform 0.3s ease-in-out'
+        transition: 'transform 0.3s ease-in-out',
+        animation: 'fadeInScale 0.15s ease-out'
       }}>
         
-        {/* Header */}
-        <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {/* Fyers-Style Vibrant Header */}
+        <div style={{ 
+          background: isBuy ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'linear-gradient(135deg, #dc2626, #b91c1c)', 
+          padding: '14px 18px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          color: '#ffffff'
+        }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>{symbol.split('-')[0]}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                <input type="radio" checked readOnly style={{ accentColor: 'var(--color-blue)' }} />
-                <span>{symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'} <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{livePrice.toFixed(2)} {isUp ? '▲' : '▼'}</span></span>
-              </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#ffffff', letterSpacing: '0.3px' }}>
+                {isBuy ? 'Buy' : 'Sell'} {symbol.split('-')[0]}
+              </h2>
+              <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginTop: '3px', fontWeight: '500' }}>
+              {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice.toFixed(2)}
+              <span style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.85 }}>
+                {isUp ? '▲' : '▼'} {livePriceData?.pct !== undefined ? `${livePriceData.pct >= 0 ? '+' : ''}${livePriceData.pct.toFixed(2)}%` : ''}
+              </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', background: 'var(--bg-panel)', borderRadius: '20px', overflow: 'hidden', padding: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Smooth B / S Toggle */}
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '20px', padding: '2px', border: '1px solid rgba(255,255,255,0.2)' }}>
               <button 
+                type="button"
                 onClick={() => setSide('BUY')}
                 style={{ 
-                  background: isBuy ? 'var(--color-blue)' : 'transparent', color: isBuy ? '#fff' : 'var(--text-secondary)',
-                  border: 'none', borderRadius: '16px', width: '32px', height: '24px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                  background: isBuy ? '#ffffff' : 'transparent', 
+                  color: isBuy ? '#1d4ed8' : 'rgba(255,255,255,0.8)',
+                  border: 'none', 
+                  borderRadius: '16px', 
+                  width: '28px', 
+                  height: '22px', 
+                  fontSize: '11px', 
+                  fontWeight: '800', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}>B</button>
               <button 
+                type="button"
                 onClick={() => setSide('SELL')}
                 style={{ 
-                  background: !isBuy ? 'var(--color-red)' : 'transparent', color: !isBuy ? '#fff' : 'var(--text-secondary)',
-                  border: 'none', borderRadius: '16px', width: '32px', height: '24px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                  background: !isBuy ? '#ffffff' : 'transparent', 
+                  color: !isBuy ? '#b91c1c' : 'rgba(255,255,255,0.8)',
+                  border: 'none', 
+                  borderRadius: '16px', 
+                  width: '28px', 
+                  height: '22px', 
+                  fontSize: '11px', 
+                  fontWeight: '800', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}>S</button>
             </div>
-            <button style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><Maximize2 size={14} /></button>
-            <button onClick={closeOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
+            <button 
+              type="button"
+              onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
+              title="Market Depth"
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+            >
+              <Maximize2 size={13} />
+            </button>
+            <button 
+              type="button"
+              onClick={closeOrderModal} 
+              title="Close"
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+            >
+              <X size={15} />
+            </button>
           </div>
         </div>
 
-        {/* Intraday / Overnight Tabs */}
+        {/* Product Type Tabs (Intraday / Overnight / GTT) */}
         {!isTrueExit && (
-        <div style={{ padding: '20px 20px 10px 20px' }}>
-          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden', width: 'fit-content' }}>
-            <div 
+        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', background: '#0e121a', borderRadius: '6px', padding: '3px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <button
+              type="button"
               onClick={() => setProductType('INT')} 
               style={{ 
-                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                background: productType === 'INT' ? 'var(--color-blue)' : 'transparent',
-                color: productType === 'INT' ? '#fff' : 'var(--text-primary)',
-                fontSize: '13px', fontWeight: '500'
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                background: productType === 'INT' ? '#2563eb' : 'transparent',
+                color: productType === 'INT' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
               }}
             >
-              Intraday <Info size={12} style={{ opacity: 0.7 }} />
-            </div>
-            <div 
+              Intraday
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setProductType('DEL');
                 setIsCO(false);
                 setIsBO(false);
               }} 
               style={{ 
-                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                background: productType === 'DEL' ? 'var(--color-blue)' : 'transparent',
-                color: productType === 'DEL' ? '#fff' : 'var(--text-primary)',
-                fontSize: '13px', fontWeight: '500'
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                background: productType === 'DEL' ? '#2563eb' : 'transparent',
+                color: productType === 'DEL' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
               }}
             >
-              Delivery <Info size={12} style={{ opacity: 0.7 }} />
-            </div>
+              {isOption || isFuture ? 'Overnight' : 'Delivery'}
+            </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setTab(tab === 'GTT' ? 'Regular' : 'GTT')}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: tab === 'GTT' ? 'rgba(59, 130, 246, 0.2)' : '#0e121a',
+              color: tab === 'GTT' ? '#60a5fa' : 'var(--text-secondary)',
+              fontSize: '12px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            GTT
+          </button>
         </div>
         )}
 
         {/* Form Body */}
-        <div style={{ padding: '10px 20px 20px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '500' }}>
-              {productType === 'INT' ? 'Intraday' : 'Delivery'} - {orderType === 'MARKET' ? 'Market' : 'Limit'}
+        <div style={{ padding: '14px 20px 18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '600', letterSpacing: '0.2px' }}>
+              {productType === 'INT' ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          {/* 3-Column Inputs Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
             {/* Qty */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a' }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
                   step={1}
@@ -477,196 +564,191 @@ export default function OrderModal() {
                     const num = parseInt(e.target.value, 10);
                     setQuantity(Math.max(1, isNaN(num) ? 1 : num));
                   }}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
               {orderModal.lotsize > 1 && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', paddingLeft: '2px' }}>
                   Total Qty: {(parseInt(quantity) || 0) * orderModal.lotsize}
-                </div>
-              )}
-              {totalQuantity > getFreezeLimit(symbol, orderModal.lotsize) && (
-                <div style={{ 
-                  fontSize: '10.5px', 
-                  color: '#93c5fd', 
-                  background: 'rgba(59, 130, 246, 0.15)', 
-                  border: '1px solid rgba(59, 130, 246, 0.3)', 
-                  borderRadius: '4px', 
-                  padding: '4px 6px', 
-                  marginTop: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <Zap size={12} color="#60a5fa" />
-                  <span>
-                    Auto-Sliced into <strong>{calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} orders</strong> (Freeze Limit: {getFreezeLimit(symbol, orderModal.lotsize).toLocaleString('en-IN')})
-                  </span>
                 </div>
               )}
             </div>
 
             {/* Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: orderType === 'MARKET' ? 0.5 : 1 }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Price(Tick: 0.05)</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: orderType === 'MARKET' ? 0.6 : 1 }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Price(Tick: 0.05)</legend>
                 <input 
                   type="text" 
                   value={orderType === 'MARKET' ? (livePrice ? livePrice.toFixed(2) : '0.00') : price} 
                   onChange={e => setPrice(e.target.value)} 
                   disabled={orderType === 'MARKET'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={orderType === 'MARKET'} onChange={e => setOrderType(e.target.checked ? 'MARKET' : 'LIMIT')} style={{ accentColor: 'var(--color-blue)' }} /> 
-                Market price <Info size={12} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                <input type="checkbox" checked={orderType === 'MARKET'} onChange={e => setOrderType(e.target.checked ? 'MARKET' : 'LIMIT')} style={{ accentColor: '#2563eb' }} /> 
+                Market price
               </label>
             </div>
 
             {/* Trigger Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: tab !== 'Stop Loss' ? 0.5 : 1, background: tab !== 'Stop Loss' ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Trigger Price</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: tab !== 'Stop Loss' ? 0.5 : 1 }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trigger Price</legend>
                 <input 
                   type="text" 
+                  placeholder={tab !== 'Stop Loss' ? '—' : '0.00'}
                   value={slTrigger} 
                   onChange={e => setSlTrigger(e.target.value)}
                   disabled={tab !== 'Stop Loss'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: 'var(--color-blue)' }} /> 
-                Trigger {side.toLowerCase()} <Info size={12} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: '#2563eb' }} /> 
+                Trigger {side.toLowerCase()}
               </label>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            {productType === 'INT' && (
-              <>
-                <div style={{ gridColumn: '2' }}>
-                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !(isCO || isBO) ? 0.5 : 1, background: !(isCO || isBO) ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Stoploss</legend>
-                    <input 
-                      type="text" 
-                      value={slPrice}
-                      onChange={e => setSlPrice(e.target.value)}
-                      disabled={!(isCO || isBO)}
-                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                    />
-                  </fieldset>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                    CO <Info size={12} />
-                  </label>
-                </div>
+          {/* Intraday Stoploss & Take Profit (CO & BO) */}
+          {productType === 'INT' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
+              <div></div>
+              <div>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: !(isCO || isBO) ? 0.5 : 1 }}>
+                  <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Stoploss</legend>
+                  <input 
+                    type="text" 
+                    placeholder={!(isCO || isBO) ? '—' : '0.00'}
+                    value={slPrice}
+                    onChange={e => setSlPrice(e.target.value)}
+                    disabled={!(isCO || isBO)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  />
+                </fieldset>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                  <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: '#2563eb' }} /> 
+                  CO (Cover Order)
+                </label>
+              </div>
 
-                <div style={{ gridColumn: '3' }}>
-                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !isBO ? 0.5 : 1, background: !isBO ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Take Profit</legend>
-                    <input 
-                      type="text" 
-                      value={tgtPrice}
-                      onChange={e => setTgtPrice(e.target.value)}
-                      disabled={!isBO}
-                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                    />
-                  </fieldset>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                    BO <Info size={12} />
-                  </label>
-                </div>
-              </>
-            )}
-          </div>
+              <div>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: !isBO ? 0.5 : 1 }}>
+                  <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Take Profit</legend>
+                  <input 
+                    type="text" 
+                    placeholder={!isBO ? '—' : '0.00'}
+                    value={tgtPrice}
+                    onChange={e => setTgtPrice(e.target.value)}
+                    disabled={!isBO}
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  />
+                </fieldset>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                  <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: '#2563eb' }} /> 
+                  BO (Bracket Order)
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Slicing Notice Banner */}
+          {totalQuantity > getFreezeLimit(symbol, orderModal.lotsize) && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#93c5fd', 
+              background: 'rgba(59, 130, 246, 0.12)', 
+              border: '1px solid rgba(59, 130, 246, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 10px', 
+              marginTop: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Zap size={14} color="#60a5fa" />
+              <span>
+                Order Slicing: <strong>{getFreezeLimit(symbol, orderModal.lotsize).toLocaleString('en-IN')} Qty</strong> allowed per order; <strong>{calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
+              </span>
+            </div>
+          )}
 
           {/* Trailing Stop Loss (TSL) Jump Input */}
           {(tab === 'Stop Loss' || isCO || isBO) && (
-            <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
               <div>
-                <div style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--color-blue-light)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>📈 Trailing Stop Loss (TSL Jump)</span>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>
+                  📈 Trailing Stop Loss (TSL Jump)
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  SL price auto-ratchets upward as LTP moves in your favor
+                  SL auto-trails upward as LTP advances
                 </div>
               </div>
-              <div style={{ width: '110px' }}>
+              <div style={{ width: '100px' }}>
                 <input 
                   type="number" 
                   step="0.5" 
                   min="0.5" 
-                  placeholder="₹ Trail Jump" 
+                  placeholder="₹ Jump" 
                   value={trailingJump} 
                   onChange={e => setTrailingJump(e.target.value)} 
-                  style={{ width: '100%', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 10px', color: '#fff', fontSize: '12.5px', outline: 'none' }} 
+                  style={{ width: '100%', background: '#0e121a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '5px 8px', color: '#fff', fontSize: '12px', outline: 'none' }} 
                 />
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px' }}>
             <div 
-              onClick={() => {
-                openMarketDepthModal(symbol, orderModal.lotsize || 1);
-              }}
-              style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
+              style={{ color: '#60a5fa', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}
             >
-              Market Depth <Maximize2 size={12} />
+              Market Depth <Maximize2 size={11} />
             </div>
           </div>
         </div>
 
-          {/* Margin Alert (if insufficient) */}
-          {isInsufficient && (
-            <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '12px', borderRadius: '8px', marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'var(--color-yellow)', color: '#000', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>!</div>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#fef08a' }}>Insufficient margin!</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To buy {quantity} Share, please add ₹{(requiredMargin - balanceNum).toFixed(2)}</div>
-                </div>
+        {/* Margin Alert (if insufficient) */}
+        {isInsufficient && (
+          <div style={{ background: 'rgba(234, 179, 8, 0.1)', borderTop: '1px solid rgba(234, 179, 8, 0.3)', borderBottom: '1px solid rgba(234, 179, 8, 0.3)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: '#eab308', color: '#000', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>!</div>
+              <div>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#fef08a' }}>Insufficient margin!</div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Please add ₹{(requiredMargin - balanceNum).toFixed(2)} to place this order.</div>
               </div>
-              <button style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
             </div>
-          )}
-        {/* Footer */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button style={{ background: '#2563eb', color: 'white', border: 'none', padding: '5px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
+          </div>
+        )}
+
+        {/* Footer Bar */}
+        <div style={{ background: '#0e121a', padding: '14px 20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
-                <RefreshCw size={14} style={{ color: 'var(--text-secondary)' }} />
-                <span style={{ fontSize: '15px', fontWeight: '700' }}>Margin</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px' }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Required:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>₹{requiredMargin.toFixed(2)} ({leverageText})</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Available:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>₹{balanceNum.toFixed(2)}</span>
-                </div>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Margin Required:</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#ffffff' }}>₹{requiredMargin.toFixed(2)} ({leverageText})</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Available:</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>₹{balanceNum.toFixed(2)}</span>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginLeft: '22px', marginTop: '4px' }}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
-                <Plus size={14} /> Add Funds
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '2px' }}>
               <button 
+                type="button"
                 onClick={() => estimatedTaxes && setShowBreakup(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
-                <FileText size={14} /> Price breakup
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '12px', padding: 0, cursor: 'pointer', fontWeight: '500' }}
+              >
+                <FileText size={12} /> Price breakup
               </button>
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '8px', alignSelf: 'stretch' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button 
               type="button"
               onClick={() => {
@@ -682,39 +764,46 @@ export default function OrderModal() {
                 useStore.getState().setBasketModalOpen(true);
               }}
               style={{
-                background: 'rgba(59, 130, 246, 0.15)',
+                background: 'rgba(59, 130, 246, 0.12)',
                 border: '1px solid rgba(59, 130, 246, 0.35)',
                 color: '#60a5fa',
-                padding: '12px 16px',
-                borderRadius: '4px',
-                fontSize: '13px',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '5px',
                 whiteSpace: 'nowrap'
               }}
             >
-              <ShoppingBag size={14} /> Add to Basket
+              <ShoppingBag size={13} /> Add to Basket
             </button>
 
             <button 
+              type="button"
               onClick={handlePlaceOrder}
               disabled={isInsufficient || isPlacing}
               style={{ 
-                background: (isInsufficient || isPlacing) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-                color: (isInsufficient || isPlacing) ? 'var(--text-secondary)' : '#fff', 
-                padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-                border: 'none', cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
-                flex: 1,
+                background: (isInsufficient || isPlacing) ? '#334155' : (isBuy ? '#10b981' : '#ef4444'), 
+                color: (isInsufficient || isPlacing) ? '#94a3b8' : '#ffffff', 
+                padding: '10px 20px', 
+                borderRadius: '6px', 
+                fontSize: '12.5px', 
+                fontWeight: '800', 
+                letterSpacing: '0.4px',
+                border: 'none', 
+                cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', 
+                transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minWidth: '150px'
+                minWidth: '140px',
+                boxShadow: (isInsufficient || isPlacing) ? 'none' : (isBuy ? '0 4px 12px rgba(16, 185, 129, 0.3)' : '0 4px 12px rgba(239, 68, 68, 0.3)')
               }}
             >
-              {isPlacing ? 'PLACING ORDER...' : `PLACE ${isBuy ? 'BUY' : 'SELL'} ORDER`}
+              {isPlacing ? 'PLACING ORDER...' : (isBuy ? `BUY ${totalQuantity > 1 ? `${totalQuantity} Qty` : ''}` : `SELL ${totalQuantity > 1 ? `${totalQuantity} Qty` : ''}`)}
             </button>
           </div>
         </div>
