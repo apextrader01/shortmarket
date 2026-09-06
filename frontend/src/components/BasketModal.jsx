@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Plus } from 'lucide-react';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -30,14 +31,14 @@ function extractOptionStrike(symbol) {
 }
 
 const POPULAR_UNDERLYINGS = [
-  { label: 'NIFTY', symbol: 'NIFTY', indexKey: 'NSE:NIFTY50-INDEX', step: 50, lotsize: 25 },
-  { label: 'BANKNIFTY', symbol: 'BANKNIFTY', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100, lotsize: 15 },
-  { label: 'FINNIFTY', symbol: 'FINNIFTY', indexKey: 'NSE:FINNIFTY-INDEX', step: 50, lotsize: 25 },
-  { label: 'SENSEX', symbol: 'SENSEX', indexKey: 'BSE:SENSEX-INDEX', step: 100, lotsize: 10 },
-  { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25, lotsize: 50 },
-  { label: 'RELIANCE', symbol: 'RELIANCE', indexKey: 'NSE:RELIANCE-EQ', step: 20, lotsize: 250 },
-  { label: 'TCS', symbol: 'TCS', indexKey: 'NSE:TCS-EQ', step: 20, lotsize: 175 },
-  { label: 'HDFCBANK', symbol: 'HDFCBANK', indexKey: 'NSE:HDFCBANK-EQ', step: 20, lotsize: 550 }
+  { label: 'NIFTY', symbol: 'NIFTY', exch: 'NSE', indexKey: 'NSE:NIFTY50-INDEX', step: 50 },
+  { label: 'BANKNIFTY', symbol: 'BANKNIFTY', exch: 'NSE', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100 },
+  { label: 'FINNIFTY', symbol: 'FINNIFTY', exch: 'NSE', indexKey: 'NSE:FINNIFTY-INDEX', step: 50 },
+  { label: 'SENSEX', symbol: 'SENSEX', exch: 'BSE', indexKey: 'BSE:SENSEX-INDEX', step: 100 },
+  { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', exch: 'NSE', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25 },
+  { label: 'RELIANCE', symbol: 'RELIANCE', exch: 'NSE', indexKey: 'NSE:RELIANCE-EQ', step: 20 },
+  { label: 'TCS', symbol: 'TCS', exch: 'NSE', indexKey: 'NSE:TCS-EQ', step: 20 },
+  { label: 'HDFCBANK', symbol: 'HDFCBANK', exch: 'NSE', indexKey: 'NSE:HDFCBANK-EQ', step: 20 }
 ];
 
 export default function BasketModal() {
@@ -98,10 +99,12 @@ export default function BasketModal() {
     const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
     const optionStrike = isOption ? extractOptionStrike(symbol) : 0;
     const typeStr = isOption ? (/(?:\d+|[-_\s])CE/i.test(cleanSym) || cleanSym.endsWith('CE') ? 'CE' : 'PE') : 'OTHER';
-    const totalQuantity = item.quantity * (item.lotsize || 1);
+    const effectiveLotsize = (item.lotsize && Number(item.lotsize) > 1) ? Number(item.lotsize) : (getInstantLotsize(symbol) || 1);
+    const totalQuantity = (Number(item.quantity) || 1) * effectiveLotsize;
     
     return {
       ...item,
+      lotsize: effectiveLotsize,
       livePrice,
       optionStrike,
       isOption,
@@ -289,26 +292,29 @@ export default function BasketModal() {
 
   const applyPreset = (type, customUnderlying = null) => {
     const targetUnderlying = customUnderlying || selectedUnderlying;
+    const isBSE = targetUnderlying === 'SENSEX' || targetUnderlying === 'BANKEX';
+    const defaultExch = isBSE ? 'BSE' : 'NSE';
     const info = POPULAR_UNDERLYINGS.find(u => u.symbol === targetUnderlying) || {
       symbol: targetUnderlying,
-      indexKey: `NSE:${targetUnderlying}-EQ`,
-      step: 50,
-      lotsize: 25
+      exch: defaultExch,
+      indexKey: `${defaultExch}:${targetUnderlying}-INDEX`,
+      step: 50
     };
 
-    const liveSpot = prices[info.indexKey]?.ltp || prices[`NSE:${info.symbol}`]?.ltp || prices[`BSE:${info.symbol}`]?.ltp;
+    const exch = info.exch || defaultExch;
+    const liveSpot = prices[info.indexKey]?.ltp || prices[`${exch}:${info.symbol}`]?.ltp || prices[`NSE:${info.symbol}`]?.ltp || prices[`BSE:${info.symbol}`]?.ltp;
     const defaultSpot = info.symbol === 'BANKNIFTY' ? 51500 : (info.symbol === 'SENSEX' ? 76500 : (info.symbol === 'FINNIFTY' ? 24000 : (info.symbol === 'RELIANCE' ? 1450 : (info.symbol === 'TCS' ? 2300 : (info.symbol === 'HDFCBANK' ? 710 : 24400)))));
     const spotPrice = liveSpot || defaultSpot;
 
     const step = info.step || 50;
     const roundedStrike = Math.round(spotPrice / step) * step;
-    const lotsize = info.lotsize || 25;
+    const lotsize = getInstantLotsize(info.symbol) || 1;
 
     const now = new Date();
     const yr = String(now.getFullYear()).slice(-2);
     const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const mo = months[now.getMonth()];
-    const symPrefix = `NSE:${info.symbol}${yr}${mo}`;
+    const symPrefix = `${exch}:${info.symbol}${yr}${mo}`;
 
     let newItems = [];
     if (type === 'BULL_CALL_SPREAD') {
@@ -446,38 +452,42 @@ export default function BasketModal() {
           {/* Autocomplete Dropdown */}
           {searchResults.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: '20px', right: '20px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
-              {searchResults.map((stk, sIdx) => (
-                <div key={sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div>
-                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{stk.uniqueSymbol || stk.symbol}</div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{stk.name || stk.exchange} • Lot: {stk.lotsize || 1}</div>
+              {searchResults.map((stk, sIdx) => {
+                const sym = stk.uniqueSymbol || stk.symbol;
+                const effectiveLotsize = (stk.lotsize && Number(stk.lotsize) > 1) ? Number(stk.lotsize) : getInstantLotsize(sym);
+                return (
+                  <div key={sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div>
+                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{sym}</div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{stk.name || stk.exchange} • Lot: {effectiveLotsize}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          addToBasket({ symbol: sym, side: 'BUY', quantity: 1, lotsize: effectiveLotsize, orderType: 'MARKET', price: '' });
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }} 
+                        style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-blue)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        + BUY
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          addToBasket({ symbol: sym, side: 'SELL', quantity: 1, lotsize: effectiveLotsize, orderType: 'MARKET', price: '' });
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }} 
+                        style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-red)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        + SELL
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        addToBasket({ symbol: stk.uniqueSymbol || stk.symbol, side: 'BUY', quantity: 1, lotsize: stk.lotsize || 1, orderType: 'MARKET', price: '' });
-                        setSearchQuery('');
-                        setSearchResults([]);
-                      }} 
-                      style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-blue)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      + BUY
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        addToBasket({ symbol: stk.uniqueSymbol || stk.symbol, side: 'SELL', quantity: 1, lotsize: stk.lotsize || 1, orderType: 'MARKET', price: '' });
-                        setSearchQuery('');
-                        setSearchResults([]);
-                      }} 
-                      style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-red)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
-                    >
-                      + SELL
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
