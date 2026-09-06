@@ -11,7 +11,15 @@ export default function LoginView() {
   const [view, setView] = useState('login');
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const ref = urlParams.get('ref');
+    let ref = urlParams.get('ref');
+    if (!ref) {
+      // Support path-based referral URLs like /ref/:referralSlug
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      const refIdx = parts.indexOf('ref');
+      if (refIdx !== -1 && parts[refIdx + 1]) {
+        ref = decodeURIComponent(parts[refIdx + 1]);
+      }
+    }
     if (ref) {
       localStorage.setItem('referral_code', ref);
     }

@@ -28,7 +28,7 @@ export default function AboutUsView({ setActiveTab }) {
     {
       title: 'Risk Policies',
       content: 'Options and margin trading are highly leveraged and carry a high degree of risk. Please review our comprehensive Risk Disclosure Document before engaging in leveraged trading.',
-      link: 'https://www.angelone.in/riskpolicy'
+      link: 'https://www.shortedge.in/riskpolicy'
     },
     {
       title: 'Roles and Responsibilities for UPI',
