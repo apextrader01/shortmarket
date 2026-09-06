@@ -290,19 +290,19 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
-    if (!path) return 'Markets';
+    if (!path) return 'Journal';
     
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
-      'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
+      'markets': 'Markets', 'papertrading': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-      'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal',
+      'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal', 'tradediary': 'Journal',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
       'aboutus': 'AboutUs'
     };
-    return tabsMap[path.toLowerCase()] || 'Markets';
+    return tabsMap[path.toLowerCase()] || 'Journal';
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -538,25 +538,29 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard', 'Journal',
-                ...(user?.is_admin ? ['Admin Panel'] : [])
-              ].map((tab) => {
-                const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
-                return (
+                { label: 'Trade Diary', key: 'Journal' },
+                { label: 'Paper Trading', key: 'Markets' },
+                { label: 'Positions', key: 'Positions' },
+                { label: 'Orders', key: 'Orders' },
+                { label: 'Portfolio', key: 'Portfolio' },
+                { label: 'Mutual Funds', key: 'MutualFunds' },
+                { label: 'Leaderboard', key: 'Leaderboard' },
+                ...(user?.is_admin ? [{ label: 'Admin Panel', key: 'AdminPanel' }] : [])
+              ].map((item) => (
                 <div
-                  key={tab}
-                  onClick={() => setActiveTab(tabKey)}
-                  className={`nav-pill ${activeTab === tabKey ? "active" : ""}`}
+                  key={item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  className={`nav-pill ${activeTab === item.key ? "active" : ""}`}
                   style={{
-                    padding:        '16px 2px',
+                    padding:        '16px 6px',
                     cursor:         'pointer',
                     textTransform:  'uppercase',
                     letterSpacing:  '0.5px',
                   }}
                 >
-                  {tab}
+                  {item.label}
                 </div>
-              )})}
+              ))}
             </div>
 
             {/* Hamburger Menu (Mobile Only) */}
@@ -642,7 +646,7 @@ function App() {
           {activeTab === 'Journal' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
               <Suspense fallback={<TabLoader />}>
-                <TradingJournalView onBack={() => setActiveTab('Markets')} />
+                <TradingJournalView setActiveTab={setActiveTab} onBack={() => setActiveTab('Markets')} />
               </Suspense>
             </div>
           )}

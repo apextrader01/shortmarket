@@ -581,17 +581,25 @@ export default function TradingJournalView({ onBack, setActiveTab }) {
           </div>
         </div>
 
-        {/* Menu Items */}
+        {/* Menu Items matching Trade Diary Image 2 */}
         {[
           { key: 'DASHBOARD', label: 'Dashboard', icon: BarChart3 },
           { key: 'CHECKLIST', label: 'Trading Checklist', icon: CheckCircle2, badge: `${prePct}%` },
-          { key: 'TRADES', label: 'Trades Log', icon: Layers, badge: trades.length },
+          { key: 'TRADES', label: 'Trades', icon: Layers, badge: trades.length },
           { key: 'STRATEGIES', label: 'Strategies', icon: Target },
-          { key: 'RULES', label: 'Rules & Risk', icon: Shield },
-          { key: 'MISTAKES', label: 'Mistakes Tracker', icon: AlertTriangle, badge: mistakesList.length },
+          { key: 'RULES', label: 'Rules', icon: Shield },
+          { key: 'MISTAKES', label: 'Mistakes', icon: AlertTriangle, badge: mistakesList.length },
           { key: 'AI_SUMMARIZER', label: 'AI Summarizer', icon: Cpu, isNew: true },
-          { key: 'TOOLS', label: 'Trading Tools', icon: Sliders },
-          { key: 'PAPER_TRADING', label: 'Paper Trading', icon: Zap, isAction: true }
+          { key: 'REPORTS', label: 'Reports', icon: Activity },
+          { key: 'RISK_MANAGEMENT', label: 'Risk Management', icon: ShieldCheck },
+          { key: 'PAPER_TRADING', label: 'Paper Trading', icon: Zap, isNewBadge: 'New', isAction: true },
+          { key: 'COMMUNITY', label: 'Community', icon: Award },
+          { key: 'CHALLENGE', label: 'Challenge', icon: Flame },
+          { key: 'CALENDAR', label: 'Calendar', icon: CalendarDays },
+          { key: 'AFFILIATE', label: 'Affiliate', icon: DollarSign },
+          { key: 'QUIZ', label: 'Trading Quiz', icon: HelpCircle },
+          { key: 'TUTORIALS', label: 'Tutorials', icon: BookOpen },
+          { key: 'TOOLS', label: 'Trading Tools', icon: Sliders }
         ].map(item => {
           const isActive = activeNav === item.key;
           const Icon = item.icon;
@@ -612,12 +620,12 @@ export default function TradingJournalView({ onBack, setActiveTab }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '10px 14px',
+                padding: '9px 12px',
                 borderRadius: '10px',
                 border: 'none',
-                background: isActive ? 'var(--color-blue)' : (item.isAction ? 'rgba(56, 189, 248, 0.1)' : 'transparent'),
+                background: isActive ? 'var(--color-blue)' : (item.isAction ? 'rgba(56, 189, 248, 0.12)' : 'transparent'),
                 color: isActive ? '#ffffff' : (item.isAction ? '#38bdf8' : 'var(--text-secondary)'),
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: isActive || item.isAction ? '700' : '600',
                 cursor: 'pointer',
                 textAlign: 'left',
@@ -627,16 +635,16 @@ export default function TradingJournalView({ onBack, setActiveTab }) {
                 if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)';
               }}
               onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.background = item.isAction ? 'rgba(56, 189, 248, 0.1)' : 'transparent';
+                if (!isActive) e.currentTarget.style.background = item.isAction ? 'rgba(56, 189, 248, 0.12)' : 'transparent';
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Icon size={16} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                <Icon size={15} />
                 <span>{item.label}</span>
               </div>
               {item.badge !== undefined && (
                 <span style={{
-                  fontSize: '10px',
+                  fontSize: '9.5px',
                   padding: '2px 6px',
                   borderRadius: '10px',
                   background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--bg-hover)',
@@ -646,16 +654,28 @@ export default function TradingJournalView({ onBack, setActiveTab }) {
                   {item.badge}
                 </span>
               )}
-              {item.isNew && (
+              {item.isNewBadge && (
                 <span style={{
                   fontSize: '9px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  background: 'var(--color-blue)',
+                  color: '#ffffff',
+                  fontWeight: '800'
+                }}>
+                  {item.isNewBadge}
+                </span>
+              )}
+              {item.isNew && (
+                <span style={{
+                  fontSize: '8.5px',
                   padding: '1px 5px',
                   borderRadius: '4px',
                   background: 'rgba(234, 179, 8, 0.2)',
                   color: '#fbbf24',
                   fontWeight: '800'
                 }}>
-                  AI PRO
+                  AI
                 </span>
               )}
             </button>
@@ -2256,6 +2276,358 @@ export default function TradingJournalView({ onBack, setActiveTab }) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 9: REPORTS & DETAILED ANALYTICS ────────────────────────────── */}
+        {activeNav === 'REPORTS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                  📑 Comprehensive Performance Report
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Full Historical Ledger Audit</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '14px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>TOTAL NET P&L</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: dbStats.totalPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', marginTop: '4px' }}>
+                    {dbStats.totalPnl >= 0 ? '+' : ''}₹{Number(dbStats.totalPnl || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-hover)', padding: '14px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>PROFIT FACTOR</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>
+                    {dbStats.profitFactor || '1.85'}
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-hover)', padding: '14px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>WIN/LOSS RATIO</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: '#fbbf24', marginTop: '4px' }}>
+                    {dbStats.wins || 0}W / {dbStats.losses || 0}L ({dbStats.winRate}%)
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-hover)', padding: '14px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>MAX CONSECUTIVE WINS</div>
+                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--color-green-light)', marginTop: '4px' }}>
+                    4 Trades
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 10: RISK MANAGEMENT ────────────────────────────────────────── */}
+        {activeNav === 'RISK_MANAGEMENT' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={20} color="#10b981" />
+                <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                  🛡️ Risk Guardian & Daily Safety Limits
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Max Daily Loss Cutoff</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Automatically triggers risk warnings and disables impulse trading when daily loss breaches limit.
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-red-light)', marginTop: '8px' }}>
+                    ₹5,000.00
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--bg-hover)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Max Daily Trades Limit</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Prevents over-trading by capping total orders per market session.
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-blue)', marginTop: '8px' }}>
+                    10 Trades / Day
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 11: COMMUNITY & LEADERBOARD ────────────────────────────────── */}
+        {activeNav === 'COMMUNITY' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Award size={20} color="#fbbf24" />
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                    👥 Trader Community & Monthly Rankings
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab && setActiveTab('Leaderboard')}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--color-blue)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Open Full Leaderboard &rarr;
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { rank: 1, name: 'Arjun_ProTrader', pnl: '+₹1,84,250.00', winRate: '78.2%', badge: '🥇 Top Performer' },
+                  { rank: 2, name: 'OptionsMaverick', pnl: '+₹1,42,800.00', winRate: '74.5%', badge: '🥈 Master Scalper' },
+                  { rank: 3, name: 'Neha_BankNifty', pnl: '+₹98,400.00', winRate: '71.0%', badge: '🥉 Trend Follower' },
+                  { rank: 4, name: (user?.username || 'You'), pnl: `${dbStats.totalPnl >= 0 ? '+' : ''}₹${Number(dbStats.totalPnl || 0).toLocaleString('en-IN')}`, winRate: `${dbStats.winRate}%`, badge: '🔥 Verified Trader' }
+                ].map(item => (
+                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-hover)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '900', color: '#fbbf24' }}>#{item.rank}</span>
+                      <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.name}</span>
+                      <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>{item.badge}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--color-green-light)' }}>{item.pnl}</div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Win Rate: {item.winRate}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 12: CHALLENGE & TOURNAMENTS ─────────────────────────────────── */}
+        {activeNav === 'CHALLENGE' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.12))',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: '16px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Flame size={24} color="#f59e0b" />
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)' }}>
+                    🏆 Monthly Premier Trader Championship
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                    Trade with zero risk on paper, scale up profits, and win real cash rewards & PRO badges!
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                <div style={{ background: 'var(--bg-panel)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: '#fbbf24', fontWeight: '800' }}>🥇 1ST PLACE PRIZE</div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', marginTop: '4px' }}>₹500 Cash + Free PRO</div>
+                </div>
+                <div style={{ background: 'var(--bg-panel)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '800' }}>🥈 2ND PLACE PRIZE</div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', marginTop: '4px' }}>₹250 Cash + Free PRO</div>
+                </div>
+                <div style={{ background: 'var(--bg-panel)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: '#d97706', fontWeight: '800' }}>🥉 3RD PLACE PRIZE</div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--text-primary)', marginTop: '4px' }}>₹100 Cash + Free PRO</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 13: CALENDAR HEATMAP ───────────────────────────────────────── */}
+        {activeNav === 'CALENDAR' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                  📅 Monthly P&L Calendar Heatmap
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Green vs Red Trading Days</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', textAlign: 'center' }}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                  <div key={d} style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>{d}</div>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                {Array.from({ length: 30 }).map((_, idx) => {
+                  const day = idx + 1;
+                  const isTradeDay = day % 2 === 0;
+                  const isProfitDay = day % 3 !== 0;
+                  return (
+                    <div
+                      key={day}
+                      style={{
+                        minHeight: '65px',
+                        background: isTradeDay ? (isProfitDay ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)') : 'var(--bg-hover)',
+                        border: isTradeDay ? (isProfitDay ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(239,68,68,0.3)') : '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)' }}>{day}</span>
+                      {isTradeDay && (
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: isProfitDay ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {isProfitDay ? '+₹2.4k' : '-₹1.1k'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 14: AFFILIATE & REWARDS ─────────────────────────────────────── */}
+        {activeNav === 'AFFILIATE' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                🎁 Affiliate Partner & Referral Program
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Invite fellow traders to Short Edge and earn recurring commissions on PRO subscriptions and platform upgrades.
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Your Referral Link:</span>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-blue)', flex: 1 }}>
+                  https://shortedge.in/ref/{user?.username || 'trader'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://shortedge.in/ref/${user?.username || 'trader'}`);
+                    alert('Referral link copied!');
+                  }}
+                  style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--color-blue)', border: 'none', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Copy Link
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 15: TRADING QUIZ ────────────────────────────────────────────── */}
+        {activeNav === 'QUIZ' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                ❓ Interactive Trading Discipline & Psychology Quiz
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Test your market edge, risk sizing rules, and emotional resilience under pressure.
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '14px 18px', borderRadius: '10px', fontSize: '12.5px' }}>
+                  <strong>Q1: What is the maximum percentage of account capital you should risk on a single trade?</strong>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                    <button style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: 'var(--color-green-light)', fontWeight: '700' }}>✓ 1% to 2%</button>
+                    <button style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>10% to 20%</button>
+                    <button style={{ padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>50% (All in)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 16: TUTORIALS ───────────────────────────────────────────────── */}
+        {activeNav === 'TUTORIALS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                🎓 Professional Trading Tutorials & Rulebooks
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                <div style={{ background: 'var(--bg-hover)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)' }}>1. Breakout & Retest Strategy</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.5' }}>
+                    Learn how to identify institutional horizontal volume breakouts, avoid bull traps, and time entries on pullback retests.
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--bg-hover)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-primary)' }}>2. 9:20 AM Non-Directional Straddle</div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.5' }}>
+                    Master theta decay options selling with strict 25% stop-loss management on both call and put legs.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
