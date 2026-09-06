@@ -161,6 +161,23 @@ export default function LoginView() {
           </div>
         </div>
         
+        {localStorage.getItem('referral_code') && view === 'register' && (
+          <div style={{
+            background: 'rgba(59, 130, 246, 0.12)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            color: '#60a5fa',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            fontSize: '12.5px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            🎁 <span>Special Partner Invite active (<b>{localStorage.getItem('referral_code')}</b>)! You qualify for a 20% platform discount.</span>
+          </div>
+        )}
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#fff', marginBottom: '8px' }}>
             {view === 'login' && 'Welcome back'}

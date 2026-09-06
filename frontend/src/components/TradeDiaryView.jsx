@@ -1302,7 +1302,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   // Export CSV Handler
   const handleExportTradesCSV = () => {
     if (filteredTrades.length === 0) {
-      alert('No trades available to export in this market view.');
+      setTradeActionNotice('⚠️ No trades available to export in this market view.');
+      setTimeout(() => setTradeActionNotice(null), 3000);
       return;
     }
 
@@ -1338,8 +1339,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     e.preventDefault();
     const entry = parseFloat(newTradeForm.entry_price);
     const exit = parseFloat(newTradeForm.exit_price);
-    const qty = parseInt(newTradeForm.quantity, 10);
-    const charges = parseFloat(newTradeForm.charges) || 40;
+    const qty = parseFloat(newTradeForm.quantity);
+    const charges = !isNaN(parseFloat(newTradeForm.charges)) ? parseFloat(newTradeForm.charges) : (newTradeForm.market_segment === 'Indian' ? 40 : 0);
 
     let realizedPnl = 0;
     if (!isNaN(entry) && !isNaN(exit) && !isNaN(qty)) {

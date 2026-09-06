@@ -553,6 +553,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
             <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription" color="#34D399" onClick={() => setShowReferrals(true)} />
             <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
+            <Card icon={FileText} title="Trade Diary & Analytics" desc="Audit your edge, track mistakes, and access the 30-Day Discipline Challenge" color="#3B82F6" onClick={() => setActiveTab('TradeDiary')} />
           </div>
         </div>
 
