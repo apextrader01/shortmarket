@@ -367,14 +367,8 @@ const OptionChainViewInternal = () => {
         quantity: 1,
         lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
         orderType: 'MARKET',
-        price: '',
-        expiry: expiry,
-        strike: parseFloat(opt.strike || 0),
-        optionType: optionType,
-        underlying: symbol
+        price: ''
       });
-      useStore.getState().subscribeToSymbol?.(optKey);
-      useStore.getState().fetchBatchPrices?.([optKey], true);
     } else if (oneClickMode) {
       // ONE-CLICK SCALPER MODE: Bypass modal, execute instantly at Market Price
       const lotsize = opt.lotsize ? parseInt(opt.lotsize) : 1;
