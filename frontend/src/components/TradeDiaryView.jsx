@@ -1,3 +1,51 @@
+// Market Segments Configuration & Presets
+export const MARKET_CONFIGS = {
+  Indian: {
+    label: 'Indian (NSE/BSE)',
+    flag: '🇮🇳',
+    currency: '₹',
+    qtyLabel: 'Quantity (Lots/Shares)',
+    qtyPlaceholder: 'e.g. 50 (1 Lot Nifty) or 100',
+    defaultQty: '50',
+    defaultCharges: 40,
+    priceStep: '0.05',
+    suggestions: ['NIFTY 24500 CE', 'NIFTY 24600 PE', 'BANKNIFTY 52000 CE', 'BANKNIFTY 52500 PE', 'RELIANCE', 'HDFCBANK', 'TCS', 'TATAMOTORS', 'SENSEX 81000 CE']
+  },
+  Crypto: {
+    label: 'Crypto (USDT)',
+    flag: '⚡',
+    currency: '$',
+    qtyLabel: 'Coin Quantity',
+    qtyPlaceholder: 'e.g. 0.25 (BTC) or 10 (SOL)',
+    defaultQty: '1',
+    defaultCharges: 1.5,
+    priceStep: '0.01',
+    suggestions: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT', 'DOGE/USDT', 'ADA/USDT']
+  },
+  Forex: {
+    label: 'Forex (Pairs)',
+    flag: '💱',
+    currency: '$',
+    qtyLabel: 'Lot Size (Mini/Standard)',
+    qtyPlaceholder: 'e.g. 0.10 or 1.00',
+    defaultQty: '0.10',
+    defaultCharges: 2.0,
+    priceStep: '0.00001',
+    suggestions: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'XAU/USD (Gold)', 'AUD/USD', 'USD/CAD', 'GBP/JPY']
+  },
+  US: {
+    label: 'US Stocks',
+    flag: '🇺🇸',
+    currency: '$',
+    qtyLabel: 'Share Count',
+    qtyPlaceholder: 'e.g. 10 or 50 shares',
+    defaultQty: '10',
+    defaultCharges: 0,
+    priceStep: '0.01',
+    suggestions: ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'AMZN', 'GOOGL', 'META', 'SPY', 'QQQ']
+  }
+};
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -511,25 +559,71 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
     return list.sort((a, b) => new Date(b.trade_date || 0) - new Date(a.trade_date || 0));
   }, [dbTrades, positions, todayStr]);
 
-  // Compute KPIs
+    // Market Currency & Formatting Helpers
+  const currentMarketConfig = MARKET_CONFIGS[marketSegment] || MARKET_CONFIGS.Indian;
+  const currencySymbol = currentMarketConfig.currency;
+
+  const formatMoney = (val, seg = marketSegment) => {
+    const num = Number(val || 0);
+    const cfg = MARKET_CONFIGS[seg] || MARKET_CONFIGS.Indian;
+    const sym = cfg.currency;
+    const isNegative = num < 0;
+    const absVal = Math.abs(num);
+    const formatted = cfg.currency === '₹'
+      ? absVal.toLocaleString('en-IN')
+      : absVal.toLocaleString('en-US', { minimumFractionDigits: absVal % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 });
+    return `${isNegative ? '-' : (num > 0 ? '+' : '')}${sym}${formatted}`;
+  };
+
+  const formatMoneyPlain = (val, seg = marketSegment) => {
+    const num = Number(val || 0);
+    const cfg = MARKET_CONFIGS[seg] || MARKET_CONFIGS.Indian;
+    const sym = cfg.currency;
+    const absVal = Math.abs(num);
+    const formatted = cfg.currency === '₹'
+      ? absVal.toLocaleString('en-IN')
+      : absVal.toLocaleString('en-US', { minimumFractionDigits: absVal % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 });
+    return `${sym}${formatted}`;
+  };
+
+  // Strictly Filter Trades by Active Market Segment and Time Range
+  const filteredTrades = useMemo(() => {
+    return allTrades.filter(t => {
+      const seg = (t.market_segment || 'Indian').toLowerCase();
+      const currentSeg = marketSegment.toLowerCase();
+      if (seg !== currentSeg) return false;
+
+      if (timeRange === 'ALL') return true;
+      if (!t.trade_date) return true;
+
+      const tradeTime = new Date(t.trade_date).getTime();
+      const now = new Date().getTime();
+      const diffDays = (now - tradeTime) / (1000 * 60 * 60 * 24);
+
+      if (timeRange === 'TODAY') return t.trade_date === todayStr;
+      if (timeRange === '7D') return diffDays <= 7;
+      if (timeRange === '30D') return diffDays <= 30;
+      if (timeRange === '90D') return diffDays <= 90;
+      if (timeRange === '1Y') return diffDays <= 365;
+      return true;
+    });
+  }, [allTrades, marketSegment, timeRange, todayStr]);
+
+  // Compute Strict Market Segment KPIs
   const metrics = useMemo(() => {
-    if (allTrades.length === 0) {
+    if (filteredTrades.length === 0) {
       return {
-        highestPnl: 48500,
-        winRate: 64,
-        avgRiskReward: '1:2.4',
-        tradesCount: 38,
-        totalPnL: 82400,
-        totalGross: 94800,
-        totalCharges: 12400,
-        wins: 24,
-        losses: 14,
-        confidenceScore: 84,
-        topTrades: [
-          { id: 'sample-1', symbol: 'NIFTY 24600 CE', trade_date: todayStr, strategy: '🔥 Breakout', net_pnl: 18400 },
-          { id: 'sample-2', symbol: 'BANKNIFTY 52000 PE', trade_date: '2026-09-04', strategy: '🛡️ Option Selling', net_pnl: 14200 },
-          { id: 'sample-3', symbol: 'RELIANCE', trade_date: '2026-09-02', strategy: '📊 S&R Bounce', net_pnl: 9600 }
-        ]
+        highestPnl: 0,
+        winRate: 0,
+        avgRiskReward: '1:0',
+        tradesCount: 0,
+        totalPnL: 0,
+        totalGross: 0,
+        totalCharges: 0,
+        wins: 0,
+        losses: 0,
+        confidenceScore: 0,
+        topTrades: []
       };
     }
 
@@ -542,10 +636,10 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
     let totalGross = 0;
     let totalCharges = 0;
 
-    allTrades.forEach(t => {
-      const pnl = Number(t.net_pnl || t.realized_pnl || 0);
-      const gross = Number(t.realized_pnl || t.net_pnl || 0);
-      const chg = Number(t.charges || 40);
+    filteredTrades.forEach(t => {
+      const pnl = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+      const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
+      const chg = Number(t.charges || (marketSegment === 'Indian' ? 40 : (marketSegment === 'US' ? 0 : 2)));
       totalNet += pnl;
       totalGross += gross;
       totalCharges += chg;
@@ -560,16 +654,16 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       }
     });
 
-    const totalTrades = allTrades.length;
+    const totalTrades = filteredTrades.length;
     const winRate = totalTrades > 0 ? Math.round((winCount / totalTrades) * 100) : 0;
     const avgWin = winCount > 0 ? totalWinPnl / winCount : 0;
     const avgLoss = lossCount > 0 ? totalLossPnl / lossCount : 1;
     const rrRatio = avgLoss > 0 ? `1:${(avgWin / avgLoss).toFixed(1)}` : '1:2.0';
     const confidence = Math.min(100, Math.max(10, Math.round((winRate * 0.7) + (winCount > 5 ? 25 : 10))));
 
-    const topTrades = [...allTrades]
-      .filter(t => Number(t.net_pnl || t.realized_pnl) > 0)
-      .sort((a, b) => Number(b.net_pnl || b.realized_pnl) - Number(a.net_pnl || a.realized_pnl))
+    const topTrades = [...filteredTrades]
+      .filter(t => Number(t.net_pnl !== undefined ? t.net_pnl : t.realized_pnl) > 0)
+      .sort((a, b) => Number(b.net_pnl !== undefined ? b.net_pnl : b.realized_pnl) - Number(a.net_pnl !== undefined ? a.net_pnl : a.realized_pnl))
       .slice(0, 4);
 
     return {
@@ -585,7 +679,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       confidenceScore: confidence,
       topTrades
     };
-  }, [allTrades, todayStr]);
+  }, [filteredTrades, marketSegment]);
 
   // Handle Save New Trade Form
   const handleSaveNewTrade = async (e) => {
@@ -1686,7 +1780,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                 gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', 
                 gap: isMobile ? '12px' : '16px' 
               }}>
-                {/* Cumulative P&L */}
+                {/* Cumulative Performance Card with Dynamic SVG Equity Curve */}
                 <div style={{ 
                   backgroundColor: colors.bgCard, 
                   border: `1px solid ${colors.borderColor}`, 
@@ -1694,12 +1788,12 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                   padding: isMobile ? '16px' : '20px 24px', 
                   display: 'flex', 
                   flexDirection: 'column', 
-                  minHeight: isMobile ? '200px' : '260px',
+                  minHeight: isMobile ? '230px' : '280px',
                   boxShadow: colors.cardShadow
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>
-                      <TrendingUp size={16} color="#2563eb" /> Cumulative Performance
+                      <TrendingUp size={16} color="#2563eb" /> Cumulative Performance ({marketSegment})
                     </div>
                     <div style={{ display: 'flex', gap: '3px', backgroundColor: colors.bgInner, padding: '2px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
                       {['D', 'W', 'M'].map((p) => (
@@ -1723,29 +1817,143 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                     </div>
                   </div>
 
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '800', color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed, marginBottom: '4px' }}>
-                      {metrics.totalPnL >= 0 ? '+' : ''}₹{metrics.totalPnL.toLocaleString('en-IN')}
-                    </div>
-                    <div style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '16px' }}>
-                      Net P&L across {metrics.tradesCount} logged trades ({metrics.wins} Wins / {metrics.losses} Losses) • Charges: ₹{metrics.totalCharges.toLocaleString('en-IN')}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '800', color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed, marginBottom: '2px' }}>
+                        {formatMoney(metrics.totalPnL)}
+                      </div>
+                      <div style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '8px' }}>
+                        Net P&L across {metrics.tradesCount} {marketSegment} trades ({metrics.wins} Wins / {metrics.losses} Losses) • Charges: {formatMoneyPlain(metrics.totalCharges)}
+                      </div>
                     </div>
 
-                    {/* Visual Growth Trend Line Bar */}
-                    <div style={{ height: '36px', display: 'flex', alignItems: 'flex-end', gap: '6px', paddingTop: '8px', borderTop: `1px solid ${colors.borderColor}` }}>
-                      {[40, 65, 30, 85, 70, 95, 80, 110, 90, 125, 140, 160].map((h, i) => (
-                        <div 
-                          key={i} 
-                          title={`Period ${i + 1}`}
-                          style={{ 
-                            flex: 1, 
-                            height: `${h / 2}%`, 
-                            backgroundColor: i % 4 === 2 ? colors.accentRed : colors.accentGreen, 
-                            borderRadius: '3px 3px 0 0',
-                            opacity: 0.85
-                          }} 
-                        />
-                      ))}
+                    {/* Dynamic Real-Time Cumulative Equity SVG Curve */}
+                    <div style={{ width: '100%', minHeight: '130px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', position: 'relative' }}>
+                      {filteredTrades.length === 0 ? (
+                        <div style={{ 
+                          height: '110px', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          border: `1px dashed ${colors.borderColor}`,
+                          borderRadius: '8px',
+                          backgroundColor: colors.bgInner,
+                          color: colors.textMuted,
+                          fontSize: '12px',
+                          gap: '6px'
+                        }}>
+                          <TrendingUp size={20} color={colors.textMuted} />
+                          <span>No {marketSegment} trades logged in this timeframe.</span>
+                          <button 
+                            onClick={() => {
+                              setNewTradeForm(prev => ({
+                                ...prev,
+                                market_segment: marketSegment,
+                                symbol: MARKET_CONFIGS[marketSegment]?.suggestions[0] || 'NIFTY 24500 CE'
+                              }));
+                              setShowNewTradeModal(true);
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#2563eb',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Log your first {marketSegment} trade →
+                          </button>
+                        </div>
+                      ) : (
+                        (() => {
+                          const sorted = [...filteredTrades].sort((a, b) => new Date(a.trade_date || 0) - new Date(b.trade_date || 0));
+                          let runCum = 0;
+                          const points = [{ xLabel: 'Start', cum: 0, change: 0, date: sorted[0]?.trade_date || todayStr, symbol: 'Start' }];
+                          
+                          sorted.forEach((t, i) => {
+                            const pnl = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+                            runCum += pnl;
+                            points.push({
+                              xLabel: `#${i + 1}`,
+                              cum: runCum,
+                              change: pnl,
+                              date: t.trade_date || todayStr,
+                              symbol: t.symbol
+                            });
+                          });
+
+                          const cumValues = points.map(p => p.cum);
+                          const minVal = Math.min(0, ...cumValues);
+                          const maxVal = Math.max(0, ...cumValues);
+                          const rawSpan = maxVal - minVal || 100;
+                          const span = rawSpan * 1.25;
+                          const topBound = maxVal + (span - rawSpan) * 0.5;
+
+                          const svgW = 560;
+                          const svgH = 110;
+                          const padX = 20;
+                          const padY = 14;
+
+                          const zeroY = padY + ((topBound - 0) / span) * (svgH - padY * 2);
+
+                          const coords = points.map((p, i) => {
+                            const x = padX + (i / (points.length - 1 || 1)) * (svgW - padX * 2);
+                            const y = padY + ((topBound - p.cum) / span) * (svgH - padY * 2);
+                            return { ...p, x, y };
+                          });
+
+                          const lineD = coords.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
+                          const areaD = `${lineD} L ${coords[coords.length - 1].x} ${zeroY} L ${coords[0].x} ${zeroY} Z`;
+                          const isProfitable = runCum >= 0;
+                          const strokeColor = isProfitable ? colors.accentGreen : colors.accentRed;
+
+                          return (
+                            <div style={{ width: '100%', position: 'relative' }}>
+                              <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%', height: '105px', overflow: 'visible' }}>
+                                <defs>
+                                  <linearGradient id="cumPnlGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor={strokeColor} stopOpacity="0.35" />
+                                    <stop offset="100%" stopColor={strokeColor} stopOpacity="0.0" />
+                                  </linearGradient>
+                                </defs>
+
+                                {/* Zero Baseline */}
+                                <line x1={padX} y1={zeroY} x2={svgW - padX} y2={zeroY} stroke={colors.borderColor} strokeDasharray="3 3" strokeWidth="1.5" />
+
+                                {/* Area Glow */}
+                                <path d={areaD} fill="url(#cumPnlGradient)" />
+
+                                {/* Stroke Curve */}
+                                <path d={lineD} fill="none" stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                                {/* Interactive Data Point Dots */}
+                                {coords.map((p, i) => (
+                                  <g key={i} style={{ cursor: 'pointer' }}>
+                                    <circle
+                                      cx={p.x}
+                                      cy={p.y}
+                                      r={coords.length > 25 ? 2.5 : 4.5}
+                                      fill={p.cum >= 0 ? colors.accentGreen : colors.accentRed}
+                                      stroke={colors.bgCard}
+                                      strokeWidth="2"
+                                    />
+                                    <title>{`${p.symbol}: ${formatMoney(p.change, marketSegment)}\nCumulative: ${formatMoney(p.cum, marketSegment)}\nDate: ${p.date}`}</title>
+                                  </g>
+                                ))}
+                              </svg>
+
+                              {/* X-Axis Timeline Labels */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.textMuted, marginTop: '2px', padding: '0 4px' }}>
+                                <span>{coords[0]?.date || 'Start'}</span>
+                                {coords.length > 2 && <span>{coords[Math.floor(coords.length / 2)]?.date}</span>}
+                                <span>{coords[coords.length - 1]?.date || 'Latest'}</span>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1788,7 +1996,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '13px', fontWeight: '800', color: colors.accentGreen }}>
-                            +₹{Number(trade.net_pnl || trade.realized_pnl).toLocaleString('en-IN')}
+                            {formatMoney(Number(trade.net_pnl !== undefined ? trade.net_pnl : trade.realized_pnl))}
                           </span>
                           <button
                             onClick={() => setSelectedTradeForShare(trade)}
@@ -2106,7 +2314,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
               </div>
 
               {/* TRADES LIST */}
-              {allTrades.length === 0 ? (
+              {filteredTrades.length === 0 ? (
                 <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, boxShadow: colors.cardShadow }}>
                   No trades logged yet. Click "+ Add Trade" or trade in the Paper Trading terminal!
                 </div>
@@ -2115,8 +2323,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                   {/* MOBILE CARD VIEW FOR SMARTPHONES */}
                   {isMobile ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {allTrades
-                        .filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
+                      {filteredTrades.filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
                         .filter(t => tradeSideFilter === 'ALL' || t.trade_type === tradeSideFilter)
                         .map((t, idx) => {
                           const net = Number(t.net_pnl || t.realized_pnl || 0);
@@ -2152,7 +2359,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontSize: '14px', fontWeight: '800', color: isWin ? colors.accentGreen : colors.accentRed }}>
-                                    {isWin ? '+' : ''}₹{net.toLocaleString('en-IN')}
+                                    {formatMoney(net, t.market_segment || marketSegment)}
                                   </span>
                                   <button
                                     onClick={() => setSelectedTradeForShare(t)}
@@ -2203,8 +2410,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                             </tr>
                           </thead>
                           <tbody>
-                            {allTrades
-                              .filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
+                            {filteredTrades.filter(t => !tradeSearch || t.symbol.toLowerCase().includes(tradeSearch.toLowerCase()))
                               .filter(t => tradeSideFilter === 'ALL' || t.trade_type === tradeSideFilter)
                               .map((t, idx) => {
                                 const net = Number(t.net_pnl || t.realized_pnl || 0);
@@ -2233,7 +2439,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                                       {isWin ? '+' : ''}₹{Number(t.realized_pnl || 0).toLocaleString('en-IN')}
                                     </td>
                                     <td style={{ padding: '10px 14px', color: isWin ? colors.accentGreen : colors.accentRed, fontWeight: '800' }}>
-                                      {isWin ? '+' : ''}₹{net.toLocaleString('en-IN')}
+                                      {formatMoney(net, t.market_segment || marketSegment)}
                                     </td>
                                     <td style={{ padding: '10px 14px' }}>
                                       <span style={{ padding: '2px 8px', borderRadius: '12px', backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, fontSize: '10px', color: colors.accentBlueLight }}>
@@ -3169,7 +3375,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       {/* 1. LOG NEW TRADE MODAL */}
       {showNewTradeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '540px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
                 <Plus size={18} color="#2563eb" /> Log New Trade
@@ -3179,65 +3385,282 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
               </button>
             </div>
 
-            <form onSubmit={handleSaveNewTrade} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Symbol / Instrument</label>
-                  <input type="text" required placeholder="e.g. NIFTY 24500 CE or RELIANCE" value={newTradeForm.symbol} onChange={(e) => setNewTradeForm({ ...newTradeForm, symbol: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Side</label>
-                  <select value={newTradeForm.trade_type} onChange={(e) => setNewTradeForm({ ...newTradeForm, trade_type: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
-                    <option value="BUY">BUY</option>
-                    <option value="SELL">SELL</option>
-                  </select>
-                </div>
+            {/* Market Segment Selector Tabs */}
+            <div>
+              <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                Select Market Segment
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                {Object.entries(MARKET_CONFIGS).map(([key, cfg]) => {
+                  const isSelected = (newTradeForm.market_segment || 'Indian') === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setNewTradeForm(prev => ({
+                          ...prev,
+                          market_segment: key,
+                          symbol: cfg.suggestions[0] || '',
+                          quantity: cfg.defaultQty,
+                          charges: cfg.defaultCharges.toString()
+                        }));
+                      }}
+                      style={{
+                        padding: '8px 4px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        borderRadius: '8px',
+                        border: `1px solid ${isSelected ? '#2563eb' : colors.borderColor}`,
+                        backgroundColor: isSelected ? (isLight ? 'rgba(37, 99, 235, 0.12)' : 'rgba(37, 99, 235, 0.25)') : colors.bgInner,
+                        color: isSelected ? colors.accentBlueLight : colors.textSecondary,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <span style={{ fontSize: '14px' }}>{cfg.flag}</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{key}</span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Entry Price (₹)</label>
-                  <input type="number" step="0.05" inputMode="decimal" required placeholder="0.00" value={newTradeForm.entry_price} onChange={(e) => setNewTradeForm({ ...newTradeForm, entry_price: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Exit Price (₹)</label>
-                  <input type="number" step="0.05" inputMode="decimal" required placeholder="0.00" value={newTradeForm.exit_price} onChange={(e) => setNewTradeForm({ ...newTradeForm, exit_price: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
-                </div>
-                <div style={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Quantity</label>
-                  <input type="number" inputMode="numeric" required value={newTradeForm.quantity} onChange={(e) => setNewTradeForm({ ...newTradeForm, quantity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} />
-                </div>
-              </div>
+            {/* Form Fields */}
+            {(() => {
+              const activeMarket = newTradeForm.market_segment || marketSegment || 'Indian';
+              const activeCfg = MARKET_CONFIGS[activeMarket] || MARKET_CONFIGS.Indian;
+              const activeSym = activeCfg.currency;
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Strategy</label>
-                  <select value={newTradeForm.strategy} onChange={(e) => setNewTradeForm({ ...newTradeForm, strategy: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
-                    {STRATEGY_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Mindset / Emotion</label>
-                  <select value={newTradeForm.emotion} onChange={(e) => setNewTradeForm({ ...newTradeForm, emotion: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}>
-                    {EMOTION_TAGS.map(em => <option key={em} value={em}>{em}</option>)}
-                  </select>
-                </div>
-              </div>
+              return (
+                <form onSubmit={handleSaveNewTrade} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Symbol & Side */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                        Symbol / Instrument ({activeMarket})
+                      </label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder={activeCfg.suggestions[0]} 
+                        value={newTradeForm.symbol} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, symbol: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                      {/* Quick Symbol Suggestions Chips */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                        {activeCfg.suggestions.slice(0, 5).map(s => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setNewTradeForm({ ...newTradeForm, symbol: s })}
+                            style={{
+                              padding: '2px 7px',
+                              fontSize: '10px',
+                              fontWeight: '600',
+                              borderRadius: '12px',
+                              backgroundColor: newTradeForm.symbol === s ? '#2563eb' : colors.bgInner,
+                              color: newTradeForm.symbol === s ? '#ffffff' : colors.textSecondary,
+                              border: `1px solid ${colors.borderColor}`,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Side</label>
+                      <select 
+                        value={newTradeForm.trade_type} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, trade_type: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}
+                      >
+                        <option value="BUY">BUY / LONG</option>
+                        <option value="SELL">SELL / SHORT</option>
+                      </select>
+                    </div>
+                  </div>
 
-              <div>
-                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Trade Notes & Reflections</label>
-                <textarea rows={2} value={newTradeForm.notes} onChange={(e) => setNewTradeForm({ ...newTradeForm, notes: e.target.value })} placeholder="Why did you take this trade? Any lessons learned?" style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
-              </div>
+                  {/* Price & Quantity Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                        Entry Price ({activeSym})
+                      </label>
+                      <input 
+                        type="number" 
+                        step={activeCfg.priceStep} 
+                        inputMode="decimal" 
+                        required 
+                        placeholder="0.00" 
+                        value={newTradeForm.entry_price} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, entry_price: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                        Exit Price ({activeSym})
+                      </label>
+                      <input 
+                        type="number" 
+                        step={activeCfg.priceStep} 
+                        inputMode="decimal" 
+                        required 
+                        placeholder="0.00" 
+                        value={newTradeForm.exit_price} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, exit_price: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                    </div>
+                    <div style={{ gridColumn: isMobile ? '1 / -1' : 'auto' }}>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                        {activeCfg.qtyLabel}
+                      </label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        inputMode="decimal" 
+                        required 
+                        placeholder={activeCfg.qtyPlaceholder}
+                        value={newTradeForm.quantity} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, quantity: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                    </div>
+                  </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                <button type="button" onClick={() => setShowNewTradeModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer' }}>
-                  Save Trade Log
-                </button>
-              </div>
-            </form>
+                  {/* Charges & Date Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                        Brokerage & Charges ({activeSym})
+                      </label>
+                      <input 
+                        type="number" 
+                        step="any" 
+                        value={newTradeForm.charges} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, charges: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Trade Date</label>
+                      <input 
+                        type="date" 
+                        value={newTradeForm.trade_date} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, trade_date: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Strategy & Mindset */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Strategy</label>
+                      <select 
+                        value={newTradeForm.strategy} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, strategy: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}
+                      >
+                        {STRATEGY_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Mindset / Emotion</label>
+                      <select 
+                        value={newTradeForm.emotion} 
+                        onChange={(e) => setNewTradeForm({ ...newTradeForm, emotion: e.target.value })} 
+                        style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '13px', marginTop: '3px', outline: 'none' }}
+                      >
+                        {EMOTION_TAGS.map(em => <option key={em} value={em}>{em}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Trade Notes & Lessons Learned</label>
+                    <textarea 
+                      rows={2} 
+                      value={newTradeForm.notes} 
+                      onChange={(e) => setNewTradeForm({ ...newTradeForm, notes: e.target.value })} 
+                      placeholder="Why did you take this trade? Any lessons learned?" 
+                      style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} 
+                    />
+                  </div>
+
+                  {/* Live Calculated P&L Preview Banner */}
+                  {(() => {
+                    const entry = parseFloat(newTradeForm.entry_price);
+                    const exit = parseFloat(newTradeForm.exit_price);
+                    const qty = parseFloat(newTradeForm.quantity);
+                    const chg = parseFloat(newTradeForm.charges) || 0;
+
+                    if (!isNaN(entry) && !isNaN(exit) && !isNaN(qty) && qty > 0) {
+                      const gross = newTradeForm.trade_type === 'BUY' ? (exit - entry) * qty : (entry - exit) * qty;
+                      const net = gross - chg;
+                      const isWin = net >= 0;
+
+                      return (
+                        <div style={{
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          backgroundColor: isWin ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          border: `1px solid ${isWin ? colors.accentGreen : colors.accentRed}`,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '10px', color: colors.textSecondary, textTransform: 'uppercase', fontWeight: '800' }}>
+                              Calculated P&L Preview ({activeMarket})
+                            </div>
+                            <div style={{ fontSize: '11px', color: colors.textSecondary, marginTop: '2px' }}>
+                              Gross: {gross >= 0 ? '+' : ''}{activeSym}{gross.toFixed(2)} • Charges: {activeSym}{chg.toFixed(2)}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '16px', fontWeight: '800', color: isWin ? colors.accentGreen : colors.accentRed }}>
+                              {net >= 0 ? '+' : ''}{activeSym}{net.toFixed(2)}
+                            </div>
+                            <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', backgroundColor: isWin ? colors.accentGreen : colors.accentRed, color: '#ffffff' }}>
+                              {isWin ? 'WIN' : 'LOSS'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowNewTradeModal(false)} 
+                      style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '8px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 2px 10px rgba(37, 99, 235, 0.4)' }}
+                    >
+                      Save Trade Log
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
           </div>
         </div>
       )}
