@@ -213,7 +213,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   };
   if (showProfile) {
     return (
-      <div style={{ padding: '24px', animation: 'fadeIn 0.3s ease-out', maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+      <div style={{ padding: isMobile ? '16px 12px' : '24px 28px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
         <button 
           className="btn btn-secondary" 
           onClick={() => setShowProfile(false)} 
@@ -227,7 +227,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   }
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '16px 12px 70px 12px' : '32px', overflowY: 'auto', background: 'var(--bg-dark)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ flex: 1, padding: isMobile ? '16px 12px 70px 12px' : '24px 28px 60px 28px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
@@ -292,22 +292,21 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       </div>
 
       {/* Add Funds Banner */}
-      {/* Add Funds Banner */}
-      <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
+      <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px', marginBottom: '36px', borderLeft: '4px solid var(--color-blue)', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '800', color: 'var(--color-blue-light)', flexShrink: 0 }}>
             ₹
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Get ready to invest</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Get ready to invest</div>
             <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Edge</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: 'var(--text-primary)', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '280px' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s' }}>
             DEPOSIT
           </button>
-          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.15s' }}>
             RESET ACCOUNT
           </button>
         </div>
