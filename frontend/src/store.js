@@ -941,18 +941,23 @@ export const useStore = create(persist((set, get) => ({
   
   updateBankDetails: async (details) => {
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API}/api/user/bank_details`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(details),
         credentials: 'include'
       });
       const data = await res.json();
       if (res.ok) {
         set({ user: { ...get().user, ...details } });
+        if (get().fetchUserData) get().fetchUserData();
         return data;
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to save bank details');
       }
     } catch(err) {
       throw err;
@@ -961,17 +966,22 @@ export const useStore = create(persist((set, get) => ({
 
   requestWithdrawal: async (amount) => {
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch(`${API}/api/withdrawals/request`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ amount }),
         credentials: 'include'
       });
       const data = await res.json();
       if (res.ok) {
+        if (get().fetchUserData) get().fetchUserData();
         return data;
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Withdrawal request failed');
       }
     } catch(err) {
       throw err;

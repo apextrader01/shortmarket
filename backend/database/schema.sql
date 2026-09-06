@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
     aadhar_number TEXT,
     kyc_pan_url TEXT,
     kyc_aadhar_url TEXT,
+    upi_id TEXT,
+    bank_account_no TEXT,
+    bank_ifsc TEXT,
     is_admin BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -84,3 +87,15 @@ CREATE TABLE IF NOT EXISTS deposit_requests (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS reward_withdrawals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'PROCESSING', 'CREDITED', 'REJECTED')),
+    admin_notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);
+

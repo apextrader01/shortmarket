@@ -49,6 +49,9 @@ async function initSchema() {
         table.boolean('is_admin').defaultTo(false);
         table.string('subscription_tier').defaultTo('BASIC');
         table.datetime('subscription_expires');
+        table.string('upi_id');
+        table.string('bank_account_no');
+        table.string('bank_ifsc');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -84,6 +87,17 @@ async function initSchema() {
         });
         console.log('Added client details and KYC columns to users table');
       }
+
+      const hasBankDetails = await db.schema.hasColumn('users', 'upi_id');
+      if (!hasBankDetails) {
+        await db.schema.alterTable('users', table => {
+          table.string('upi_id');
+          table.string('bank_account_no');
+          table.string('bank_ifsc');
+        });
+        console.log('Added Bank & UPI columns to users table');
+      }
+
       const hasIsAdmin = await db.schema.hasColumn('users', 'is_admin');
       if (!hasIsAdmin) {
         await db.schema.alterTable('users', table => {
@@ -520,6 +534,25 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_loss DECIMAL(14,2)');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS risk_guardian_active BOOLEAN DEFAULT false');
+
+    // Bank & UPI details columns for users
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id VARCHAR(255)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(255)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(50)');
+
+    // Ensure reward_withdrawals table always exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS reward_withdrawals (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'PENDING',
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_reward_withdrawals_user_id ON reward_withdrawals(user_id)');
 
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
