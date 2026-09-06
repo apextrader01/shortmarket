@@ -373,6 +373,32 @@ export default function SettingsView() {
 
 export function BiometricSettingsSection({ user }) {
   const userId = user?.id || 'default';
+  const { 
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession
+  } = useStore(useShallow(state => ({ 
+    userSessions: state.userSessions || [],
+    userSessionsLoading: state.userSessionsLoading,
+    fetchUserSessions: state.fetchUserSessions,
+    revokeOtherSessions: state.revokeOtherSessions,
+    revokeSession: state.revokeSession
+  })));
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (fetchUserSessions) {
+      fetchUserSessions();
+    }
+  }, []);
+
   const [pinEnabled, setPinEnabled] = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioAvailable, setBioAvailable] = useState(false);
