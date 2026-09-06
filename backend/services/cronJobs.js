@@ -267,6 +267,18 @@ function initCronJobs(priceCache, triggerEngine) {
             console.error('[CRON] Watchlist cleanup error:', err);
         }
     }, TZ);
+
+    // --- 5:00 PM (17:00 IST) Daily Options, Futures Master & Lot Sizes Refresh ---
+    cron.schedule('0 17 * * *', async () => {
+        console.log('[CRON] ⏰ 5:00 PM: Running scheduled daily Options & Futures Master + Lotsize Update...');
+        try {
+            const { updateOptionsMaster } = require('../database/updateOptionsMaster');
+            await updateOptionsMaster();
+            console.log('[CRON] 5:00 PM: Options & Lotsize master sync successfully completed.');
+        } catch (err) {
+            console.error('[CRON] 5:00 PM Options & Lotsize sync error:', err);
+        }
+    }, TZ);
 }
 
 module.exports = { initCronJobs, isIntradayBlocked: () => isIntradayBlocked };

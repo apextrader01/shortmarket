@@ -5630,14 +5630,23 @@ server.listen(PORT, async () => {
       } catch(e) { console.error('Backup auto-login cron error:', e); }
     });
 
-    // Automated Options & Futures Master Download daily at 08:15 AM IST (Mon-Sun)
-    const optionsRule = new schedule.RecurrenceRule();
-    optionsRule.hour = 8;
-    optionsRule.minute = 15;
-    optionsRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(optionsRule, async () => {
-      console.log('Daily 8:15 AM Cron: Updating Options & Futures Master...');
-      await updateOptionsMaster().catch(e => console.error(e));
+    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM & 05:00 PM (17:00 IST)
+    const optionsMorningRule = new schedule.RecurrenceRule();
+    optionsMorningRule.hour = 8;
+    optionsMorningRule.minute = 15;
+    optionsMorningRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(optionsMorningRule, async () => {
+      console.log('⏰ Daily 8:15 AM Cron: Updating Options & Futures Master & Lot Sizes...');
+      await updateOptionsMaster().catch(e => console.error('Morning updateOptionsMaster error:', e));
+    });
+
+    const optionsEveningRule = new schedule.RecurrenceRule();
+    optionsEveningRule.hour = 17; // 5:00 PM IST
+    optionsEveningRule.minute = 0;
+    optionsEveningRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(optionsEveningRule, async () => {
+      console.log('⏰ Daily 5:00 PM (17:00 IST) Evening Cron: Updating Options & Futures Master & Lot Sizes...');
+      await updateOptionsMaster().catch(e => console.error('Evening updateOptionsMaster error:', e));
     });
 
 

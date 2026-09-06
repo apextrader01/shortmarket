@@ -134,6 +134,7 @@ try {
 }
 
 module.exports = {
+    initializeCache,
     getLotSizes,
     getAllStocks,
     searchInstruments
