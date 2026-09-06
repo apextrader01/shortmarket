@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Plus } from 'lucide-react';
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -30,16 +30,9 @@ function extractOptionStrike(symbol) {
   return 0;
 }
 
-const POPULAR_UNDERLYINGS = [
-  { label: 'NIFTY', symbol: 'NIFTY', exch: 'NSE', indexKey: 'NSE:NIFTY50-INDEX', step: 50 },
-  { label: 'BANKNIFTY', symbol: 'BANKNIFTY', exch: 'NSE', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100 },
-  { label: 'FINNIFTY', symbol: 'FINNIFTY', exch: 'NSE', indexKey: 'NSE:FINNIFTY-INDEX', step: 50 },
-  { label: 'SENSEX', symbol: 'SENSEX', exch: 'BSE', indexKey: 'BSE:SENSEX-INDEX', step: 100 },
-  { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', exch: 'NSE', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25 },
-  { label: 'RELIANCE', symbol: 'RELIANCE', exch: 'NSE', indexKey: 'NSE:RELIANCE-EQ', step: 20 },
-  { label: 'TCS', symbol: 'TCS', exch: 'NSE', indexKey: 'NSE:TCS-EQ', step: 20 },
-  { label: 'HDFCBANK', symbol: 'HDFCBANK', exch: 'NSE', indexKey: 'NSE:HDFCBANK-EQ', step: 20 }
-];
+const INDICES_LIST = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'MIDCPNIFTY', 'BANKEX'];
+const MCX_LIST = ['CRUDEOIL', 'NATURALGAS', 'GOLD', 'SILVER', 'COPPER', 'ZINC', 'ALUMINIUM', 'LEAD'];
+const POPULAR_STOCKS_LIST = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN', 'ICICIBANK', 'TATAMOTORS', 'BAJFINANCE', 'BHARTIARTL', 'ITC', 'KOTAKBANK', 'LT', 'AXISBANK'];
 
 export default function BasketModal() {
   const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
@@ -51,6 +44,59 @@ export default function BasketModal() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
+
+  const [underlyingCategory, setUnderlyingCategory] = useState('ALL'); // 'ALL' | 'INDICES' | 'MCX' | 'STOCKS'
+  const [underlyingSearch, setUnderlyingSearch] = useState('');
+  const [showUnderlyingDropdown, setShowUnderlyingDropdown] = useState(false);
+  const [allAvailableUnderlyings, setAllAvailableUnderlyings] = useState([]);
+  const underlyingDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (underlyingDropdownRef.current && !underlyingDropdownRef.current.contains(e.target)) {
+        setShowUnderlyingDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      try {
+        const res = await fetch(`${API}/api/options/symbols`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setAllAvailableUnderlyings(data);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch option symbols for BasketModal:', e);
+      }
+    };
+    fetchSymbols();
+  }, []);
+
+  // Auto-subscribe to spot/index feed for selected underlying
+  useEffect(() => {
+    if (!basketModalOpen) return;
+    const isMCX = MCX_LIST.includes(selectedUnderlying) || isCommodityContract(selectedUnderlying);
+    const isBSE = selectedUnderlying === 'SENSEX' || selectedUnderlying === 'BANKEX';
+    let key = null;
+    if (selectedUnderlying === 'NIFTY') key = 'NSE:NIFTY50-INDEX';
+    else if (selectedUnderlying === 'BANKNIFTY') key = 'NSE:NIFTYBANK-INDEX';
+    else if (selectedUnderlying === 'FINNIFTY') key = 'NSE:FINNIFTY-INDEX';
+    else if (selectedUnderlying === 'SENSEX') key = 'BSE:SENSEX-INDEX';
+    else if (selectedUnderlying === 'MIDCPNIFTY') key = 'NSE:MIDCPNIFTY-INDEX';
+    else if (selectedUnderlying === 'BANKEX') key = 'BSE:BANKEX-INDEX';
+    else if (!isMCX) key = `${isBSE ? 'BSE' : 'NSE'}:${selectedUnderlying}-EQ`;
+    
+    if (key) {
+      useStore.getState().subscribeToSymbol?.(key);
+      useStore.getState().fetchBatchPrices?.([key]);
+    }
+  }, [basketModalOpen, selectedUnderlying]);
 
   // Auto-subscribe to socket feed and fetch batch prices whenever basket opens or items change
   useEffect(() => {
@@ -290,31 +336,98 @@ export default function BasketModal() {
     }
   };
 
+  const getUnderlyingType = (sym) => {
+    if (INDICES_LIST.includes(sym)) return 'INDEX';
+    if (MCX_LIST.includes(sym) || isCommodityContract(sym)) return 'MCX';
+    return 'STOCK';
+  };
+
+  const getPillsForCategory = () => {
+    if (underlyingCategory === 'INDICES') return INDICES_LIST;
+    if (underlyingCategory === 'MCX') return MCX_LIST;
+    if (underlyingCategory === 'STOCKS') return POPULAR_STOCKS_LIST;
+    return ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'CRUDEOIL', 'NATURALGAS', 'GOLD', 'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN'];
+  };
+
+  const masterList = allAvailableUnderlyings.length > 0 
+    ? allAvailableUnderlyings 
+    : Array.from(new Set([...INDICES_LIST, ...MCX_LIST, ...POPULAR_STOCKS_LIST]));
+
+  const filteredUnderlyings = masterList.filter(sym => {
+    const matchesSearch = !underlyingSearch.trim() || sym.toLowerCase().includes(underlyingSearch.toLowerCase());
+    if (!matchesSearch) return false;
+    if (underlyingCategory === 'INDICES') return INDICES_LIST.includes(sym);
+    if (underlyingCategory === 'MCX') return MCX_LIST.includes(sym) || isCommodityContract(sym);
+    if (underlyingCategory === 'STOCKS') return !INDICES_LIST.includes(sym) && !MCX_LIST.includes(sym) && !isCommodityContract(sym);
+    return true;
+  });
+
   const applyPreset = (type, customUnderlying = null) => {
     const targetUnderlying = customUnderlying || selectedUnderlying;
+    const isMCX = MCX_LIST.includes(targetUnderlying) || isCommodityContract(targetUnderlying);
     const isBSE = targetUnderlying === 'SENSEX' || targetUnderlying === 'BANKEX';
-    const defaultExch = isBSE ? 'BSE' : 'NSE';
-    const info = POPULAR_UNDERLYINGS.find(u => u.symbol === targetUnderlying) || {
-      symbol: targetUnderlying,
-      exch: defaultExch,
-      indexKey: `${defaultExch}:${targetUnderlying}-INDEX`,
-      step: 50
+    const exch = isMCX ? 'MCX' : (isBSE ? 'BSE' : 'NSE');
+
+    let indexKey = null;
+    if (targetUnderlying === 'NIFTY') indexKey = 'NSE:NIFTY50-INDEX';
+    else if (targetUnderlying === 'BANKNIFTY') indexKey = 'NSE:NIFTYBANK-INDEX';
+    else if (targetUnderlying === 'FINNIFTY') indexKey = 'NSE:FINNIFTY-INDEX';
+    else if (targetUnderlying === 'SENSEX') indexKey = 'BSE:SENSEX-INDEX';
+    else if (targetUnderlying === 'MIDCPNIFTY') indexKey = 'NSE:MIDCPNIFTY-INDEX';
+    else if (targetUnderlying === 'BANKEX') indexKey = 'BSE:BANKEX-INDEX';
+    else if (!isMCX) indexKey = `NSE:${targetUnderlying}-EQ`;
+
+    const liveSpot = (indexKey && prices[indexKey]?.ltp) || prices[`${exch}:${targetUnderlying}`]?.ltp || prices[`NSE:${targetUnderlying}`]?.ltp || prices[`BSE:${targetUnderlying}`]?.ltp || 0;
+
+    const fallbackSpots = {
+      'NIFTY': 24000,
+      'BANKNIFTY': 51500,
+      'FINNIFTY': 24000,
+      'SENSEX': 76500,
+      'MIDCPNIFTY': 12500,
+      'BANKEX': 57000,
+      'CRUDEOIL': 6500,
+      'NATURALGAS': 220,
+      'GOLD': 72000,
+      'SILVER': 85000,
+      'COPPER': 800,
+      'ZINC': 270,
+      'ALUMINIUM': 230,
+      'RELIANCE': 1450,
+      'TCS': 2300,
+      'HDFCBANK': 710,
+      'INFY': 1850,
+      'SBIN': 820,
+      'ICICIBANK': 1250,
+      'TATAMOTORS': 980
     };
 
-    const exch = info.exch || defaultExch;
-    const liveSpot = prices[info.indexKey]?.ltp || prices[`${exch}:${info.symbol}`]?.ltp || prices[`NSE:${info.symbol}`]?.ltp || prices[`BSE:${info.symbol}`]?.ltp;
-    const defaultSpot = info.symbol === 'BANKNIFTY' ? 51500 : (info.symbol === 'SENSEX' ? 76500 : (info.symbol === 'FINNIFTY' ? 24000 : (info.symbol === 'RELIANCE' ? 1450 : (info.symbol === 'TCS' ? 2300 : (info.symbol === 'HDFCBANK' ? 710 : 24400)))));
-    const spotPrice = liveSpot || defaultSpot;
+    const spotPrice = liveSpot > 0 ? liveSpot : (fallbackSpots[targetUnderlying] || 1000);
 
-    const step = info.step || 50;
+    let step = 50;
+    if (targetUnderlying === 'BANKNIFTY' || targetUnderlying === 'SENSEX' || targetUnderlying === 'BANKEX') step = 100;
+    else if (targetUnderlying === 'MIDCPNIFTY') step = 25;
+    else if (targetUnderlying === 'NIFTY' || targetUnderlying === 'FINNIFTY' || targetUnderlying === 'CRUDEOIL') step = 50;
+    else if (targetUnderlying === 'NATURALGAS') step = 5;
+    else if (targetUnderlying === 'GOLD') step = 100;
+    else if (targetUnderlying === 'SILVER') step = 250;
+    else if (targetUnderlying === 'COPPER' || targetUnderlying === 'ZINC' || targetUnderlying === 'ALUMINIUM') step = 5;
+    else {
+      if (spotPrice > 3000) step = 50;
+      else if (spotPrice > 1500) step = 20;
+      else if (spotPrice > 500) step = 10;
+      else if (spotPrice > 200) step = 5;
+      else step = 2.5;
+    }
+
     const roundedStrike = Math.round(spotPrice / step) * step;
-    const lotsize = getInstantLotsize(info.symbol) || 1;
+    const lotsize = getInstantLotsize(targetUnderlying) || 1;
 
     const now = new Date();
     const yr = String(now.getFullYear()).slice(-2);
     const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const mo = months[now.getMonth()];
-    const symPrefix = `${exch}:${info.symbol}${yr}${mo}`;
+    const symPrefix = `${exch}:${targetUnderlying}${yr}${mo}`;
 
     let newItems = [];
     if (type === 'BULL_CALL_SPREAD') {
@@ -376,35 +489,155 @@ export default function BasketModal() {
           <button onClick={() => setBasketModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
-        {/* Underlying Asset Selector Bar */}
-        <div style={{ padding: '8px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap', marginRight: '4px' }}>UNDERLYING:</span>
-          {POPULAR_UNDERLYINGS.map(u => {
-            const isSel = selectedUnderlying === u.symbol;
-            return (
-              <button
-                key={u.symbol}
-                type="button"
-                onClick={() => {
-                  setSelectedUnderlying(u.symbol);
-                }}
-                style={{
-                  padding: '3px 9px',
-                  borderRadius: '12px',
-                  background: isSel ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
-                  border: isSel ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
-                  color: isSel ? '#fff' : 'var(--text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: isSel ? '700' : '500',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
+        {/* Underlying Asset Filter & Search Bar */}
+        <div style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          
+          {/* Controls Header: Category Tabs + Search Input */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            
+            {/* Category Tabs */}
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+              {['ALL', 'INDICES', 'MCX', 'STOCKS'].map(cat => {
+                const isActive = underlyingCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setUnderlyingCategory(cat)}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '4px',
+                      background: isActive ? 'var(--color-blue)' : 'transparent',
+                      color: isActive ? '#fff' : 'var(--text-secondary)',
+                      border: 'none',
+                      fontSize: '10.5px',
+                      fontWeight: isActive ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Underlying Dropdown Box */}
+            <div ref={underlyingDropdownRef} style={{ position: 'relative', flex: 1, minWidth: '220px', maxWidth: '300px' }}>
+              <div 
+                onClick={() => setShowUnderlyingDropdown(true)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: '6px', 
+                  background: 'var(--bg-panel)', border: '1px solid var(--border-color)', 
+                  borderRadius: '6px', padding: '4px 10px', cursor: 'text' 
                 }}
               >
-                {u.label}
-              </button>
-            );
-          })}
+                <Search size={13} color="var(--text-secondary)" />
+                <input 
+                  type="text" 
+                  placeholder="Search all F&O / MCX..." 
+                  value={underlyingSearch} 
+                  onFocus={() => setShowUnderlyingDropdown(true)}
+                  onChange={e => {
+                    setUnderlyingSearch(e.target.value);
+                    setShowUnderlyingDropdown(true);
+                  }}
+                  style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '11.5px', outline: 'none', flex: 1 }}
+                />
+                {underlyingSearch && (
+                  <X size={13} color="var(--text-secondary)" style={{ cursor: 'pointer' }} onClick={() => setUnderlyingSearch('')} />
+                )}
+              </div>
+
+              {/* Floating Dropdown Results */}
+              {showUnderlyingDropdown && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  maxHeight: '220px', overflowY: 'auto',
+                  background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
+                  borderRadius: '6px', marginTop: '4px', zIndex: 100,
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.8)'
+                }}>
+                  {filteredUnderlyings.length > 0 ? (
+                    filteredUnderlyings.map(sym => {
+                      const type = getUnderlyingType(sym);
+                      const lot = getInstantLotsize(sym);
+                      const isSel = selectedUnderlying === sym;
+                      return (
+                        <div
+                          key={sym}
+                          onClick={() => {
+                            setSelectedUnderlying(sym);
+                            setShowUnderlyingDropdown(false);
+                            setUnderlyingSearch('');
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            background: isSel ? 'rgba(59,130,246,0.15)' : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'background 0.1s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                          onMouseLeave={e => e.currentTarget.style.background = isSel ? 'rgba(59,130,246,0.15)' : 'transparent'}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: isSel ? '#60a5fa' : '#fff' }}>{sym}</span>
+                            <span style={{ 
+                              fontSize: '9.5px', padding: '1px 5px', borderRadius: '3px', fontWeight: '700',
+                              background: type === 'INDEX' ? 'rgba(59,130,246,0.2)' : (type === 'MCX' ? 'rgba(245,158,11,0.2)' : 'rgba(168,85,247,0.2)'),
+                              color: type === 'INDEX' ? '#60a5fa' : (type === 'MCX' ? '#fbbf24' : '#c084fc')
+                            }}>
+                              {type}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Lot: {lot}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ padding: '12px', textAlign: 'center', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                      No matching underlyings found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Quick Selection Pills */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto', paddingBottom: '2px' }}>
+            <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap', marginRight: '2px' }}>QUICK SELECT:</span>
+            {getPillsForCategory().map(sym => {
+              const isSel = selectedUnderlying === sym;
+              return (
+                <button
+                  key={sym}
+                  type="button"
+                  onClick={() => setSelectedUnderlying(sym)}
+                  style={{
+                    padding: '3px 9px',
+                    borderRadius: '12px',
+                    background: isSel ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
+                    border: isSel ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                    color: isSel ? '#fff' : 'var(--text-secondary)',
+                    fontSize: '11px',
+                    fontWeight: isSel ? '700' : '500',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {sym}
+                </button>
+              );
+            })}
+          </div>
+
         </div>
 
         {/* 1-Click Strategy Presets Bar */}
