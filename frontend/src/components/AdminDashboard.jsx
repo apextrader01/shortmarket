@@ -4799,6 +4799,8 @@ export default function AdminDashboard() {
                   <div><span style={{ color: 'var(--text-secondary)' }}>Experience:</span> <span style={{ color: 'white' }}>{selectedUser.trading_experience || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Segment:</span> <span style={{ color: 'white' }}>{selectedUser.preferred_segment || 'N/A'}</span></div>
                   <div><span style={{ color: 'var(--text-secondary)' }}>Style:</span> <span style={{ color: 'white' }}>{selectedUser.trading_style || 'N/A'}</span></div>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Address:</span> <span style={{ color: 'white', fontWeight: '500' }}>{selectedUser.address || 'Not provided'}</span></div>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--text-secondary)' }}>Bank / UPI:</span> <span style={{ color: '#34d399', fontWeight: '600' }}>{selectedUser.upi_id || selectedUser.bank_account_no ? `${selectedUser.upi_id ? `UPI: ${selectedUser.upi_id}` : ''}${selectedUser.upi_id && selectedUser.bank_account_no ? ' | ' : ''}${selectedUser.bank_account_no ? `Bank A/C: ${selectedUser.bank_account_no} (${selectedUser.bank_ifsc || 'N/A'})` : ''}` : 'Not provided'}</span></div>
                 </div>
               </div>
 

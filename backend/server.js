@@ -1419,7 +1419,7 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
         'users.is_banned', 'users.phone', 'users.pan_card', 'users.aadhar_number',
         'users.kyc_pan_url', 'users.kyc_aadhar_url', 'users.is_admin', 'users.created_at',
         'users.last_ip', 'users.registration_ip', 'users.device_model', 'users.os_name',
-        'users.browser_name',
+        'users.browser_name', 'users.address', 'users.upi_id', 'users.bank_account_no', 'users.bank_ifsc',
         'users.city as ip_city', 'users.state as ip_state',
         'user_profiles.dob', 'user_profiles.gender',
         'user_profiles.state as onboarding_state', 'user_profiles.city as onboarding_city',
