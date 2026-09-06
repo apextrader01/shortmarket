@@ -4,6 +4,7 @@ import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { calculateOrderMargin } from '../utils/marginCalculator';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
@@ -122,62 +123,21 @@ export default function OrderModal() {
     return () => clearTimeout(timer);
   }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
 
-  const isFuture = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
-  const leverageMultiplier = (productType === 'INT' && !isOption && !isFuture) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
-  
-  let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
-  
-  if (isOption && !isBuy) {
-    // Extract strike price robustly. Broker symbols often look like NIFTY30JUN2623900PE
-    // This regex looks for a 3-letter month and 2-digit year before the strike digits.
-    const cleanSymbol = symbol.split('-')[0];
-    let optionStrike = 0;
-    const robustMatch = cleanSymbol.match(/(?:\d{2}[A-Z]{3}|\d{2}[1-9A-Z]\d{2})(\d+)(?:CE|PE)$/i);
-    if (robustMatch) {
-      optionStrike = parseFloat(robustMatch[1]);
-    } else {
-      const strikeMatch = cleanSymbol.match(/(\d+)(CE|PE)$/i);
-      if (strikeMatch) {
-         let rawStrikeStr = strikeMatch[1];
-         if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
-         optionStrike = parseFloat(rawStrikeStr);
-      }
-    }
-    // Index vs Stock differentiation
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
-    
-    // 10% (10x leverage) for Index Options, 20% (5x leverage) for highly volatile Stock Options
-    const marginRate = isIndex ? 0.10 : 0.20; 
-    
-    if (optionStrike > 0) {
-      const grossMargin = optionStrike * totalQuantity * marginRate;
-      // Subtract the premium you collect from the buyer (baseMargin holds the premium value initially)
-      baseMargin = Math.max(grossMargin - baseMargin, 0); 
-    } else {
-      // Fallback
-      baseMargin = totalQuantity * (isIndex ? 4000 : 8000);
-    }
-  } else if (isFuture) {
-    // Futures Margin Calculation (Symmetric for Buy and Sell)
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
-    const marginRate = isIndex ? 0.10 : 0.15; // 10% for Index Futures, 15% for Stock/Commodity Futures
-    baseMargin = baseMargin * marginRate;
-  }
+  const marginCalc = calculateOrderMargin({
+    symbol,
+    side,
+    quantity: totalQuantity,
+    price: orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0),
+    productType,
+    lotsize: orderModal.lotsize || 1,
+    isOption
+  });
 
-  // FIX: isTrueExit must compare against orderModal.type (not orderModal.side which doesn't exist)
-  // When true, the sell is an exit of an existing holding — no margin required
+  const isFuture = marginCalc.isFuture;
   const isTrueExit = orderModal.isExit && side === orderModal.type;
-  const requiredMargin = isTrueExit ? 0 : baseMargin * leverageMultiplier;
+  const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
   const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
-
-  let leverageText = '';
-  if (isOption) {
-      leverageText = isBuy ? '1x' : 'SPAN';
-  } else {
-      const totalValue = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
-      const effectiveLeverage = requiredMargin > 0 ? (totalValue / requiredMargin) : 1;
-      leverageText = `${Math.round(effectiveLeverage)}x`;
-  }
+  const leverageText = isTrueExit ? 'Exit' : marginCalc.leverageText;
 
   const isRestricted = restrictedStocks.includes(symbol);
   

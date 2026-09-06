@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -317,23 +318,22 @@ export default function BasketModal() {
   let totalBuyMargin = 0;
   let hedgedMargin = 0;
 
-  // 1. Calculate margin required for all buy legs (Standardized SPAN for Futures, 100% for Option Premium, 4x leverage for INT Stocks)
+  // 1. Calculate margin required for all buy legs (Standardized SPAN for Futures, 100% for Option Premium, 5x leverage for INT Stocks)
   buys.forEach(buy => {
     const price = buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0);
     const cleanSym = (buy.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const isFuture = buy.symbol.includes('FUT') || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => buy.symbol.includes(idx));
 
     if (buy.isOption) {
       // 100% upfront premium paid for Option Buys
       totalBuyMargin += (buy.totalQuantity * price);
     } else if (isFuture) {
-      // Futures Margin (Standardized SPAN: 10% for Index Futures, 15% for Stock/Commodity Futures)
-      const marginRate = isIndex ? 0.10 : 0.15;
+      // Futures Margin (Exact exchange SPAN + Exposure margin)
+      const marginRate = getFuturesMarginRate(buy.symbol);
       totalBuyMargin += (buy.totalQuantity * price * marginRate);
     } else {
-      // Cash Equity: 25% for Intraday (4x Leverage), 100% for Delivery
-      const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0;
+      // Cash Equity: 20% for Intraday (5x Leverage), 100% for Delivery
+      const leverageMultiplier = productType === 'INT' ? 0.20 : 1.0;
       totalBuyMargin += (buy.totalQuantity * price * leverageMultiplier);
     }
   });
@@ -363,26 +363,28 @@ export default function BasketModal() {
   unhedgedSells.forEach(sell => {
     if (sell.remainingQty <= 0) return;
 
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => sell.symbol.includes(idx));
+    const clean = (sell.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const isCommodity = sell.symbol.includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => clean.startsWith(c));
+    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY', 'MIDCAPNIFTY', 'NIFTYNXT50', 'BANKEX'].some(idx => clean.startsWith(idx));
     const price = sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0);
     const premium = sell.remainingQty * price;
     let baseMargin = 0;
 
     if (sell.isOption) {
-      const marginRate = isIndex ? 0.10 : 0.20; 
+      const sellMarginRate = isIndex ? 0.125 : (isCommodity ? 0.25 : 0.225);
       if (sell.optionStrike > 0) {
-        const grossMargin = sell.optionStrike * sell.remainingQty * marginRate;
-        baseMargin = Math.max(grossMargin - premium, 0); 
+        const grossMargin = sell.optionStrike * sell.remainingQty * sellMarginRate;
+        baseMargin = Math.max(grossMargin - premium, sell.remainingQty * (isIndex ? 40 : 80)); 
       } else {
-        baseMargin = sell.remainingQty * (isIndex ? 4000 : 8000);
+        baseMargin = sell.remainingQty * (isIndex ? 4500 : 9000);
       }
     } else if (sell.symbol.includes('FUT') || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(sell.symbol)) {
-      // Futures Margin (Symmetric 10% Index, 15% Stock)
-      const marginRate = isIndex ? 0.10 : 0.15;
+      // Futures Margin (Exact exchange SPAN + Exposure)
+      const marginRate = getFuturesMarginRate(sell.symbol);
       baseMargin = sell.remainingQty * price * marginRate;
     } else {
       // Equity Shorting
-      const leverageMultiplier = productType === 'INT' ? 0.25 : 1.0;
+      const leverageMultiplier = productType === 'INT' ? 0.20 : 1.0;
       baseMargin = sell.remainingQty * price * leverageMultiplier;
     }
     
