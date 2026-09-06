@@ -275,43 +275,69 @@ export default function BasketModal() {
     }
   };
 
-  const applyPreset = (type) => {
-    const atmPrice = prices['NSE:NIFTY50-INDEX']?.ltp || prices['NSE:NIFTY50']?.ltp || 24400;
-    const roundedStrike = Math.round(atmPrice / 50) * 50;
+  const POPULAR_UNDERLYINGS = [
+    { label: 'NIFTY', symbol: 'NIFTY', indexKey: 'NSE:NIFTY50-INDEX', step: 50, lotsize: 25 },
+    { label: 'BANKNIFTY', symbol: 'BANKNIFTY', indexKey: 'NSE:NIFTYBANK-INDEX', step: 100, lotsize: 15 },
+    { label: 'FINNIFTY', symbol: 'FINNIFTY', indexKey: 'NSE:FINNIFTY-INDEX', step: 50, lotsize: 25 },
+    { label: 'SENSEX', symbol: 'SENSEX', indexKey: 'BSE:SENSEX-INDEX', step: 100, lotsize: 10 },
+    { label: 'MIDCPNIFTY', symbol: 'MIDCPNIFTY', indexKey: 'NSE:MIDCPNIFTY-INDEX', step: 25, lotsize: 50 },
+    { label: 'RELIANCE', symbol: 'RELIANCE', indexKey: 'NSE:RELIANCE-EQ', step: 20, lotsize: 250 },
+    { label: 'TCS', symbol: 'TCS', indexKey: 'NSE:TCS-EQ', step: 20, lotsize: 175 },
+    { label: 'HDFCBANK', symbol: 'HDFCBANK', indexKey: 'NSE:HDFCBANK-EQ', step: 20, lotsize: 550 }
+  ];
+
+  const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
+
+  const applyPreset = (type, customUnderlying = null) => {
+    const targetUnderlying = customUnderlying || selectedUnderlying;
+    const info = POPULAR_UNDERLYINGS.find(u => u.symbol === targetUnderlying) || {
+      symbol: targetUnderlying,
+      indexKey: `NSE:${targetUnderlying}-EQ`,
+      step: 50,
+      lotsize: 25
+    };
+
+    const liveSpot = prices[info.indexKey]?.ltp || prices[`NSE:${info.symbol}`]?.ltp || prices[`BSE:${info.symbol}`]?.ltp;
+    const defaultSpot = info.symbol === 'BANKNIFTY' ? 51500 : (info.symbol === 'SENSEX' ? 76500 : (info.symbol === 'FINNIFTY' ? 24000 : (info.symbol === 'RELIANCE' ? 1450 : (info.symbol === 'TCS' ? 2300 : (info.symbol === 'HDFCBANK' ? 710 : 24400)))));
+    const spotPrice = liveSpot || defaultSpot;
+
+    const step = info.step || 50;
+    const roundedStrike = Math.round(spotPrice / step) * step;
+    const lotsize = info.lotsize || 25;
 
     const now = new Date();
     const yr = String(now.getFullYear()).slice(-2);
     const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const mo = months[now.getMonth()];
-    const symPrefix = `NSE:NIFTY${yr}${mo}`;
+    const symPrefix = `NSE:${info.symbol}${yr}${mo}`;
 
     let newItems = [];
     if (type === 'BULL_CALL_SPREAD') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'BEAR_PUT_SPREAD') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'STRADDLE') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'STRANGLE') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike + 150}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - 150}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike + (step * 3)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 3)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
       ];
     } else if (type === 'IRON_CONDOR') {
       newItems = [
-        { symbol: `${symPrefix}${roundedStrike + 200}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-        { symbol: `${symPrefix}${roundedStrike - 200}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+        { symbol: `${symPrefix}${roundedStrike + (step * 4)}CE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: 1, lotsize, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - (step * 4)}PE`, side: 'BUY', quantity: 1, lotsize, orderType: 'MARKET', price: '' }
       ];
     }
 
@@ -345,9 +371,40 @@ export default function BasketModal() {
           <button onClick={() => setBasketModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
+        {/* Underlying Asset Selector Bar */}
+        <div style={{ padding: '8px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap', marginRight: '4px' }}>UNDERLYING:</span>
+          {POPULAR_UNDERLYINGS.map(u => {
+            const isSel = selectedUnderlying === u.symbol;
+            return (
+              <button
+                key={u.symbol}
+                type="button"
+                onClick={() => {
+                  setSelectedUnderlying(u.symbol);
+                }}
+                style={{
+                  padding: '3px 9px',
+                  borderRadius: '12px',
+                  background: isSel ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
+                  border: isSel ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                  color: isSel ? '#fff' : 'var(--text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: isSel ? '700' : '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {u.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* 1-Click Strategy Presets Bar */}
-        <div style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap' }}>1-CLICK PRESETS:</span>
+        <div style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.015)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', alignItems: 'center', overflowX: 'auto' }}>
+          <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: '800', whiteSpace: 'nowrap' }}>⚡ {selectedUnderlying} PRESETS:</span>
           <button type="button" onClick={() => applyPreset('BULL_CALL_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐂 Bull Call Spread</button>
           <button type="button" onClick={() => applyPreset('BEAR_PUT_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐻 Bear Put Spread</button>
           <button type="button" onClick={() => applyPreset('STRADDLE')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>⚡ Straddle</button>
