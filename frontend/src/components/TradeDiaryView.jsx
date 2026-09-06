@@ -732,6 +732,12 @@ const [challengeDay, setChallengeDay] = useState(14);
   // Additional Institutional Modals & Sub-view States
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [selectedTutorialForPlayer, setSelectedTutorialForPlayer] = useState(null);
+  const [tutorialCategoryFilter, setTutorialCategoryFilter] = useState('ALL');
+  const [tutorialSearchQuery, setTutorialSearchQuery] = useState('');
+  const [completedTutorialIds, setCompletedTutorialIds] = useState([1, 2]);
+  const [activePlayerTab, setActivePlayerTab] = useState('TAKEAWAYS'); // TAKEAWAYS | CHEAT_SHEET | NOTES
+  const [tutorialNotes, setTutorialNotes] = useState({});
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [selectedCalendarSession, setSelectedCalendarSession] = useState(null);
   const [showStatementAuditModal, setShowStatementAuditModal] = useState(false);
   
@@ -8750,47 +8756,397 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
-          {/* 15. TUTORIALS SUB-VIEW                                         */}
+          {/* 15. TUTORIALS & MASTERCLASSES SUB-VIEW                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'TUTORIALS' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1050px', margin: '0 auto' }}>
-              <div>
-                <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Video size={20} color="#2563eb" /> Video Masterclasses & Playbooks
-                </h2>
-                <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Step-by-step institutional masterclasses on systematic journaling, breakout strategies, and risk.</p>
-              </div>
+          {activeTab === 'TUTORIALS' && (() => {
+            const masterclassesList = [
+              {
+                id: 1,
+                title: 'Trade Diary 101: Systematic Journaling for 2x Win Rate',
+                duration: '14 mins',
+                category: 'Journaling & Edge',
+                level: 'Foundational',
+                desc: 'How to tag setups, quantify your real edge, and eliminate unconscious cognitive leaks.',
+                takeaways: [
+                  'Log trade entry context, screenshot, and emotional state immediately upon order execution.',
+                  'Audit weekly profit factor by strategy tag to cut low-expectancy setups.',
+                  'Tag emotional impulses (FOMO, Revenge, Hesitation) to calculate exact rupee cost of indiscipline.'
+                ],
+                playbook: {
+                  setup: 'Systematic Journal Audit',
+                  entry: 'Pre-defined checklist score > 80%',
+                  stop: 'Hard stop in system, never mental',
+                  target: 'Minimum 1:2.0 Risk-to-Reward',
+                  winRate: '68% (with 0 revenge trades)'
+                }
+              },
+              {
+                id: 2,
+                title: 'The 1% Position Sizing Blueprint: Capital Defense',
+                duration: '18 mins',
+                category: 'Risk & Sizing',
+                level: 'Institutional',
+                desc: 'Mathematical formula to calculate maximum allowed quantity and survive losing streaks.',
+                takeaways: [
+                  'Never risk more than 1% to 2% of total capital on a single trading setup.',
+                  'Position Size = (Account Capital * Risk %) / (Entry Price - Stop Loss Price).',
+                  'Drawdown defense: Reduce size by 50% after 3 consecutive stop-losses.'
+                ],
+                playbook: {
+                  setup: 'Fixed Fractional Capital Sizing',
+                  entry: 'Stop-loss distance mathematically determined first',
+                  stop: 'ATR volatility-based stop boundary',
+                  target: 'Scale out 50% at 1:1.5, trail rest',
+                  winRate: '72% Long-Term Expectancy'
+                }
+              },
+              {
+                id: 3,
+                title: 'High Probability 15m Breakouts with Volume Confirmation',
+                duration: '22 mins',
+                category: 'Strategy Setups',
+                level: 'Advanced',
+                desc: 'Identifying genuine breakout momentum versus liquidity grabs and fakeouts.',
+                takeaways: [
+                  'Wait for a 15-minute candle body close outside consolidation range with 1.5x average volume.',
+                  'Enter on the 5-minute retest pullback of the broken resistance shelf.',
+                  'Stop-loss placed strictly below the breakout candle swing low.'
+                ],
+                playbook: {
+                  setup: '15m Volume Expansion Breakout',
+                  entry: 'Pullback retest of breakout zone with bullish pin bar',
+                  stop: '0.2% below swing low or candle wick',
+                  target: 'Next daily resistance pivot (1:2.5 R:R)',
+                  winRate: '64% Win Rate'
+                }
+              },
+              {
+                id: 4,
+                title: 'Conquering FOMO & Revenge Trading Tilt',
+                duration: '16 mins',
+                category: 'Psychology & Discipline',
+                level: 'Foundational',
+                desc: 'The psychological antidote protocol to keep calm after stop-loss hits.',
+                takeaways: [
+                  'Accept stop-loss as a normal cost of doing business in a probabilistic game.',
+                  'Enforce a mandatory 15-minute screen timeout after any stop-loss execution.',
+                  'Never double size after a loss to make back capital quickly.'
+                ],
+                playbook: {
+                  setup: 'Psychological Reset Protocol',
+                  entry: 'Only after 15-min walk and breathing reset',
+                  stop: 'Enforce daily circuit breaker (Max 3 trades/day)',
+                  target: 'Consistent rule execution over P&L',
+                  winRate: '85% Mistake Reduction'
+                }
+              },
+              {
+                id: 5,
+                title: 'Options Theta Harvesting & Expiry Day Traps',
+                duration: '25 mins',
+                category: 'Options & Derivatives',
+                level: 'Advanced',
+                desc: 'Understanding time decay and why option buyers bleed on chop days.',
+                takeaways: [
+                  'Option buyers lose 40%+ of premium to theta decay in sideways markets.',
+                  'Trade direction only with confirmed trend momentum; avoid buying OTM options on low IV days.',
+                  'For option selling: enter credit spreads with defined max risk.'
+                ],
+                playbook: {
+                  setup: 'Theta-Positive Credit Spread',
+                  entry: 'Sell 15 Delta OTM option with 25 Delta protection',
+                  stop: 'Exit when spread premium doubles (100% SL)',
+                  target: '80% Theta decay captured by 02:45 PM',
+                  winRate: '76% Statistical Edge'
+                }
+              },
+              {
+                id: 6,
+                title: 'Scaling into Winning Runners with Trailing Stops',
+                duration: '20 mins',
+                category: 'Execution Edge',
+                level: 'Intermediate',
+                desc: 'Transforming 1:1 trades into 1:3 runners using 9 EMA dynamic trailing.',
+                takeaways: [
+                  'Lock in 50% profit at 1:1.5 R:R and move stop-loss to breakeven.',
+                  'Trail remaining runner position using 9 EMA on 5-minute timeframe.',
+                  'Exit runner only when candle closes decisively against the 9 EMA.'
+                ],
+                playbook: {
+                  setup: '9 EMA Dynamic Runner Trail',
+                  entry: 'Breakout from high volume node',
+                  stop: 'Initial stop at prior candle low',
+                  target: 'Trailing 9 EMA until trend exhaustion',
+                  winRate: '58% (High Profit Factor: 3.2)'
+                }
+              },
+              {
+                id: 7,
+                title: 'Price Action Liquidity Sweeps & Smart Money Concepts',
+                duration: '28 mins',
+                category: 'Strategy Setups',
+                level: 'Institutional',
+                desc: 'Identifying institutional stop hunts above key equal highs and lows before the real trend.',
+                takeaways: [
+                  'Retail stops cluster above previous day highs and below previous day lows.',
+                  'Wait for liquidity sweep wick and sharp reversal back into value range.',
+                  'Enter on market structure shift (MSS) with tight invalidation.'
+                ],
+                playbook: {
+                  setup: 'Liquidity Sweep & Market Structure Shift',
+                  entry: 'Rejection wick above PDH with 5m MSS confirmation',
+                  stop: 'Above the sweep wick peak (tight risk)',
+                  target: 'Opposite liquidity pool (1:3.5 R:R)',
+                  winRate: '62% Win Rate'
+                }
+              },
+              {
+                id: 8,
+                title: 'Multi-Market Pre-Market Routine & Morning Scans',
+                duration: '15 mins',
+                category: 'Journaling & Edge',
+                level: 'Practical',
+                desc: 'Systematic 15-minute morning routine covering Gift Nifty, global indices, and sector momentum.',
+                takeaways: [
+                  'Check overnight global sentiment, US bond yields, and commodity movements.',
+                  'Mark Daily High, Daily Low, and Opening Gap levels before 09:15 AM.',
+                  'Complete the Trade Diary Pre-Market Checklist before logging into the terminal.'
+                ],
+                playbook: {
+                  setup: 'Pre-Market Alpha Preparation',
+                  entry: 'Only trade stocks aligned with top relative strength sector',
+                  stop: 'Pre-planned before market open',
+                  target: 'First 45-minute opening momentum',
+                  winRate: '80% Execution Clarity'
+                }
+              }
+            ];
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '14px' }}>
-                {[
-                  { id: 1, title: 'Trade Diary 101: Systematic Journaling for 2x Win Rate', duration: '14 mins', category: 'Journaling', desc: 'How to tag setups, quantify your real edge, and eliminate unconscious cognitive leaks.' },
-                  { id: 2, title: 'The 1% Position Sizing Blueprint: Capital Defense', duration: '18 mins', category: 'Risk Management', desc: 'Mathematical formula to calculate maximum allowed quantity and survive losing streaks.' },
-                  { id: 3, title: 'High Probability 15m Breakouts with Volume Confirmation', duration: '22 mins', category: 'Strategy Setups', desc: 'Identifying genuine breakout momentum versus liquidity grabs and fakeouts.' },
-                  { id: 4, title: 'Conquering FOMO & Revenge Trading Tilt', duration: '16 mins', category: 'Trading Psychology', desc: 'The psychological antidote protocol to keep calm after stop-loss hits.' },
-                  { id: 5, title: 'Options Theta Harvesting & Expiry Day Traps', duration: '25 mins', category: 'Options & Mechanics', desc: 'Understanding time decay and why option buyers bleed on chop days.' },
-                  { id: 6, title: 'Scaling into Winning Runners with Trailing Stops', duration: '20 mins', category: 'Execution Edge', desc: 'Transforming 1:1 trades into 1:3 runners using 9 EMA dynamic trailing.' }
-                ].map(v => (
-                  <div
-                    key={v.id}
-                    onClick={() => setSelectedTutorialForPlayer(v)}
-                    style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: colors.cardShadow, cursor: 'pointer', transition: 'transform 0.15s ease' }}
-                  >
-                    <div style={{ height: '120px', backgroundColor: colors.bgInner, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', position: 'relative' }}>
-                      <PlayCircle size={40} />
-                      <span style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.7)', color: '#ffffff', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                        {v.duration}
+            const filteredClasses = masterclassesList.filter(m => {
+              const matchCat = tutorialCategoryFilter === 'ALL' || m.category === tutorialCategoryFilter;
+              const matchSearch = tutorialSearchQuery === '' || m.title.toLowerCase().includes(tutorialSearchQuery.toLowerCase()) || m.desc.toLowerCase().includes(tutorialSearchQuery.toLowerCase());
+              return matchCat && matchSearch;
+            });
+
+            const completedCount = masterclassesList.filter(m => completedTutorialIds.includes(m.id)).length;
+            const completionPct = Math.round((completedCount / masterclassesList.length) * 100);
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                
+                {/* Header & Course Stats */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Video size={22} color="#2563eb" /> Video Masterclasses & Strategy Playbooks
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Institutional curriculum on risk mechanics, breakout execution, psychology antidotes, and systematic journaling.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => setShowCertificateModal(true)}
+                      style={{
+                        backgroundColor: colors.bgCard,
+                        color: '#f59e0b',
+                        border: `1px solid ${colors.borderColor}`,
+                        borderRadius: '8px',
+                        padding: '7px 12px',
+                        fontSize: '11.5px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Award size={14} /> View Discipline Diploma
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress Banner & Search / Filter Controls */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '14px', padding: isMobile ? '14px' : '18px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary }}>
+                        CURRICULUM PROGRESS: {completedCount} / {masterclassesList.length} Completed ({completionPct}%)
                       </span>
+                      <span style={{ fontSize: '11px', color: colors.textMuted }}>• 158 Total Minutes</span>
                     </div>
-                    <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb' }}>{v.category}</span>
-                      <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary, lineHeight: 1.35 }}>{v.title}</div>
-                      <p style={{ fontSize: '11px', color: colors.textSecondary, margin: 0, lineHeight: 1.4 }}>{v.desc}</p>
+
+                    {/* Search Bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '0 10px', minWidth: '220px' }}>
+                      <Search size={14} color={colors.textMuted} />
+                      <input
+                        type="text"
+                        placeholder="Search masterclasses & playbooks..."
+                        value={tutorialSearchQuery}
+                        onChange={e => setTutorialSearchQuery(e.target.value)}
+                        style={{ backgroundColor: 'transparent', border: 'none', padding: '7px 8px', color: colors.textPrimary, fontSize: '11.5px', outline: 'none', width: '100%' }}
+                      />
                     </div>
                   </div>
-                ))}
+
+                  {/* Progress Bar */}
+                  <div style={{ width: '100%', height: '6px', backgroundColor: colors.bgInner, borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ width: `${completionPct}%`, height: '100%', background: 'linear-gradient(90deg, #2563eb, #10b981)', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {['ALL', 'Journaling & Edge', 'Risk & Sizing', 'Strategy Setups', 'Psychology & Discipline', 'Options & Derivatives'].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setTutorialCategoryFilter(cat)}
+                        style={{
+                          backgroundColor: tutorialCategoryFilter === cat ? '#2563eb' : colors.bgInner,
+                          color: tutorialCategoryFilter === cat ? '#ffffff' : colors.textSecondary,
+                          border: `1px solid ${colors.borderColor}`,
+                          borderRadius: '6px',
+                          padding: '4px 9px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {cat === 'ALL' ? `All Masterclasses (${masterclassesList.length})` : cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 8 Masterclasses Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '16px' }}>
+                  {filteredClasses.map(v => {
+                    const isDone = completedTutorialIds.includes(v.id);
+
+                    return (
+                      <div
+                        key={v.id}
+                        style={{
+                          backgroundColor: colors.bgCard,
+                          border: `1px solid ${colors.borderColor}`,
+                          borderRadius: '14px',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          boxShadow: colors.cardShadow,
+                          transition: 'transform 0.15s ease, border-color 0.15s ease'
+                        }}
+                      >
+                        {/* Video Thumbnail Header */}
+                        <div
+                          onClick={() => setSelectedTutorialForPlayer(v)}
+                          style={{
+                            height: '140px',
+                            background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            position: 'relative',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(37, 99, 235, 0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)' }}>
+                            <Play size={22} color="#ffffff" style={{ marginLeft: '3px' }} />
+                          </div>
+
+                          {/* Level Badge */}
+                          <span style={{ position: 'absolute', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.6)', color: colors.accentBlueLight, fontSize: '10px', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            {v.level}
+                          </span>
+
+                          {/* Completion Badge */}
+                          {isDone && (
+                            <span style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#ffffff', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Check size={12} /> Completed
+                            </span>
+                          )}
+
+                          {/* Duration Badge */}
+                          <span style={{ position: 'absolute', bottom: '10px', right: '10px', backgroundColor: 'rgba(0,0,0,0.75)', color: '#ffffff', fontSize: '10.5px', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                            ⏱️ {v.duration}
+                          </span>
+                        </div>
+
+                        {/* Card Body */}
+                        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
+                                {v.category}
+                              </span>
+                              <span style={{ fontSize: '10px', color: colors.textMuted }}>Includes Playbook Cheat-Sheet</span>
+                            </div>
+
+                            <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, lineHeight: 1.35 }}>
+                              {v.title}
+                            </div>
+
+                            <p style={{ fontSize: '11.5px', color: colors.textSecondary, margin: 0, lineHeight: 1.45 }}>
+                              {v.desc}
+                            </p>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                            <button
+                              onClick={() => setSelectedTutorialForPlayer(v)}
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <PlayCircle size={14} /> Watch Masterclass
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setSelectedTutorialForPlayer(v);
+                                setActivePlayerTab('CHEAT_SHEET');
+                              }}
+                              style={{
+                                backgroundColor: colors.bgInner,
+                                color: colors.textPrimary,
+                                border: `1px solid ${colors.borderColor}`,
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                fontSize: '11.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <BookOpen size={13} /> Playbook
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
@@ -10052,30 +10408,189 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         </div>
       )}
 
-      {/* 9. MASTERCLASS VIDEO PLAYER MODAL */}
+      {/* 9. MASTERCLASS VIDEO PLAYER & RESOURCE HUB MODAL */}
       {selectedTutorialForPlayer && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '620px', maxHeight: '92vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 50px rgba(0,0,0,0.7)' }}>
+            
+            {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>{selectedTutorialForPlayer.title}</div>
-              <button onClick={() => setSelectedTutorialForPlayer(null)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: colors.bgInner, padding: '3px 8px', borderRadius: '4px' }}>
+                  {selectedTutorialForPlayer.category}
+                </span>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>
+                  {selectedTutorialForPlayer.title}
+                </div>
+              </div>
+              <button onClick={() => { setSelectedTutorialForPlayer(null); setIsPlayingVideo(false); }} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
             </div>
-            {/* Simulated Video Player Screen */}
-            <div style={{ height: '180px', backgroundColor: '#000000', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#ffffff', position: 'relative' }}>
-              <PlayCircle size={48} color="#2563eb" style={{ cursor: 'pointer' }} />
-              <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>Click to Play Masterclass ({selectedTutorialForPlayer.duration})</span>
+
+            {/* Simulated Interactive Video Screen */}
+            <div style={{ height: '220px', backgroundColor: '#020617', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '14px', color: '#ffffff', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
+              
+              {/* Top Video Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#94a3b8' }}>HD 1080p • Institutional Desk Recording</span>
+                <span style={{ fontSize: '10px', backgroundColor: 'rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>1.25x SPEED</span>
+              </div>
+
+              {/* Center Play/Pause Simulation */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+                <button
+                  onClick={() => setIsPlayingVideo(!isPlayingVideo)}
+                  style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#2563eb', border: 'none', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 16px rgba(37, 99, 235, 0.5)' }}
+                >
+                  {isPlayingVideo ? <span style={{ fontSize: '18px', fontWeight: '900' }}>❚❚</span> : <Play size={24} style={{ marginLeft: '3px' }} />}
+                </button>
+                <span style={{ fontSize: '11px', color: '#cbd5e1', marginTop: '8px', fontWeight: '600' }}>
+                  {isPlayingVideo ? 'Playing Masterclass Stream...' : `Click to Stream Video (${selectedTutorialForPlayer.duration})`}
+                </span>
+              </div>
+
+              {/* Bottom Video Controls Bar */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', zIndex: 2 }}>
+                {/* Scrubbing Bar */}
+                <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: isPlayingVideo ? '65%' : '25%', height: '100%', backgroundColor: '#2563eb', transition: 'width 0.3s ease' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+                  <span>{isPlayingVideo ? '06:45' : '02:30'} / {selectedTutorialForPlayer.duration}</span>
+                  <span>Chapter: Invalidation & Sizing Rules</span>
+                </div>
+              </div>
             </div>
-            <div style={{ fontSize: '12px', color: colors.textSecondary, lineHeight: 1.4 }}>
-              <b>Core Takeaways:</b>
-              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                <li>Pre-define maximum risk before placing entry order on terminal</li>
-                <li>Never move stop-loss further away once position is live</li>
-                <li>Journal emotions immediately upon trade exit</li>
-              </ul>
+
+            {/* Sub-Tabs: Takeaways | Playbook Cheat-Sheet | Notes */}
+            <div style={{ display: 'flex', gap: '6px', borderBottom: `1px solid ${colors.borderColor}`, paddingBottom: '6px' }}>
+              {[
+                { id: 'TAKEAWAYS', label: '📝 Core Rules & Protocol' },
+                { id: 'CHEAT_SHEET', label: '📥 Strategy Playbook' },
+                { id: 'NOTES', label: '✍️ My Journal Notes' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActivePlayerTab(tab.id)}
+                  style={{
+                    backgroundColor: activePlayerTab === tab.id ? '#2563eb' : 'transparent',
+                    color: activePlayerTab === tab.id ? '#ffffff' : colors.textSecondary,
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button onClick={() => setSelectedTutorialForPlayer(null)} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Close Masterclass</button>
+
+            {/* TAB 1: CORE TAKEAWAYS */}
+            {activePlayerTab === 'TAKEAWAYS' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary }}>Key Institutional Execution Rules:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {(selectedTutorialForPlayer.takeaways || [
+                    'Pre-define maximum risk before placing entry order on terminal',
+                    'Never move stop-loss further away once position is live',
+                    'Journal emotions immediately upon trade exit'
+                  ]).map((t, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', backgroundColor: colors.bgInner, padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                      <span style={{ color: colors.accentGreen, fontWeight: '800', fontSize: '12px' }}>✓</span>
+                      <span style={{ fontSize: '11.5px', color: colors.textPrimary, lineHeight: 1.4 }}>{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: PLAYBOOK CHEAT-SHEET */}
+            {activePlayerTab === 'CHEAT_SHEET' && (
+              <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BookOpen size={14} color="#2563eb" /> Strategy Blueprint: {selectedTutorialForPlayer.playbook?.setup || selectedTutorialForPlayer.title}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                  <div style={{ backgroundColor: colors.bgCard, padding: '8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                    <span style={{ color: colors.textMuted, fontWeight: '700' }}>ENTRY TRIGGER:</span>
+                    <div style={{ fontWeight: '700', color: colors.textPrimary, marginTop: '2px' }}>{selectedTutorialForPlayer.playbook?.entry || '15m Breakout with 1.5x Volume'}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, padding: '8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                    <span style={{ color: colors.textMuted, fontWeight: '700' }}>STOP-LOSS PLACEMENT:</span>
+                    <div style={{ fontWeight: '700', color: colors.accentRed, marginTop: '2px' }}>{selectedTutorialForPlayer.playbook?.stop || 'Below breakout candle low'}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, padding: '8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                    <span style={{ color: colors.textMuted, fontWeight: '700' }}>TARGET R:R:</span>
+                    <div style={{ fontWeight: '700', color: colors.accentGreen, marginTop: '2px' }}>{selectedTutorialForPlayer.playbook?.target || 'Minimum 1:2.0'}</div>
+                  </div>
+
+                  <div style={{ backgroundColor: colors.bgCard, padding: '8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                    <span style={{ color: colors.textMuted, fontWeight: '700' }}>HISTORICAL WIN RATE:</span>
+                    <div style={{ fontWeight: '700', color: colors.accentBlueLight, marginTop: '2px' }}>{selectedTutorialForPlayer.playbook?.winRate || '65% Expectancy'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: PERSONAL JOURNAL NOTES */}
+            {activePlayerTab === 'NOTES' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>Personal Strategy Notes</div>
+                <textarea
+                  rows={3}
+                  placeholder="Type your personal observations, rules to enforce, or key lightbulb moments..."
+                  value={tutorialNotes[selectedTutorialForPlayer.id] || ''}
+                  onChange={e => setTutorialNotes({ ...tutorialNotes, [selectedTutorialForPlayer.id]: e.target.value })}
+                  style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '10px', color: colors.textPrimary, fontSize: '11.5px', outline: 'none', resize: 'none' }}
+                />
+              </div>
+            )}
+
+            {/* Bottom Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap', gap: '8px' }}>
+              <button
+                onClick={() => {
+                  const id = selectedTutorialForPlayer.id;
+                  setCompletedTutorialIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                }}
+                style={{
+                  backgroundColor: completedTutorialIds.includes(selectedTutorialForPlayer.id) ? 'rgba(16, 185, 129, 0.15)' : colors.bgInner,
+                  color: completedTutorialIds.includes(selectedTutorialForPlayer.id) ? colors.accentGreen : colors.textPrimary,
+                  border: `1px solid ${completedTutorialIds.includes(selectedTutorialForPlayer.id) ? colors.accentGreen : colors.borderColor}`,
+                  borderRadius: '8px',
+                  padding: '7px 12px',
+                  fontSize: '11.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Check size={14} /> {completedTutorialIds.includes(selectedTutorialForPlayer.id) ? 'Marked as Completed ✓' : 'Mark as Completed'}
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{ backgroundColor: colors.bgInner, color: colors.accentBlueLight, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '7px 12px', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Download size={13} /> PDF Playbook
+                </button>
+                <button
+                  onClick={() => { setSelectedTutorialForPlayer(null); setIsPlayingVideo(false); }}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Done
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
       )}
