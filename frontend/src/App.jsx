@@ -767,29 +767,31 @@ function App() {
         </div>
       </div>
       
-      {/* Mobile Bottom Navigation */}
-      <div className="mobile-bottom-nav">
-        <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
-          <List size={20} />
-          <span>Watchlist</span>
+      {/* Mobile Bottom Navigation (Only for Paper Trading Terminal) */}
+      {activeTab !== 'TradeDiary' && (
+        <div className="mobile-bottom-nav">
+          <div className={`mobile-nav-item ${activeTab === 'Markets' || activeTab === 'Watchlist' ? 'active' : ''}`} onClick={() => setActiveTab('Watchlist')}>
+            <List size={20} />
+            <span>Watchlist</span>
+          </div>
+          <div className={`mobile-nav-item ${activeTab === 'Chart' ? 'active' : ''}`} onClick={() => setActiveTab('Chart')}>
+            <TrendingUp size={20} />
+            <span>Chart</span>
+          </div>
+          <div className={`mobile-nav-item ${activeTab === 'Orders' ? 'active' : ''}`} onClick={() => setActiveTab('Orders')}>
+            <List size={20} />
+            <span>Orders</span>
+          </div>
+          <div className={`mobile-nav-item ${activeTab === 'Portfolio' || activeTab === 'Positions' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
+            <Briefcase size={20} />
+            <span>Portfolio</span>
+          </div>
+          <div className={`mobile-nav-item ${activeTab === 'ClientData' ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
+            <User size={20} />
+            <span>Profile</span>
+          </div>
         </div>
-        <div className={`mobile-nav-item ${activeTab === 'Chart' ? 'active' : ''}`} onClick={() => setActiveTab('Chart')}>
-          <TrendingUp size={20} />
-          <span>Chart</span>
-        </div>
-        <div className={`mobile-nav-item ${activeTab === 'Orders' ? 'active' : ''}`} onClick={() => setActiveTab('Orders')}>
-          <List size={20} />
-          <span>Orders</span>
-        </div>
-        <div className={`mobile-nav-item ${activeTab === 'Portfolio' || activeTab === 'Positions' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
-          <Briefcase size={20} />
-          <span>Portfolio</span>
-        </div>
-        <div className={`mobile-nav-item ${activeTab === 'ClientData' ? 'active' : ''}`} onClick={() => setActiveTab('ClientData')}>
-          <User size={20} />
-          <span>Profile</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
