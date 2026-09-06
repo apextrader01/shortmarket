@@ -5796,3 +5796,273 @@ app.post('/api/admin/unban', authenticateToken, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── TRADE DIARY & TRADING JOURNAL API ENDPOINTS ──────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+// 1. Trades API
+app.get('/api/journal/trades', authenticateToken, async (req, res) => {
+  try {
+    const trades = await db('journal_trades')
+      .where({ user_id: req.user.id })
+      .orderBy('trade_date', 'desc')
+      .orderBy('created_at', 'desc');
+    res.json({ success: true, trades });
+  } catch (err) {
+    console.error('Fetch Journal Trades Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/journal/trades', authenticateToken, async (req, res) => {
+  try {
+    const {
+      symbol, trade_type, product_type, market_segment, entry_price, exit_price,
+      quantity, realized_pnl, charges, net_pnl, roi_percentage, strategy,
+      emotion, mistake, setup_rating, trade_date, notes, tags, screenshot_url
+    } = req.body;
+
+    const [newTrade] = await db('journal_trades').insert({
+      user_id: req.user.id,
+      trade_id: `JT-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+      symbol: symbol || 'NIFTY',
+      trade_type: trade_type || 'BUY',
+      product_type: product_type || 'INT',
+      market_segment: market_segment || 'Indian',
+      entry_price: parseFloat(entry_price) || 0,
+      exit_price: parseFloat(exit_price) || 0,
+      quantity: parseInt(quantity) || 1,
+      realized_pnl: parseFloat(realized_pnl) || 0,
+      charges: parseFloat(charges) || 0,
+      net_pnl: parseFloat(net_pnl) || (parseFloat(realized_pnl) || 0),
+      roi_percentage: parseFloat(roi_percentage) || 0,
+      strategy: strategy || '',
+      emotion: emotion || '',
+      mistake: mistake || '',
+      setup_rating: parseInt(setup_rating) || 5,
+      trade_date: trade_date || new Date().toISOString().split('T')[0],
+      notes: notes || '',
+      tags: tags ? JSON.stringify(tags) : JSON.stringify([]),
+      screenshot_url: screenshot_url || ''
+    }).returning('*');
+
+    res.json({ success: true, trade: newTrade });
+  } catch (err) {
+    console.error('Create Journal Trade Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/journal/trades/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body, updated_at: new Date() };
+    delete updateData.id;
+    delete updateData.user_id;
+    if (updateData.tags && typeof updateData.tags !== 'string') {
+      updateData.tags = JSON.stringify(updateData.tags);
+    }
+
+    const [updated] = await db('journal_trades')
+      .where({ id, user_id: req.user.id })
+      .update(updateData)
+      .returning('*');
+
+    res.json({ success: true, trade: updated });
+  } catch (err) {
+    console.error('Update Journal Trade Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/journal/trades/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db('journal_trades').where({ id, user_id: req.user.id }).del();
+    res.json({ success: true, message: 'Trade deleted successfully' });
+  } catch (err) {
+    console.error('Delete Journal Trade Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Checklists API
+app.get('/api/journal/checklists', authenticateToken, async (req, res) => {
+  try {
+    const { date } = req.query;
+    let query = db('trading_checklists').where({ user_id: req.user.id });
+    if (date) query = query.where({ date });
+    const checklists = await query.orderBy('date', 'desc');
+    res.json({ success: true, checklists });
+  } catch (err) {
+    console.error('Fetch Checklists Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/journal/checklists', authenticateToken, async (req, res) => {
+  try {
+    const { date, pre_market_data, post_market_data, notes } = req.body;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const existing = await db('trading_checklists').where({ user_id: req.user.id, date: targetDate }).first();
+    let result;
+
+    if (existing) {
+      [result] = await db('trading_checklists')
+        .where({ id: existing.id })
+        .update({
+          pre_market_data: pre_market_data ? JSON.stringify(pre_market_data) : existing.pre_market_data,
+          post_market_data: post_market_data ? JSON.stringify(post_market_data) : existing.post_market_data,
+          notes: notes !== undefined ? notes : existing.notes,
+          updated_at: new Date()
+        })
+        .returning('*');
+    } else {
+      [result] = await db('trading_checklists').insert({
+        user_id: req.user.id,
+        date: targetDate,
+        pre_market_data: JSON.stringify(pre_market_data || {}),
+        post_market_data: JSON.stringify(post_market_data || {}),
+        notes: notes || ''
+      }).returning('*');
+    }
+
+    res.json({ success: true, checklist: result });
+  } catch (err) {
+    console.error('Save Checklist Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Mistakes Tracker API
+app.get('/api/journal/mistakes', authenticateToken, async (req, res) => {
+  try {
+    const mistakes = await db('trading_mistakes').where({ user_id: req.user.id }).orderBy('loss_incurred', 'desc');
+    res.json({ success: true, mistakes });
+  } catch (err) {
+    console.error('Fetch Mistakes Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/journal/mistakes', authenticateToken, async (req, res) => {
+  try {
+    const { mistake_name, category, loss_incurred, lessons_learned } = req.body;
+    const [mistake] = await db('trading_mistakes').insert({
+      user_id: req.user.id,
+      mistake_name: mistake_name || 'Trading Mistake',
+      category: category || 'EXECUTION',
+      loss_incurred: parseFloat(loss_incurred) || 0,
+      frequency: 1,
+      lessons_learned: lessons_learned || ''
+    }).returning('*');
+    res.json({ success: true, mistake });
+  } catch (err) {
+    console.error('Add Mistake Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/journal/mistakes/:id', authenticateToken, async (req, res) => {
+  try {
+    await db('trading_mistakes').where({ id: req.params.id, user_id: req.user.id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Strategies API
+app.get('/api/journal/strategies', authenticateToken, async (req, res) => {
+  try {
+    const strategies = await db('trading_strategies').where({ user_id: req.user.id }).orderBy('net_pnl', 'desc');
+    res.json({ success: true, strategies });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/journal/strategies', authenticateToken, async (req, res) => {
+  try {
+    const { strategy_name, description, win_rate, total_trades, net_pnl, color } = req.body;
+    const [strategy] = await db('trading_strategies').insert({
+      user_id: req.user.id,
+      strategy_name: strategy_name || 'New Strategy',
+      description: description || '',
+      win_rate: parseFloat(win_rate) || 0,
+      total_trades: parseInt(total_trades) || 0,
+      net_pnl: parseFloat(net_pnl) || 0,
+      color: color || '#3b82f6'
+    }).returning('*');
+    res.json({ success: true, strategy });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/journal/strategies/:id', authenticateToken, async (req, res) => {
+  try {
+    await db('trading_strategies').where({ id: req.params.id, user_id: req.user.id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Rules API
+app.get('/api/journal/rules', authenticateToken, async (req, res) => {
+  try {
+    const rules = await db('trading_rules').where({ user_id: req.user.id }).orderBy('created_at', 'asc');
+    res.json({ success: true, rules });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/journal/rules', authenticateToken, async (req, res) => {
+  try {
+    const { rule_text, category, is_active } = req.body;
+    const [rule] = await db('trading_rules').insert({
+      user_id: req.user.id,
+      rule_text: rule_text || 'Trading Rule',
+      category: category || 'RISK',
+      is_active: is_active !== false,
+      times_followed: 0,
+      times_broken: 0
+    }).returning('*');
+    res.json({ success: true, rule });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/journal/rules/:id', authenticateToken, async (req, res) => {
+  try {
+    const { rule_text, is_active, times_followed, times_broken } = req.body;
+    const [rule] = await db('trading_rules')
+      .where({ id: req.params.id, user_id: req.user.id })
+      .update({
+        ...(rule_text !== undefined ? { rule_text } : {}),
+        ...(is_active !== undefined ? { is_active } : {}),
+        ...(times_followed !== undefined ? { times_followed } : {}),
+        ...(times_broken !== undefined ? { times_broken } : {}),
+        updated_at: new Date()
+      })
+      .returning('*');
+    res.json({ success: true, rule });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/journal/rules/:id', authenticateToken, async (req, res) => {
+  try {
+    await db('trading_rules').where({ id: req.params.id, user_id: req.user.id }).del();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+

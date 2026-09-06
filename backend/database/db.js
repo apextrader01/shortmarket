@@ -699,7 +699,96 @@ async function ensureCriticalColumns() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_market_calendar_date ON market_calendar(date)');
 
-    console.log('✅ Critical columns, indexes, system_settings, contests, user_sessions, and market_calendar verified on tables');
+    // ── Trade Diary & Trading Journal Tables ──
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS journal_trades (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        trade_id VARCHAR(100),
+        symbol VARCHAR(100) NOT NULL,
+        trade_type VARCHAR(20) DEFAULT 'BUY',
+        product_type VARCHAR(20) DEFAULT 'INT',
+        market_segment VARCHAR(20) DEFAULT 'Indian',
+        entry_price DECIMAL(14, 2) DEFAULT 0,
+        exit_price DECIMAL(14, 2) DEFAULT 0,
+        quantity INTEGER DEFAULT 1,
+        realized_pnl DECIMAL(14, 2) DEFAULT 0,
+        charges DECIMAL(14, 2) DEFAULT 0,
+        net_pnl DECIMAL(14, 2) DEFAULT 0,
+        roi_percentage DECIMAL(8, 2) DEFAULT 0,
+        strategy VARCHAR(100),
+        emotion VARCHAR(100),
+        mistake VARCHAR(100),
+        setup_rating INTEGER DEFAULT 5,
+        trade_date VARCHAR(20),
+        notes TEXT,
+        tags JSONB,
+        screenshot_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_id ON journal_trades(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_trade_date ON journal_trades(trade_date)');
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_checklists (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date VARCHAR(20) NOT NULL,
+        pre_market_data JSONB DEFAULT '{}',
+        post_market_data JSONB DEFAULT '{}',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_user_checklist_date UNIQUE (user_id, date)
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_mistakes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mistake_name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'EXECUTION',
+        loss_incurred DECIMAL(14, 2) DEFAULT 0,
+        frequency INTEGER DEFAULT 1,
+        lessons_learned TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_strategies (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        strategy_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        win_rate DECIMAL(6, 2) DEFAULT 0,
+        total_trades INTEGER DEFAULT 0,
+        net_pnl DECIMAL(14, 2) DEFAULT 0,
+        color VARCHAR(20) DEFAULT '#3b82f6',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_rules (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        rule_text VARCHAR(500) NOT NULL,
+        category VARCHAR(50) DEFAULT 'RISK',
+        is_active BOOLEAN DEFAULT TRUE,
+        times_followed INTEGER DEFAULT 0,
+        times_broken INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log('✅ Critical columns, indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }

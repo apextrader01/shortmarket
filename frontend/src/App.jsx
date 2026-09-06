@@ -290,19 +290,20 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname.replace('/', '');
-    if (!path) return 'Markets';
+    if (!path) return 'Journal';
     
     // Convert path to Match exact tab case (e.g. 'mutualfunds' -> 'MutualFunds')
     const tabsMap = {
+      'journal': 'Journal', 'tradediary': 'Journal', 'tradingjournal': 'Journal',
       'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
       'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
       'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-      'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal',
+      'leaderboard': 'Leaderboard',
       'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
       'reports': 'Reports',
       'aboutus': 'AboutUs'
     };
-    return tabsMap[path.toLowerCase()] || 'Markets';
+    return tabsMap[path.toLowerCase()] || 'Journal';
   });
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -317,7 +318,7 @@ function App() {
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
-      let newPath = `/${activeTab.toLowerCase()}`;
+      let newPath = activeTab === 'Journal' ? '/' : `/${activeTab.toLowerCase()}`;
       if (activeTab === 'Portfolio' && typeof portfolioSubTab !== 'undefined') {
         newPath = `/portfolio/${portfolioSubTab.toLowerCase()}`;
       }
@@ -331,19 +332,20 @@ function App() {
     const handlePopState = () => {
       const path = window.location.pathname.replace('/', '');
       if (!path) {
-        setActiveTab('Markets');
+        setActiveTab('Journal');
         return;
       }
       const tabsMap = {
+        'journal': 'Journal', 'tradediary': 'Journal', 'tradingjournal': 'Journal',
         'markets': 'Markets', 'options': 'Options', 'positions': 'Positions',
         'orders': 'Orders', 'portfolio': 'Portfolio', 'alerts': 'Orders',
         'analytics': 'Analytics', 'mutualfunds': 'MutualFunds', 'pricing': 'Pricing', 'referrals': 'Referrals',
-        'leaderboard': 'Leaderboard', 'journal': 'Journal', 'tradingjournal': 'Journal',
+        'leaderboard': 'Leaderboard',
         'adminpanel': 'AdminPanel', 'clientdata': 'ClientData', 'settings': 'Settings',
         'reports': 'Reports',
         'aboutus': 'AboutUs'
       };
-      setActiveTab(tabsMap[path.toLowerCase()] || 'Markets');
+      setActiveTab(tabsMap[path.toLowerCase()] || 'Journal');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -504,192 +506,193 @@ function App() {
         </div>
       )}
 
-      <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
-          {/* Left: title + index pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
-              <img src="/logo.png" alt="Short Market Logo" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
-            </div>
-
-            <TopIndexTicker />
-          </div>
-
-          {/* Right: nav tabs + user info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {/* Background Alerts Engine Audio Output */}
-            {/* (Can put a hidden audio element here if we add sound) */}
-            
-            {/* Hotkey Toast Notification */}
-            {hotkeyToast && (
-              <div style={{
-                position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(234, 179, 8, 0.9)', color: '#000', padding: '12px 24px',
-                borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', zIndex: 9999,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-                animation: 'fadeInOut 1.5s forwards'
-              }}>
-                {hotkeyToast}
-              </div>
-            )}
-            
-            {/* Tab Navigation */}
-            <div className="hide-on-mobile" style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              fontSize: '10px', fontWeight: '700', marginRight: '4px',
-            }}>
-              {[
-                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard', 'Journal',
-                ...(user?.is_admin ? ['Admin Panel'] : [])
-              ].map((tab) => {
-                const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
-                return (
-                <div
-                  key={tab}
-                  onClick={() => setActiveTab(tabKey)}
-                  className={`nav-pill ${activeTab === tabKey ? "active" : ""}`}
-                  style={{
-                    padding:        '16px 2px',
-                    cursor:         'pointer',
-                    textTransform:  'uppercase',
-                    letterSpacing:  '0.5px',
-                  }}
-                >
-                  {tab}
+      {activeTab === 'Journal' ? (
+        <Suspense fallback={<TabLoader />}>
+          <TradingJournalView onOpenPaperTrading={() => setActiveTab('Markets')} onBack={() => setActiveTab('Markets')} />
+        </Suspense>
+      ) : (
+        <>
+          <header className="topbar glass-header" style={{ width: '100%', flexShrink: 0, zIndex: 10, borderBottom: '1px solid var(--border-color)' }}>
+              {/* Left: title + index pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
+                  <img src="/logo.png" alt="Short Market Logo" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
                 </div>
-              )})}
-            </div>
 
-            {/* Hamburger Menu (Mobile Only) */}
-            <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
-              <Menu size={24} color="var(--text-primary)" />
-            </div>
+                <TopIndexTicker />
+              </div>
 
-            {/* User avatar + logout */}
-            <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div 
-                onClick={() => setActiveTab('ClientData')}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
-                className="hover:bg-white/5 transition-colors"
-              >
-                <div style={{
-                  width: '28px', height: '28px', borderRadius: '50%',
-                  background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid var(--border-color)', overflow: 'hidden'
+              {/* Right: nav tabs + user info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                {/* Hotkey Toast Notification */}
+                {hotkeyToast && (
+                  <div style={{
+                    position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+                    background: 'rgba(234, 179, 8, 0.9)', color: '#000', padding: '12px 24px',
+                    borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', zIndex: 9999,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                    animation: 'fadeInOut 1.5s forwards'
+                  }}>
+                    {hotkeyToast}
+                  </div>
+                )}
+                
+                {/* Tab Navigation */}
+                <div className="hide-on-mobile" style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  fontSize: '10px', fontWeight: '700', marginRight: '4px',
                 }}>
-                  {user?.profile_picture_url ? (
-                    <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <User size={14} color="var(--text-secondary)" />
-                  )}
+                  {[
+                    { key: 'Journal', label: 'Trade Diary' },
+                    { key: 'Markets', label: 'Markets' },
+                    { key: 'Positions', label: 'Positions' },
+                    { key: 'Orders', label: 'Orders' },
+                    { key: 'Portfolio', label: 'Portfolio' },
+                    { key: 'MutualFunds', label: 'Mutual Funds' },
+                    { key: 'Leaderboard', label: 'Leaderboard' },
+                    ...(user?.is_admin ? [{ key: 'AdminPanel', label: 'Admin Panel' }] : [])
+                  ].map((tabItem) => (
+                    <div
+                      key={tabItem.key}
+                      onClick={() => setActiveTab(tabItem.key)}
+                      className={`nav-pill ${activeTab === tabItem.key ? "active" : ""}`}
+                      style={{
+                        padding:        '16px 4px',
+                        cursor:         'pointer',
+                        textTransform:  'uppercase',
+                        letterSpacing:  '0.5px',
+                      }}
+                    >
+                      {tabItem.label}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '15px' }}>{user.username}</div>
+
+                {/* Hamburger Menu (Mobile Only) */}
+                <div className="mobile-only" onClick={() => setShowMobileMenu(true)} style={{ cursor: 'pointer', padding: '4px' }}>
+                  <Menu size={24} color="var(--text-primary)" />
+                </div>
+
+                {/* User avatar + logout */}
+                <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div 
+                    onClick={() => setActiveTab('ClientData')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}
+                    className="hover:bg-white/5 transition-colors"
+                  >
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      background: 'var(--bg-panel)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      border: '1px solid var(--border-color)', overflow: 'hidden'
+                    }}>
+                      {user?.profile_picture_url ? (
+                        <img src={user.profile_picture_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <User size={14} color="var(--text-secondary)" />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '15px' }}>{user.username}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </header>
+
+          <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
+            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
+              <MarketWatch 
+                className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
+                onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
+              />
+            )}
+            <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
+              <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+              {(activeTab === 'Markets' || activeTab === 'Chart') && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
+                    <ChartWidget />
+                  </div>
+                </div>
+              )}
+              {activeTab === 'Options' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
+                  <ErrorBoundary>
+                    <Suspense fallback={<TabLoader />}>
+                      <OptionChainView setActiveTab={setActiveTab} />
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              )}
+              {activeTab === 'Portfolio' && <PortfolioView />}
+              {activeTab === 'Orders' && <OrdersView />}
+              {activeTab === 'Positions' && <PositionsView />}
+
+              {activeTab === 'Analytics' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <AnalyticsView />
+                  </Suspense>
+                </div>
+              )}
+              {activeTab === 'MutualFunds' && (
+                <Suspense fallback={<TabLoader />}>
+                  <MutualFundsView />
+                </Suspense>
+              )}
+              {activeTab === 'Leaderboard' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <LeaderboardView />
+                  </Suspense>
+                </div>
+              )}
+              {activeTab === 'ClientData' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                  <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
+                </div>
+              )}
+              {activeTab === 'AboutUs' && (
+                <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <AboutUsView setActiveTab={setActiveTab} />
+                  </Suspense>
+                </div>
+              )}
+              {activeTab === 'Reports' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <ReportsView onBack={() => setActiveTab('ClientData')} />
+                  </Suspense>
+                </div>
+              )}
               
+              {activeTab === 'Referrals' && (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <ReferralsView setActiveTab={setActiveTab} />
+                  </Suspense>
+                </div>
+              )}
+              {activeTab === 'Pricing' && (
+                <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <PricingView setActiveTab={setActiveTab} />
+                  </Suspense>
+                </div>
+              )}
+              {activeTab === 'AdminPanel' && user?.is_admin && (
+                <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                  <Suspense fallback={<TabLoader />}>
+                    <AdminDashboard />
+                  </Suspense>
+                </div>
+              )}
+              </main>
             </div>
           </div>
-        </header>
-
-      <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-        {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
-          <MarketWatch 
-            className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
-            onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
-          />
-        )}
-        <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
-          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-          {(activeTab === 'Markets' || activeTab === 'Chart') && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
-                <ChartWidget />
-              </div>
-            </div>
-          )}
-          {activeTab === 'Options' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
-              <ErrorBoundary>
-                <Suspense fallback={<TabLoader />}>
-                  <OptionChainView setActiveTab={setActiveTab} />
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          )}
-          {activeTab === 'Portfolio' && <PortfolioView />}
-          {activeTab === 'Orders' && <OrdersView />}
-          {activeTab === 'Positions' && <PositionsView />}
-
-          {activeTab === 'Analytics' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <AnalyticsView />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'MutualFunds' && (
-            <Suspense fallback={<TabLoader />}>
-              <MutualFundsView />
-            </Suspense>
-          )}
-          {activeTab === 'Leaderboard' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <LeaderboardView />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'Journal' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '16px', minHeight: 0, overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <TradingJournalView onBack={() => setActiveTab('Markets')} />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'ClientData' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
-              <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
-            </div>
-          )}
-          {activeTab === 'AboutUs' && (
-            <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <AboutUsView setActiveTab={setActiveTab} />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'Reports' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <ReportsView onBack={() => setActiveTab('ClientData')} />
-              </Suspense>
-            </div>
-          )}
-          
-          {activeTab === 'Referrals' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <ReferralsView setActiveTab={setActiveTab} />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'Pricing' && (
-            <div style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
-              <Suspense fallback={<TabLoader />}>
-                <PricingView setActiveTab={setActiveTab} />
-              </Suspense>
-            </div>
-          )}
-          {activeTab === 'AdminPanel' && user?.is_admin && (
-            <div style={{ width: '100%', height: 'calc(100vh - 64px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-              <Suspense fallback={<TabLoader />}>
-                <AdminDashboard />
-              </Suspense>
-            </div>
-          )}
-          </main>
-        </div>
-      </div>
+        </>
+      )}
 
       {orderModal?.isOpen && <OrderModal />}
       {editOrderModal?.isOpen && <EditOrderModal />}
