@@ -1,3 +1,41 @@
+const FREEZE_LIMITS = {
+    NIFTY: 1800,
+    BANKNIFTY: 900,
+    FINNIFTY: 1800,
+    MIDCPNIFTY: 4200,
+    NIFTYNXT50: 1800,
+    SENSEX: 1000,
+    BANKEX: 1000,
+    CRUDEOIL: 10000,
+    NATURALGAS: 50000,
+    GOLD: 100,
+    GOLDM: 1000,
+    SILVER: 300,
+    SILVERM: 1000,
+    DEFAULT_EQUITY: 100000,
+    DEFAULT_FNO: 1800
+};
+
+function getFreezeLimit(sym) {
+    if (!sym) return FREEZE_LIMITS.DEFAULT_EQUITY;
+    const upper = String(sym).toUpperCase();
+    if (upper.includes('BANKNIFTY')) return FREEZE_LIMITS.BANKNIFTY;
+    if (upper.includes('FINNIFTY')) return FREEZE_LIMITS.FINNIFTY;
+    if (upper.includes('MIDCPNIFTY') || upper.includes('MIDCAPNIFTY')) return FREEZE_LIMITS.MIDCPNIFTY;
+    if (upper.includes('NIFTYNXT50') || upper.includes('NIFTYJR')) return FREEZE_LIMITS.NIFTYNXT50;
+    if (upper.includes('NIFTY')) return FREEZE_LIMITS.NIFTY;
+    if (upper.includes('SENSEX')) return FREEZE_LIMITS.SENSEX;
+    if (upper.includes('BANKEX')) return FREEZE_LIMITS.BANKEX;
+    if (upper.includes('CRUDEOIL')) return FREEZE_LIMITS.CRUDEOIL;
+    if (upper.includes('NATURALGAS')) return FREEZE_LIMITS.NATURALGAS;
+    if (upper.includes('GOLDM')) return FREEZE_LIMITS.GOLDM;
+    if (upper.includes('GOLD')) return FREEZE_LIMITS.GOLD;
+    if (upper.includes('SILVERM')) return FREEZE_LIMITS.SILVERM;
+    if (upper.includes('SILVER')) return FREEZE_LIMITS.SILVER;
+    if (upper.includes('CE') || upper.includes('PE') || upper.includes('FUT')) return FREEZE_LIMITS.DEFAULT_FNO;
+    return FREEZE_LIMITS.DEFAULT_EQUITY;
+}
+
 /**
  * Calculates Brokerage and Taxes for a trade.
  * 
@@ -8,7 +46,7 @@
  * @param {number} price - Execution price
  * @returns {object} { brokerage, stt, exchangeCharge, gst, sebiCharge, stampDuty, dpCharge, totalTaxes }
  */
-function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0) {
+function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null) {
     const turnover = quantity * price;
     
     const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
@@ -17,6 +55,9 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     const isFuture = !isMutualFund && !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT'));
     const isEquity = !isMutualFund && !isOption && !isFuture;
     const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE') || symbol.includes('NATURALGAS') || symbol.includes('COPPER') || symbol.includes('ZINC');
+
+    const freezeLimit = getFreezeLimit(symbol);
+    const slicesCount = slicesOverride || (quantity > freezeLimit ? Math.ceil(quantity / freezeLimit) : 1);
 
     let brokerage = 0;
     let stt = 0;
@@ -30,7 +71,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
         if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
     } else if (isOption) {
-        brokerage = 20; // Flat ₹20 for Options
+        brokerage = 20 * slicesCount; // Flat ₹20 per executed order/slice for Options
         if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0005 : 0.000625);
         }
@@ -38,7 +79,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        brokerage = Math.min(turnover * 0.0003, 20);
+        brokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
         if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0001 : 0.000125);
         }
@@ -54,7 +95,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
             // Intraday Equity
-            brokerage = Math.min(turnover * 0.0003, 20); // 0.03% or ₹20 max
+            brokerage = Math.min(turnover * 0.0003, 20 * slicesCount); // 0.03% or ₹20 max per slice
             if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
             if (side === 'BUY') stampDuty = turnover * 0.00003;
         }

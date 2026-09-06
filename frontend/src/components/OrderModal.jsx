@@ -711,7 +711,7 @@ export default function OrderModal() {
                
                <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                     <span>Brokerage</span>
+                     <span>Brokerage {calculateOrderSlices(symbol, totalQuantity).length > 1 ? `(${calculateOrderSlices(symbol, totalQuantity).length} sliced orders)` : ''}</span>
                      <span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
                   </div>
                   
