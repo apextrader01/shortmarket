@@ -37,8 +37,15 @@ export default function SettingsView() {
     revokeSession: state.revokeSession
   })));
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchUserSessions();
