@@ -113,6 +113,27 @@ export default function BasketModal() {
 
   const chainsCacheRef = useRef({});
 
+  // Asynchronous helper to guarantee chain is in cache before use
+  const ensureOptionChain = async (underlying) => {
+    if (chainsCacheRef.current[underlying]) {
+      return chainsCacheRef.current[underlying];
+    }
+    try {
+      setLoadingChain(true);
+      const res = await fetch(`${API}/api/options/chain/${underlying}`);
+      if (res.ok) {
+        const chain = await res.json();
+        chainsCacheRef.current[underlying] = chain;
+        return chain;
+      }
+    } catch (e) {
+      console.error(`Failed to load option chain for ${underlying}:`, e);
+    } finally {
+      setLoadingChain(false);
+    }
+    return null;
+  };
+
   const handleGlobalMultiplierChange = (newMultiplier) => {
     const val = Math.max(1, isNaN(newMultiplier) ? 1 : newMultiplier);
     setGlobalMultiplier(val);
@@ -163,43 +184,28 @@ export default function BasketModal() {
     if (!basketModalOpen) return;
     
     let isCancelled = false;
-    const fetchChain = async () => {
-      setLoadingChain(true);
-      try {
-        let chain = chainsCacheRef.current[selectedUnderlying];
-        if (!chain) {
-          const res = await fetch(`${API}/api/options/chain/${selectedUnderlying}`);
-          if (res.ok) {
-            chain = await res.json();
-            chainsCacheRef.current[selectedUnderlying] = chain;
-          }
-        }
+    const loadChainForSelected = async () => {
+      const chain = await ensureOptionChain(selectedUnderlying);
+      if (!isCancelled && chain) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const expList = Object.keys(chain)
+          .filter(exp => new Date(exp) >= today)
+          .sort((a, b) => new Date(a) - new Date(b));
 
-        if (!isCancelled && chain) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          const expList = Object.keys(chain)
-            .filter(exp => new Date(exp) >= today)
-            .sort((a, b) => new Date(a) - new Date(b));
-
-          setAvailableExpiries(expList);
-          
-          // Automatically select the nearest expiry
-          if (expList.length > 0) {
-            setSelectedExpiry(prev => (expList.includes(prev) ? prev : expList[0]));
-          } else {
-            setSelectedExpiry('');
-          }
+        setAvailableExpiries(expList);
+        
+        // Automatically select the nearest expiry if not already set or invalid
+        if (expList.length > 0) {
+          setSelectedExpiry(prev => (expList.includes(prev) ? prev : expList[0]));
+        } else {
+          setSelectedExpiry('');
         }
-      } catch (e) {
-        console.error('Failed to fetch chain for BasketModal:', e);
-      } finally {
-        if (!isCancelled) setLoadingChain(false);
       }
     };
 
-    fetchChain();
+    loadChainForSelected();
     return () => { isCancelled = true; };
   }, [basketModalOpen, selectedUnderlying]);
 
@@ -219,7 +225,7 @@ export default function BasketModal() {
     
     if (key) {
       useStore.getState().subscribeToSymbol?.(key);
-      useStore.getState().fetchBatchPrices?.([key]);
+      useStore.getState().fetchBatchPrices?.([key], true);
     }
   }, [basketModalOpen, selectedUnderlying]);
 
@@ -231,8 +237,17 @@ export default function BasketModal() {
       useStore.getState().subscribeToSymbol?.(sym);
     });
     if (useStore.getState().fetchBatchPrices) {
-      useStore.getState().fetchBatchPrices(symbols);
+      useStore.getState().fetchBatchPrices(symbols, true);
     }
+
+    // Keep LTP active and responsive
+    const interval = setInterval(() => {
+      if (symbols.length > 0 && useStore.getState().fetchBatchPrices) {
+        useStore.getState().fetchBatchPrices(symbols, false);
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
   }, [basketModalOpen, basketItems]);
 
   // Quick Search for any stock / derivative to add directly into the basket
@@ -262,18 +277,29 @@ export default function BasketModal() {
 
   // Enhance basket items with live price, lotsize, strike, type, and underlying/expiry info
   const enhancedItems = basketItems.map(item => {
-    const symbol = item.symbol;
-    const livePrice = symbol ? (prices[symbol]?.ltp || 0) : 0;
+    const symbol = item.symbol || '';
     const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+    
+    // Robust LTP resolution across all possible key formats (prefixed, raw, NSE, BSE, MCX, NFO)
+    const livePrice = symbol ? (
+      prices[symbol]?.ltp || 
+      prices[cleanSym]?.ltp || 
+      prices[`NSE:${cleanSym}`]?.ltp || 
+      prices[`BSE:${cleanSym}`]?.ltp || 
+      prices[`MCX:${cleanSym}`]?.ltp || 
+      prices[`NFO:${cleanSym}`]?.ltp || 
+      0
+    ) : 0;
+
     const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
     const parsed = isOption ? parseOptionSymbol(symbol) : null;
-    const optionStrike = parsed?.strike || (isOption ? extractOptionStrike(symbol) : 0);
+    const optionStrike = item.strike || parsed?.strike || (isOption ? extractOptionStrike(symbol) : 0);
     const typeStr = item.optionType || parsed?.optionType || (isOption ? (/(?:\d+|[-_\s])CE/i.test(cleanSym) || cleanSym.endsWith('CE') ? 'CE' : 'PE') : 'OTHER');
-    const effectiveLotsize = (item.lotsize && Number(item.lotsize) > 1) ? Number(item.lotsize) : (getInstantLotsize(symbol) || 1);
-    const totalQuantity = (Number(item.quantity) || 1) * effectiveLotsize;
     
     // Resolve underlying
     const underlying = item.underlying || parsed?.underlying || selectedUnderlying;
+    const effectiveLotsize = (item.lotsize && Number(item.lotsize) > 1) ? Number(item.lotsize) : (getInstantLotsize(symbol) || getInstantLotsize(underlying) || 1);
+    const totalQuantity = (Number(item.quantity) || 1) * effectiveLotsize;
     
     // Resolve expiry from cache if not directly present
     let expiry = item.expiry;
@@ -297,7 +323,7 @@ export default function BasketModal() {
       ...item,
       underlying,
       expiry,
-      strike: item.strike || optionStrike,
+      strike: optionStrike,
       optionStrike,
       optionType: typeStr,
       lotsize: effectiveLotsize,
@@ -626,10 +652,63 @@ export default function BasketModal() {
     return true;
   });
 
+  // Handle Global Expiry Selection from Dropdown (Synchronizes all legs in basket)
+  const handleGlobalExpiryChange = async (newExpiry) => {
+    setSelectedExpiry(newExpiry);
+    
+    if (basketItems.length === 0) return;
+    const chain = await ensureOptionChain(selectedUnderlying);
+    if (!chain || !chain[newExpiry]) return;
+
+    const strikesInNewExp = Object.keys(chain[newExpiry]).map(Number).sort((a, b) => a - b);
+    if (strikesInNewExp.length === 0) return;
+
+    const updatedSymbols = [];
+    const updatedItems = basketItems.map(item => {
+      const itemUnderlying = item.underlying || selectedUnderlying;
+      if (itemUnderlying !== selectedUnderlying) return item; // Don't modify other underlying legs
+      
+      const isOption = item.isOption || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(item.symbol);
+      if (!isOption) return item;
+
+      const curStrike = item.strike || item.optionStrike || extractOptionStrike(item.symbol);
+      let targetStrike = curStrike;
+      if (!chain[newExpiry][targetStrike]) {
+        targetStrike = strikesInNewExp.reduce((prev, curr) => 
+          Math.abs(curr - curStrike) < Math.abs(prev - curStrike) ? curr : prev, 
+          strikesInNewExp[0]
+        );
+      }
+
+      const optType = item.optionType || (item.symbol.endsWith('PE') ? 'PE' : 'CE');
+      const contract = chain[newExpiry][targetStrike]?.[optType] || chain[newExpiry][targetStrike]?.CE || chain[newExpiry][targetStrike]?.PE;
+      
+      if (contract) {
+        updatedSymbols.push(contract.symbol);
+        return {
+          ...item,
+          symbol: contract.symbol,
+          expiry: newExpiry,
+          strike: targetStrike,
+          optionType: optType,
+          lotsize: contract.lotsize || item.lotsize,
+          underlying: selectedUnderlying
+        };
+      }
+      return item;
+    });
+
+    useStore.setState({ basketItems: updatedItems });
+    if (updatedSymbols.length > 0) {
+      updatedSymbols.forEach(s => useStore.getState().subscribeToSymbol?.(s));
+      useStore.getState().fetchBatchPrices?.(updatedSymbols, true);
+    }
+  };
+
   // Apply Strategy Preset using exact selected Expiry from real Option Chain
-  const applyPreset = (type, customUnderlying = null) => {
+  const applyPreset = async (type, customUnderlying = null) => {
     const targetUnderlying = customUnderlying || selectedUnderlying;
-    const chain = chainsCacheRef.current[targetUnderlying];
+    const chain = await ensureOptionChain(targetUnderlying);
     
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -640,6 +719,13 @@ export default function BasketModal() {
     const activeExpiry = (selectedExpiry && expList.includes(selectedExpiry)) 
       ? selectedExpiry 
       : (expList[0] || selectedExpiry);
+
+    if (activeExpiry && activeExpiry !== selectedExpiry) {
+      setSelectedExpiry(activeExpiry);
+    }
+    if (expList.length > 0) {
+      setAvailableExpiries(expList);
+    }
 
     const isMCX = MCX_LIST.includes(targetUnderlying) || isCommodityContract(targetUnderlying);
     const isBSE = targetUnderlying === 'SENSEX' || targetUnderlying === 'BANKEX';
@@ -654,7 +740,13 @@ export default function BasketModal() {
     else if (targetUnderlying === 'BANKEX') indexKey = 'BSE:BANKEX-INDEX';
     else if (!isMCX) indexKey = `${exch}:${targetUnderlying}-EQ`;
 
-    const liveSpot = indexKey && prices[indexKey] ? prices[indexKey].ltp : 0;
+    let liveSpot = indexKey && prices[indexKey] ? prices[indexKey].ltp : 0;
+    if (!liveSpot && indexKey) {
+      await useStore.getState().fetchBatchPrices?.([indexKey], true);
+      const curPrices = useStore.getState().prices;
+      liveSpot = curPrices[indexKey]?.ltp || 0;
+    }
+
     const fallbackSpots = {
       'NIFTY': 24500, 'BANKNIFTY': 51000, 'FINNIFTY': 23000, 'SENSEX': 80000, 'MIDCPNIFTY': 12500,
       'BANKEX': 57000, 'CRUDEOIL': 6500, 'NATURALGAS': 220, 'GOLD': 72000, 'SILVER': 85000,
@@ -663,7 +755,7 @@ export default function BasketModal() {
     };
 
     const spotPrice = liveSpot > 0 ? liveSpot : (fallbackSpots[targetUnderlying] || 1000);
-    const lotsize = getInstantLotsize(targetUnderlying) || 1;
+    const defaultLotsize = getInstantLotsize(targetUnderlying) || 1;
 
     let newItems = [];
 
@@ -689,7 +781,7 @@ export default function BasketModal() {
         if (data) {
           return {
             symbol: data.symbol,
-            lotsize: data.lotsize || lotsize,
+            lotsize: data.lotsize || defaultLotsize,
             strike: stk,
             optionType: optType,
             expiry: activeExpiry,
@@ -715,8 +807,8 @@ export default function BasketModal() {
         if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
       } else if (type === 'STRANGLE') {
-        const leg1 = getContract(atmIndex + 3, 'CE');
-        const leg2 = getContract(atmIndex - 3, 'PE');
+        const leg1 = getContract(atmIndex + 2, 'CE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
         if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
       } else if (type === 'IRON_CONDOR') {
@@ -731,59 +823,11 @@ export default function BasketModal() {
       }
     }
 
-    // Fallback if chain data not loaded yet
-    if (newItems.length === 0) {
-      let step = 50;
-      if (targetUnderlying === 'BANKNIFTY' || targetUnderlying === 'SENSEX' || targetUnderlying === 'BANKEX') step = 100;
-      else if (targetUnderlying === 'MIDCPNIFTY') step = 25;
-      else if (targetUnderlying === 'NATURALGAS') step = 5;
-      else if (targetUnderlying === 'GOLD') step = 100;
-      else if (targetUnderlying === 'SILVER') step = 250;
-      else if (targetUnderlying === 'COPPER' || targetUnderlying === 'ZINC' || targetUnderlying === 'ALUMINIUM') step = 5;
-      
-      const roundedStrike = Math.round(spotPrice / step) * step;
-      const now = new Date();
-      const yr = String(now.getFullYear()).slice(-2);
-      const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-      const mo = months[now.getMonth()];
-      const symPrefix = `${exch}:${targetUnderlying}${yr}${mo}`;
-
-      if (type === 'BULL_CALL_SPREAD') {
-        newItems = [
-          { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike, optionType: 'CE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike + (step * 2), optionType: 'CE', underlying: targetUnderlying }
-        ];
-      } else if (type === 'BEAR_PUT_SPREAD') {
-        newItems = [
-          { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike, optionType: 'PE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike - (step * 2), optionType: 'PE', underlying: targetUnderlying }
-        ];
-      } else if (type === 'STRADDLE') {
-        newItems = [
-          { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike, optionType: 'CE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike, optionType: 'PE', underlying: targetUnderlying }
-        ];
-      } else if (type === 'STRANGLE') {
-        newItems = [
-          { symbol: `${symPrefix}${roundedStrike + (step * 3)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike + (step * 3), optionType: 'CE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike - (step * 3)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike - (step * 3), optionType: 'PE', underlying: targetUnderlying }
-        ];
-      } else if (type === 'IRON_CONDOR') {
-        newItems = [
-          { symbol: `${symPrefix}${roundedStrike + (step * 4)}CE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike + (step * 4), optionType: 'CE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike + (step * 2)}CE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike + (step * 2), optionType: 'CE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike - (step * 2)}PE`, side: 'SELL', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike - (step * 2), optionType: 'PE', underlying: targetUnderlying },
-          { symbol: `${symPrefix}${roundedStrike - (step * 4)}PE`, side: 'BUY', quantity: globalMultiplier, lotsize, orderType: 'MARKET', price: '', strike: roundedStrike - (step * 4), optionType: 'PE', underlying: targetUnderlying }
-        ];
-      }
-    }
-
-    useStore.setState({ basketItems: newItems });
-    newItems.forEach(i => {
-      useStore.getState().subscribeToSymbol?.(i.symbol);
-    });
-    if (useStore.getState().fetchBatchPrices) {
-      useStore.getState().fetchBatchPrices(newItems.map(i => i.symbol));
+    if (newItems.length > 0) {
+      useStore.setState({ basketItems: newItems });
+      const symsToSub = newItems.map(i => i.symbol);
+      symsToSub.forEach(s => useStore.getState().subscribeToSymbol?.(s));
+      useStore.getState().fetchBatchPrices?.(symsToSub, true);
     }
   };
 
@@ -791,16 +835,7 @@ export default function BasketModal() {
   const handleLegStrikeStep = async (index, direction) => {
     const item = enhancedItems[index];
     const underlying = item.underlying || selectedUnderlying;
-    let chain = chainsCacheRef.current[underlying];
-    if (!chain) {
-      try {
-        const res = await fetch(`${API}/api/options/chain/${underlying}`);
-        if (res.ok) {
-          chain = await res.json();
-          chainsCacheRef.current[underlying] = chain;
-        }
-      } catch (e) {}
-    }
+    const chain = await ensureOptionChain(underlying);
     const legExpiry = item.expiry || selectedExpiry || (chain ? Object.keys(chain)[0] : null);
     if (!chain || !legExpiry || !chain[legExpiry]) return;
 
@@ -831,7 +866,7 @@ export default function BasketModal() {
           underlying: underlying
         });
         useStore.getState().subscribeToSymbol?.(contract.symbol);
-        useStore.getState().fetchBatchPrices?.([contract.symbol]);
+        useStore.getState().fetchBatchPrices?.([contract.symbol], true);
       }
     }
   };
@@ -840,16 +875,7 @@ export default function BasketModal() {
   const handleLegExpiryChange = async (index, newExpiry) => {
     const item = enhancedItems[index];
     const underlying = item.underlying || selectedUnderlying;
-    let chain = chainsCacheRef.current[underlying];
-    if (!chain) {
-      try {
-        const res = await fetch(`${API}/api/options/chain/${underlying}`);
-        if (res.ok) {
-          chain = await res.json();
-          chainsCacheRef.current[underlying] = chain;
-        }
-      } catch (e) {}
-    }
+    const chain = await ensureOptionChain(underlying);
     if (!chain || !chain[newExpiry]) return;
 
     const availableStrikes = Object.keys(chain[newExpiry]).map(Number).sort((a,b) => a - b);
@@ -870,7 +896,7 @@ export default function BasketModal() {
         underlying: underlying
       });
       useStore.getState().subscribeToSymbol?.(contract.symbol);
-      useStore.getState().fetchBatchPrices?.([contract.symbol]);
+      useStore.getState().fetchBatchPrices?.([contract.symbol], true);
     }
   };
 
@@ -878,16 +904,7 @@ export default function BasketModal() {
   const handleLegTypeToggle = async (index) => {
     const item = enhancedItems[index];
     const underlying = item.underlying || selectedUnderlying;
-    let chain = chainsCacheRef.current[underlying];
-    if (!chain) {
-      try {
-        const res = await fetch(`${API}/api/options/chain/${underlying}`);
-        if (res.ok) {
-          chain = await res.json();
-          chainsCacheRef.current[underlying] = chain;
-        }
-      } catch (e) {}
-    }
+    const chain = await ensureOptionChain(underlying);
     const legExpiry = item.expiry || selectedExpiry || (chain ? Object.keys(chain)[0] : null);
     const curStrike = item.optionStrike || item.strike;
     const targetType = item.typeStr === 'CE' ? 'PE' : 'CE';
@@ -903,7 +920,7 @@ export default function BasketModal() {
         underlying: underlying
       });
       useStore.getState().subscribeToSymbol?.(contract.symbol);
-      useStore.getState().fetchBatchPrices?.([contract.symbol]);
+      useStore.getState().fetchBatchPrices?.([contract.symbol], true);
     } else {
       let newSym = item.symbol;
       if (item.symbol.endsWith('CE')) newSym = item.symbol.slice(0, -2) + 'PE';
@@ -913,7 +930,7 @@ export default function BasketModal() {
         optionType: targetType
       });
       useStore.getState().subscribeToSymbol?.(newSym);
-      useStore.getState().fetchBatchPrices?.([newSym]);
+      useStore.getState().fetchBatchPrices?.([newSym], true);
     }
   };
 
@@ -1105,7 +1122,7 @@ export default function BasketModal() {
             </span>
             <select
               value={selectedExpiry}
-              onChange={(e) => setSelectedExpiry(e.target.value)}
+              onChange={(e) => handleGlobalExpiryChange(e.target.value)}
               style={{
                 background: 'var(--bg-panel)',
                 border: '1px solid #3b82f6',
