@@ -659,7 +659,7 @@ function App() {
             </div>
           )}
           {activeTab === 'Reports' && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
               <Suspense fallback={<TabLoader />}>
                 <ReportsView onBack={() => setActiveTab('ClientData')} />
               </Suspense>

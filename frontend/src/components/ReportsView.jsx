@@ -1739,18 +1739,18 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
   ];
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '12px 8px 60px 8px' : '32px', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg-dark)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ flex: 1, padding: isMobile ? '12px 10px 60px 10px' : '20px 32px 48px 32px', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '28px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <div 
           onClick={onBack} 
-          style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={18} />
         </div>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>Reports & Statements</h2>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>View and download your official trading statements</div>
+          <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>Reports & Statements</h2>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>View and download your official trading statements, ledger, and analytics</div>
         </div>
       </div>
 
@@ -1763,8 +1763,8 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
             style={{
               fontSize: isMobile ? '13px' : '14px',
               fontWeight: '600',
-              color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
-              borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
+              color: activeTab === tab ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+              borderBottom: activeTab === tab ? '2px solid var(--color-blue-light)' : '2px solid transparent',
               paddingBottom: '10px',
               marginBottom: '-1px',
               cursor: 'pointer',
@@ -1779,7 +1779,7 @@ export default function ReportsView({ initialTab = 'Statement - Ledger', onBack 
       </div>
 
       {/* Content */}
-      <div style={{ minHeight: '400px' }}>
+      <div style={{ minHeight: '400px', width: '100%' }}>
         {activeTab === 'Trading Journal' && <TradingJournalView onBack={() => setActiveTab('Trading Insights')} />}
         {activeTab === 'Statement - Ledger' && <LedgerStatement />}
         {activeTab === 'Trades and Charges' && <TradesAndCharges />}
