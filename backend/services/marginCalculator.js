@@ -11,6 +11,18 @@ try {
     console.error('Failed to load lotsizeMap in marginCalculator:', e);
 }
 
+let dynamicMarginOverrides = {};
+
+function setDynamicMarginOverrides(overrides) {
+    if (overrides && typeof overrides === 'object') {
+        dynamicMarginOverrides = { ...dynamicMarginOverrides, ...overrides };
+    }
+}
+
+function getDynamicMarginOverrides() {
+    return dynamicMarginOverrides;
+}
+
 function isDerivativeContract(sym) {
     if (!sym || typeof sym !== 'string') return false;
     const clean = sym.includes(':') ? sym.split(':')[1] : sym;
@@ -99,6 +111,9 @@ function getFuturesMarginRate(symbol) {
   if (!symbol) return 0.185;
   const upper = String(symbol).toUpperCase().replace(/^(NSE:|BSE:|MCX:)/i, '');
 
+  for (const [key, rate] of Object.entries(dynamicMarginOverrides)) {
+    if (upper.startsWith(key.toUpperCase())) return Number(rate);
+  }
   for (const [key, rate] of Object.entries(COMMODITY_FUTURES_MARGIN_RATES)) {
     if (upper.startsWith(key)) return rate;
   }
@@ -199,6 +214,8 @@ function calculateOrderMargin({
 module.exports = {
   getFuturesMarginRate,
   calculateOrderMargin,
+  setDynamicMarginOverrides,
+  getDynamicMarginOverrides,
   STOCK_FUTURES_MARGIN_RATES,
   COMMODITY_FUTURES_MARGIN_RATES,
   INDEX_FUTURES_MARGIN_RATES

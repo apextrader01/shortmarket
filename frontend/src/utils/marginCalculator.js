@@ -1,5 +1,17 @@
 ﻿import { getInstantLotsize, isDerivativeContract, isCommodityContract } from './lotsizeHelper';
 
+let dynamicMarginOverrides = {};
+
+export function setDynamicMarginOverrides(overrides) {
+  if (overrides && typeof overrides === 'object') {
+    dynamicMarginOverrides = { ...dynamicMarginOverrides, ...overrides };
+  }
+}
+
+export function getDynamicMarginOverrides() {
+  return dynamicMarginOverrides;
+}
+
 // Exchange SPAN + Exposure Margin Rates for Stock Futures (NSE Official)
 export const STOCK_FUTURES_MARGIN_RATES = {
   TCS: 0.1825,         // 18.25% (matches Fyers ₹95,245.638 on ₹5,21,842.50)
@@ -64,6 +76,11 @@ export const INDEX_FUTURES_MARGIN_RATES = {
 export function getFuturesMarginRate(symbol) {
   if (!symbol) return 0.185;
   const upper = String(symbol).toUpperCase().replace(/^(NSE:|BSE:|MCX:)/i, '');
+
+  // 0. Dynamic Overrides (from Admin / Live broker sync)
+  for (const [key, rate] of Object.entries(dynamicMarginOverrides)) {
+    if (upper.startsWith(key.toUpperCase())) return Number(rate);
+  }
 
   // 1. Commodity Check
   for (const [key, rate] of Object.entries(COMMODITY_FUTURES_MARGIN_RATES)) {
