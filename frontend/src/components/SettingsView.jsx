@@ -422,6 +422,58 @@ export function BiometricSettingsSection({ user }) {
             </button>
           </div>
         </div>
+
+        {/* Auto-Lock Inactivity Timer Card (Side-by-Side) */}
+        {pinEnabled && (
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            padding: '18px',
+            borderRadius: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: autoLockMinutes > 0 ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
+                <Clock size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Auto-Lock Timer</div>
+                <div style={{ fontSize: '11.5px', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                  {autoLockMinutes === 0 ? '⚡ Immediately on Background' : autoLockMinutes === -1 ? 'Off / Never' : `Locks after ${autoLockMinutes}m idle`}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {AUTO_LOCK_OPTIONS.map(opt => {
+                const isSel = autoLockMinutes === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleSelectAutoLock(opt.value)}
+                    style={{
+                      padding: '5px 8px',
+                      borderRadius: '5px',
+                      background: isSel ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.04)',
+                      border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      color: isSel ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: isSel ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PIN Setup Form Overlay / Modal */}
@@ -464,54 +516,6 @@ export function BiometricSettingsSection({ user }) {
               Save PIN
             </button>
           </form>
-        </div>
-      )}
-
-      {/* Auto-Lock Inactivity Timer Options */}
-      {pinEnabled && (
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          padding: '16px 18px',
-          borderRadius: '10px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}>
-          <div>
-            <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Clock size={16} color="var(--color-blue-light)" /> Auto-Lock Inactivity Timer
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Automatically lock terminal after period of inactivity or backgrounding
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {AUTO_LOCK_OPTIONS.map(opt => {
-              const isSel = autoLockMinutes === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => handleSelectAutoLock(opt.value)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    background: isSel ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                    border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                    color: isSel ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                    fontSize: '11.5px',
-                    fontWeight: isSel ? '700' : '500',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
 

@@ -654,7 +654,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             </div>
 
             {/* 🔐 Biometric & 4-Digit PIN Security */}
-            <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)' }}>
+            <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', gridColumn: isMobile ? '1' : '1 / -1' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Fingerprint size={16} color="var(--color-blue-light)" /> Quick App Unlock (4-Digit PIN & Biometrics)
