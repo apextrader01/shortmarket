@@ -7,7 +7,7 @@ import {
   HelpCircle, Video, Plus, Settings, Sun, Moon, User, ChevronDown, 
   ArrowUpRight, ArrowDownRight, Wallet, Award, BarChart3, Clock, 
   Flame, Check, X, Edit3, Trash2, Search, Filter, RefreshCw, ExternalLink,
-  BookOpen, ChevronRight, Lock, PlayCircle, Star, ThumbsUp, AlertCircle
+  BookOpen, ChevronRight, Lock, PlayCircle, Star, ThumbsUp, AlertCircle, Menu
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
@@ -58,6 +58,14 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
   // Navigation state: which Trade Diary sub-view is active
   const [activeTab, setActiveTab] = useState('DASHBOARD');
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 850);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Filter states
   const [marketSegment, setMarketSegment] = useState('Indian'); // 'Indian', 'Crypto', 'Forex', 'US'
@@ -436,51 +444,91 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       overflow: 'hidden'
     }}>
+      {/* Mobile Drawer Backdrop */}
+      {isMobile && showMobileSidebar && (
+        <div 
+          onClick={() => setShowMobileSidebar(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 49
+          }}
+        />
+      )}
+
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/* ── LEFT SIDEBAR ────────────────────────────────────────────────── */}
       {/* ══════════════════════════════════════════════════════════════════ */}
       <aside style={{
-        width: '230px',
-        minWidth: '230px',
+        width: '240px',
+        minWidth: '240px',
         backgroundColor: '#0f172a',
         borderRight: '1px solid #1e293b',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         overflowY: 'auto',
-        zIndex: 20
+        zIndex: isMobile ? 50 : 20,
+        position: isMobile ? 'fixed' : 'relative',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        transform: isMobile && !showMobileSidebar ? 'translateX(-100%)' : 'translateX(0)',
+        transition: 'transform 0.25s ease-in-out',
+        boxShadow: isMobile && showMobileSidebar ? '4px 0 24px rgba(0,0,0,0.6)' : 'none'
       }}>
         {/* Brand Header */}
         <div style={{
           padding: '18px 20px',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
+          justifyContent: 'space-between',
           borderBottom: '1px solid #1e293b'
         }}>
-          <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ffffff',
-            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-          }}>
-            <Check size={18} strokeWidth={3} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+            }}>
+              <Check size={18} strokeWidth={3} />
+            </div>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: '800',
+              letterSpacing: '-0.3px',
+              background: 'linear-gradient(90deg, #ffffff, #93c5fd)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              Trade Diary
+            </span>
           </div>
-          <span style={{
-            fontSize: '18px',
-            fontWeight: '800',
-            letterSpacing: '-0.3px',
-            background: 'linear-gradient(90deg, #ffffff, #93c5fd)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
-            Trade Diary
-          </span>
+
+          {isMobile && (
+            <button
+              onClick={() => setShowMobileSidebar(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {/* Sidebar Menu Items */}
@@ -493,6 +541,7 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
               <button
                 key={item.id}
                 onClick={() => {
+                  if (isMobile) setShowMobileSidebar(false);
                   if (item.isBridge) {
                     if (onOpenPaperTrading) {
                       onOpenPaperTrading();
@@ -611,37 +660,60 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: isMobile ? '0 12px' : '0 24px',
           flexShrink: 0
         }}>
-          {/* Index Tickers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', overflowX: 'auto' }}>
-            {indexList.map((idx) => {
-              const live = prices[idx.key];
-              const pct = live ? Number(live.pct) : idx.fallbackPct;
-              const isPositive = pct >= 0;
+          {/* Left: Mobile Menu Toggle + Index Tickers */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflowX: 'auto' }}>
+            {isMobile && (
+              <button
+                onClick={() => setShowMobileSidebar(true)}
+                title="Open Navigation"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px'
+                }}
+              >
+                <Menu size={22} color="#f8fafc" />
+              </button>
+            )}
 
-              return (
-                <div
-                  key={idx.name}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '12px',
-                    fontWeight: '600'
-                  }}
-                >
-                  <span style={{ color: '#cbd5e1' }}>{idx.name}:</span>
-                  <span style={{
-                    color: isPositive ? '#10b981' : '#ef4444',
-                    fontWeight: '700'
-                  }}>
-                    {isPositive ? '+' : ''}{pct.toFixed(2)}%
-                  </span>
-                </div>
-              );
-            })}
+            {/* Index Tickers */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflowX: 'auto' }}>
+              {indexList.map((idx) => {
+                const live = prices[idx.key];
+                const pct = live ? Number(live.pct) : idx.fallbackPct;
+                const isPositive = pct >= 0;
+
+                return (
+                  <div
+                    key={idx.name}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    <span style={{ color: '#cbd5e1' }}>{idx.name}:</span>
+                    <span style={{
+                      color: isPositive ? '#10b981' : '#ef4444',
+                      fontWeight: '700'
+                    }}>
+                      {isPositive ? '+' : ''}{pct.toFixed(2)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Right Topbar Controls */}
