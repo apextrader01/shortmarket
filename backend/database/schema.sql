@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     upi_id TEXT,
     bank_account_no TEXT,
     bank_ifsc TEXT,
+    address TEXT,
     is_admin BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

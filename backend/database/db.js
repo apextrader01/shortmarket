@@ -52,6 +52,7 @@ async function initSchema() {
         table.string('upi_id');
         table.string('bank_account_no');
         table.string('bank_ifsc');
+        table.text('address');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -96,6 +97,14 @@ async function initSchema() {
           table.string('bank_ifsc');
         });
         console.log('Added Bank & UPI columns to users table');
+      }
+
+      const hasAddress = await db.schema.hasColumn('users', 'address');
+      if (!hasAddress) {
+        await db.schema.alterTable('users', table => {
+          table.text('address');
+        });
+        console.log('Added address column to users table');
       }
 
       const hasIsAdmin = await db.schema.hasColumn('users', 'is_admin');
@@ -539,6 +548,7 @@ async function ensureCriticalColumns() {
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id VARCHAR(255)');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(255)');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(50)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT');
 
     // Ensure reward_withdrawals table always exists
     await db.raw(`

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2 } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -16,7 +16,56 @@ import {
 } from '../utils/biometricAuth';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier, updateBankDetails } = useStore(useShallow(state => ({ user: state.user, updatePassword: state.updatePassword, logout: state.logout, oneClickMode: state.oneClickMode, setOneClickMode: state.setOneClickMode, oneClickMultiplier: state.oneClickMultiplier, setOneClickMultiplier: state.setOneClickMultiplier, updateBankDetails: state.updateBankDetails })));
+  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails } = useStore(useShallow(state => ({ 
+    user: state.user, 
+    updatePassword: state.updatePassword, 
+    logout: state.logout, 
+    oneClickMode: state.oneClickMode, 
+    setOneClickMode: state.setOneClickMode, 
+    oneClickMultiplier: state.oneClickMultiplier, 
+    setOneClickMultiplier: state.setOneClickMultiplier, 
+    updateBankDetails: state.updateBankDetails,
+    updateUserDetails: state.updateUserDetails
+  })));
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    phone: user?.phone || '',
+    pan_card: user?.pan_card || '',
+    address: user?.address || ''
+  });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        phone: user.phone || '',
+        pan_card: user.pan_card || '',
+        address: user.address || ''
+      });
+      setBankDetails({
+        upi_id: user.upi_id || '',
+        bank_account_no: user.bank_account_no || '',
+        bank_ifsc: user.bank_ifsc || ''
+      });
+    }
+  }, [user]);
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileMsg({ type: '', text: '' });
+    const res = await updateUserDetails(profileForm);
+    if (res.success) {
+      setProfileMsg({ type: 'success', text: 'Profile details updated successfully!' });
+      setIsEditingProfile(false);
+      setTimeout(() => setProfileMsg({ type: '', text: '' }), 3000);
+    } else {
+      setProfileMsg({ type: 'error', text: res.error || 'Failed to update profile details' });
+    }
+    setProfileLoading(false);
+  };
 
   const [bankDetails, setBankDetails] = useState({
     upi_id: user?.upi_id || '',
@@ -33,6 +82,7 @@ export default function SettingsView() {
     try {
       await updateBankDetails(bankDetails);
       setBankMsg({ type: 'success', text: 'Bank details updated successfully!' });
+      setTimeout(() => setBankMsg({ type: '', text: '' }), 3000);
     } catch(err) {
       setBankMsg({ type: 'error', text: err.message });
     }
@@ -84,28 +134,116 @@ export default function SettingsView() {
       <div className="settings-grid">
         
         {/* Profile Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={18} color="var(--color-blue)" /> Profile Information
-          </h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Username</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.username}</div>
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <User size={18} color="var(--color-blue)" /> Profile Information
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setIsEditingProfile(!isEditingProfile); setProfileMsg({ type: '', text: '' }); }}
+                style={{
+                  background: isEditingProfile ? 'var(--bg-hover)' : 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid var(--border-color)',
+                  color: isEditingProfile ? 'var(--text-secondary)' : 'var(--color-blue-light)',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'background 0.15s'
+                }}
+              >
+                <Edit3 size={13} /> {isEditingProfile ? 'Cancel' : 'Edit Details'}
+              </button>
             </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={12}/> Email Address</div>
-              <div style={{ fontSize: '14px', fontWeight: '500', wordBreak: 'break-all' }}>{user?.email}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={12}/> Phone Number</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.phone || 'Not provided'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={12}/> PAN Card</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.pan_card || 'Not provided'}</div>
-            </div>
+
+            {profileMsg.text && (
+              <div style={{ 
+                padding: '10px 14px', 
+                borderRadius: '6px', 
+                marginBottom: '16px', 
+                background: profileMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', 
+                color: profileMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', 
+                fontSize: '13px', 
+                border: `1px solid ${profileMsg.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}` 
+              }}>
+                {profileMsg.text}
+              </div>
+            )}
+
+            {!isEditingProfile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Username</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.username}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={12}/> Email Address</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500', wordBreak: 'break-all' }}>{user?.email}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={12}/> Phone Number</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.phone || 'Not provided'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={12}/> PAN Card</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.pan_card || 'Not provided'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={12}/> Address</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{user?.address || 'Not provided'}</div>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    value={profileForm.phone}
+                    onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    placeholder="e.g. 9876543210"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>PAN Card</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={profileForm.pan_card}
+                    onChange={e => setProfileForm({ ...profileForm, pan_card: e.target.value.toUpperCase() })}
+                    placeholder="e.g. ABCDE1234F"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Residential / Communication Address</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={profileForm.address}
+                    onChange={e => setProfileForm({ ...profileForm, address: e.target.value })}
+                    placeholder="Enter complete address (House No, Street, City, State, PIN Code)"
+                    style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box', minHeight: '70px', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                  <button type="submit" className="btn btn-primary" disabled={profileLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {profileLoading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {profileLoading ? 'Saving...' : 'Save Profile Details'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditingProfile(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 

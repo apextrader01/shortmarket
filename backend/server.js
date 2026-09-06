@@ -1083,9 +1083,15 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
 
 app.post('/api/user/details', authenticateToken, async (req, res) => {
   try {
-    const { phone, pan_card, aadhar_number } = req.body;
-    await db('users').where({ id: req.user.id }).update({ phone, pan_card, aadhar_number });
-    res.json({ success: true, phone, pan_card, aadhar_number });
+    const { phone, pan_card, aadhar_number, address } = req.body;
+    const updateObj = {};
+    if (phone !== undefined) updateObj.phone = phone;
+    if (pan_card !== undefined) updateObj.pan_card = pan_card;
+    if (aadhar_number !== undefined) updateObj.aadhar_number = aadhar_number;
+    if (address !== undefined) updateObj.address = address;
+
+    await db('users').where({ id: req.user.id }).update(updateObj);
+    res.json({ success: true, ...updateObj });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

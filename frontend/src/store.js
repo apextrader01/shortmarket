@@ -938,7 +938,31 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  
+  updateUserDetails: async (details) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/user/details`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(details),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        set({ user: { ...get().user, ...details } });
+        if (get().fetchUserData) get().fetchUserData();
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Failed to update profile details' };
+      }
+    } catch(err) {
+      return { success: false, error: err.message };
+    }
+  },
+
   updateBankDetails: async (details) => {
     try {
       const token = localStorage.getItem('token');
