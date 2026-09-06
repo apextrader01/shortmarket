@@ -543,8 +543,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
         <div>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Coming Features</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
-            <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.045% interest per day" color="#A855F7" badge="Coming Soon" />
-            <Card title="Option Chain" desc="Advanced options trading with strategy builder" color="#3B82F6" onClick={() => setActiveTab('Options')} badge="Coming Soon" />
+            <Card title="MTF (Margin Trading Facility)" desc="Buy upto 4 times quantity of equity stocks with just 0.045% interest per day" color="#A855F7" badge="Coming Soon" />
           </div>
         </div>
 

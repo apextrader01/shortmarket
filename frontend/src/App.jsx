@@ -538,7 +538,7 @@ function App() {
               fontSize: '10px', fontWeight: '700', marginRight: '4px',
             }}>
               {[
-                'Markets', 'Positions', 'Orders', 'Options', 'Portfolio', 'Mutual Funds', 'Leaderboard', 'Journal',
+                'Markets', 'Positions', 'Orders', 'Portfolio', 'Mutual Funds', 'Leaderboard', 'Journal',
                 ...(user?.is_admin ? ['Admin Panel'] : [])
               ].map((tab) => {
                 const tabKey = tab.replace(' ', ''); // e.g. "Mutual Funds" -> "MutualFunds"
@@ -730,7 +730,6 @@ function App() {
             { label: 'Markets', icon: TrendingUp },
             { label: 'Positions', icon: Briefcase },
             { label: 'Orders', icon: List },
-            { label: 'Options Chain', icon: LineChart },
             { label: 'Portfolio', icon: Briefcase },
             { label: 'Leaderboard', icon: Trophy },
             { label: 'Trading Journal', icon: BookOpen },
@@ -741,7 +740,7 @@ function App() {
             { label: 'About Us', icon: Info },
             ...(user?.is_admin ? [{ label: 'Admin Panel', icon: ShieldCheck }] : [])
           ].map(tab => (
-            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label === 'Trading Journal' ? 'Journal' : (tab.label === 'Options Chain' ? 'Options' : tab.label.replace(' ', ''))); setShowMobileMenu(false); }}>
+            <div key={tab.label} className="mobile-menu-item" onClick={() => { setActiveTab(tab.label === 'Trading Journal' ? 'Journal' : tab.label.replace(' ', '')); setShowMobileMenu(false); }}>
               <tab.icon size={20} />
               {tab.label}
             </div>
