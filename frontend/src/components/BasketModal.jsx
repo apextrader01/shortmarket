@@ -94,11 +94,11 @@ const MCX_LIST = ['CRUDEOIL', 'NATURALGAS', 'GOLD', 'SILVER', 'COPPER', 'ZINC', 
 const POPULAR_STOCKS_LIST = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN', 'ICICIBANK', 'TATAMOTORS', 'BAJFINANCE', 'BHARTIARTL', 'ITC', 'KOTAKBANK', 'LT', 'AXISBANK'];
 
 const STRATEGY_PRESETS = [
-  { id: 'BULL_CALL_SPREAD', label: '🐂 Bull Call', color: '#22c55e', bgActive: '#16a34a', bgInactive: 'rgba(34,197,94,0.12)', borderInactive: 'rgba(34,197,94,0.3)', textInactive: '#4ade80' },
-  { id: 'BEAR_PUT_SPREAD', label: '🐻 Bear Put', color: '#ef4444', bgActive: '#dc2626', bgInactive: 'rgba(239,68,68,0.12)', borderInactive: 'rgba(239,68,68,0.3)', textInactive: '#ef4444' },
-  { id: 'STRADDLE', label: '⚡ Straddle', color: '#3b82f6', bgActive: '#2563eb', bgInactive: 'rgba(59,130,246,0.12)', borderInactive: 'rgba(59,130,246,0.3)', textInactive: 'var(--color-blue-light)' },
-  { id: 'STRANGLE', label: '🎯 Strangle', color: '#f59e0b', bgActive: '#d97706', bgInactive: 'rgba(245,158,11,0.12)', borderInactive: 'rgba(245,158,11,0.3)', textInactive: '#fbbf24' },
-  { id: 'IRON_CONDOR', label: '🦅 Iron Condor', color: '#a855f7', bgActive: '#9333ea', bgInactive: 'rgba(168,85,247,0.12)', borderInactive: 'rgba(168,85,247,0.3)', textInactive: '#c084fc' }
+  { id: 'BULL_CALL_SPREAD', label: '🐂 Bull Call', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+  { id: 'BEAR_PUT_SPREAD', label: '🐻 Bear Put', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+  { id: 'STRADDLE', label: '⚡ Straddle', color: '#2563eb', bgActive: '#2563eb', bgInactive: 'rgba(37,99,235,0.12)', borderInactive: 'rgba(37,99,235,0.3)', textInactive: '#2563eb' },
+  { id: 'STRANGLE', label: '🎯 Strangle', color: '#d97706', bgActive: '#d97706', bgInactive: 'rgba(217,119,6,0.12)', borderInactive: 'rgba(217,119,6,0.3)', textInactive: '#d97706' },
+  { id: 'IRON_CONDOR', label: '🦅 Iron Condor', color: '#9333ea', bgActive: '#9333ea', bgInactive: 'rgba(147,51,234,0.12)', borderInactive: 'rgba(147,51,234,0.3)', textInactive: '#9333ea' }
 ];
 
 export default function BasketModal() {
@@ -950,12 +950,12 @@ export default function BasketModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(3px)',
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
-        width: '840px', maxWidth: '96vw', background: 'var(--bg-dark)', borderRadius: '10px', 
-        border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
+        width: '840px', maxWidth: '96vw', background: 'var(--bg-panel)', borderRadius: '10px', 
+        border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
         display: 'flex', flexDirection: 'column', maxHeight: '88vh'
       }}>
         
@@ -963,19 +963,19 @@ export default function BasketModal() {
         <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ShoppingBag size={20} color="var(--color-blue)" />
-            <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Basket & Multi-Leg Strategy Builder ({basketItems.length})</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Basket & Multi-Leg Strategy Builder ({basketItems.length})</h2>
           </div>
           <button onClick={() => setBasketModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
         {/* Underlying Asset Filter & Search Bar */}
-        <div style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ padding: '10px 20px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           
           {/* Controls Header: Category Tabs + Search Input */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             
             {/* Category Tabs */}
-            <div style={{ display: 'flex', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-panel)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
               {['ALL', 'INDICES', 'MCX', 'STOCKS'].map(cat => {
                 const isActive = underlyingCategory === cat;
                 return (
@@ -1021,7 +1021,7 @@ export default function BasketModal() {
                     setUnderlyingSearch(e.target.value);
                     setShowUnderlyingDropdown(true);
                   }}
-                  style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '11.5px', outline: 'none', flex: 1 }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '11.5px', outline: 'none', flex: 1 }}
                 />
                 {underlyingSearch && (
                   <X size={13} color="var(--text-secondary)" style={{ cursor: 'pointer' }} onClick={() => setUnderlyingSearch('')} />
@@ -1035,7 +1035,7 @@ export default function BasketModal() {
                   maxHeight: '220px', overflowY: 'auto',
                   background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
                   borderRadius: '6px', marginTop: '4px', zIndex: 100,
-                  boxShadow: '0 10px 25px rgba(0,0,0,0.8)'
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.4)'
                 }}>
                   {filteredUnderlyings.length > 0 ? (
                     filteredUnderlyings.map(sym => {
@@ -1055,20 +1055,20 @@ export default function BasketModal() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            borderBottom: '1px solid var(--border-color)',
                             background: isSel ? 'rgba(59,130,246,0.15)' : 'transparent',
                             cursor: 'pointer',
                             transition: 'background 0.1s ease'
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card)'}
                           onMouseLeave={e => e.currentTarget.style.background = isSel ? 'rgba(59,130,246,0.15)' : 'transparent'}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: isSel ? '#60a5fa' : '#fff' }}>{sym}</span>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: isSel ? 'var(--color-blue)' : 'var(--text-primary)' }}>{sym}</span>
                             <span style={{ 
                               fontSize: '9.5px', padding: '1px 5px', borderRadius: '3px', fontWeight: '700',
                               background: type === 'INDEX' ? 'rgba(59,130,246,0.2)' : (type === 'MCX' ? 'rgba(245,158,11,0.2)' : 'rgba(168,85,247,0.2)'),
-                              color: type === 'INDEX' ? '#60a5fa' : (type === 'MCX' ? '#fbbf24' : '#c084fc')
+                              color: type === 'INDEX' ? 'var(--color-blue)' : (type === 'MCX' ? '#d97706' : '#9333ea')
                             }}>
                               {type}
                             </span>
@@ -1101,8 +1101,8 @@ export default function BasketModal() {
                   style={{
                     padding: '3px 9px',
                     borderRadius: '12px',
-                    background: isSel ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
-                    border: isSel ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                    background: isSel ? 'var(--color-blue)' : 'var(--bg-panel)',
+                    border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
                     color: isSel ? '#fff' : 'var(--text-secondary)',
                     fontSize: '11px',
                     fontWeight: isSel ? '700' : '500',
@@ -1121,14 +1121,14 @@ export default function BasketModal() {
 
         {/* Expiry Selector & 1-Click Strategy Presets Bar */}
         <div style={{ 
-          padding: '8px 20px', background: 'rgba(255,255,255,0.02)', 
+          padding: '8px 20px', background: 'var(--bg-card)', 
           borderBottom: '1px solid var(--border-color)', 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
           gap: '12px', flexWrap: 'wrap' 
         }}>
           {/* Expiry Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11.5px', color: '#60a5fa', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '11.5px', color: 'var(--color-blue)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
               <Calendar size={13} /> Expiry:
             </span>
             <select
@@ -1136,8 +1136,8 @@ export default function BasketModal() {
               onChange={(e) => handleGlobalExpiryChange(e.target.value)}
               style={{
                 background: 'var(--bg-panel)',
-                border: '1px solid #3b82f6',
-                color: '#fff',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
                 padding: '4px 8px',
                 borderRadius: '6px',
                 fontSize: '11.5px',
@@ -1203,12 +1203,12 @@ export default function BasketModal() {
 
             {/* Global All Legs Multiplier */}
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '11.5px', color: '#60a5fa', fontWeight: '700' }}>Basket Lots:</span>
+              <span style={{ fontSize: '11.5px', color: 'var(--color-blue)', fontWeight: '700' }}>Basket Lots:</span>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-panel)', overflow: 'hidden' }}>
                 <button
                   type="button"
                   onClick={() => handleGlobalMultiplierChange(Math.max(1, globalMultiplier - 1))}
-                  style={{ width: '24px', height: '24px', background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: '24px', height: '24px', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   title="Decrease all lots"
                 >
                   -
@@ -1219,12 +1219,12 @@ export default function BasketModal() {
                   step="1"
                   value={globalMultiplier}
                   onChange={e => handleGlobalMultiplierChange(parseInt(e.target.value, 10) || 1)}
-                  style={{ width: '34px', height: '24px', textAlign: 'center', background: 'var(--bg-dark)', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', color: '#60a5fa', fontSize: '11.5px', fontWeight: '800', outline: 'none' }}
+                  style={{ width: '34px', height: '24px', textAlign: 'center', background: 'var(--bg-card)', border: 'none', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', color: 'var(--color-blue)', fontSize: '11.5px', fontWeight: '800', outline: 'none' }}
                 />
                 <button
                   type="button"
                   onClick={() => handleGlobalMultiplierChange(globalMultiplier + 1)}
-                  style={{ width: '24px', height: '24px', background: 'transparent', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  style={{ width: '24px', height: '24px', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   title="Increase all lots"
                 >
                   +
@@ -1243,8 +1243,8 @@ export default function BasketModal() {
                       style={{
                         padding: '2px 6px',
                         borderRadius: '4px',
-                        background: isAct ? 'var(--color-blue)' : 'rgba(255,255,255,0.06)',
-                        border: isAct ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                        background: isAct ? 'var(--color-blue)' : 'var(--bg-card)',
+                        border: isAct ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
                         color: isAct ? '#fff' : 'var(--text-secondary)',
                         fontSize: '10px',
                         fontWeight: isAct ? '800' : '600',
@@ -1261,22 +1261,22 @@ export default function BasketModal() {
           </div>
 
           {hedgedMargin > 0 && (
-            <div style={{ fontSize: '10.5px', color: '#4ade80', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '3px 8px', borderRadius: '12px', fontWeight: '700' }}>
+            <div style={{ fontSize: '10.5px', color: 'var(--color-green-light)', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '3px 8px', borderRadius: '12px', fontWeight: '700' }}>
               🛡️ Hedge Benefit Applied
             </div>
           )}
         </div>
 
         {/* Search & Add Any Stock/Option to Basket */}
-        <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '5px 10px' }}>
+        <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border-color)', position: 'relative', background: 'var(--bg-panel)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '5px 10px' }}>
             <Search size={13} color="var(--text-secondary)" />
             <input 
               type="text" 
               placeholder="Search & add any stock, futures, or option to basket (e.g. RELIANCE, NIFTY, TCS)..." 
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '12px', outline: 'none', flex: 1 }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '12px', outline: 'none', flex: 1 }}
             />
             {searchQuery && (
               <X size={13} color="var(--text-secondary)" style={{ cursor: 'pointer' }} onClick={() => setSearchQuery('')} />
@@ -1285,14 +1285,14 @@ export default function BasketModal() {
 
           {/* Autocomplete Dropdown */}
           {searchResults.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: '20px', right: '20px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: '100%', left: '20px', right: '20px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.3)', overflow: 'hidden' }}>
               {searchResults.map((stk, sIdx) => {
                 const sym = stk.uniqueSymbol || stk.symbol;
                 const effectiveLotsize = (stk.lotsize && Number(stk.lotsize) > 1) ? Number(stk.lotsize) : getInstantLotsize(sym);
                 return (
-                  <div key={sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div key={sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>
                     <div>
-                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{sym}</div>
+                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)' }}>{sym}</div>
                       <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{stk.name || stk.exchange} • Lot: {effectiveLotsize}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -1327,7 +1327,7 @@ export default function BasketModal() {
         </div>
 
         {/* Item List / Strategy Legs Table */}
-        <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: '14px 20px', overflowY: 'auto', flex: 1, background: 'var(--bg-panel)' }}>
           {basketItems.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '40px 0', fontSize: '13px' }}>
               Your basket is empty. Select a strategy preset above or search any contract to add.
@@ -1346,7 +1346,7 @@ export default function BasketModal() {
                 return (
                   <div key={index} style={{
                     display: 'flex', alignItems: 'center', padding: '10px 14px',
-                    background: 'var(--bg-panel)', borderRadius: '6px',
+                    background: 'var(--bg-card)', borderRadius: '6px',
                     border: '1px solid var(--border-color)', gap: '10px',
                     flexWrap: 'wrap'
                   }}>
@@ -1376,8 +1376,8 @@ export default function BasketModal() {
                             value={item.expiry || selectedExpiry}
                             onChange={(e) => handleLegExpiryChange(index, e.target.value)}
                             style={{
-                              background: 'var(--bg-dark)', border: '1px solid var(--border-color)',
-                              color: '#60a5fa', padding: '4px 6px', borderRadius: '4px',
+                              background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
+                              color: 'var(--color-blue)', padding: '4px 6px', borderRadius: '4px',
                               fontSize: '11px', fontWeight: '700', outline: 'none', cursor: 'pointer'
                             }}
                           >
@@ -1392,22 +1392,22 @@ export default function BasketModal() {
                         {/* Strike Stepper */}
                         <div style={{ display: 'flex', flexDirection: 'column', minWidth: '105px' }}>
                           <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '2px' }}>STRIKE</span>
-                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-dark)', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-panel)', overflow: 'hidden' }}>
                             <button
                               type="button"
                               onClick={() => handleLegStrikeStep(index, 'DOWN')}
-                              style={{ width: '24px', height: '26px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ width: '24px', height: '26px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
                               title="Lower strike"
                             >
                               -
                             </button>
-                            <span style={{ flex: 1, textAlign: 'center', fontSize: '11.5px', fontWeight: '800', color: '#fff' }}>
+                            <span style={{ flex: 1, textAlign: 'center', fontSize: '11.5px', fontWeight: '800', color: 'var(--text-primary)' }}>
                               {item.optionStrike || item.strike || '-'}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleLegStrikeStep(index, 'UP')}
-                              style={{ width: '24px', height: '26px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ width: '24px', height: '26px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
                               title="Higher strike"
                             >
                               +
@@ -1425,7 +1425,7 @@ export default function BasketModal() {
                               height: '26px', borderRadius: '4px',
                               background: item.typeStr === 'CE' ? 'rgba(59,130,246,0.15)' : 'rgba(234,179,8,0.15)',
                               border: item.typeStr === 'CE' ? '1px solid #3b82f6' : '1px solid #eab308',
-                              color: item.typeStr === 'CE' ? '#60a5fa' : '#facc15',
+                              color: item.typeStr === 'CE' ? 'var(--color-blue)' : '#d97706',
                               fontSize: '11px', fontWeight: '800', cursor: 'pointer'
                             }}
                             title="Click to toggle CE / PE"
@@ -1437,7 +1437,7 @@ export default function BasketModal() {
                     ) : (
                       /* Non-option Symbol Display */
                       <div style={{ flex: 1, minWidth: '160px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>{item.symbol}</div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.symbol}</div>
                         <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Lot: {item.lotsize || 1}</div>
                       </div>
                     )}
@@ -1448,15 +1448,15 @@ export default function BasketModal() {
                         <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                           LOT (×{item.lotsize || 1})
                         </span>
-                        <span style={{ fontSize: '9.5px', color: (item.totalQuantity > getFreezeLimit(item.symbol, item.lotsize)) ? '#fbbf24' : 'var(--text-secondary)', fontWeight: '700' }}>
+                        <span style={{ fontSize: '9.5px', color: (item.totalQuantity > getFreezeLimit(item.symbol, item.lotsize)) ? '#d97706' : 'var(--text-secondary)', fontWeight: '700' }}>
                           {item.totalQuantity} Qty
                         </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-dark)', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-panel)', overflow: 'hidden' }}>
                         <button
                           type="button"
                           onClick={() => updateBasketItem(index, { quantity: Math.max(1, (item.quantity || 1) - 1) })}
-                          style={{ width: '22px', height: '26px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                          style={{ width: '22px', height: '26px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
                         >
                           -
                         </button>
@@ -1465,12 +1465,12 @@ export default function BasketModal() {
                           min="1"
                           value={item.quantity || 1}
                           onChange={(e) => updateBasketItem(index, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                          style={{ width: '45px', height: '26px', background: 'transparent', border: 'none', color: '#fff', fontSize: '11.5px', fontWeight: '700', textAlign: 'center', outline: 'none' }}
+                          style={{ width: '45px', height: '26px', background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '11.5px', fontWeight: '700', textAlign: 'center', outline: 'none' }}
                         />
                         <button
                           type="button"
                           onClick={() => updateBasketItem(index, { quantity: (item.quantity || 1) + 1 })}
-                          style={{ width: '22px', height: '26px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                          style={{ width: '22px', height: '26px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
                         >
                           +
                         </button>
@@ -1490,7 +1490,7 @@ export default function BasketModal() {
                           padding: '3px 7px',
                           fontSize: '10px',
                           fontWeight: '700',
-                          color: '#fbbf24',
+                          color: '#d97706',
                           whiteSpace: 'nowrap'
                         }}
                         title={`Freeze limit is ${getFreezeLimit(item.symbol, item.lotsize)} qty. This leg will be auto-sliced into ${calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize).length} orders on execution.`}
@@ -1515,8 +1515,8 @@ export default function BasketModal() {
                           }}
                           style={{
                             flex: item.orderType === 'LIMIT' ? '0 0 50px' : 1,
-                            height: '26px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)',
-                            color: '#fff', padding: '2px 4px', borderRadius: '4px', fontSize: '11px', outline: 'none', cursor: 'pointer'
+                            height: '26px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)',
+                            color: 'var(--text-primary)', padding: '2px 4px', borderRadius: '4px', fontSize: '11px', outline: 'none', cursor: 'pointer'
                           }}
                         >
                           <option value="MARKET">Mkt</option>
@@ -1530,8 +1530,8 @@ export default function BasketModal() {
                             value={item.price}
                             onChange={(e) => updateBasketItem(index, { price: e.target.value })}
                             style={{
-                              flex: 1, minWidth: 0, height: '26px', background: 'var(--bg-dark)',
-                              border: '1px solid var(--color-blue)', color: '#fff', padding: '2px 4px',
+                              flex: 1, minWidth: 0, height: '26px', background: 'var(--bg-panel)',
+                              border: '1px solid var(--color-blue)', color: 'var(--text-primary)', padding: '2px 4px',
                               borderRadius: '4px', fontSize: '11px', outline: 'none'
                             }}
                           />
@@ -1542,7 +1542,7 @@ export default function BasketModal() {
                     {/* LTP */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', width: '70px', marginLeft: 'auto' }}>
                       <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '2px' }}>LTP</span>
-                      <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#fff' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-primary)' }}>
                         ₹{item.livePrice > 0 ? item.livePrice.toFixed(2) : '-'}
                       </span>
                     </div>
@@ -1564,7 +1564,7 @@ export default function BasketModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ background: 'rgba(0,0,0,0.25)', padding: '14px 20px', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '14px 20px', borderTop: '1px solid var(--border-color)' }}>
           {/* Order Slicing Notice Banner if quantities exceed freeze limits */}
           {totalExecutionSlices > enhancedItems.length && basketItems.length > 0 && (
             <div style={{
@@ -1577,13 +1577,13 @@ export default function BasketModal() {
               alignItems: 'center',
               justifyContent: 'space-between',
               fontSize: '11.5px',
-              color: '#fbbf24'
+              color: '#d97706'
             }}>
               <span>⚡ <strong>Exchange Order Slicing:</strong> Quantities exceed freeze limits and will be split into <strong>{totalExecutionSlices} orders</strong> (₹20 brokerage/order).</span>
               <button
                 type="button"
                 onClick={() => setShowBreakup(true)}
-                style={{ background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer', fontWeight: '700', textDecoration: 'underline', padding: 0 }}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', fontWeight: '700', textDecoration: 'underline', padding: 0 }}
               >
                 View Breakup
               </button>
@@ -1593,7 +1593,7 @@ export default function BasketModal() {
           {isInsufficient && basketItems.length > 0 && (
             <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ background: 'var(--color-yellow)', color: '#000', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '11px' }}>!</div>
-              <div style={{ fontSize: '12px', color: '#fef08a' }}>Insufficient margin! Shortfall: ₹{(finalMargin - balanceNum).toFixed(2)}</div>
+              <div style={{ fontSize: '12px', color: '#d97706' }}>Insufficient margin! Shortfall: ₹{(finalMargin - balanceNum).toFixed(2)}</div>
             </div>
           )}
 
@@ -1601,7 +1601,7 @@ export default function BasketModal() {
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Available Balance</div>
-                <div style={{ fontSize: '13.5px', fontWeight: '700' }}>₹{balanceNum.toFixed(2)}</div>
+                <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>₹{balanceNum.toFixed(2)}</div>
               </div>
               <div>
                 <div style={{ fontSize: '10.5px', color: 'var(--color-blue)', marginBottom: '2px' }}>Combined Margin</div>
@@ -1617,7 +1617,7 @@ export default function BasketModal() {
                     gap: '5px', 
                     background: 'rgba(59, 130, 246, 0.1)', 
                     border: '1px solid rgba(59, 130, 246, 0.25)', 
-                    color: '#60a5fa', 
+                    color: 'var(--color-blue)', 
                     fontSize: '12px', 
                     padding: '6px 10px', 
                     borderRadius: '4px', 
@@ -1634,7 +1634,7 @@ export default function BasketModal() {
               onClick={handleExecute}
               disabled={isInsufficient || isSubmitting || basketItems.length === 0}
               style={{ 
-                background: (isInsufficient || basketItems.length === 0) ? 'var(--bg-panel)' : 'var(--color-blue)', 
+                background: (isInsufficient || basketItems.length === 0) ? 'var(--bg-card)' : 'var(--color-blue)', 
                 color: (isInsufficient || basketItems.length === 0) ? 'var(--text-secondary)' : '#fff', 
                 padding: '10px 22px', borderRadius: '6px', fontSize: '13px', fontWeight: '800', letterSpacing: '0.5px',
                 border: 'none', cursor: (isInsufficient || basketItems.length === 0) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease'

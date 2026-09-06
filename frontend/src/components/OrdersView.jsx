@@ -113,7 +113,7 @@ export default function OrdersView() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-main)', minHeight: 0 }}>
       {/* Sub Navigation */}
       <div style={{ display: 'flex', padding: '0 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: '24px' }}>
@@ -125,8 +125,8 @@ export default function OrdersView() {
                 padding: '16px 4px',
                 fontSize: '13px',
                 fontWeight: activeTab === tab ? '600' : '500',
-                color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
-                borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
+                color: activeTab === tab ? '#2563eb' : 'var(--text-secondary)',
+                borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
@@ -141,7 +141,7 @@ export default function OrdersView() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{
-                background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
+                background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
                 padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
                 outline: 'none', cursor: 'pointer'
               }}
@@ -159,9 +159,9 @@ export default function OrdersView() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'rgba(59, 130, 246, 0.15)',
-              border: '1px solid rgba(59, 130, 246, 0.35)',
-              color: '#60a5fa',
+              background: 'rgba(37, 99, 235, 0.12)',
+              border: '1px solid rgba(37, 99, 235, 0.3)',
+              color: '#2563eb',
               borderRadius: '4px',
               padding: '6px 14px',
               fontSize: '12px',
@@ -170,8 +170,6 @@ export default function OrdersView() {
               whiteSpace: 'nowrap',
               transition: 'all 0.15s ease'
             }}
-            onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'}
-            onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
           >
             <ShoppingBag size={14} /> Basket Orders
           </button>
@@ -181,7 +179,7 @@ export default function OrdersView() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              background: 'var(--bg-dark)', border: '1px solid var(--border-color)', 
+              background: 'var(--bg-card)', border: '1px solid var(--border-color)', 
               padding: '6px 12px', borderRadius: '4px', color: 'var(--text-primary)', fontSize: '13px',
               width: '200px', outline: 'none'
             }}

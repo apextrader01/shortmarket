@@ -36,11 +36,11 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
       onClick={() => { setSelectedSymbol(stock.uniqueSymbol); if (onStockSelect) onStockSelect(); }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`watchlist-item ${isSelected ? 'selected hover-glow' : 'hover-glow'}`}
-      style={{ padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', background: isSelected ? 'transparent' : isHovered ? 'rgba(255,255,255,0.02)' : 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
+      className={`watchlist-item ${isSelected ? 'selected' : ''}`}
+      style={{ padding: '6px 12px', borderBottom: '1px solid var(--border-color)', cursor: 'pointer', background: isSelected ? 'rgba(37,99,235,0.08)' : isHovered ? 'var(--bg-hover)' : 'transparent', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontWeight: isSelected ? '700' : '600', textShadow: isSelected ? '0 0 8px rgba(255,255,255,0.4)' : 'none', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-primary)' }}>
           {stock.symbol}
           <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '9px', padding: '1px 3px', borderRadius: '3px' }}>{stock.exchange}</span>
         </div>
@@ -243,7 +243,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
           type="text"
           placeholder={`Search & add to Watchlist ${watchlists.findIndex(w => String(w.id) === String(activeWatchlistId)) + 1}`}
           className="input-field search-pill"
-          style={{ width: '100%', paddingLeft: '32px', fontSize: '13px', background: 'var(--bg-dark)' }}
+          style={{ width: '100%', paddingLeft: '32px', fontSize: '13px', background: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);

@@ -269,28 +269,28 @@ export default function PositionsView() {
   };
 
   return (
-    <div style={{ padding: isMobile ? '12px 12px 40px 12px' : '20px', width: '100%', boxSizing: 'border-box', background: 'var(--bg-dark)', overflowY: 'auto', position: 'relative' }}>
+    <div style={{ padding: isMobile ? '12px 12px 40px 12px' : '20px', width: '100%', boxSizing: 'border-box', background: 'var(--bg-main)', overflowY: 'auto', position: 'relative' }}>
       {/* Top Header Bar with Tabs, Live MTM Widget, and Exit Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '12px' : '20px', flexWrap: 'wrap', gap: '12px' }}>
         {/* Left: Title & Sub-tabs */}
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px', flexWrap: 'wrap' }}>
-          <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', margin: 0, color: '#fff' }}>Positions</h2>
-          <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '8px', padding: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Positions</h2>
+          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '8px', padding: '3px', border: '1px solid var(--border-color)' }}>
             <button
               onClick={() => setViewMode('OPEN')}
-              style={{ background: viewMode === 'OPEN' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'OPEN' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
+              style={{ background: viewMode === 'OPEN' ? '#2563eb' : 'transparent', color: viewMode === 'OPEN' ? '#ffffff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               OPEN
             </button>
             <button
               onClick={() => setViewMode('HOLDINGS')}
-              style={{ background: viewMode === 'HOLDINGS' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'HOLDINGS' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
+              style={{ background: viewMode === 'HOLDINGS' ? '#2563eb' : 'transparent', color: viewMode === 'HOLDINGS' ? '#ffffff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               HOLDINGS
             </button>
             <button
               onClick={() => setViewMode('CLOSED')}
-              style={{ background: viewMode === 'CLOSED' ? 'var(--color-blue)' : 'transparent', color: viewMode === 'CLOSED' ? '#fff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
+              style={{ background: viewMode === 'CLOSED' ? '#2563eb' : 'transparent', color: viewMode === 'CLOSED' ? '#ffffff' : 'var(--text-secondary)', border: 'none', padding: isMobile ? '5px 10px' : '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: isMobile ? '11px' : '12px', fontWeight: '700', transition: 'all 0.15s' }}
             >
               CLOSED
             </button>
@@ -404,7 +404,7 @@ export default function PositionsView() {
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table className="responsive-mobile-table positions-layout positions-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ padding: '16px 20px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Symbol</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Buy/Sell</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Net Quantity</th>
@@ -425,7 +425,7 @@ export default function PositionsView() {
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
                   
                   return (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', transition: 'background 0.2s', ':hover': { background: 'rgba(255,255,255,0.02)' } }}>
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
                       <td data-label="Symbol" style={{ padding: '16px 20px' }}>
                         {isMutualFund(pos.symbol) ? (
                           <div>
@@ -544,15 +544,16 @@ export default function PositionsView() {
             {isMobile && (
               <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
                 {/* 📊 Compact Kite-Style Positions Summary Bar */}
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.03)', 
-                  border: '1px solid rgba(255,255,255,0.07)', 
+                <div className="glass-panel" style={{ 
+                  background: 'var(--bg-panel)', 
+                  border: '1px solid var(--border-color)', 
                   borderRadius: '8px', 
                   padding: '10px 14px', 
                   marginBottom: '10px',
                   display: 'flex', 
                   justifyContent: 'space-between', 
-                  alignItems: 'center' 
+                  alignItems: 'center',
+                  boxShadow: 'var(--card-shadow, 0 2px 8px rgba(0,0,0,0.05))'
                 }}>
                   <div>
                     <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Total MTM (Live)</div>
@@ -599,7 +600,7 @@ export default function PositionsView() {
                       }}
                       style={{
                         padding: '10px 14px',
-                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        borderBottom: '1px solid var(--border-color)',
                         background: 'transparent',
                         display: 'flex',
                         flexDirection: 'column',

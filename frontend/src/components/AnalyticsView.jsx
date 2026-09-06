@@ -176,13 +176,13 @@ export default function AnalyticsView() {
 
       return (
         <div style={{
-          background: 'rgba(11, 17, 33, 0.92)',
+          background: 'var(--bg-panel)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
+          border: '1px solid var(--border-color)',
           padding: '14px 18px',
           borderRadius: '12px',
-          boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+          boxShadow: 'var(--card-shadow, 0 12px 30px rgba(0,0,0,0.15))',
           minWidth: '220px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
@@ -196,7 +196,6 @@ export default function AnalyticsView() {
               fontSize: '18px', 
               fontWeight: '700', 
               color: isPointPositive ? '#00E676' : '#FF3B30',
-              textShadow: isPointPositive ? '0 0 12px rgba(0, 230, 118, 0.4)' : '0 0 12px rgba(255, 59, 48, 0.4)',
               display: 'flex',
               alignItems: 'center',
               gap: '4px'
@@ -205,7 +204,7 @@ export default function AnalyticsView() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid var(--border-color)', fontSize: '12px' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Daily P&L:</span>
             <span style={{ 
               fontWeight: '600', 
@@ -231,24 +230,23 @@ export default function AnalyticsView() {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '14px' }}>
         
         {/* Total Trades Card */}
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
-          backdropFilter: 'blur(10px)',
+        <div className="glass-panel" style={{
+          background: 'var(--bg-panel)',
           padding: isMobile ? '14px' : '18px',
           borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '12px', fontWeight: '500' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Activity size={15} style={{ color: '#38bdf8' }} /> Total Trades
+              <Activity size={15} style={{ color: '#2563eb' }} /> Total Trades
             </span>
-            <span style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>EXECUTED</span>
+            <span style={{ background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>EXECUTED</span>
           </div>
-          <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '700', letterSpacing: '-0.5px' }}>
+          <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '700', letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
             {totalTrades}
           </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -259,13 +257,12 @@ export default function AnalyticsView() {
         </div>
 
         {/* Win Rate Card */}
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
-          backdropFilter: 'blur(10px)',
+        <div className="glass-panel" style={{
+          background: 'var(--bg-panel)',
           padding: isMobile ? '14px' : '18px',
           borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -289,25 +286,23 @@ export default function AnalyticsView() {
             fontSize: isMobile ? '20px' : '26px', 
             fontWeight: '700', 
             letterSpacing: '-0.5px',
-            color: parseFloat(winRate) >= 50 ? '#00E676' : '#EAB308',
-            textShadow: parseFloat(winRate) >= 50 ? '0 0 16px rgba(0, 230, 118, 0.25)' : 'none'
+            color: parseFloat(winRate) >= 50 ? '#00E676' : '#EAB308'
           }}>
             {winRate}%
           </div>
           {/* Mini progress bar */}
-          <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(100, Math.max(0, parseFloat(winRate)))}%`, height: '100%', background: parseFloat(winRate) >= 50 ? 'linear-gradient(90deg, #00E676, #00B0FF)' : '#EAB308', borderRadius: '2px' }} />
+          <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.min(100, Math.max(0, parseFloat(winRate)))}%`, height: '100%', background: parseFloat(winRate) >= 50 ? 'linear-gradient(90deg, #00E676, #2563eb)' : '#EAB308', borderRadius: '2px' }} />
           </div>
         </div>
 
         {/* Profit Factor Card */}
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
-          backdropFilter: 'blur(10px)',
+        <div className="glass-panel" style={{
+          background: 'var(--bg-panel)',
           padding: isMobile ? '14px' : '18px',
           borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -318,7 +313,7 @@ export default function AnalyticsView() {
             </span>
             <span style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>P/L RATIO</span>
           </div>
-          <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '700', letterSpacing: '-0.5px', color: '#c084fc' }}>
+          <div style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '700', letterSpacing: '-0.5px', color: '#9333ea' }}>
             {stats.profitFactor}x
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
@@ -327,13 +322,12 @@ export default function AnalyticsView() {
         </div>
 
         {/* Avg Winner vs Loser Card */}
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
-          backdropFilter: 'blur(10px)',
+        <div className="glass-panel" style={{
+          background: 'var(--bg-panel)',
           padding: isMobile ? '14px' : '18px',
           borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -342,7 +336,7 @@ export default function AnalyticsView() {
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <TrendingUp size={15} style={{ color: '#00E676' }} /> Avg Win / Loss
             </span>
-            <span style={{ background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>PER TRADE</span>
+            <span style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>PER TRADE</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: isMobile ? '16px' : '19px', fontWeight: '700', color: '#00E676' }}>
@@ -361,14 +355,14 @@ export default function AnalyticsView() {
       </div>
 
       {/* Modern Cumulative Equity Curve Section */}
-      <div style={{
-        background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.6) 0%, rgba(11, 17, 33, 0.85) 100%)',
+      <div className="glass-panel" style={{
+        background: 'var(--bg-panel)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         padding: isMobile ? '16px' : '22px',
         borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px'
@@ -381,12 +375,12 @@ export default function AnalyticsView() {
           justifyContent: 'space-between',
           alignItems: isMobile ? 'flex-start' : 'center',
           gap: '12px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          borderBottom: '1px solid var(--border-color)',
           paddingBottom: '14px'
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: isMobile ? '16px' : '18px', fontWeight: '700', letterSpacing: '-0.3px' }}>
+              <h3 style={{ margin: 0, fontSize: isMobile ? '16px' : '18px', fontWeight: '700', letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
                 Cumulative Equity Curve
               </h3>
               <span style={{
@@ -408,12 +402,12 @@ export default function AnalyticsView() {
                   {isNetPositive ? '+' : ''}{formatCurrency(stats.netEquity)}
                 </span>
               </div>
-              <div style={{ color: 'rgba(255, 255, 255, 0.2)' }}>|</div>
+              <div style={{ color: 'var(--border-color)' }}>|</div>
               <div>
                 <span style={{ color: 'var(--text-secondary)' }}>Peak Equity: </span>
-                <span style={{ fontWeight: '600', color: '#38bdf8' }}>{formatCurrency(stats.peak)}</span>
+                <span style={{ fontWeight: '600', color: '#2563eb' }}>{formatCurrency(stats.peak)}</span>
               </div>
-              <div style={{ color: 'rgba(255, 255, 255, 0.2)' }}>|</div>
+              <div style={{ color: 'var(--border-color)' }}>|</div>
               <div>
                 <span style={{ color: 'var(--text-secondary)' }}>Max DD: </span>
                 <span style={{ fontWeight: '600', color: '#f87171' }}>-{formatCurrency(stats.maxDrawdown)}</span>
@@ -424,10 +418,10 @@ export default function AnalyticsView() {
           {/* Timeframe Selector Pill Group */}
           <div style={{
             display: 'flex',
-            background: 'rgba(0, 0, 0, 0.35)',
+            background: 'var(--bg-card)',
             padding: '3px',
             borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            border: '1px solid var(--border-color)',
             alignSelf: isMobile ? 'stretch' : 'auto',
             justifyContent: isMobile ? 'space-between' : 'flex-start'
           }}>
@@ -438,9 +432,9 @@ export default function AnalyticsView() {
                   key={tf}
                   onClick={() => setTimeframe(tf)}
                   style={{
-                    background: active ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-                    color: active ? '#60a5fa' : 'var(--text-secondary)',
-                    border: active ? '1px solid rgba(96, 165, 250, 0.4)' : '1px solid transparent',
+                    background: active ? '#2563eb' : 'transparent',
+                    color: active ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
                     borderRadius: '6px',
                     padding: isMobile ? '5px 10px' : '5px 12px',
                     fontSize: '11px',
@@ -470,7 +464,7 @@ export default function AnalyticsView() {
                   {/* Gradient for Bullish / Profitable Equity */}
                   <linearGradient id="gradientGreen" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#00E676" stopOpacity={0.45} />
-                    <stop offset="60%" stopColor="#00B0FF" stopOpacity={0.12} />
+                    <stop offset="60%" stopColor="#2563eb" stopOpacity={0.12} />
                     <stop offset="100%" stopColor="#00E676" stopOpacity={0.0} />
                   </linearGradient>
 
@@ -483,15 +477,15 @@ export default function AnalyticsView() {
                 </defs>
 
                 {/* Subtle Modern Dashed Grid */}
-                <CartesianGrid strokeDasharray="4 4" stroke="rgba(255, 255, 255, 0.05)" vertical={false} />
+                <CartesianGrid strokeDasharray="4 4" stroke="var(--border-color)" vertical={false} />
 
                 {/* X Axis */}
                 <XAxis 
                   dataKey="date" 
-                  stroke="rgba(255, 255, 255, 0.3)" 
+                  stroke="var(--text-secondary)" 
                   fontSize={11} 
                   tickLine={false} 
-                  axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                  axisLine={{ stroke: 'var(--border-color)' }}
                   tickFormatter={(val) => {
                     if (!val) return '';
                     const d = new Date(val);
@@ -502,7 +496,7 @@ export default function AnalyticsView() {
 
                 {/* Y Axis with clean Indian notation */}
                 <YAxis 
-                  stroke="rgba(255, 255, 255, 0.3)" 
+                  stroke="var(--text-secondary)" 
                   fontSize={11} 
                   tickLine={false} 
                   axisLine={false} 
@@ -513,19 +507,20 @@ export default function AnalyticsView() {
                 {/* Zero ₹0 Baseline Reference Line */}
                 <ReferenceLine 
                   y={0} 
-                  stroke="rgba(255, 255, 255, 0.25)" 
+                  stroke="var(--text-secondary)" 
                   strokeDasharray="4 4" 
                   strokeWidth={1.2}
+                  strokeOpacity={0.5}
                   label={{ 
                     value: '₹0 Baseline', 
                     position: 'insideTopRight', 
-                    fill: 'rgba(255, 255, 255, 0.4)', 
+                    fill: 'var(--text-secondary)', 
                     fontSize: 10,
                     offset: 10
                   }} 
                 />
 
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255, 255, 255, 0.2)', strokeWidth: 1, strokeDasharray: '3 3' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border-color)', strokeWidth: 1, strokeDasharray: '3 3' }} />
 
                 {/* Neon Curved Area */}
                 <Area 
@@ -556,24 +551,24 @@ export default function AnalyticsView() {
       </div>
 
       {/* Trade Log Section */}
-      <div style={{ 
-        background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.6) 0%, rgba(11, 17, 33, 0.8) 100%)', 
+      <div className="glass-panel" style={{ 
+        background: 'var(--bg-panel)', 
         borderRadius: '16px', 
-        border: '1px solid rgba(255, 255, 255, 0.08)', 
+        border: '1px solid var(--border-color)', 
         overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)'
+        boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))'
       }}>
         <div style={{ 
           padding: '16px 20px', 
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
+          borderBottom: '1px solid var(--border-color)', 
           fontWeight: '700', 
           fontSize: '15px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clock size={16} style={{ color: '#38bdf8' }} /> Closed Trades Performance Log
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Clock size={16} style={{ color: '#2563eb' }} /> Closed Trades Performance Log
           </span>
           <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>
             Showing last {recentTrades?.length || 0} trades
@@ -589,20 +584,20 @@ export default function AnalyticsView() {
                 return (
                   <div key={i} style={{ 
                     padding: '14px 16px', 
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.06)', 
+                    borderBottom: '1px solid var(--border-color)', 
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: '6px',
-                    background: i % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'transparent'
+                    background: i % 2 === 0 ? 'var(--bg-card)' : 'transparent'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: '700', fontSize: '14px' }}>{trade.symbol}</span>
+                        <span style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-primary)' }}>{trade.symbol}</span>
                         <span style={{ 
                           fontSize: '10px', 
                           fontWeight: '700', 
                           padding: '2px 6px', 
-                          borderRadius: '4px',
+                          borderRadius: '4px', 
                           background: trade.side === 'BUY' ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)',
                           color: trade.side === 'BUY' ? '#00E676' : '#FF3B30'
                         }}>
@@ -630,7 +625,7 @@ export default function AnalyticsView() {
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: 'rgba(0, 0, 0, 0.25)', textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <tr style={{ background: 'var(--bg-secondary)', textAlign: 'left', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ padding: '12px 20px', fontWeight: '600' }}>Date & Time</th>
                   <th style={{ padding: '12px 20px', fontWeight: '600' }}>Symbol</th>
                   <th style={{ padding: '12px 20px', fontWeight: '600' }}>Action</th>
@@ -644,14 +639,14 @@ export default function AnalyticsView() {
                   const isWin = pnl >= 0;
                   return (
                     <tr key={i} style={{ 
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                      background: i % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
+                      borderBottom: '1px solid var(--border-color)',
+                      background: i % 2 === 0 ? 'var(--bg-card)' : 'transparent',
                       transition: 'background 0.15s ease'
                     }}>
                       <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>
                         {new Date(trade.created_at).toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td style={{ padding: '12px 20px', fontWeight: '700' }}>{trade.symbol}</td>
+                      <td style={{ padding: '12px 20px', fontWeight: '700', color: 'var(--text-primary)' }}>{trade.symbol}</td>
                       <td style={{ padding: '12px 20px' }}>
                         <span style={{ 
                           padding: '3px 8px', 
@@ -664,7 +659,7 @@ export default function AnalyticsView() {
                           {trade.side}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px', fontWeight: '500' }}>{trade.quantity}</td>
+                      <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--text-primary)' }}>{trade.quantity}</td>
                       <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: '700', color: isWin ? '#00E676' : '#FF3B30' }}>
                         {isWin ? '+' : ''}{formatCurrency(pnl)}
                       </td>

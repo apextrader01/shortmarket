@@ -246,8 +246,8 @@ export default function PortfolioView() {
         justifyContent: 'space-between', 
         alignItems: 'center', 
         padding: isMobile ? '0 16px' : '0 28px', 
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
-        background: 'rgba(11, 17, 33, 0.95)',
+        borderBottom: '1px solid var(--border-color)', 
+        background: 'var(--bg-panel)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         flexShrink: 0
@@ -270,14 +270,13 @@ export default function PortfolioView() {
                   padding: '16px 2px',
                   fontSize: '13.5px',
                   fontWeight: active ? '700' : '500',
-                  color: active ? '#38bdf8' : 'var(--text-secondary)',
-                  borderBottom: active ? '2px solid #38bdf8' : '2px solid transparent',
+                  color: active ? '#2563eb' : 'var(--text-secondary)',
+                  borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  textShadow: active ? '0 0 12px rgba(56, 189, 248, 0.3)' : 'none'
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <Icon size={16} style={{ color: active ? '#38bdf8' : 'var(--text-secondary)' }} />
+                <Icon size={16} style={{ color: active ? '#2563eb' : 'var(--text-secondary)' }} />
                 <span>{tab.label}</span>
               </div>
             );
@@ -290,10 +289,10 @@ export default function PortfolioView() {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            background: 'rgba(0, 0, 0, 0.3)',
+            background: 'var(--bg-card)',
             padding: '6px 14px',
             borderRadius: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            border: '1px solid var(--border-color)',
             fontSize: '12px'
           }}>
             <span style={{ color: 'var(--text-secondary)' }}>Overall Return:</span>
@@ -328,13 +327,12 @@ export default function PortfolioView() {
           }}>
             
             {/* Card 1: Total Portfolio Current Value */}
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.55) 0%, rgba(11, 17, 33, 0.75) 100%)',
-              backdropFilter: 'blur(12px)',
+            <div className="glass-panel" style={{
               padding: isMobile ? '14px' : '18px',
               borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-panel)',
+              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
@@ -342,15 +340,15 @@ export default function PortfolioView() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
                   <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Wallet size={14} style={{ color: '#38bdf8' }} />
+                    <Wallet size={14} style={{ color: '#2563eb' }} />
                   </div>
                   <span>Current Worth</span>
                 </div>
-                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }}>
+                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
                   PORTFOLIO
                 </span>
               </div>
-              <div style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: '700', letterSpacing: '-0.5px', color: '#FFFFFF' }}>
+              <div style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: '700', letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
                 {formatCurrency(totalCurrent)}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
@@ -360,13 +358,12 @@ export default function PortfolioView() {
             </div>
 
             {/* Card 2: Overall Gain / Return */}
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.55) 0%, rgba(11, 17, 33, 0.75) 100%)',
-              backdropFilter: 'blur(12px)',
+            <div className="glass-panel" style={{
               padding: isMobile ? '14px' : '18px',
               borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-panel)',
+              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
@@ -393,8 +390,7 @@ export default function PortfolioView() {
                 fontSize: isMobile ? '18px' : '24px', 
                 fontWeight: '700', 
                 letterSpacing: '-0.5px',
-                color: isGain ? '#00E676' : '#FF3B30',
-                textShadow: isGain ? '0 0 14px rgba(0, 230, 118, 0.3)' : '0 0 14px rgba(255, 59, 48, 0.3)'
+                color: isGain ? '#00E676' : '#FF3B30'
               }}>
                 {isGain ? '+' : ''}{formatCurrency(overallGain)}
               </div>
@@ -407,13 +403,12 @@ export default function PortfolioView() {
             </div>
 
             {/* Card 3: Unrealized P&L (Live) */}
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.55) 0%, rgba(11, 17, 33, 0.75) 100%)',
-              backdropFilter: 'blur(12px)',
+            <div className="glass-panel" style={{
               padding: isMobile ? '14px' : '18px',
               borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-panel)',
+              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
@@ -434,8 +429,7 @@ export default function PortfolioView() {
                 fontSize: isMobile ? '18px' : '24px', 
                 fontWeight: '700', 
                 letterSpacing: '-0.5px',
-                color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30',
-                textShadow: unrealizedPnl >= 0 ? '0 0 14px rgba(0, 230, 118, 0.3)' : '0 0 14px rgba(255, 59, 48, 0.3)'
+                color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30'
               }}>
                 {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
               </div>
@@ -445,13 +439,12 @@ export default function PortfolioView() {
             </div>
 
             {/* Card 4: Today's Realized P&L */}
-            <div style={{
-              background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.55) 0%, rgba(11, 17, 33, 0.75) 100%)',
-              backdropFilter: 'blur(12px)',
+            <div className="glass-panel" style={{
               padding: isMobile ? '14px' : '18px',
               borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-panel)',
+              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
@@ -491,13 +484,12 @@ export default function PortfolioView() {
           }}>
             
             {/* Left Box: Asset Allocation Donut Chart */}
-            <div style={{
-              background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.6) 0%, rgba(11, 17, 33, 0.85) 100%)',
-              backdropFilter: 'blur(16px)',
+            <div className="glass-panel" style={{
+              background: 'var(--bg-panel)',
               padding: '20px',
               borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              border: '1px solid var(--border-color)',
+              boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
@@ -582,11 +574,11 @@ export default function PortfolioView() {
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
               
               {/* Stocks Card */}
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
+              <div className="glass-panel" style={{
+                background: 'var(--bg-panel)',
                 padding: '16px',
                 borderRadius: '14px',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -597,15 +589,15 @@ export default function PortfolioView() {
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#3B82F6' }} />
                     <span style={{ fontWeight: '600', fontSize: '13px' }}>Stocks</span>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                  <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                     {getAssetPct(totalInvestedStocks)}%
                   </span>
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: '#FFFFFF' }}>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {formatCurrency(totalInvestedStocks)}
                 </div>
                 {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ width: `${getAssetPct(totalInvestedStocks)}%`, height: '100%', background: '#3B82F6', borderRadius: '2px' }} />
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -614,11 +606,11 @@ export default function PortfolioView() {
               </div>
 
               {/* ETFs Card */}
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
+              <div className="glass-panel" style={{
+                background: 'var(--bg-panel)',
                 padding: '16px',
                 borderRadius: '14px',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -629,15 +621,15 @@ export default function PortfolioView() {
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#10B981' }} />
                     <span style={{ fontWeight: '600', fontSize: '13px' }}>ETFs</span>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.12)', color: '#34d399', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                  <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                     {getAssetPct(totalInvestedETFs)}%
                   </span>
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: '#FFFFFF' }}>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {formatCurrency(totalInvestedETFs)}
                 </div>
                 {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ width: `${getAssetPct(totalInvestedETFs)}%`, height: '100%', background: '#10B981', borderRadius: '2px' }} />
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -646,11 +638,11 @@ export default function PortfolioView() {
               </div>
 
               {/* Derivatives Card */}
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
+              <div className="glass-panel" style={{
+                background: 'var(--bg-panel)',
                 padding: '16px',
                 borderRadius: '14px',
-                border: '1px solid rgba(245, 158, 11, 0.2)',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -661,15 +653,15 @@ export default function PortfolioView() {
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#F59E0B' }} />
                     <span style={{ fontWeight: '600', fontSize: '13px' }}>Derivatives (F&O)</span>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                  <span style={{ fontSize: '11px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                     {getAssetPct(totalInvestedDerivatives)}%
                   </span>
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: '#FFFFFF' }}>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {formatCurrency(totalInvestedDerivatives)}
                 </div>
                 {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ width: `${getAssetPct(totalInvestedDerivatives)}%`, height: '100%', background: '#F59E0B', borderRadius: '2px' }} />
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -678,11 +670,11 @@ export default function PortfolioView() {
               </div>
 
               {/* Mutual Funds Card */}
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(15, 32, 60, 0.5) 0%, rgba(11, 17, 33, 0.7) 100%)',
+              <div className="glass-panel" style={{
+                background: 'var(--bg-panel)',
                 padding: '16px',
                 borderRadius: '14px',
-                border: '1px solid rgba(168, 85, 247, 0.2)',
+                border: '1px solid var(--border-color)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -693,15 +685,15 @@ export default function PortfolioView() {
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#A855F7' }} />
                     <span style={{ fontWeight: '600', fontSize: '13px' }}>Mutual Funds</span>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                  <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.12)', color: '#9333ea', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                     {getAssetPct(totalInvestedMutualFunds)}%
                   </span>
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: '#FFFFFF' }}>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {formatCurrency(totalInvestedMutualFunds)}
                 </div>
                 {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
                   <div style={{ width: `${getAssetPct(totalInvestedMutualFunds)}%`, height: '100%', background: '#A855F7', borderRadius: '2px' }} />
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -714,19 +706,18 @@ export default function PortfolioView() {
           </div>
 
           {/* Holdings Section */}
-          <div style={{
-            background: 'linear-gradient(180deg, rgba(15, 32, 60, 0.6) 0%, rgba(11, 17, 33, 0.85) 100%)',
-            backdropFilter: 'blur(16px)',
+          <div className="glass-panel" style={{
+            background: 'var(--bg-panel)',
             borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))',
             overflow: 'hidden'
           }}>
             
             {/* Holdings Header with Search & Filter Controls */}
             <div style={{
               padding: '16px 20px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               flexDirection: isMobile ? 'column' : 'row',
               justifyContent: 'space-between',
@@ -735,8 +726,8 @@ export default function PortfolioView() {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Layers size={17} style={{ color: '#38bdf8' }} /> Your Portfolio Holdings
-                  <span style={{ fontSize: '11px', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 8px', borderRadius: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  <Layers size={17} style={{ color: '#2563eb' }} /> Your Portfolio Holdings
+                  <span style={{ fontSize: '11px', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                     {processedHoldings.length}
                   </span>
                 </h3>
@@ -750,8 +741,8 @@ export default function PortfolioView() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: 'rgba(0, 0, 0, 0.35)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: '8px',
                   padding: '5px 10px',
                   flex: isMobile ? 1 : 'none'
@@ -776,10 +767,10 @@ export default function PortfolioView() {
                 {/* Filter Pills */}
                 <div style={{
                   display: 'flex',
-                  background: 'rgba(0, 0, 0, 0.35)',
+                  background: 'var(--bg-card)',
                   padding: '2px',
                   borderRadius: '8px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)'
+                  border: '1px solid var(--border-color)'
                 }}>
                   {[
                     { id: 'ALL', label: 'All' },
@@ -792,9 +783,9 @@ export default function PortfolioView() {
                         key={f.id}
                         onClick={() => setFilterType(f.id)}
                         style={{
-                          background: active ? 'rgba(59, 130, 246, 0.3)' : 'transparent',
-                          color: active ? '#60a5fa' : 'var(--text-secondary)',
-                          border: active ? '1px solid rgba(96, 165, 250, 0.4)' : '1px solid transparent',
+                          background: active ? '#2563eb' : 'transparent',
+                          color: active ? '#ffffff' : 'var(--text-secondary)',
+                          border: 'none',
                           borderRadius: '6px',
                           padding: '4px 10px',
                           fontSize: '11px',
@@ -813,9 +804,9 @@ export default function PortfolioView() {
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                   style={{
-                    background: 'rgba(0, 0, 0, 0.35)',
-                    color: 'var(--text-secondary)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '8px',
                     padding: '4px 8px',
                     fontSize: '11px',
@@ -846,18 +837,18 @@ export default function PortfolioView() {
                           onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
                           style={{
                             padding: '12px 16px',
-                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            borderBottom: '1px solid var(--border-color)',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '4px',
                             cursor: 'pointer',
-                            background: idx % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
+                            background: idx % 2 === 0 ? 'var(--bg-card)' : 'transparent',
                             transition: 'background 0.15s ease'
                           }}
                         >
                           {/* Line 1: Exchange & Segment | Total P&L */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
                               {safeSymbol.split(':')[0] || 'NSE'} • CNC
                             </span>
                             <div style={{ 
@@ -883,7 +874,7 @@ export default function PortfolioView() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                             <div>Qty: <strong style={{ color: 'var(--text-primary)' }}>{pos.qty}</strong> • Avg: ₹{parseFloat(pos.average_price).toFixed(2)}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>LTP: <strong style={{ color: '#38bdf8' }}>₹{pos.ltp.toFixed(2)}</strong></span>
+                              <span>LTP: <strong style={{ color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</strong></span>
                               <span style={{ 
                                 fontSize: '10px', 
                                 color: '#FF3B30', 
@@ -911,7 +902,7 @@ export default function PortfolioView() {
                 /* 🖥️ Modern Desktop Holdings Table */
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(0, 0, 0, 0.25)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                    <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                       <th style={{ padding: '14px 20px', fontWeight: '600' }}>Symbol</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Qty</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
@@ -940,24 +931,24 @@ export default function PortfolioView() {
                           <tr 
                             key={pos.id || idx} 
                             style={{ 
-                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              background: idx % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
+                              borderBottom: '1px solid var(--border-color)',
+                              background: idx % 2 === 0 ? 'var(--bg-card)' : 'transparent',
                               transition: 'background 0.15s ease'
                             }}
                           >
                             <td style={{ padding: '14px 20px', fontWeight: '700' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
-                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'rgba(255, 255, 255, 0.06)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
+                                <span style={{ color: 'var(--text-primary)' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
+                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
                                   {safeSymbol.split(':')[0] || 'NSE'}
                                 </span>
                               </div>
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600' }}>{pos.qty}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>{pos.qty}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{parseFloat(pos.average_price).toFixed(2)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#38bdf8' }}>₹{pos.ltp.toFixed(2)}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700' }}>{formatCurrency(pos.current)}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                               <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}

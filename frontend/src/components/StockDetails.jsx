@@ -71,15 +71,15 @@ export default function StockDetails({ symbol, price, candles }) {
 
   const tabStyle = (tab) => ({
     padding: '8px 16px', cursor: 'pointer', fontWeight: '600', fontSize: '13px',
-    color: activeTab === tab ? '#60A5FA' : '#94A3B8',
-    borderBottom: activeTab === tab ? '2px solid #60A5FA' : '2px solid transparent',
+    color: activeTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
+    borderBottom: activeTab === tab ? '2px solid var(--color-blue)' : '2px solid transparent',
     transition: 'all 0.2s'
   });
 
   const renderOverview = () => {
-    if (loading) return <div style={{ padding: '20px', color: '#94A3B8' }}>Loading detailed data...</div>;
-    if (!details) return <div style={{ padding: '20px', color: '#94A3B8' }}>Details not available for this stock.</div>;
-    if (details.error) return <div style={{ padding: '20px', color: '#EF5350' }}>Error: {details.error} - {details.details}</div>;
+    if (loading) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Loading detailed data...</div>;
+    if (!details) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Details not available for this stock.</div>;
+    if (details.error) return <div style={{ padding: '20px', color: 'var(--color-red-light)' }}>Error: {details.error} - {details.details}</div>;
 
     const stats = details.stats || {};
     const header = details.header || {};
@@ -115,22 +115,22 @@ export default function StockDetails({ symbol, price, candles }) {
         
         {/* Performance */}
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '24px' }}>Performance</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '24px', color: 'var(--text-primary)' }}>Performance</h4>
           
           {/* Range Slider 1 */}
           <div style={{ marginBottom: '28px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               <span>Today's low</span>
               <span>Today's high</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>
               <span>{l ? l.toFixed(2) : '-'}</span>
               <span>{h ? h.toFixed(2) : '-'}</span>
             </div>
             <div style={{ position: 'relative', height: '4px', background: 'var(--border-color)', borderRadius: '2px' }}>
               {livePrice > 0 && h > l && (
                 <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - l) / (h - l)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
-                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
+                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid var(--text-secondary)' }} />
                 </div>
               )}
             </div>
@@ -138,18 +138,18 @@ export default function StockDetails({ symbol, price, candles }) {
 
           {/* Range Slider 2 */}
           <div style={{ marginBottom: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
               <span>52 week low</span>
               <span>52 week high</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>
               <span>{low52 ? low52.toFixed(2) : '-'}</span>
               <span>{high52 ? high52.toFixed(2) : '-'}</span>
             </div>
             <div style={{ position: 'relative', height: '4px', background: 'var(--border-color)', borderRadius: '2px' }}>
               {livePrice > 0 && high52 > low52 && (
                 <div style={{ position: 'absolute', left: `${Math.max(0, Math.min(100, ((livePrice - low52) / (high52 - low52)) * 100))}%`, top: '4px', transform: 'translateX(-50%)' }}>
-                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid #64748B' }} />
+                  <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '8px solid var(--text-secondary)' }} />
                 </div>
               )}
             </div>
@@ -158,36 +158,36 @@ export default function StockDetails({ symbol, price, candles }) {
           {/* Bottom row metrics */}
           <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Open price</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.open ? price.open.toFixed(2) : (details.livePriceData?.open ? Number(details.livePriceData.open).toFixed(2) : (price?.close ? price.close.toFixed(2) : '-'))}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Open price</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{price?.open ? price.open.toFixed(2) : (details.livePriceData?.open ? Number(details.livePriceData.open).toFixed(2) : (price?.close ? price.close.toFixed(2) : '-'))}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Previous close</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{price?.close ? price.close.toFixed(2) : '-'}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Previous close</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{price?.close ? price.close.toFixed(2) : '-'}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Live volume</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{formatNum(vol)}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Live volume</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{formatNum(vol)}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Lower circuit</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{lowerCircuit ? lowerCircuit.toFixed(2) : '-'}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Lower circuit</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{lowerCircuit ? lowerCircuit.toFixed(2) : '-'}</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Upper circuit</span>
-              <span style={{ fontSize: '14px', fontWeight: '700' }}>{upperCircuit ? upperCircuit.toFixed(2) : '-'}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Upper circuit</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{upperCircuit ? upperCircuit.toFixed(2) : '-'}</span>
             </div>
           </div>
         </div>
 
         {/* Fundamentals */}
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Fundamentals</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Fundamentals</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
             {(details.fundamentals || []).map((item) => (
-              <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
-                <span style={{ color: '#94A3B8', fontSize: '12px' }}>{item.name}</span>
-                <span style={{ fontWeight: '600', fontSize: '13px' }}>{item.value}</span>
+              <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{item.name}</span>
+                <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-primary)' }}>{item.value}</span>
               </div>
             ))}
           </div>
@@ -195,26 +195,26 @@ export default function StockDetails({ symbol, price, candles }) {
 
         {/* About Company */}
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>About Company</h4>
-          <p style={{ fontSize: '12px', color: '#CBD5E1', lineHeight: '1.6', marginBottom: '16px', opacity: 0.9 }}>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)' }}>About Company</h4>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '16px' }}>
             {profile.businessSummary ? profile.businessSummary.substring(0, 400) + '...' : (profile.aboutCompany || `${header.companyName || cleanSym} is an actively traded enterprise listed on Indian stock exchanges.`)}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div className="glass-panel" style={{ padding: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8' }}>MD/CEO</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.managingDirector || profile.ceo || profile.directors?.[0] || '-'}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>MD/CEO</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{profile.managingDirector || profile.ceo || profile.directors?.[0] || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Founded</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{profile.foundedYear || '-'}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Founded</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{profile.foundedYear || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Symbol</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.nseScriptCode || header.bseScriptCode || cleanSym || '-'}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Symbol</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{header.nseScriptCode || header.bseScriptCode || cleanSym || '-'}</div>
             </div>
             <div className="glass-panel" style={{ padding: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#94A3B8' }}>Industry</div>
-              <div style={{ fontSize: '12px', fontWeight: '700' }}>{header.industryName || '-'}</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Industry</div>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{header.industryName || '-'}</div>
             </div>
           </div>
         </div>
@@ -222,16 +222,16 @@ export default function StockDetails({ symbol, price, candles }) {
         {/* Shareholding Pattern */}
         {holders && holders.length > 0 && (
           <div style={{ marginTop: '16px' }}>
-            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Shareholding Pattern</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Shareholding Pattern</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {holders[0].shareHoldings.map((h) => (
                 <div key={h.key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                    <span>{h.key}</span>
-                    <span style={{ fontWeight: '700' }}>{(h.value).toFixed(2)}%</span>
+                    <span style={{ color: 'var(--text-primary)' }}>{h.key}</span>
+                    <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{(h.value).toFixed(2)}%</span>
                   </div>
                   <div style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '3px' }}>
-                    <div style={{ width: `${h.value}%`, height: '100%', background: '#60A5FA', borderRadius: '3px' }} />
+                    <div style={{ width: `${h.value}%`, height: '100%', background: 'var(--color-blue)', borderRadius: '3px' }} />
                   </div>
                 </div>
               ))}
@@ -241,19 +241,19 @@ export default function StockDetails({ symbol, price, candles }) {
 
         {financials.length > 0 && (
           <div style={{ marginTop: '16px', minWidth: 0 }}>
-            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Financial Performance (Yearly)</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Financial Performance (Yearly)</h4>
             <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px', WebkitOverflowScrolling: 'touch', minWidth: 0, width: '100%' }} className="scrollbar-hide">
               {financials.map(fin => (
                 <div key={fin.title} className="glass-panel" style={{ padding: '12px', minWidth: '240px', flexShrink: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: '#E2E8F0' }}>{fin.title}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Year</span>
-                    <span style={{ fontSize: '11px', color: '#94A3B8' }}>Value (Cr)</span>
+                  <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '12px', color: 'var(--text-primary)' }}>{fin.title}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Year</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Value (Cr)</span>
                   </div>
                   {fin.yearly && Object.entries(fin.yearly).slice(-5).map(([year, val]) => (
                     <div key={year} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '600' }}>{year}</span>
-                      <span style={{ fontSize: '13px', fontWeight: '600', color: fin.title === 'Profit' && val < 0 ? '#EF4444' : '#10B981' }}>₹{val?.toLocaleString('en-IN', {maximumFractionDigits: 2})}</span>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{year}</span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: fin.title === 'Profit' && val < 0 ? 'var(--color-red-light)' : 'var(--color-green-light)' }}>₹{val?.toLocaleString('en-IN', {maximumFractionDigits: 2})}</span>
                     </div>
                   ))}
                 </div>
@@ -265,17 +265,17 @@ export default function StockDetails({ symbol, price, candles }) {
         {/* Mutual Funds Invested */}
         {fundsInvested.length > 0 && (
           <div style={{ marginTop: '16px' }}>
-            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Mutual Funds Invested</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Mutual Funds Invested</h4>
             <div style={{ display: 'grid', gap: '12px' }}>
               {fundsInvested.map(fund => (
                 <div key={fund.searchId} className="glass-panel hoverable" style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}>
-                  {fund.logoUrl && <img src={fund.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: '#FFF' }} />}
+                  {fund.logoUrl && <img src={fund.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: 'var(--bg-panel)' }} />}
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{fund.name}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{fund.name}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>AUM %</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700' }}>{fund.investedAumPercent?.toFixed(2)}%</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>AUM %</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{fund.investedAumPercent?.toFixed(2)}%</div>
                   </div>
                 </div>
               ))}
@@ -286,67 +286,65 @@ export default function StockDetails({ symbol, price, candles }) {
         {/* Similar Stocks */}
         {similarAssets.length > 0 && (
           <div style={{ marginTop: '16px' }}>
-            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Similar Stocks</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Similar Stocks</h4>
             <div className="glass-panel" style={{ overflowX: 'auto', padding: '0' }}>
               <table className="responsive-mobile-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'right' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#94A3B8', fontSize: '12px' }}>
-                    <th style={{ padding: '16px', textAlign: 'left', fontWeight: '400' }}>Stock</th>
-                    <th style={{ padding: '16px', fontWeight: '400' }}>Mkt price (1D)</th>
-                    <th style={{ padding: '16px', fontWeight: '400', width: '150px', textAlign: 'center' }}>52 week performance</th>
-                    <th style={{ padding: '16px', fontWeight: '400' }}>Market cap (Cr)</th>
-                    <th style={{ padding: '16px', fontWeight: '400' }}>P/E ratio</th>
-                    <th style={{ padding: '16px', fontWeight: '400' }}>P/B ratio</th>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '12px', background: 'var(--bg-secondary)' }}>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '600' }}>Stock</th>
+                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>Mkt price (1D)</th>
+                    <th style={{ padding: '14px 16px', fontWeight: '600', width: '150px', textAlign: 'center' }}>52 week performance</th>
+                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>Market cap (Cr)</th>
+                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>P/E ratio</th>
+                    <th style={{ padding: '14px 16px', fontWeight: '600' }}>P/B ratio</th>
                   </tr>
                 </thead>
                 <tbody>
                   {similarAssets.map(peer => {
-                    // For the slider, since we don't have LTP in this payload, we just render the bounds
-                    // If we had LTP, we'd calculate the dot position. We'll put it in the middle for now or omit the dot.
                     return (
-                      <tr key={peer.companyHeader?.searchId} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }} className="hoverable-row">
-                        <td style={{ padding: '16px', textAlign: 'left' }}>
+                      <tr key={peer.companyHeader?.searchId} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} className="hoverable-row">
+                        <td style={{ padding: '14px 16px', textAlign: 'left' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            {peer.companyHeader?.logoUrl && <img src={peer.companyHeader.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: '#FFF' }} />}
+                            {peer.companyHeader?.logoUrl && <img src={peer.companyHeader.logoUrl} alt="logo" style={{ width: '28px', height: '28px', borderRadius: '4px', background: 'var(--bg-panel)' }} />}
                             <div>
-                              <div style={{ fontSize: '13px', fontWeight: '600', color: '#E2E8F0' }}>{peer.companyHeader?.displayName}</div>
-                              <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{peer.companyHeader?.nseScriptCode || peer.companyHeader?.bseScriptCode}</div>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{peer.companyHeader?.displayName}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: '500' }}>{peer.companyHeader?.nseScriptCode || peer.companyHeader?.bseScriptCode}</div>
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
                           {peer.livePriceData?.ltp ? (
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span>₹{peer.livePriceData.ltp.toFixed(2)}</span>
-                              <span style={{ fontSize: '11px', color: peer.livePriceData.dayChange < 0 ? '#EF4444' : '#10B981' }}>
+                              <span style={{ fontWeight: '700' }}>₹{peer.livePriceData.ltp.toFixed(2)}</span>
+                              <span style={{ fontSize: '11px', color: peer.livePriceData.dayChange < 0 ? 'var(--color-red-light)' : 'var(--color-green-light)', fontWeight: '600' }}>
                                 {peer.livePriceData.dayChange > 0 ? '+' : ''}{peer.livePriceData.dayChange.toFixed(2)} ({peer.livePriceData.dayChangePerc.toFixed(2)}%)
                               </span>
                             </div>
                           ) : '-'}
                         </td>
-                        <td style={{ padding: '16px', verticalAlign: 'middle' }}>
+                        <td style={{ padding: '14px 16px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                            <span style={{ fontSize: '10px', color: '#94A3B8' }}>L</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>L</span>
                             <div style={{ flex: 1, height: '4px', background: 'var(--border-color)', borderRadius: '2px', position: 'relative' }}>
                                 {peer.livePriceData?.ltp && peer.nseYearHigh > peer.nseYearLow && (
                                     <div style={{ 
                                       position: 'absolute', 
                                       left: `${Math.max(0, Math.min(100, ((peer.livePriceData.ltp - peer.nseYearLow) / (peer.nseYearHigh - peer.nseYearLow)) * 100))}%`, 
                                       top: '50%', transform: 'translate(-50%, -50%)', 
-                                      width: '4px', height: '10px', background: '#94A3B8', borderRadius: '2px' 
+                                      width: '4px', height: '10px', background: 'var(--color-blue)', borderRadius: '2px' 
                                     }} />
                                 )}
                             </div>
-                            <span style={{ fontSize: '10px', color: '#94A3B8' }}>H</span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>H</span>
                           </div>
                         </td>
-                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
                           {formatNum(peer.marketCap)}
                         </td>
-                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
                           {peer.peRatio ? peer.peRatio.toFixed(2) : '-'}
                         </td>
-                        <td style={{ padding: '16px', fontSize: '13px', fontWeight: '600' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
                           {peer.pbRatio ? peer.pbRatio.toFixed(2) : '-'}
                         </td>
                       </tr>
@@ -362,22 +360,21 @@ export default function StockDetails({ symbol, price, candles }) {
     );
   };
 
-  
   const renderTechnicals = () => {
-    if (!technicals) return <div style={{ padding: '20px', color: '#94A3B8' }}>Not enough historical data to compute technicals. Please select a longer timeframe chart.</div>;
+    if (!technicals) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Not enough historical data to compute technicals. Please select a longer timeframe chart.</div>;
 
     const { rsi, macd, sma10, sma20, sma50, sma100, sma200, ema10, ema20, ema50, ema200, bb, stoch, adx, atr } = technicals;
     const ltp = price?.ltp || 0;
 
     const renderInd = (label, val, verdict) => (
-      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px', marginBottom: '8px' }}>
-        <span style={{ color: '#94A3B8', fontSize: '13px' }}>{label}</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{label}</span>
         <div style={{ display: 'flex', gap: '16px', width: '150px', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: '700', fontSize: '13px' }}>{val}</span>
+          <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>{val}</span>
           <span style={{ 
             fontSize: '11px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px',
             background: verdict === 'BULLISH' ? 'rgba(34,197,94,0.15)' : (verdict === 'BEARISH' ? 'rgba(239,83,80,0.15)' : 'var(--border-color)'),
-            color: verdict === 'BULLISH' ? '#22C55E' : (verdict === 'BEARISH' ? '#EF5350' : '#94A3B8')
+            color: verdict === 'BULLISH' ? 'var(--color-green-light)' : (verdict === 'BEARISH' ? 'var(--color-red-light)' : 'var(--text-secondary)')
           }}>{verdict}</span>
         </div>
       </div>
@@ -386,7 +383,7 @@ export default function StockDetails({ symbol, price, candles }) {
     return (
       <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Oscillators & Momentum</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Oscillators & Momentum</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
             {renderInd('RSI (14)', rsi?.toFixed(2), rsi > 70 ? 'BEARISH' : (rsi < 30 ? 'BULLISH' : 'NEUTRAL'))}
             {renderInd('MACD (12, 26)', macd?.MACD?.toFixed(2), macd?.MACD > macd?.signal ? 'BULLISH' : 'BEARISH')}
@@ -397,7 +394,7 @@ export default function StockDetails({ symbol, price, candles }) {
         </div>
 
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Bollinger Bands (20, 2)</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Bollinger Bands (20, 2)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
             {bb && renderInd('Upper Band (Overbought)', bb.upper?.toFixed(2), ltp > bb.upper ? 'BEARISH' : 'NEUTRAL')}
             {bb && renderInd('Middle Band (SMA 20)', bb.middle?.toFixed(2), ltp > bb.middle ? 'BULLISH' : 'BEARISH')}
@@ -406,42 +403,43 @@ export default function StockDetails({ symbol, price, candles }) {
         </div>
 
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Exponential Moving Averages (EMA)</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Exponential Moving Averages (EMA)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
-            {ema10 && renderInd('EMA 10', '\u20B9' + ema10?.toFixed(2), ltp > ema10 ? 'BULLISH' : 'BEARISH')}
-            {ema20 && renderInd('EMA 20', '\u20B9' + ema20?.toFixed(2), ltp > ema20 ? 'BULLISH' : 'BEARISH')}
-            {ema50 && renderInd('EMA 50', '\u20B9' + ema50?.toFixed(2), ltp > ema50 ? 'BULLISH' : 'BEARISH')}
-            {ema200 && renderInd('EMA 200', '\u20B9' + ema200?.toFixed(2), ltp > ema200 ? 'BULLISH' : 'BEARISH')}
+            {ema10 && renderInd('EMA 10', '₹' + ema10?.toFixed(2), ltp > ema10 ? 'BULLISH' : 'BEARISH')}
+            {ema20 && renderInd('EMA 20', '₹' + ema20?.toFixed(2), ltp > ema20 ? 'BULLISH' : 'BEARISH')}
+            {ema50 && renderInd('EMA 50', '₹' + ema50?.toFixed(2), ltp > ema50 ? 'BULLISH' : 'BEARISH')}
+            {ema200 && renderInd('EMA 200', '₹' + ema200?.toFixed(2), ltp > ema200 ? 'BULLISH' : 'BEARISH')}
           </div>
         </div>
 
         <div>
-          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px' }}>Simple Moving Averages (SMA)</h4>
+          <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Simple Moving Averages (SMA)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
-            {sma10 && renderInd('SMA 10', '\u20B9' + sma10?.toFixed(2), ltp > sma10 ? 'BULLISH' : 'BEARISH')}
-            {sma20 && renderInd('SMA 20', '\u20B9' + sma20?.toFixed(2), ltp > sma20 ? 'BULLISH' : 'BEARISH')}
-            {sma50 && renderInd('SMA 50', '\u20B9' + sma50?.toFixed(2), ltp > sma50 ? 'BULLISH' : 'BEARISH')}
-            {sma100 && renderInd('SMA 100', '\u20B9' + sma100?.toFixed(2), ltp > sma100 ? 'BULLISH' : 'BEARISH')}
-            {sma200 && renderInd('SMA 200', '\u20B9' + sma200?.toFixed(2), ltp > sma200 ? 'BULLISH' : 'BEARISH')}
+            {sma10 && renderInd('SMA 10', '₹' + sma10?.toFixed(2), ltp > sma10 ? 'BULLISH' : 'BEARISH')}
+            {sma20 && renderInd('SMA 20', '₹' + sma20?.toFixed(2), ltp > sma20 ? 'BULLISH' : 'BEARISH')}
+            {sma50 && renderInd('SMA 50', '₹' + sma50?.toFixed(2), ltp > sma50 ? 'BULLISH' : 'BEARISH')}
+            {sma100 && renderInd('SMA 100', '₹' + sma100?.toFixed(2), ltp > sma100 ? 'BULLISH' : 'BEARISH')}
+            {sma200 && renderInd('SMA 200', '₹' + sma200?.toFixed(2), ltp > sma200 ? 'BULLISH' : 'BEARISH')}
           </div>
         </div>
       </div>
     );
   };
-const renderNews = () => {
-    if (loading) return <div style={{ padding: '20px', color: '#94A3B8' }}>Loading news...</div>;
+
+  const renderNews = () => {
+    if (loading) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>Loading news...</div>;
     const news = details?.news || [];
-    if (news.length === 0) return <div style={{ padding: '20px', color: '#94A3B8' }}>No recent news found.</div>;
+    if (news.length === 0) return <div style={{ padding: '20px', color: 'var(--text-secondary)' }}>No recent news found.</div>;
 
     return (
       <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
         {news.map((item, i) => (
           <a key={i} href={item.link} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
             <div className="glass-panel hoverable" style={{ padding: '16px', transition: 'all 0.2s', cursor: 'pointer' }}>
-              <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '6px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 {item.publisher} • {new Date(item.providerPublishTime * 1000).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </div>
-              <h5 style={{ fontSize: '14px', fontWeight: '700', color: '#F8FAFC', marginBottom: '8px', lineHeight: '1.4' }}>
+              <h5 style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', lineHeight: '1.4' }}>
                 {item.title}
               </h5>
             </div>
@@ -453,7 +451,7 @@ const renderNews = () => {
 
   return (
     <div style={{ marginTop: '24px' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', overflowX: 'auto', paddingBottom: '4px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', overflowX: 'auto', paddingBottom: '4px' }}>
         <div onClick={() => setActiveTab('Overview')} style={tabStyle('Overview')}>Overview</div>
         <div onClick={() => setActiveTab('Technicals')} style={tabStyle('Technicals')}>Technicals</div>
         <div onClick={() => setActiveTab('News')} style={tabStyle('News')}>News</div>

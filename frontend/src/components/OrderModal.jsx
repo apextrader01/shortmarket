@@ -344,10 +344,10 @@ export default function OrderModal() {
       <div style={{
         width: '540px', 
         maxWidth: '95vw',
-        background: '#161b26', 
+        background: 'var(--bg-panel)', 
         borderRadius: '10px', 
-        border: '1px solid rgba(255, 255, 255, 0.1)', 
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05)',
+        border: '1px solid var(--border-color)', 
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
         overflow: 'hidden', 
         display: 'flex', 
         flexDirection: 'column',
@@ -437,8 +437,8 @@ export default function OrderModal() {
 
         {/* Product Type Tabs (Intraday / Overnight / GTT) */}
         {!isTrueExit && (
-        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', background: '#0e121a', borderRadius: '6px', padding: '3px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-panel)' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
             <button
               type="button"
               onClick={() => setProductType('INT')} 
@@ -483,9 +483,9 @@ export default function OrderModal() {
             style={{
               padding: '6px 12px',
               borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              background: tab === 'GTT' ? 'rgba(59, 130, 246, 0.2)' : '#0e121a',
-              color: tab === 'GTT' ? '#60a5fa' : 'var(--text-secondary)',
+              border: '1px solid var(--border-color)',
+              background: tab === 'GTT' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)',
+              color: tab === 'GTT' ? '#2563eb' : 'var(--text-secondary)',
               fontSize: '12px',
               fontWeight: '600',
               cursor: 'pointer'
@@ -497,7 +497,7 @@ export default function OrderModal() {
         )}
 
         {/* Form Body */}
-        <div style={{ padding: '14px 20px 18px 20px' }}>
+        <div style={{ padding: '14px 20px 18px 20px', background: 'var(--bg-panel)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '600', letterSpacing: '0.2px' }}>
               {productType === 'INT' ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'}
@@ -508,7 +508,7 @@ export default function OrderModal() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
             {/* Qty */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a' }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)' }}>
                 <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
@@ -525,7 +525,7 @@ export default function OrderModal() {
                     const num = parseInt(e.target.value, 10);
                     setQuantity(Math.max(1, isNaN(num) ? 1 : num));
                   }}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
               {orderModal.lotsize > 1 && (
@@ -537,14 +537,14 @@ export default function OrderModal() {
 
             {/* Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: orderType === 'MARKET' ? 0.6 : 1 }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: orderType === 'MARKET' ? 0.6 : 1 }}>
                 <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Price(Tick: 0.05)</legend>
                 <input 
                   type="text" 
                   value={orderType === 'MARKET' ? (livePrice ? livePrice.toFixed(2) : '0.00') : price} 
                   onChange={e => setPrice(e.target.value)} 
                   disabled={orderType === 'MARKET'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
@@ -555,7 +555,7 @@ export default function OrderModal() {
 
             {/* Trigger Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: tab !== 'Stop Loss' ? 0.5 : 1 }}>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: tab !== 'Stop Loss' ? 0.5 : 1 }}>
                 <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trigger Price</legend>
                 <input 
                   type="text" 
@@ -563,7 +563,7 @@ export default function OrderModal() {
                   value={slTrigger} 
                   onChange={e => setSlTrigger(e.target.value)}
                   disabled={tab !== 'Stop Loss'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
@@ -578,7 +578,7 @@ export default function OrderModal() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
               <div></div>
               <div>
-                <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: !(isCO || isBO) ? 0.5 : 1 }}>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: !(isCO || isBO) ? 0.5 : 1 }}>
                   <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Stoploss</legend>
                   <input 
                     type="text" 
@@ -586,7 +586,7 @@ export default function OrderModal() {
                     value={slPrice}
                     onChange={e => setSlPrice(e.target.value)}
                     disabled={!(isCO || isBO)}
-                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                   />
                 </fieldset>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
@@ -596,7 +596,7 @@ export default function OrderModal() {
               </div>
 
               <div>
-                <fieldset style={{ margin: 0, padding: 0, border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px', background: '#0e121a', opacity: !isBO ? 0.5 : 1 }}>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: !isBO ? 0.5 : 1 }}>
                   <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Take Profit</legend>
                   <input 
                     type="text" 
@@ -604,7 +604,7 @@ export default function OrderModal() {
                     value={tgtPrice}
                     onChange={e => setTgtPrice(e.target.value)}
                     disabled={!isBO}
-                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: '#ffffff', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                   />
                 </fieldset>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
@@ -655,7 +655,7 @@ export default function OrderModal() {
                   placeholder="₹ Jump" 
                   value={trailingJump} 
                   onChange={e => setTrailingJump(e.target.value)} 
-                  style={{ width: '100%', background: '#0e121a', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '4px', padding: '5px 8px', color: '#fff', fontSize: '12px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }} 
                 />
               </div>
             </div>
@@ -664,7 +664,7 @@ export default function OrderModal() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px' }}>
             <div 
               onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
-              style={{ color: '#60a5fa', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}
+              style={{ color: 'var(--color-blue)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}
             >
               Market Depth <Maximize2 size={11} />
             </div>
@@ -677,7 +677,7 @@ export default function OrderModal() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ background: '#eab308', color: '#000', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>!</div>
               <div>
-                <div style={{ fontWeight: '700', fontSize: '13px', color: '#fef08a' }}>Insufficient margin!</div>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#d97706' }}>Insufficient margin!</div>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Please add ₹{(requiredMargin - balanceNum).toFixed(2)} to place this order.</div>
               </div>
             </div>
@@ -687,9 +687,9 @@ export default function OrderModal() {
 
         {/* Footer Bar */}
         <div style={{
-          background: '#0e121a',
+          background: 'var(--bg-card)',
           padding: '12px 18px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          borderTop: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -700,14 +700,14 @@ export default function OrderModal() {
             {/* Margin Required Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Margin Required:</span>
-              <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#ffffff' }}>
+              <span style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>
                 ₹{requiredMargin.toFixed(2)}
               </span>
               {leverageText && (
                 <span style={{
                   fontSize: '10px',
                   fontWeight: '700',
-                  color: '#60a5fa',
+                  color: 'var(--color-blue)',
                   background: 'rgba(59, 130, 246, 0.15)',
                   border: '1px solid rgba(59, 130, 246, 0.3)',
                   borderRadius: '3px',
@@ -722,7 +722,7 @@ export default function OrderModal() {
             {/* Available Margin Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Available:</span>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.85)' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>
                 ₹{balanceNum.toFixed(2)}
               </span>
             </div>
@@ -738,7 +738,7 @@ export default function OrderModal() {
                   gap: '4px',
                   background: 'transparent',
                   border: 'none',
-                  color: '#60a5fa',
+                  color: 'var(--color-blue)',
                   fontSize: '11.5px',
                   padding: 0,
                   cursor: 'pointer',
@@ -769,9 +769,9 @@ export default function OrderModal() {
                   useStore.getState().setBasketModalOpen(true);
                 }}
                 style={{
-                  background: 'rgba(59, 130, 246, 0.12)',
-                  border: '1px solid rgba(59, 130, 246, 0.35)',
-                  color: '#60a5fa',
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--color-blue)',
                   padding: '9px 12px',
                   borderRadius: '6px',
                   fontSize: '12px',
