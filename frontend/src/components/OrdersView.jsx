@@ -11,7 +11,7 @@ export default function OrdersView() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  const { orders, pendingTriggers, removePendingTrigger } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger })));
+  const { orders, pendingTriggers, removePendingTrigger, setBasketModalOpen } = useStore(useShallow(state => ({ orders: state.orders, pendingTriggers: state.pendingTriggers, removePendingTrigger: state.removePendingTrigger, setBasketModalOpen: state.setBasketModalOpen })));
   const [activeTab, setActiveTab] = useState('Open Orders');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,6 +152,29 @@ export default function OrdersView() {
               <option value="REJECTED">Rejected</option>
             </select>
           )}
+          <button
+            type="button"
+            onClick={() => setBasketModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(59, 130, 246, 0.35)',
+              color: '#60a5fa',
+              borderRadius: '4px',
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'}
+            onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
+          >
+            <ShoppingBag size={14} /> Basket Orders
+          </button>
           <input
             type="text"
             placeholder="Filter orders..."
