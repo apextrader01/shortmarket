@@ -1,14 +1,52 @@
-import React, { useState } from 'react';
-import { useStore } from '../store';
+import React, { useState, useEffect, useRef } from 'react';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { X, Trash2, ShoppingBag } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Search, Plus } from 'lucide-react';
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Auto-subscribe to socket feed and fetch batch prices whenever basket opens or items change
+  useEffect(() => {
+    if (!basketModalOpen || basketItems.length === 0) return;
+    const symbols = basketItems.map(i => i.symbol).filter(Boolean);
+    symbols.forEach(sym => {
+      useStore.getState().subscribeToSymbol?.(sym);
+    });
+    if (useStore.getState().fetchBatchPrices) {
+      useStore.getState().fetchBatchPrices(symbols);
+    }
+  }, [basketModalOpen, basketItems]);
+
+  // Quick Search for any stock / derivative to add directly into the basket
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(searchQuery)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.slice(0, 6));
+        }
+      } catch (e) {
+        console.error('Basket search error:', e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   if (!basketModalOpen) return null;
 
@@ -228,46 +266,51 @@ export default function BasketModal() {
   };
 
   const applyPreset = (type) => {
-    const atmPrice = prices['NSE:NIFTY50-INDEX']?.ltp || 23900;
+    const atmPrice = prices['NSE:NIFTY50-INDEX']?.ltp || prices['NSE:NIFTY50']?.ltp || 24400;
     const roundedStrike = Math.round(atmPrice / 50) * 50;
 
+    const now = new Date();
+    const yr = String(now.getFullYear()).slice(-2);
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const mo = months[now.getMonth()];
+    const symPrefix = `NSE:NIFTY${yr}${mo}`;
+
+    let newItems = [];
     if (type === 'BULL_CALL_SPREAD') {
-      useStore.setState({
-        basketItems: [
-          { symbol: `NSE:NIFTY24SEP${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
-        ]
-      });
+      newItems = [
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+      ];
     } else if (type === 'BEAR_PUT_SPREAD') {
-      useStore.setState({
-        basketItems: [
-          { symbol: `NSE:NIFTY24SEP${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
-        ]
-      });
+      newItems = [
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+      ];
     } else if (type === 'STRADDLE') {
-      useStore.setState({
-        basketItems: [
-          { symbol: `NSE:NIFTY24SEP${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
-        ]
-      });
+      newItems = [
+        { symbol: `${symPrefix}${roundedStrike}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+      ];
     } else if (type === 'STRANGLE') {
-      useStore.setState({
-        basketItems: [
-          { symbol: `NSE:NIFTY24SEP${roundedStrike + 150}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike - 150}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
-        ]
-      });
+      newItems = [
+        { symbol: `${symPrefix}${roundedStrike + 150}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - 150}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+      ];
     } else if (type === 'IRON_CONDOR') {
-      useStore.setState({
-        basketItems: [
-          { symbol: `NSE:NIFTY24SEP${roundedStrike + 200}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
-          { symbol: `NSE:NIFTY24SEP${roundedStrike - 200}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
-        ]
-      });
+      newItems = [
+        { symbol: `${symPrefix}${roundedStrike + 200}CE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike + 100}CE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - 100}PE`, side: 'SELL', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' },
+        { symbol: `${symPrefix}${roundedStrike - 200}PE`, side: 'BUY', quantity: 1, lotsize: 25, orderType: 'MARKET', price: '' }
+      ];
+    }
+
+    useStore.setState({ basketItems: newItems });
+    newItems.forEach(i => {
+      useStore.getState().subscribeToSymbol?.(i.symbol);
+    });
+    if (useStore.getState().fetchBatchPrices) {
+      useStore.getState().fetchBatchPrices(newItems.map(i => i.symbol));
     }
   };
 
@@ -311,10 +354,64 @@ export default function BasketModal() {
               <div onClick={() => setProductType('DEL')} style={{ width: '60px', textAlign: 'center', padding: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
             </div>
           </div>
-
           {hedgedMargin > 0 && (
             <div style={{ fontSize: '11.5px', color: '#4ade80', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', padding: '4px 10px', borderRadius: '12px', fontWeight: '700' }}>
               🛡️ Hedge Benefit Applied (Margin Discount)
+            </div>
+          )}
+        </div>
+
+        {/* Search & Add Any Stock/Option to Basket */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-color)', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '6px 12px' }}>
+            <Search size={14} color="var(--text-secondary)" />
+            <input 
+              type="text" 
+              placeholder="Search & add any stock, futures, or option to basket (e.g. RELIANCE, NIFTY, TCS)..." 
+              value={searchQuery} 
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '12.5px', outline: 'none', flex: 1 }}
+            />
+            {searchQuery && (
+              <X size={14} color="var(--text-secondary)" style={{ cursor: 'pointer' }} onClick={() => setSearchQuery('')} />
+            )}
+          </div>
+
+          {/* Autocomplete Dropdown */}
+          {searchResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: '20px', right: '20px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', zIndex: 50, boxShadow: '0 8px 24px rgba(0,0,0,0.6)', overflow: 'hidden' }}>
+              {searchResults.map((stk, sIdx) => (
+                <div key={sIdx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff' }}>{stk.uniqueSymbol || stk.symbol}</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{stk.name || stk.exchange} • Lot: {stk.lotsize || 1}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        addToBasket({ symbol: stk.uniqueSymbol || stk.symbol, side: 'BUY', quantity: 1, lotsize: stk.lotsize || 1, orderType: 'MARKET', price: '' });
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }} 
+                      style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-blue)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      + BUY
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        addToBasket({ symbol: stk.uniqueSymbol || stk.symbol, side: 'SELL', quantity: 1, lotsize: stk.lotsize || 1, orderType: 'MARKET', price: '' });
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }} 
+                      style={{ padding: '4px 10px', borderRadius: '4px', background: 'var(--color-red)', color: '#fff', border: 'none', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      + SELL
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

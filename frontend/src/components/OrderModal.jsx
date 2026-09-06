@@ -665,23 +665,57 @@ export default function OrderModal() {
             </div>
           </div>
           
-          <button 
-            onClick={handlePlaceOrder}
-            disabled={isInsufficient || isPlacing}
-            style={{ 
-              background: (isInsufficient || isPlacing) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-              color: (isInsufficient || isPlacing) ? 'var(--text-secondary)' : '#fff', 
-              padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
-              alignSelf: 'stretch',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: '180px'
-            }}
-          >
-            {isPlacing ? 'PLACING ORDER...' : `PLACE ${isBuy ? 'BUY' : 'SELL'} ORDER`}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignSelf: 'stretch' }}>
+            <button 
+              type="button"
+              onClick={() => {
+                useStore.getState().addToBasket({
+                  symbol,
+                  side,
+                  quantity: parseInt(quantity) || 1,
+                  lotsize: orderModal.lotsize || 1,
+                  orderType,
+                  price: orderType === 'MARKET' ? '' : price
+                });
+                closeOrderModal();
+                useStore.getState().setBasketModalOpen(true);
+              }}
+              style={{
+                background: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                color: '#60a5fa',
+                padding: '12px 16px',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <ShoppingBag size={14} /> Add to Basket
+            </button>
+
+            <button 
+              onClick={handlePlaceOrder}
+              disabled={isInsufficient || isPlacing}
+              style={{ 
+                background: (isInsufficient || isPlacing) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
+                color: (isInsufficient || isPlacing) ? 'var(--text-secondary)' : '#fff', 
+                padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
+                border: 'none', cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: '150px'
+              }}
+            >
+              {isPlacing ? 'PLACING ORDER...' : `PLACE ${isBuy ? 'BUY' : 'SELL'} ORDER`}
+            </button>
+          </div>
         </div>
 
       </div>
