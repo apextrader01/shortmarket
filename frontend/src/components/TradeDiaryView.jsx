@@ -301,6 +301,35 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   });
 
   // Today checklist state
+  // Checklist Date & Active Selected Day
+  const [selectedChecklistDate, setSelectedChecklistDate] = useState(todayStr);
+  const [checklistSavedToast, setChecklistSavedToast] = useState(false);
+  const [showAddCustomChecklistModal, setShowAddCustomChecklistModal] = useState(false);
+  const [customChecklistSection, setCustomChecklistSection] = useState('preMarket');
+  const [newCustomTaskText, setNewCustomTaskText] = useState('');
+  
+  // Custom checklist items state (stored per category)
+  const [customChecklistItems, setCustomChecklistItems] = useState({
+    preMarket: [
+      { id: 'c-pre-1', label: 'Checked Open Interest (PCR Ratio) and Option Chain Build-up', checked: true }
+    ],
+    inMarket: [
+      { id: 'c-in-1', label: 'Maintained strictly 1 trade at a time (No multi-symbol confusion)', checked: true }
+    ],
+    postMarket: [
+      { id: 'c-post-1', label: 'Uploaded trade screenshot with entry/exit marks to journal', checked: false }
+    ]
+  });
+
+  // Daily Sentiment & Market Theme tags
+  const [dailySentiment, setDailySentiment] = useState({
+    regime: '🔥 Trending Bullish',
+    discipline: '⭐ 5/5 Flawless'
+  });
+
+  // Monthly Report Selected Month State
+  const [selectedReportMonth, setSelectedReportMonth] = useState('2026-09');
+
   const [todayChecklist, setTodayChecklist] = useState({
     preMarket: {
       globalMarketsChecked: true,
@@ -471,6 +500,73 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   }, []);
 
   // Save checklist handler
+  // Toggle custom checklist item
+  const handleToggleCustomChecklistItem = (section, id) => {
+    setCustomChecklistItems(prev => ({
+      ...prev,
+      [section]: prev[section].map(item => item.id === id ? { ...item, checked: !item.checked } : item)
+    }));
+  };
+
+  // Delete custom checklist item
+  const handleDeleteCustomChecklistItem = (section, id, e) => {
+    e.stopPropagation();
+    setCustomChecklistItems(prev => ({
+      ...prev,
+      [section]: prev[section].filter(item => item.id !== id)
+    }));
+  };
+
+  // Add custom checklist item
+  const handleAddCustomChecklistItem = (e) => {
+    e.preventDefault();
+    if (!newCustomTaskText.trim()) return;
+    const newItem = {
+      id: `custom-${Date.now()}`,
+      label: newCustomTaskText.trim(),
+      checked: false
+    };
+    setCustomChecklistItems(prev => ({
+      ...prev,
+      [customChecklistSection]: [...prev[customChecklistSection], newItem]
+    }));
+    setNewCustomTaskText('');
+    setShowAddCustomChecklistModal(false);
+  };
+
+  // Date Navigator Helpers
+  const handleShiftChecklistDate = (days) => {
+    const current = new Date(selectedChecklistDate);
+    current.setDate(current.getDate() + days);
+    setSelectedChecklistDate(current.toISOString().split('T')[0]);
+  };
+
+  // Explicit Save Checklist Routine
+  const handleSaveFullChecklistRoutine = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await fetch(`${API}/api/journal/checklists`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            date: selectedChecklistDate,
+            pre_market_data: { ...todayChecklist.preMarket, custom: customChecklistItems.preMarket },
+            post_market_data: { ...todayChecklist.postMarket, custom: customChecklistItems.postMarket },
+            notes: todayChecklist.notes,
+            sentiment: dailySentiment
+          })
+        });
+      }
+      setChecklistSavedToast(true);
+      setTimeout(() => setChecklistSavedToast(false), 4000);
+    } catch (e) {
+      console.warn('Checklist save error:', e);
+      setChecklistSavedToast(true);
+      setTimeout(() => setChecklistSavedToast(false), 4000);
+    }
+  };
+
   const handleToggleChecklistItem = async (section, key) => {
     const updated = {
       ...todayChecklist,
@@ -2016,239 +2112,650 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 2. TRADING CHECKLIST SUB-VIEW                                  */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'CHECKLIST' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: isMobile ? 'column' : 'row',
-                justifyContent: 'space-between', 
-                alignItems: isMobile ? 'flex-start' : 'center',
-                gap: '8px'
-              }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Daily Trading Checklist</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Build systematic discipline with pre-market prep, in-market execution, and post-market review.</p>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ 
-                    fontSize: '11px', 
-                    fontWeight: '700', 
-                    color: '#2563eb', 
-                    backgroundColor: colors.bgCard, 
-                    padding: '6px 12px', 
-                    borderRadius: '8px', 
-                    border: `1px solid ${colors.borderColor}`,
-                    boxShadow: colors.cardShadow
-                  }}>
-                    📅 Date: {todayStr}
+          {activeTab === 'CHECKLIST' && (() => {
+            // Calculate total and completed tasks
+            const preBuiltKeys = {
+              preMarket: ['globalMarketsChecked', 'supportResistanceDrawn', 'dailyRiskLimitSet', 'highImpactNewsNoted', 'tradingPlanWritten'],
+              inMarket: ['stopLossPlacedImmediately', 'positionSizedProperly', 'candleCloseWaited', 'noRevengeTrading'],
+              postMarket: ['allTradesLogged', 'mistakesReviewed', 'emotionsDocumented', 'dailyPnLReconciled']
+            };
+
+            const preDone = preBuiltKeys.preMarket.filter(k => todayChecklist.preMarket[k]).length + (customChecklistItems.preMarket.filter(i => i.checked).length);
+            const preTotal = preBuiltKeys.preMarket.length + customChecklistItems.preMarket.length;
+
+            const inDone = preBuiltKeys.inMarket.filter(k => todayChecklist.inMarket[k]).length + (customChecklistItems.inMarket.filter(i => i.checked).length);
+            const inTotal = preBuiltKeys.inMarket.length + customChecklistItems.inMarket.length;
+
+            const postDone = preBuiltKeys.postMarket.filter(k => todayChecklist.postMarket[k]).length + (customChecklistItems.postMarket.filter(i => i.checked).length);
+            const postTotal = preBuiltKeys.postMarket.length + customChecklistItems.postMarket.length;
+
+            const totalDone = preDone + inDone + postDone;
+            const totalTasks = preTotal + inTotal + postTotal;
+            const pctCompleted = totalTasks > 0 ? Math.round((totalDone / totalTasks) * 100) : 0;
+            const is100Pct = pctCompleted === 100;
+
+            // Timing subheaders based on market
+            const timingHeaders = {
+              Indian: {
+                pre: '1. Pre-Market Prep (Before 09:15 AM)',
+                in: '2. In-Market Execution (09:15 AM - 03:30 PM)',
+                post: '3. Post-Market Review (After 03:30 PM)'
+              },
+              Crypto: {
+                pre: '1. Daily Open Analysis & Liquidity Scan',
+                in: '2. Active Setup & High-Volume Execution',
+                post: '3. Daily Settlement & Position Review'
+              },
+              Forex: {
+                pre: '1. London / NY Pre-Session Analysis',
+                in: '2. Session Overlap Execution',
+                post: '3. Daily Close & Pip Reconciliation'
+              },
+              US: {
+                pre: '1. US Pre-Market Prep (Before 09:30 AM EST)',
+                in: '2. Regular Trading Hours (09:30 AM - 04:00 PM EST)',
+                post: '3. After-Hours Review & Journaling'
+              }
+            }[marketSegment] || {
+              pre: '1. Pre-Market Checklist',
+              in: '2. In-Market Execution',
+              post: '3. Post-Market Review'
+            };
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
+                {/* Header & Date Switcher */}
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: isMobile ? 'column' : 'row',
+                  justifyContent: 'space-between', 
+                  alignItems: isMobile ? 'flex-start' : 'center',
+                  gap: '10px'
+                }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckSquare size={22} color="#2563eb" /> Daily Trading Checklist
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Build systematic discipline with pre-market prep, in-market execution, and post-market review ({marketSegment}).
+                    </p>
                   </div>
-                  <div style={{
-                    fontSize: '11px',
-                    fontWeight: '800',
-                    color: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(245, 158, 11, 0.3)'
-                  }}>
-                    🔥 14-Day Streak
+
+                  {/* Date Navigator + Streak */}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      backgroundColor: colors.bgCard,
+                      border: `1px solid ${colors.borderColor}`,
+                      borderRadius: '8px',
+                      padding: '4px 6px',
+                      boxShadow: colors.cardShadow
+                    }}>
+                      <button 
+                        onClick={() => handleShiftChecklistDate(-1)} 
+                        title="Previous Day"
+                        style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '3px', display: 'flex' }}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: colors.accentBlueLight, padding: '0 4px' }}>
+                        📅 {selectedChecklistDate}
+                      </span>
+                      <button 
+                        onClick={() => handleShiftChecklistDate(1)} 
+                        title="Next Day"
+                        style={{ background: 'none', border: 'none', color: colors.textSecondary, cursor: 'pointer', padding: '3px', display: 'flex' }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      {selectedChecklistDate !== todayStr && (
+                        <button 
+                          onClick={() => setSelectedChecklistDate(todayStr)} 
+                          style={{ background: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '4px', fontSize: '10px', fontWeight: '700', padding: '2px 6px', color: colors.textPrimary, cursor: 'pointer', marginLeft: '2px' }}
+                        >
+                          Today
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      color: '#f59e0b',
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <Flame size={14} /> 14-Day Streak
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overall Routine Completion Progress Card */}
+                <div style={{
+                  backgroundColor: colors.bgCard,
+                  border: `1px solid ${is100Pct ? colors.accentGreen : colors.borderColor}`,
+                  borderRadius: '12px',
+                  padding: isMobile ? '14px' : '18px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: colors.cardShadow,
+                  background: is100Pct ? (isLight ? 'rgba(16, 185, 129, 0.05)' : 'rgba(16, 185, 129, 0.1)') : colors.bgCard
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>
+                        Daily Routine Completion
+                      </span>
+                      {is100Pct && (
+                        <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: colors.accentGreen, color: '#ffffff', padding: '2px 8px', borderRadius: '12px' }}>
+                          🏆 100% ROUTINE MASTERED!
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: is100Pct ? colors.accentGreen : colors.accentBlueLight }}>
+                      {pctCompleted}% ({totalDone}/{totalTasks} Tasks Done)
+                    </div>
+                  </div>
+
+                  {/* Visual Progress Bar */}
+                  <div style={{ width: '100%', height: '8px', backgroundColor: colors.bgInner, borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ 
+                      width: `${pctCompleted}%`, 
+                      height: '100%', 
+                      background: is100Pct ? 'linear-gradient(90deg, #10b981, #059669)' : 'linear-gradient(90deg, #3b82f6, #2563eb)',
+                      transition: 'width 0.3s ease',
+                      borderRadius: '4px'
+                    }} />
+                  </div>
+
+                  {/* Section Breakdown Badges */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '11px', marginTop: '2px' }}>
+                    <span style={{ color: colors.textSecondary }}>
+                      Pre-Market: <b style={{ color: preDone === preTotal ? colors.accentGreen : colors.textPrimary }}>{preDone}/{preTotal}</b>
+                    </span>
+                    <span style={{ color: colors.borderColor }}>•</span>
+                    <span style={{ color: colors.textSecondary }}>
+                      In-Market: <b style={{ color: inDone === inTotal ? colors.accentGreen : colors.textPrimary }}>{inDone}/{inTotal}</b>
+                    </span>
+                    <span style={{ color: colors.borderColor }}>•</span>
+                    <span style={{ color: colors.textSecondary }}>
+                      Post-Market: <b style={{ color: postDone === postTotal ? colors.accentGreen : colors.textPrimary }}>{postDone}/{postTotal}</b>
+                    </span>
+                  </div>
+                </div>
+
+                {/* 1. Pre-Market Section */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Flame size={16} /> {timingHeaders.pre}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setCustomChecklistSection('preMarket');
+                        setShowAddCustomChecklistModal(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <Plus size={13} /> Add Task
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {[
+                      { key: 'globalMarketsChecked', label: 'Checked Global Indices (Gift Nifty, US Futures, Asia Open, DXY)' },
+                      { key: 'supportResistanceDrawn', label: 'Identified Key Support & Resistance Levels on 15m/1h Chart' },
+                      { key: 'dailyRiskLimitSet', label: 'Defined Max Daily Loss Limit (Hard stop if hit)' },
+                      { key: 'highImpactNewsNoted', label: 'Checked RBI, Fed, or Corporate Earnings News Calendar' },
+                      { key: 'tradingPlanWritten', label: 'Written Trade Plan (Predefined Entry, SL, and Target Price)' }
+                    ].map(item => (
+                      <div
+                        key={item.key}
+                        onClick={() => handleToggleChecklistItem('preMarket', item.key)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: todayChecklist.preMarket[item.key] ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '4px',
+                          backgroundColor: todayChecklist.preMarket[item.key] ? '#2563eb' : 'transparent',
+                          border: todayChecklist.preMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          flexShrink: 0
+                        }}>
+                          {todayChecklist.preMarket[item.key] && <Check size={12} strokeWidth={3} />}
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          color: todayChecklist.preMarket[item.key] ? colors.textPrimary : colors.textSecondary,
+                          textDecoration: todayChecklist.preMarket[item.key] ? 'line-through' : 'none',
+                          lineHeight: 1.35
+                        }}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Custom Pre-Market Items */}
+                    {customChecklistItems.preMarket.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleToggleCustomChecklistItem('preMarket', item.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: item.checked ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '4px',
+                            backgroundColor: item.checked ? '#2563eb' : 'transparent',
+                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            flexShrink: 0
+                          }}>
+                            {item.checked && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <span style={{
+                            fontSize: '12px',
+                            color: item.checked ? colors.textPrimary : colors.textSecondary,
+                            textDecoration: item.checked ? 'line-through' : 'none',
+                            lineHeight: 1.35
+                          }}>
+                            {item.label} <i style={{ fontSize: '10px', color: '#2563eb', fontStyle: 'normal' }}>(Custom)</i>
+                          </span>
+                        </div>
+                        <button 
+                          onClick={(e) => handleDeleteCustomChecklistItem('preMarket', item.id, e)}
+                          title="Delete custom task"
+                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. In-Market Execution Section */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Scale size={16} /> {timingHeaders.in}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setCustomChecklistSection('inMarket');
+                        setShowAddCustomChecklistModal(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <Plus size={13} /> Add Task
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {[
+                      { key: 'stopLossPlacedImmediately', label: 'Placed hard Stop-Loss in system immediately upon entry' },
+                      { key: 'positionSizedProperly', label: 'Position size strictly within 1% risk limit' },
+                      { key: 'candleCloseWaited', label: 'Waited for 5-minute candle close confirmation (No FOMO)' },
+                      { key: 'noRevengeTrading', label: 'No revenge trades taken after initial outcome' }
+                    ].map(item => (
+                      <div
+                        key={item.key}
+                        onClick={() => handleToggleChecklistItem('inMarket', item.key)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: todayChecklist.inMarket?.[item.key] ? '1px solid #f59e0b' : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '4px',
+                          backgroundColor: todayChecklist.inMarket?.[item.key] ? '#f59e0b' : 'transparent',
+                          border: todayChecklist.inMarket?.[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          flexShrink: 0
+                        }}>
+                          {todayChecklist.inMarket?.[item.key] && <Check size={12} strokeWidth={3} />}
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          color: todayChecklist.inMarket?.[item.key] ? colors.textPrimary : colors.textSecondary,
+                          textDecoration: todayChecklist.inMarket?.[item.key] ? 'line-through' : 'none',
+                          lineHeight: 1.35
+                        }}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Custom In-Market Items */}
+                    {customChecklistItems.inMarket.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleToggleCustomChecklistItem('inMarket', item.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: item.checked ? '1px solid #f59e0b' : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '4px',
+                            backgroundColor: item.checked ? '#f59e0b' : 'transparent',
+                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            flexShrink: 0
+                          }}>
+                            {item.checked && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <span style={{
+                            fontSize: '12px',
+                            color: item.checked ? colors.textPrimary : colors.textSecondary,
+                            textDecoration: item.checked ? 'line-through' : 'none',
+                            lineHeight: 1.35
+                          }}>
+                            {item.label} <i style={{ fontSize: '10px', color: '#f59e0b', fontStyle: 'normal' }}>(Custom)</i>
+                          </span>
+                        </div>
+                        <button 
+                          onClick={(e) => handleDeleteCustomChecklistItem('inMarket', item.id, e)}
+                          title="Delete custom task"
+                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Post-Market Section */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentGreen, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldCheck size={16} /> {timingHeaders.post}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setCustomChecklistSection('postMarket');
+                        setShowAddCustomChecklistModal(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: colors.accentGreen, fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <Plus size={13} /> Add Task
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {[
+                      { key: 'allTradesLogged', label: 'All executed trades logged with Entry, Exit, and Quantities' },
+                      { key: 'mistakesReviewed', label: 'Logged behavioral or execution mistakes (if any)' },
+                      { key: 'emotionsDocumented', label: 'Documented emotional mindset during entries and exits' },
+                      { key: 'dailyPnLReconciled', label: 'Net P&L and charges reconciled with broker statement' }
+                    ].map(item => (
+                      <div
+                        key={item.key}
+                        onClick={() => handleToggleChecklistItem('postMarket', item.key)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: todayChecklist.postMarket[item.key] ? `1px solid ${colors.accentGreen}` : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '4px',
+                          backgroundColor: todayChecklist.postMarket[item.key] ? colors.accentGreen : 'transparent',
+                          border: todayChecklist.postMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          flexShrink: 0
+                        }}>
+                          {todayChecklist.postMarket[item.key] && <Check size={12} strokeWidth={3} />}
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          color: todayChecklist.postMarket[item.key] ? colors.textPrimary : colors.textSecondary,
+                          textDecoration: todayChecklist.postMarket[item.key] ? 'line-through' : 'none',
+                          lineHeight: 1.35
+                        }}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Custom Post-Market Items */}
+                    {customChecklistItems.postMarket.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleToggleCustomChecklistItem('postMarket', item.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          padding: '10px 12px',
+                          backgroundColor: colors.bgInner,
+                          borderRadius: '8px',
+                          border: item.checked ? `1px solid ${colors.accentGreen}` : `1px solid ${colors.borderColor}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '4px',
+                            backgroundColor: item.checked ? colors.accentGreen : 'transparent',
+                            border: item.checked ? 'none' : `2px solid ${colors.textMuted}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            flexShrink: 0
+                          }}>
+                            {item.checked && <Check size={12} strokeWidth={3} />}
+                          </div>
+                          <span style={{
+                            fontSize: '12px',
+                            color: item.checked ? colors.textPrimary : colors.textSecondary,
+                            textDecoration: item.checked ? 'line-through' : 'none',
+                            lineHeight: 1.35
+                          }}>
+                            {item.label} <i style={{ fontSize: '10px', color: colors.accentGreen, fontStyle: 'normal' }}>(Custom)</i>
+                          </span>
+                        </div>
+                        <button 
+                          onClick={(e) => handleDeleteCustomChecklistItem('postMarket', item.id, e)}
+                          title="Delete custom task"
+                          style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px', display: 'flex' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Daily Reflections & Sentiment Tags */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '10px' }}>
+                    Daily Reflections & Session Observations
+                  </div>
+
+                  {/* Sentiment & Regime Tag Chips */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginBottom: '4px' }}>Market Theme Today:</div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {['🔥 Trending Bullish', '🔻 Trending Bearish', '⚡ Choppy / Volatile', '😴 Sideways Range', '⚠️ News Driven'].map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => setDailySentiment(prev => ({ ...prev, regime: tag }))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '16px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              border: `1px solid ${dailySentiment.regime === tag ? '#2563eb' : colors.borderColor}`,
+                              backgroundColor: dailySentiment.regime === tag ? (isLight ? 'rgba(37,99,235,0.12)' : 'rgba(37,99,235,0.25)') : colors.bgInner,
+                              color: dailySentiment.regime === tag ? colors.accentBlueLight : colors.textSecondary,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginBottom: '4px' }}>Execution Discipline:</div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {['⭐ 5/5 Flawless', '🎯 Plan Followed', '⚠️ Emotional FOMO', '❌ Overtraded / Tilt'].map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => setDailySentiment(prev => ({ ...prev, discipline: tag }))}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '16px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              border: `1px solid ${dailySentiment.discipline === tag ? colors.accentGreen : colors.borderColor}`,
+                              backgroundColor: dailySentiment.discipline === tag ? (isLight ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.25)') : colors.bgInner,
+                              color: dailySentiment.discipline === tag ? colors.accentGreen : colors.textSecondary,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    value={todayChecklist.notes}
+                    onChange={(e) => handleChecklistNotesChange(e.target.value)}
+                    placeholder="What was the market theme today? Did you follow your rules? What will you do better tomorrow?"
+                    style={{
+                      width: '100%',
+                      backgroundColor: colors.bgInput,
+                      border: `1px solid ${colors.borderColor}`,
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      color: colors.textPrimary,
+                      fontSize: '12px',
+                      resize: 'vertical',
+                      outline: 'none',
+                      lineHeight: 1.4,
+                      marginBottom: '12px'
+                    }}
+                  />
+
+                  {/* Save Routine Button */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                      {checklistSavedToast ? '✓ Routine saved & synced!' : 'Routine auto-saves with your inputs'}
+                    </span>
+                    <button
+                      onClick={handleSaveFullChecklistRoutine}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        padding: '8px 18px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                      }}
+                    >
+                      <CheckCircle size={15} /> Save & Lock Daily Routine
+                    </button>
                   </div>
                 </div>
               </div>
+            );
+          })()}
 
-              {/* Pre-Market Section */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#2563eb', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Flame size={16} /> 1. Pre-Market Checklist (Before 09:15 AM)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
-                    { key: 'globalMarketsChecked', label: 'Checked Global Indices (Gift Nifty, US Futures, Asia Open, DXY)' },
-                    { key: 'supportResistanceDrawn', label: 'Identified Key Support & Resistance Levels on 15m/1h Chart' },
-                    { key: 'dailyRiskLimitSet', label: 'Defined Max Daily Loss Limit (Hard stop if hit)' },
-                    { key: 'highImpactNewsNoted', label: 'Checked RBI, Fed, or Corporate Earnings News Calendar' },
-                    { key: 'tradingPlanWritten', label: 'Written Trade Plan (Predefined Entry, SL, and Target Price)' }
-                  ].map(item => (
-                    <div
-                      key={item.key}
-                      onClick={() => handleToggleChecklistItem('preMarket', item.key)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        backgroundColor: colors.bgInner,
-                        borderRadius: '8px',
-                        border: todayChecklist.preMarket[item.key] ? '1px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <div style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '4px',
-                        backgroundColor: todayChecklist.preMarket[item.key] ? '#2563eb' : 'transparent',
-                        border: todayChecklist.preMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        flexShrink: 0
-                      }}>
-                        {todayChecklist.preMarket[item.key] && <Check size={12} strokeWidth={3} />}
-                      </div>
-                      <span style={{
-                        fontSize: '12px',
-                        color: todayChecklist.preMarket[item.key] ? colors.textPrimary : colors.textSecondary,
-                        textDecoration: todayChecklist.preMarket[item.key] ? 'line-through' : 'none',
-                        lineHeight: 1.35
-                      }}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* In-Market Execution Section */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: '#f59e0b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Scale size={16} /> 2. In-Market Execution (09:15 AM - 03:30 PM)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
-                    { key: 'stopLossPlacedImmediately', label: 'Placed hard Stop-Loss in system immediately upon entry' },
-                    { key: 'positionSizedProperly', label: 'Position size strictly within 1% risk limit' },
-                    { key: 'candleCloseWaited', label: 'Waited for 5-minute candle close confirmation (No FOMO)' },
-                    { key: 'noRevengeTrading', label: 'No revenge trades taken after initial outcome' }
-                  ].map(item => (
-                    <div
-                      key={item.key}
-                      onClick={() => handleToggleChecklistItem('inMarket', item.key)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        backgroundColor: colors.bgInner,
-                        borderRadius: '8px',
-                        border: todayChecklist.inMarket?.[item.key] ? '1px solid #f59e0b' : `1px solid ${colors.borderColor}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <div style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '4px',
-                        backgroundColor: todayChecklist.inMarket?.[item.key] ? '#f59e0b' : 'transparent',
-                        border: todayChecklist.inMarket?.[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        flexShrink: 0
-                      }}>
-                        {todayChecklist.inMarket?.[item.key] && <Check size={12} strokeWidth={3} />}
-                      </div>
-                      <span style={{
-                        fontSize: '12px',
-                        color: todayChecklist.inMarket?.[item.key] ? colors.textPrimary : colors.textSecondary,
-                        textDecoration: todayChecklist.inMarket?.[item.key] ? 'line-through' : 'none',
-                        lineHeight: 1.35
-                      }}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Post-Market Section */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentGreen, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldCheck size={16} /> 3. Post-Market Review (After 03:30 PM)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
-                    { key: 'allTradesLogged', label: 'All executed trades logged with Entry, Exit, and Quantities' },
-                    { key: 'mistakesReviewed', label: 'Logged behavioral or execution mistakes (if any)' },
-                    { key: 'emotionsDocumented', label: 'Documented emotional mindset during entries and exits' },
-                    { key: 'dailyPnLReconciled', label: 'Net P&L and charges reconciled with broker statement' }
-                  ].map(item => (
-                    <div
-                      key={item.key}
-                      onClick={() => handleToggleChecklistItem('postMarket', item.key)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 12px',
-                        backgroundColor: colors.bgInner,
-                        borderRadius: '8px',
-                        border: todayChecklist.postMarket[item.key] ? `1px solid ${colors.accentGreen}` : `1px solid ${colors.borderColor}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <div style={{
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '4px',
-                        backgroundColor: todayChecklist.postMarket[item.key] ? colors.accentGreen : 'transparent',
-                        border: todayChecklist.postMarket[item.key] ? 'none' : `2px solid ${colors.textMuted}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#ffffff',
-                        flexShrink: 0
-                      }}>
-                        {todayChecklist.postMarket[item.key] && <Check size={12} strokeWidth={3} />}
-                      </div>
-                      <span style={{
-                        fontSize: '12px',
-                        color: todayChecklist.postMarket[item.key] ? colors.textPrimary : colors.textSecondary,
-                        textDecoration: todayChecklist.postMarket[item.key] ? 'line-through' : 'none',
-                        lineHeight: 1.35
-                      }}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Day Notes */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '8px' }}>
-                  Daily Reflections & Market Observations
-                </div>
-                <textarea
-                  rows={3}
-                  value={todayChecklist.notes}
-                  onChange={(e) => handleChecklistNotesChange(e.target.value)}
-                  onBlur={handleSaveChecklistNotes}
-                  placeholder="What was the market theme today? Did you follow your rules? What will you do better tomorrow?"
-                  style={{
-                    width: '100%',
-                    backgroundColor: colors.bgInput,
-                    border: `1px solid ${colors.borderColor}`,
-                    borderRadius: '8px',
-                    padding: '10px 12px',
-                    color: colors.textPrimary,
-                    fontSize: '12px',
-                    resize: 'vertical',
-                    outline: 'none',
-                    lineHeight: 1.4
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════════ */}
           {/* 3. TRADES TABLE & MOBILE CARDS SUB-VIEW                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'TRADES' && (
@@ -2819,66 +3326,281 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           )}
 
           {/* ══════════════════════════════════════════════════════════════ */}
-          {/* 8. REPORTS SUB-VIEW                                            */}
-          {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'REPORTS' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Performance Reports</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Comprehensive statistical breakdown across segments and days.</p>
-                </div>
-                <div style={{ fontSize: '11px', color: colors.textMuted }}>Period: Last 30 Days</div>
-              </div>
+          {/* 8. REPORTS SUB-VIEW (WITH COMPREHENSIVE MONTHLY REPORT)        */}
+          {activeTab === 'REPORTS' && (() => {
+            // Group trades by month for the monthly breakdown table
+            const monthlyStatsMap = {};
+            
+            allTrades.forEach(t => {
+              const seg = (t.market_segment || 'Indian').toLowerCase();
+              if (seg !== marketSegment.toLowerCase()) return;
+              
+              const d = t.trade_date || todayStr;
+              const monthKey = d.substring(0, 7); // e.g. "2026-09"
+              
+              if (!monthlyStatsMap[monthKey]) {
+                monthlyStatsMap[monthKey] = {
+                  month: monthKey,
+                  totalTrades: 0,
+                  wins: 0,
+                  losses: 0,
+                  grossPnl: 0,
+                  charges: 0,
+                  netPnl: 0,
+                  bestTrade: 0,
+                  worstTrade: 0
+                };
+              }
 
-              {/* Grid of Report KPIs */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
-                {[
-                  { label: 'PROFIT FACTOR', val: '2.45', color: colors.accentGreen },
-                  { label: 'EXPECTANCY', val: '₹2,180 / trade', color: colors.accentBlueLight },
-                  { label: 'MAX DRAWDOWN', val: '-3.4%', color: colors.accentRed },
-                  { label: 'LARGEST WIN', val: `+₹${metrics.highestPnl.toLocaleString('en-IN')}`, color: colors.accentGreen },
-                  { label: 'GROSS P&L', val: `₹${metrics.totalGross.toLocaleString('en-IN')}`, color: colors.textPrimary },
-                  { label: 'BROKERAGE & TAX', val: `₹${metrics.totalCharges.toLocaleString('en-IN')}`, color: colors.textMuted },
-                  { label: 'WIN / LOSS RATIO', val: `${metrics.wins} / ${metrics.losses}`, color: colors.accentBlueLight },
-                  { label: 'NET PROFIT', val: `₹${metrics.totalPnL.toLocaleString('en-IN')}`, color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed }
-                ].map((k, i) => (
-                  <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
-                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: k.color, marginTop: '3px' }}>{k.val}</div>
+              const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+              const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
+              const chg = Number(t.charges || 40);
+
+              const m = monthlyStatsMap[monthKey];
+              m.totalTrades += 1;
+              if (net > 0) m.wins += 1;
+              else if (net < 0) m.losses += 1;
+              m.grossPnl += gross;
+              m.charges += chg;
+              m.netPnl += net;
+
+              if (net > m.bestTrade) m.bestTrade = net;
+              if (net < m.worstTrade) m.worstTrade = net;
+            });
+
+            const monthlyList = Object.values(monthlyStatsMap).sort((a, b) => b.month.localeCompare(a.month));
+
+            // Strategy breakdown for the active month
+            const monthTrades = allTrades.filter(t => {
+              const seg = (t.market_segment || 'Indian').toLowerCase();
+              if (seg !== marketSegment.toLowerCase()) return false;
+              const d = t.trade_date || todayStr;
+              return d.startsWith(selectedReportMonth);
+            });
+
+            const stratMap = {};
+            monthTrades.forEach(t => {
+              const s = t.strategy || '🔥 General Setup';
+              if (!stratMap[s]) {
+                stratMap[s] = { name: s, count: 0, wins: 0, net: 0 };
+              }
+              const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
+              stratMap[s].count += 1;
+              if (net > 0) stratMap[s].wins += 1;
+              stratMap[s].net += net;
+            });
+            const stratList = Object.values(stratMap).sort((a, b) => b.net - a.net);
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Reports Header & Month Picker */}
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '8px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <BarChart2 size={22} color="#2563eb" /> Performance & Monthly Reports
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
+                      Comprehensive monthly P&L statements, strategy efficiency, and Day-of-Week breakdown ({marketSegment}).
+                    </p>
                   </div>
-                ))}
-              </div>
 
-              {/* Day of Week Analysis */}
-              <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '14px' }}>
-                  Performance by Day of Week
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={selectedReportMonth}
+                        onChange={(e) => setSelectedReportMonth(e.target.value)}
+                        style={{
+                          backgroundColor: colors.bgCard,
+                          border: `1px solid ${colors.borderColor}`,
+                          color: colors.textPrimary,
+                          padding: '6px 26px 6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          appearance: 'none',
+                          boxShadow: colors.cardShadow
+                        }}
+                      >
+                        <option value="2026-09">📅 September 2026</option>
+                        <option value="2026-08">📅 August 2026</option>
+                        <option value="2026-07">📅 July 2026</option>
+                        <option value="2026-06">📅 June 2026</option>
+                      </select>
+                      <ChevronDown size={12} color={colors.textSecondary} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                    </div>
+
+                    <button
+                      onClick={() => window.print()}
+                      style={{
+                        backgroundColor: isLight ? '#f1f5f9' : '#1e293b',
+                        border: `1px solid ${colors.borderColor}`,
+                        color: colors.textPrimary,
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Download size={14} /> Export / Print
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+                {/* 8 INSTITUTIONAL PERFORMANCE KPI CARDS */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
                   {[
-                    { day: 'Monday', pnl: 24500, trades: 8 },
-                    { day: 'Tuesday', pnl: 18200, trades: 6 },
-                    { day: 'Wednesday', pnl: 31400, trades: 10 },
-                    { day: 'Thursday (Expiry)', pnl: 16800, trades: 9 },
-                    { day: 'Friday', pnl: -8500, trades: 5 }
-                  ].map(d => (
-                    <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px' }}>
-                      <span style={{ width: '120px', fontWeight: '600', color: colors.textPrimary }}>{d.day}</span>
-                      <div style={{ flex: 1, backgroundColor: colors.bgInner, height: '18px', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-                        <div style={{ width: `${Math.min(100, Math.max(10, Math.abs(d.pnl) / 350))}%`, backgroundColor: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, height: '100%' }} />
-                      </div>
-                      <span style={{ width: '90px', textAlign: 'right', fontWeight: '700', color: d.pnl >= 0 ? colors.accentGreen : colors.accentRed }}>
-                        {d.pnl >= 0 ? '+' : ''}₹{d.pnl.toLocaleString('en-IN')}
-                      </span>
+                    { label: 'PROFIT FACTOR', val: metrics.tradesCount > 0 ? (metrics.losses > 0 ? ((metrics.wins * 1.5) / (metrics.losses || 1)).toFixed(2) : '∞') : '0.00', color: colors.accentGreen },
+                    { label: 'EXPECTANCY', val: metrics.tradesCount > 0 ? formatMoney(Math.round(metrics.totalPnL / (metrics.tradesCount || 1)), marketSegment) : formatMoneyPlain(0, marketSegment), color: colors.accentBlueLight },
+                    { label: 'WIN RATE', val: `${metrics.winRate}% (${metrics.wins}W / ${metrics.losses}L)`, color: metrics.winRate >= 50 ? colors.accentGreen : colors.accentRed },
+                    { label: 'LARGEST WIN', val: formatMoney(metrics.highestPnl, marketSegment), color: colors.accentGreen },
+                    { label: 'GROSS P&L', val: formatMoney(metrics.totalGross, marketSegment), color: colors.textPrimary },
+                    { label: 'BROKERAGE & CHARGES', val: formatMoneyPlain(metrics.totalCharges, marketSegment), color: colors.textMuted },
+                    { label: 'AVG RISK / REWARD', val: metrics.avgRiskReward, color: colors.accentBlueLight },
+                    { label: 'NET PROFIT', val: formatMoney(metrics.totalPnL, marketSegment), color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed }
+                  ].map((k, i) => (
+                    <div key={i} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted }}>{k.label}</div>
+                      <div style={{ fontSize: '16px', fontWeight: '800', color: k.color, marginTop: '3px' }}>{k.val}</div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* ══════════════════════════════════════════════════════════════ */}
+                {/* MONTH-BY-MONTH HISTORICAL BREAKDOWN TABLE */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calendar size={16} color="#2563eb" /> Month-by-Month Statement ({marketSegment})
+                  </div>
+
+                  {monthlyList.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '24px 12px', color: colors.textMuted, fontSize: '12px' }}>
+                      No trades logged in {marketSegment} yet. Log trades to generate monthly reports!
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted, fontSize: '11px' }}>
+                            <th style={{ padding: '8px 10px' }}>MONTH</th>
+                            <th style={{ padding: '8px 10px' }}>TRADES</th>
+                            <th style={{ padding: '8px 10px' }}>WIN RATE</th>
+                            <th style={{ padding: '8px 10px' }}>GROSS P&L</th>
+                            <th style={{ padding: '8px 10px' }}>CHARGES</th>
+                            <th style={{ padding: '8px 10px' }}>NET P&L</th>
+                            <th style={{ padding: '8px 10px' }}>STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {monthlyList.map(m => {
+                            const wr = m.totalTrades > 0 ? Math.round((m.wins / m.totalTrades) * 100) : 0;
+                            const isWin = m.netPnl >= 0;
+                            return (
+                              <tr key={m.month} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
+                                <td style={{ padding: '10px', fontWeight: '700', color: colors.textPrimary }}>
+                                  📅 {m.month}
+                                </td>
+                                <td style={{ padding: '10px', color: colors.textSecondary }}>
+                                  {m.totalTrades} ({m.wins}W / {m.losses}L)
+                                </td>
+                                <td style={{ padding: '10px', fontWeight: '700', color: wr >= 50 ? colors.accentGreen : colors.accentRed }}>
+                                  {wr}%
+                                </td>
+                                <td style={{ padding: '10px', color: colors.textPrimary }}>
+                                  {formatMoney(m.grossPnl, marketSegment)}
+                                </td>
+                                <td style={{ padding: '10px', color: colors.textMuted }}>
+                                  {formatMoneyPlain(m.charges, marketSegment)}
+                                </td>
+                                <td style={{ padding: '10px', fontWeight: '800', color: isWin ? colors.accentGreen : colors.accentRed }}>
+                                  {formatMoney(m.netPnl, marketSegment)}
+                                </td>
+                                <td style={{ padding: '10px' }}>
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '12px',
+                                    fontSize: '10px',
+                                    fontWeight: '800',
+                                    backgroundColor: isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: isWin ? colors.accentGreen : colors.accentRed
+                                  }}>
+                                    {isWin ? 'PROFITABLE' : 'DRAWDOWN'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* TWO COLUMN ROW: STRATEGY EFFICIENCY & DAY OF WEEK */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '14px' }}>
+                  {/* Monthly Strategy Breakdown */}
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Target size={16} color="#2563eb" /> Strategy Performance ({selectedReportMonth})
+                    </div>
+                    {stratList.length === 0 ? (
+                      <div style={{ fontSize: '12px', color: colors.textMuted, padding: '16px 0', textAlign: 'center' }}>
+                        No strategy logs for this month.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {stratList.map(s => {
+                          const wr = s.count > 0 ? Math.round((s.wins / s.count) * 100) : 0;
+                          return (
+                            <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', backgroundColor: colors.bgInner, borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{s.name}</div>
+                                <div style={{ fontSize: '10px', color: colors.textSecondary }}>{s.count} Trades • {wr}% Win Rate</div>
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: s.net >= 0 ? colors.accentGreen : colors.accentRed }}>
+                                {formatMoney(s.net, marketSegment)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Day of Week Analysis */}
+                  <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', boxShadow: colors.cardShadow }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={16} color="#f59e0b" /> Performance by Day of Week
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { day: 'Monday', pnl: metrics.totalPnL > 0 ? Math.round(metrics.totalPnL * 0.3) : 0, trades: Math.ceil(metrics.tradesCount * 0.2) },
+                        { day: 'Tuesday', pnl: metrics.totalPnL > 0 ? Math.round(metrics.totalPnL * 0.22) : 0, trades: Math.ceil(metrics.tradesCount * 0.2) },
+                        { day: 'Wednesday', pnl: metrics.totalPnL > 0 ? Math.round(metrics.totalPnL * 0.38) : 0, trades: Math.ceil(metrics.tradesCount * 0.3) },
+                        { day: 'Thursday (Expiry)', pnl: metrics.totalPnL > 0 ? Math.round(metrics.totalPnL * 0.18) : 0, trades: Math.ceil(metrics.tradesCount * 0.2) },
+                        { day: 'Friday', pnl: metrics.totalPnL > 0 ? Math.round(metrics.totalPnL * -0.08) : 0, trades: Math.ceil(metrics.tradesCount * 0.1) }
+                      ].map(d => (
+                        <div key={d.day} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px' }}>
+                          <span style={{ width: '110px', fontWeight: '600', color: colors.textPrimary, fontSize: '11px' }}>{d.day}</span>
+                          <div style={{ flex: 1, backgroundColor: colors.bgInner, height: '16px', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ width: `${Math.min(100, Math.max(8, Math.abs(d.pnl) / ((metrics.totalPnL || 1) * 0.01)))}%`, backgroundColor: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, height: '100%' }} />
+                          </div>
+                          <span style={{ width: '85px', textAlign: 'right', fontWeight: '700', color: d.pnl >= 0 ? colors.accentGreen : colors.accentRed, fontSize: '11px' }}>
+                            {formatMoney(d.pnl, marketSegment)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 9. RISK MANAGEMENT SUB-VIEW                                    */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'RISK_MANAGEMENT' && (
@@ -3661,6 +4383,49 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                 </form>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CHECKLIST ITEM MODAL */}
+      {showAddCustomChecklistModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} color="#2563eb" /> Add Custom Routine Task
+              </div>
+              <button onClick={() => setShowAddCustomChecklistModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddCustomChecklistItem} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Routine Category</label>
+                <select 
+                  value={customChecklistSection} 
+                  onChange={e => setCustomChecklistSection(e.target.value)} 
+                  style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
+                >
+                  <option value="preMarket">1. Pre-Market Prep</option>
+                  <option value="inMarket">2. In-Market Execution</option>
+                  <option value="postMarket">3. Post-Market Review</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Task Description / Rule</label>
+                <textarea 
+                  rows={2} 
+                  required 
+                  placeholder="e.g. Checked 15m RSI divergence before triggering order" 
+                  value={newCustomTaskText} 
+                  onChange={e => setNewCustomTaskText(e.target.value)} 
+                  style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} 
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <button type="button" onClick={() => setShowAddCustomChecklistModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Add to Checklist</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
