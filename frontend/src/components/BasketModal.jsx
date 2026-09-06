@@ -257,8 +257,6 @@ export default function BasketModal() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  if (!basketModalOpen) return null;
-
   const balanceNum = Number(user?.balance) || 0;
 
   // Enhance basket items with live price, lotsize, strike, type, and underlying/expiry info
@@ -881,6 +879,8 @@ export default function BasketModal() {
       useStore.getState().fetchBatchPrices?.([newSym]);
     }
   };
+
+  if (!basketModalOpen) return null;
 
   return (
     <div className="modal-backdrop" style={{

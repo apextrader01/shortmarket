@@ -85,8 +85,6 @@ export default function OrderModal() {
     }
   }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
 
-  if (!orderModal.isOpen || !symbol) return null;
-
   const balanceNum = Number(user?.balance) || 0;
   const totalQuantity = quantity * (orderModal.lotsize || 1);
   const isBuy = side === 'BUY';
@@ -368,6 +366,8 @@ export default function OrderModal() {
       alert("Error: " + (err.message || 'Failed to place order.'));
     }
   };
+
+  if (!orderModal.isOpen || !symbol) return null;
 
   return (
     <div 
