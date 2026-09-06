@@ -93,6 +93,14 @@ const INDICES_LIST = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'MIDCPNIFTY', 
 const MCX_LIST = ['CRUDEOIL', 'NATURALGAS', 'GOLD', 'SILVER', 'COPPER', 'ZINC', 'ALUMINIUM', 'LEAD'];
 const POPULAR_STOCKS_LIST = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN', 'ICICIBANK', 'TATAMOTORS', 'BAJFINANCE', 'BHARTIARTL', 'ITC', 'KOTAKBANK', 'LT', 'AXISBANK'];
 
+const STRATEGY_PRESETS = [
+  { id: 'BULL_CALL_SPREAD', label: '🐂 Bull Call', color: '#22c55e', bgActive: '#16a34a', bgInactive: 'rgba(34,197,94,0.12)', borderInactive: 'rgba(34,197,94,0.3)', textInactive: '#4ade80' },
+  { id: 'BEAR_PUT_SPREAD', label: '🐻 Bear Put', color: '#ef4444', bgActive: '#dc2626', bgInactive: 'rgba(239,68,68,0.12)', borderInactive: 'rgba(239,68,68,0.3)', textInactive: '#ef4444' },
+  { id: 'STRADDLE', label: '⚡ Straddle', color: '#3b82f6', bgActive: '#2563eb', bgInactive: 'rgba(59,130,246,0.12)', borderInactive: 'rgba(59,130,246,0.3)', textInactive: 'var(--color-blue-light)' },
+  { id: 'STRANGLE', label: '🎯 Strangle', color: '#f59e0b', bgActive: '#d97706', bgInactive: 'rgba(245,158,11,0.12)', borderInactive: 'rgba(245,158,11,0.3)', textInactive: '#fbbf24' },
+  { id: 'IRON_CONDOR', label: '🦅 Iron Condor', color: '#a855f7', bgActive: '#9333ea', bgInactive: 'rgba(168,85,247,0.12)', borderInactive: 'rgba(168,85,247,0.3)', textInactive: '#c084fc' }
+];
+
 export default function BasketModal() {
   const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
@@ -107,6 +115,7 @@ export default function BasketModal() {
   // Strategy & Underlying selection
   const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
   const [selectedExpiry, setSelectedExpiry] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState(null);
   const [availableExpiries, setAvailableExpiries] = useState([]);
   const [loadingChain, setLoadingChain] = useState(false);
   const [globalMultiplier, setGlobalMultiplier] = useState(1);
@@ -824,6 +833,7 @@ export default function BasketModal() {
     }
 
     if (newItems.length > 0) {
+      setSelectedPreset(type);
       useStore.setState({ basketItems: newItems });
       const symsToSub = newItems.map(i => i.symbol);
       symsToSub.forEach(s => useStore.getState().subscribeToSymbol?.(s));
@@ -1149,11 +1159,32 @@ export default function BasketModal() {
           {/* 1-Click Strategy Presets */}
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap' }}>PRESETS:</span>
-            <button type="button" onClick={() => applyPreset('BULL_CALL_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐂 Bull Call</button>
-            <button type="button" onClick={() => applyPreset('BEAR_PUT_SPREAD')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🐻 Bear Put</button>
-            <button type="button" onClick={() => applyPreset('STRADDLE')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>⚡ Straddle</button>
-            <button type="button" onClick={() => applyPreset('STRANGLE')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🎯 Strangle</button>
-            <button type="button" onClick={() => applyPreset('IRON_CONDOR')} style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>🦅 Iron Condor</button>
+            {STRATEGY_PRESETS.map(preset => {
+              const isActive = selectedPreset === preset.id && basketItems.length > 0;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => applyPreset(preset.id)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '5px',
+                    background: isActive ? preset.bgActive : preset.bgInactive,
+                    border: isActive ? `1px solid ${preset.color}` : `1px solid ${preset.borderInactive}`,
+                    color: isActive ? '#ffffff' : preset.textInactive,
+                    fontSize: '11px',
+                    fontWeight: isActive ? '800' : '700',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: isActive ? `0 0 12px ${preset.bgActive}99, inset 0 0 4px rgba(255,255,255,0.25)` : 'none',
+                    transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {preset.label} {isActive ? '✓' : ''}
+                </button>
+              );
+            })}
           </div>
         </div>
 
