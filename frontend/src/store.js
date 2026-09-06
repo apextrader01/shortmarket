@@ -1095,8 +1095,8 @@ export const useStore = create(persist((set, get) => ({
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
     try {
-      const { symbol, quantity } = orderPayload;
-      const slices = calculateOrderSlices(symbol, quantity);
+      const { symbol, quantity, lotsize } = orderPayload;
+      const slices = calculateOrderSlices(symbol, quantity, lotsize);
 
       const token = localStorage.getItem('token');
       const headers = { 'Content-Type': 'application/json' };

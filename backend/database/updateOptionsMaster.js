@@ -160,6 +160,10 @@ async function updateOptionsMaster() {
             lotsizeMap[underlying] = futures[underlying][0].lotsize;
         }
     }
+    const backendMapPath = path.join(__dirname, 'lotsizeMap.json');
+    fs.writeFileSync(backendMapPath, JSON.stringify(lotsizeMap, null, 2));
+    console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to backend lotsizeMap.json!`);
+
     const frontendMapPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'utils', 'lotsizeMap.json');
     if (fs.existsSync(path.dirname(frontendMapPath))) {
         fs.writeFileSync(frontendMapPath, JSON.stringify(lotsizeMap, null, 2));

@@ -340,7 +340,8 @@ export default function OrderModal() {
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
-      product_type: isBO ? 'BO' : isCO ? 'CO' : productType
+      product_type: isBO ? 'BO' : isCO ? 'CO' : productType,
+      lotsize: orderModal.lotsize || 1
     };
 
     try {
@@ -484,7 +485,7 @@ export default function OrderModal() {
                   Total Qty: {(parseInt(quantity) || 0) * orderModal.lotsize}
                 </div>
               )}
-              {totalQuantity > getFreezeLimit(symbol) && (
+              {totalQuantity > getFreezeLimit(symbol, orderModal.lotsize) && (
                 <div style={{ 
                   fontSize: '10.5px', 
                   color: '#93c5fd', 
@@ -499,7 +500,7 @@ export default function OrderModal() {
                 }}>
                   <Zap size={12} color="#60a5fa" />
                   <span>
-                    Auto-Sliced into <strong>{calculateOrderSlices(symbol, totalQuantity).length} orders</strong> (Freeze Limit: {getFreezeLimit(symbol).toLocaleString('en-IN')})
+                    Auto-Sliced into <strong>{calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} orders</strong> (Freeze Limit: {getFreezeLimit(symbol, orderModal.lotsize).toLocaleString('en-IN')})
                   </span>
                 </div>
               )}
@@ -770,7 +771,7 @@ export default function OrderModal() {
                
                <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                     <span>Brokerage {calculateOrderSlices(symbol, totalQuantity).length > 1 ? `(${calculateOrderSlices(symbol, totalQuantity).length} sliced orders)` : ''}</span>
+                     <span>Brokerage {calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length > 1 ? `(${calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} sliced orders)` : ''}</span>
                      <span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
                   </div>
                   
