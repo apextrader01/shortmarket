@@ -228,12 +228,129 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
   // Journal DB State
   const [dbTrades, setDbTrades] = useState([]);
+  // Strategy State & Playbook Controls
+  const [selectedStrategyForPlaybook, setSelectedStrategyForPlaybook] = useState(null);
+  const [editingStrategy, setEditingStrategy] = useState(null);
+  const [strategyCategoryFilter, setStrategyCategoryFilter] = useState('ALL');
+  const [strategyEdgeFilter, setStrategyEdgeFilter] = useState('ALL');
+  const [strategyToast, setStrategyToast] = useState(null);
+
   const [strategies, setStrategies] = useState([
-    { id: 1, name: 'Breakout Momentum', win_rate: 68, total_trades: 24, net_pnl: 48500, color: '#3b82f6', category: 'Momentum', target_rr: '1:2.5' },
-    { id: 2, name: 'Support & Resistance Bounce', win_rate: 55, total_trades: 18, net_pnl: 22100, color: '#10b981', category: 'Reversal', target_rr: '1:2' },
-    { id: 3, name: 'Option Selling Theta Decay', win_rate: 78, total_trades: 32, net_pnl: 64200, color: '#8b5cf6', category: 'Options', target_rr: '1:1.5' },
-    { id: 4, name: 'VWAP Mean Reversion', win_rate: 42, total_trades: 12, net_pnl: -8400, color: '#f59e0b', category: 'Mean Reversion', target_rr: '1:2' },
-    { id: 5, name: 'Scalping Quick Momentum', win_rate: 62, total_trades: 28, net_pnl: 31400, color: '#06b6d4', category: 'Scalping', target_rr: '1:1.8' }
+    {
+      id: 1,
+      name: 'Breakout Momentum',
+      category: 'Momentum',
+      win_rate: 68,
+      total_trades: 24,
+      net_pnl: 48500,
+      profit_factor: 2.65,
+      target_rr: '1:2.5',
+      timeframe: '5-Min / 15-Min',
+      avg_win: 3200,
+      avg_loss: 1250,
+      max_streak: 5,
+      color: '#3b82f6',
+      description: 'Identifies high-volume consolidation breaks above key horizontal resistance or previous day highs with 200 EMA trend alignment.',
+      rules: [
+        'Clear consolidation range of at least 4-6 candles prior to trigger',
+        'Breakout candle volume must exceed 1.5x of the 20-period Volume SMA',
+        'Wait for complete 5-minute candle close beyond the resistance level',
+        'Stop-Loss placed strictly 1 tick below the breakout candle low',
+        'Trail Stop-Loss to Breakeven once 1:1 Risk-to-Reward is achieved'
+      ]
+    },
+    {
+      id: 2,
+      name: 'Support & Resistance Bounce',
+      category: 'Reversal',
+      win_rate: 55,
+      total_trades: 18,
+      net_pnl: 22100,
+      profit_factor: 1.85,
+      target_rr: '1:2.0',
+      timeframe: '15-Min / 1-Hour',
+      avg_win: 2400,
+      avg_loss: 1300,
+      max_streak: 3,
+      color: '#10b981',
+      description: 'Fading extreme touches at established daily/hourly supply-demand zones with pin bar or bullish/bearish engulfing rejection confirmation.',
+      rules: [
+        'Price must test a major daily or hourly key pivot/support level',
+        'Confirmation required via hammer, inverted hammer, or engulfing candle',
+        'RSI must show oversold (<30) or bullish divergence confluence',
+        'Target set at previous minor swing high / pivot resistance',
+        'Risk no more than 1% account size per bounce trade'
+      ]
+    },
+    {
+      id: 3,
+      name: 'Option Selling Theta Decay',
+      category: 'Options',
+      win_rate: 78,
+      total_trades: 32,
+      net_pnl: 64200,
+      profit_factor: 3.10,
+      target_rr: '1:1.5',
+      timeframe: '15-Min / 30-Min',
+      avg_win: 2600,
+      avg_loss: 1800,
+      max_streak: 8,
+      color: '#8b5cf6',
+      description: 'Selling OTM Strangle / Straddle or Iron Condor spreads on high IV or weekly expiry sessions to capture systematic time decay.',
+      rules: [
+        'PCR ratio between 0.85 and 1.15 indicating range-bound sentiment',
+        'Deploy delta between 0.15 - 0.20 on both Call and Put wings',
+        'Enter position only after initial 45-minute morning volatility subsides (post 10:00 AM)',
+        'Hard Stop-Loss at 30% individual leg premium expansion',
+        'Square off completely by 3:15 PM on expiry day without overnight risk'
+      ]
+    },
+    {
+      id: 4,
+      name: 'VWAP Mean Reversion',
+      category: 'Mean Reversion',
+      win_rate: 42,
+      total_trades: 12,
+      net_pnl: -8400,
+      profit_factor: 0.82,
+      target_rr: '1:2.0',
+      timeframe: '5-Min',
+      avg_win: 1800,
+      avg_loss: 2100,
+      max_streak: 2,
+      color: '#f59e0b',
+      description: 'Catching extended overbought/oversold moves 2 standard deviations away from intraday VWAP fading back to volume weighted equilibrium.',
+      rules: [
+        'Price must stretch at least 2 standard deviations beyond VWAP band',
+        'RSI must reach extreme zone (>75 or <25) on 5-minute timeframe',
+        'Exhaustion candle (long wick against current move) is mandatory',
+        'Target is the VWAP baseline median line',
+        'Strict stop loss 5 points beyond the exhaustion wick high/low'
+      ]
+    },
+    {
+      id: 5,
+      name: 'Scalping Quick Momentum',
+      category: 'Scalping',
+      win_rate: 62,
+      total_trades: 28,
+      net_pnl: 31400,
+      profit_factor: 2.15,
+      target_rr: '1:1.8',
+      timeframe: '1-Min / 3-Min',
+      avg_win: 1950,
+      avg_loss: 980,
+      max_streak: 4,
+      color: '#06b6d4',
+      description: 'Ultra-fast intraday scalps on momentum explosions, rapid order book liquidity bursts, and Opening Range Breakout (ORB) spikes.',
+      rules: [
+        'Trade during highest volatility windows (9:15 - 10:30 AM & 2:00 - 3:15 PM)',
+        'Quick execution using limit orders or instant market triggers',
+        'Maximum trade duration: 3 to 7 minutes',
+        'Immediate market exit if price consolidates or stalls for 3 candles',
+        'Never hold a losing scalp expecting a turnaround'
+      ]
+    }
   ]);
   const [rules, setRules] = useState([
     { id: 1, text: 'Maximum risk per trade is strictly 1% of total portfolio capital', category: 'RISK', followed: 42, broken: 2, active: true },
@@ -274,7 +391,11 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   const [newStrategyForm, setNewStrategyForm] = useState({
     name: '',
     category: 'Momentum',
-    target_rr: '1:2',
+    target_rr: '1:2.5',
+    timeframe: '5-Min',
+    win_rate: '65',
+    description: '',
+    rulesText: '1. Wait for candle close confirmation\n2. Align with major 200 EMA trend\n3. Predefined stop-loss in order book',
     color: '#3b82f6'
   });
 
@@ -966,20 +1087,81 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   // Add Strategy Handler
   const handleAddStrategy = (e) => {
     e.preventDefault();
-    if (!newStrategyForm.name) return;
+    if (!newStrategyForm.name.trim()) return;
+    const ruleList = newStrategyForm.rulesText
+      ? newStrategyForm.rulesText.split('\n').map(s => s.trim()).filter(Boolean)
+      : ['Follow strict risk management', 'Predefined stop loss required'];
+
     const newStrat = {
       id: Date.now(),
-      name: newStrategyForm.name,
-      category: newStrategyForm.category,
-      target_rr: newStrategyForm.target_rr,
-      color: newStrategyForm.color,
-      win_rate: 60,
+      name: newStrategyForm.name.trim(),
+      category: newStrategyForm.category || 'Momentum',
+      target_rr: newStrategyForm.target_rr || '1:2.0',
+      timeframe: newStrategyForm.timeframe || '5-Min',
+      win_rate: parseInt(newStrategyForm.win_rate, 10) || 60,
       total_trades: 0,
-      net_pnl: 0
+      net_pnl: 0,
+      profit_factor: 1.5,
+      avg_win: 0,
+      avg_loss: 0,
+      max_streak: 0,
+      color: newStrategyForm.color || '#3b82f6',
+      description: newStrategyForm.description.trim() || 'Custom trading setup strategy',
+      rules: ruleList
     };
     setStrategies(prev => [...prev, newStrat]);
     setShowAddStrategyModal(false);
-    setNewStrategyForm({ name: '', category: 'Momentum', target_rr: '1:2', color: '#3b82f6' });
+    setStrategyToast('✓ New Strategy Setup added to your Playbook!');
+    setTimeout(() => setStrategyToast(null), 3000);
+    setNewStrategyForm({
+      name: '',
+      category: 'Momentum',
+      target_rr: '1:2.5',
+      timeframe: '5-Min',
+      win_rate: '65',
+      description: '',
+      rulesText: '1. Wait for candle close confirmation\n2. Align with major 200 EMA trend\n3. Predefined stop-loss in order book',
+      color: '#3b82f6'
+    });
+  };
+
+  // Save Edited Strategy Handler
+  const handleSaveEditedStrategy = (e) => {
+    e.preventDefault();
+    if (!editingStrategy) return;
+    const ruleList = typeof editingStrategy.rulesText === 'string'
+      ? editingStrategy.rulesText.split('\n').map(s => s.trim()).filter(Boolean)
+      : (editingStrategy.rules || []);
+
+    const updated = {
+      ...editingStrategy,
+      name: editingStrategy.name.trim(),
+      category: editingStrategy.category,
+      target_rr: editingStrategy.target_rr,
+      timeframe: editingStrategy.timeframe || '5-Min',
+      win_rate: parseInt(editingStrategy.win_rate, 10) || 60,
+      description: editingStrategy.description || '',
+      rules: ruleList
+    };
+
+    setStrategies(prev => prev.map(s => s.id === updated.id ? updated : s));
+    if (selectedStrategyForPlaybook && selectedStrategyForPlaybook.id === updated.id) {
+      setSelectedStrategyForPlaybook(updated);
+    }
+    setEditingStrategy(null);
+    setStrategyToast('✓ Strategy updated successfully!');
+    setTimeout(() => setStrategyToast(null), 3000);
+  };
+
+  // Delete Strategy Handler
+  const handleDeleteStrategy = (stratId) => {
+    if (!window.confirm('Are you sure you want to delete this strategy from your playbook?')) return;
+    setStrategies(prev => prev.filter(s => s.id !== stratId));
+    if (selectedStrategyForPlaybook && selectedStrategyForPlaybook.id === stratId) {
+      setSelectedStrategyForPlaybook(null);
+    }
+    setStrategyToast('✓ Strategy deleted from playbook.');
+    setTimeout(() => setStrategyToast(null), 3000);
   };
 
   // Add Rule Handler
@@ -3296,63 +3478,440 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
 
           {/* 4. STRATEGIES SUB-VIEW                                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'STRATEGIES' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Trading Strategies</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Track setup performance, win rate %, and edge per strategy.</p>
+          {activeTab === 'STRATEGIES' && (() => {
+            // Compute Top Alpha Strategy & Global Edge Stats
+            const totalStrats = strategies.length;
+            const topStrategy = [...strategies].sort((a, b) => (b.net_pnl || 0) - (a.net_pnl || 0))[0];
+            const avgWinRate = totalStrats > 0 ? Math.round(strategies.reduce((acc, s) => acc + (s.win_rate || 0), 0) / totalStrats) : 0;
+            const totalStrategyPnL = strategies.reduce((acc, s) => acc + (s.net_pnl || 0), 0);
+
+            // Filter Strategies by Category and Edge
+            const filteredStrategies = strategies.filter(strat => {
+              if (strategyCategoryFilter !== 'ALL' && strat.category !== strategyCategoryFilter) return false;
+              if (strategyEdgeFilter === 'HIGH' && (strat.win_rate || 0) < 65) return false;
+              if (strategyEdgeFilter === 'MODERATE' && ((strat.win_rate || 0) < 50 || (strat.win_rate || 0) >= 65)) return false;
+              if (strategyEdgeFilter === 'REVIEW' && (strat.win_rate || 0) >= 50) return false;
+              return true;
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1100px', margin: '0 auto' }}>
+                {/* Header with Title & Action */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Target size={22} color="#2563eb" /> Trading Strategy Playbook & Edge Matrix
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '3px 0 0 0' }}>
+                      Track setup win rates, risk-reward ratios, rule confluence, and alpha per strategy.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddStrategyModal(true)}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      padding: '9px 16px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                      alignSelf: isMobile ? 'flex-start' : 'auto'
+                    }}
+                  >
+                    <Plus size={16} /> + Add Strategy
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowAddStrategyModal(true)}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    padding: '8px 14px',
+
+                {/* Strategy Toast Notification */}
+                {strategyToast && (
+                  <div style={{
+                    padding: '10px 14px',
                     borderRadius: '8px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    border: `1px solid ${colors.accentGreen}`,
+                    color: colors.accentGreen,
                     fontSize: '12px',
                     fontWeight: '700',
-                    border: 'none',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Plus size={15} /> Add Strategy
-                </button>
-              </div>
+                    gap: '8px'
+                  }}>
+                    <CheckCircle size={16} /> {strategyToast}
+                  </div>
+                )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: isMobile ? '10px' : '16px' }}>
-                {strategies.map((strat) => (
-                  <div key={strat.id} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: colors.cardShadow }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>{strat.name || strat.strategy_name}</span>
-                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#2563eb', backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(56, 189, 248, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>
-                        {strat.win_rate || 65}% Win Rate
-                      </span>
+                {/* Institutional Edge & Alpha Summary Banner */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                  gap: isMobile ? '8px' : '12px'
+                }}>
+                  {/* Top Alpha Strategy */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🥇 TOP ALPHA SETUP</div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {topStrategy ? (topStrategy.name || topStrategy.strategy_name) : 'None'}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '4px' }}>
-                      <div style={{ backgroundColor: colors.bgInner, padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                        <div style={{ fontSize: '10px', color: colors.textMuted }}>TRADES</div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary, marginTop: '2px' }}>{strat.total_trades || 20}</div>
-                      </div>
-                      <div style={{ backgroundColor: colors.bgInner, padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                        <div style={{ fontSize: '10px', color: colors.textMuted }}>TARGET R:R</div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: colors.accentBlueLight, marginTop: '2px' }}>{strat.target_rr || '1:2'}</div>
-                      </div>
-                      <div style={{ backgroundColor: colors.bgInner, padding: '8px 10px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
-                        <div style={{ fontSize: '10px', color: colors.textMuted }}>NET P&L</div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: strat.net_pnl >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
-                          {strat.net_pnl >= 0 ? '+' : ''}₹{(strat.net_pnl || 35000).toLocaleString('en-IN')}
-                        </div>
-                      </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentGreen, marginTop: '2px' }}>
+                      {topStrategy ? `${topStrategy.win_rate}% Win • ${formatMoney(topStrategy.net_pnl, marketSegment)}` : '0%'}
                     </div>
                   </div>
-                ))}
+
+                  {/* Avg Win Rate */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>📊 AVG STRATEGY WIN RATE</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: avgWinRate >= 50 ? colors.accentGreen : colors.accentRed }}>
+                      {avgWinRate}%
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Across all defined setups</div>
+                  </div>
+
+                  {/* Total Realized Alpha */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>💰 TOTAL REALIZED ALPHA</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: totalStrategyPnL >= 0 ? colors.accentGreen : colors.accentRed }}>
+                      {formatMoney(totalStrategyPnL, marketSegment)}
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Net strategy return</div>
+                  </div>
+
+                  {/* Active Setups Count */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🎯 ACTIVE SETUPS</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentBlueLight }}>
+                      {totalStrats}
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>In Playbook library</div>
+                  </div>
+                </div>
+
+                {/* Filters Row: Category Tabs & Edge Filter Pills */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  {/* Category Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%' }}>
+                    {['ALL', 'Momentum', 'Reversal', 'Options', 'Scalping', 'Mean Reversion'].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setStrategyCategoryFilter(cat)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          border: `1px solid ${strategyCategoryFilter === cat ? '#2563eb' : colors.borderColor}`,
+                          backgroundColor: strategyCategoryFilter === cat ? '#2563eb' : colors.bgCard,
+                          color: strategyCategoryFilter === cat ? '#ffffff' : colors.textSecondary,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {cat === 'ALL' ? '🎯 All Setups' : cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Edge Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+                    {[
+                      { id: 'ALL', label: 'All Edge' },
+                      { id: 'HIGH', label: '🔥 High Edge (≥65%)' },
+                      { id: 'MODERATE', label: '⚖️ Solid (50-64%)' },
+                      { id: 'REVIEW', label: '⚠️ Needs Review' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setStrategyEdgeFilter(f.id)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          border: `1px solid ${strategyEdgeFilter === f.id ? (isLight ? '#334155' : '#64748b') : colors.borderColor}`,
+                          backgroundColor: strategyEdgeFilter === f.id ? (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)') : 'transparent',
+                          color: strategyEdgeFilter === f.id ? colors.textPrimary : colors.textMuted,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Strategies Cards Grid */}
+                {filteredStrategies.length === 0 ? (
+                  <div style={{
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    backgroundColor: colors.bgCard,
+                    borderRadius: '12px',
+                    border: `1px dashed ${colors.borderColor}`
+                  }}>
+                    <Target size={32} color={colors.textMuted} style={{ margin: '0 auto 10px auto' }} />
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>No strategies match your filter</div>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '4px 0 14px 0' }}>Try switching category or clear edge filters</p>
+                    <button
+                      onClick={() => { setStrategyCategoryFilter('ALL'); setStrategyEdgeFilter('ALL'); }}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: isMobile ? '12px' : '16px' }}>
+                    {filteredStrategies.map((strat) => {
+                      const winRate = strat.win_rate || 60;
+                      const isHighEdge = winRate >= 65;
+                      const isModerate = winRate >= 50 && winRate < 65;
+                      const pnl = strat.net_pnl || 0;
+                      const isProfit = pnl >= 0;
+
+                      return (
+                        <div
+                          key={strat.id}
+                          style={{
+                            backgroundColor: colors.bgCard,
+                            border: `1px solid ${colors.borderColor}`,
+                            borderRadius: '14px',
+                            padding: isMobile ? '14px' : '18px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: colors.cardShadow,
+                            transition: 'border-color 0.2s ease',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Card Accent Top Bar */}
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '3px',
+                            backgroundColor: isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed)
+                          }} />
+
+                          {/* Strategy Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
+                                  {strat.name || strat.strategy_name}
+                                </span>
+                                <span style={{
+                                  fontSize: '10px',
+                                  fontWeight: '800',
+                                  color: colors.accentBlueLight,
+                                  backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(56, 189, 248, 0.12)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {strat.category || 'General'}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: colors.textMuted, marginTop: '2px' }}>
+                                Timeframe: <span style={{ color: colors.textSecondary, fontWeight: '600' }}>{strat.timeframe || '5-Min / 15-Min'}</span>
+                              </div>
+                            </div>
+
+                            {/* Edge Badge */}
+                            <div style={{
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              color: isHighEdge ? colors.accentGreen : (isModerate ? '#2563eb' : colors.accentRed),
+                              backgroundColor: isHighEdge ? 'rgba(16, 185, 129, 0.12)' : (isModerate ? 'rgba(37, 99, 235, 0.1)' : 'rgba(239, 68, 68, 0.12)'),
+                              padding: '3px 10px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isHighEdge ? '🔥 High Edge' : (isModerate ? '⚖️ Solid Edge' : '⚠️ Review')}
+                            </div>
+                          </div>
+
+                          {/* Strategy Premise / Description */}
+                          {strat.description && (
+                            <div style={{
+                              fontSize: '11.5px',
+                              color: colors.textSecondary,
+                              lineHeight: 1.4,
+                              backgroundColor: colors.bgInner,
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: `1px solid ${colors.borderColor}`
+                            }}>
+                              {strat.description}
+                            </div>
+                          )}
+
+                          {/* Visual Win Rate Progress Bar */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: '700', marginBottom: '4px' }}>
+                              <span style={{ color: colors.accentGreen }}>{winRate}% Win</span>
+                              <span style={{ color: colors.accentRed }}>{100 - winRate}% Loss</span>
+                            </div>
+                            <div style={{ height: '6px', width: '100%', borderRadius: '4px', backgroundColor: 'rgba(239, 68, 68, 0.3)', overflow: 'hidden', display: 'flex' }}>
+                              <div style={{ width: `${winRate}%`, backgroundColor: colors.accentGreen, height: '100%', borderRadius: '4px 0 0 4px', transition: 'width 0.4s ease' }} />
+                            </div>
+                          </div>
+
+                          {/* 6-Metric Mini Matrix */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>TRADES</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>{strat.total_trades || 20}</div>
+                            </div>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>PROFIT FACTOR</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>{strat.profit_factor || '2.40'}x</div>
+                            </div>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>TARGET R:R</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>{strat.target_rr || '1:2'}</div>
+                            </div>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>AVG WIN / LOSS</div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, marginTop: '2px' }}>
+                                +{formatMoneyPlain(strat.avg_win || 2500, marketSegment)} / -{formatMoneyPlain(strat.avg_loss || 1200, marketSegment)}
+                              </div>
+                            </div>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>MAX STREAK</div>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>{strat.max_streak || 4} Wins 🔥</div>
+                            </div>
+                            <div style={{ backgroundColor: colors.bgInner, padding: '7px 8px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
+                              <div style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '700' }}>NET P&L</div>
+                              <div style={{ fontSize: '13px', fontWeight: '800', color: isProfit ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                                {formatMoney(pnl, marketSegment)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Footer Buttons */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingTop: '8px', borderTop: `1px solid ${colors.borderColor}` }}>
+                            <button
+                              onClick={() => setSelectedStrategyForPlaybook(strat)}
+                              style={{
+                                backgroundColor: isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)',
+                                color: colors.accentBlueLight,
+                                border: `1px solid ${colors.borderColor}`,
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '11.5px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}
+                            >
+                              <BookOpen size={14} /> View Playbook & Rules
+                            </button>
+
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                onClick={() => setEditingStrategy({
+                                  ...strat,
+                                  rulesText: (strat.rules || []).join('\n')
+                                })}
+                                title="Edit Strategy"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.textSecondary,
+                                  padding: '6px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStrategy(strat.id)}
+                                title="Delete Strategy"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.accentRed,
+                                  padding: '6px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 5. RULES SUB-VIEW                                              */}
@@ -4916,13 +5475,302 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
         </div>
       )}
 
-      {/* 2. ADD STRATEGY MODAL */}
+      {/* 2. STRATEGY PLAYBOOK DEEP-DIVE MODAL */}
+      {selectedStrategyForPlaybook && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '18px', fontWeight: '800', color: colors.textPrimary }}>
+                    {selectedStrategyForPlaybook.name}
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: colors.accentBlueLight, backgroundColor: isLight ? 'rgba(37,99,235,0.08)' : 'rgba(56,189,248,0.12)', padding: '2px 8px', borderRadius: '6px' }}>
+                    {selectedStrategyForPlaybook.category}
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: colors.textMuted, marginTop: '3px' }}>
+                  Optimal Timeframe: <span style={{ color: colors.textSecondary, fontWeight: '700' }}>{selectedStrategyForPlaybook.timeframe || '5-Min / 15-Min'}</span> • Target R:R: <span style={{ color: colors.accentBlueLight, fontWeight: '700' }}>{selectedStrategyForPlaybook.target_rr}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedStrategyForPlaybook(null)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Premise & Theoretical Logic */}
+            <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '800', color: colors.accentBlueLight, textTransform: 'uppercase', marginBottom: '4px' }}>
+                Strategy Objective & Context
+              </div>
+              <p style={{ fontSize: '12px', color: colors.textPrimary, margin: 0, lineHeight: 1.45 }}>
+                {selectedStrategyForPlaybook.description || 'Systematic setup designed for high expectancy trade execution.'}
+              </p>
+            </div>
+
+            {/* Confluence & Entry Checklist Rules */}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckSquare size={16} color="#2563eb" /> Setup Confluence & Entry Checklist
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {(selectedStrategyForPlaybook.rules && selectedStrategyForPlaybook.rules.length > 0 ? selectedStrategyForPlaybook.rules : [
+                  'Price action aligns with higher timeframe 200 EMA trend',
+                  'Clear horizontal support / resistance level identified',
+                  'Volume confirmation exceeds 20-period moving average',
+                  'Stop Loss predefined at swing pivot prior to order entry'
+                ]).map((rule, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    backgroundColor: colors.bgInner,
+                    border: `1px solid ${colors.borderColor}`,
+                    fontSize: '12px',
+                    color: colors.textPrimary,
+                    lineHeight: 1.35
+                  }}>
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      color: colors.accentGreen,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      flexShrink: 0,
+                      marginTop: '1px'
+                    }}>
+                      ✓
+                    </div>
+                    <span>{rule}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Performance Stats Strip */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '6px',
+              padding: '10px',
+              borderRadius: '10px',
+              backgroundColor: colors.bgInner,
+              border: `1px solid ${colors.borderColor}`
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', color: colors.textMuted }}>WIN RATE</div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.accentGreen, marginTop: '2px' }}>{selectedStrategyForPlaybook.win_rate}%</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', color: colors.textMuted }}>PROFIT FACTOR</div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.accentBlueLight, marginTop: '2px' }}>{selectedStrategyForPlaybook.profit_factor || '2.40'}x</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', color: colors.textMuted }}>TRADES</div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, marginTop: '2px' }}>{selectedStrategyForPlaybook.total_trades || 0}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', color: colors.textMuted }}>NET ALPHA</div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: (selectedStrategyForPlaybook.net_pnl || 0) >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '2px' }}>
+                  {formatMoney(selectedStrategyForPlaybook.net_pnl || 0, marketSegment)}
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Logged Trades under this Strategy */}
+            {(() => {
+              const matchingTrades = allTrades.filter(t => 
+                (t.strategy || '').toLowerCase().includes(selectedStrategyForPlaybook.name.toLowerCase()) ||
+                selectedStrategyForPlaybook.name.toLowerCase().includes((t.strategy || '').toLowerCase())
+              ).slice(0, 3);
+
+              if (matchingTrades.length > 0) {
+                return (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: '800', color: colors.textSecondary, marginBottom: '6px' }}>
+                      Recent Executions Tagged with this Setup:
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {matchingTrades.map(t => {
+                        const net = Number(t.net_pnl !== undefined ? t.net_pnl : t.realized_pnl);
+                        return (
+                          <div key={t.id} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            backgroundColor: colors.bgInner,
+                            border: `1px solid ${colors.borderColor}`,
+                            fontSize: '11px'
+                          }}>
+                            <div>
+                              <span style={{ fontWeight: '700', color: colors.textPrimary }}>{t.symbol}</span>
+                              <span style={{ color: colors.textMuted, marginLeft: '6px' }}>{t.trade_date || todayStr} • {t.trade_type}</span>
+                            </div>
+                            <span style={{ fontWeight: '800', color: net >= 0 ? colors.accentGreen : colors.accentRed }}>
+                              {formatMoney(net, t.market_segment || marketSegment)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Action Bar Footer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  const strat = selectedStrategyForPlaybook;
+                  setSelectedStrategyForPlaybook(null);
+                  setEditingStrategy({
+                    ...strat,
+                    rulesText: (strat.rules || []).join('\n')
+                  });
+                }}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: `1px solid ${colors.borderColor}`,
+                  color: colors.textSecondary,
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Edit3 size={14} /> Edit Setup
+              </button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => {
+                    const stratName = selectedStrategyForPlaybook.name;
+                    setSelectedStrategyForPlaybook(null);
+                    setNewTradeForm(prev => ({ ...prev, strategy: stratName }));
+                    setShowNewTradeModal(true);
+                  }}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Plus size={14} /> Log Trade with Setup
+                </button>
+                <button
+                  onClick={() => setSelectedStrategyForPlaybook(null)}
+                  style={{
+                    backgroundColor: colors.bgInner,
+                    border: `1px solid ${colors.borderColor}`,
+                    color: colors.textPrimary,
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT STRATEGY MODAL */}
+      {editingStrategy && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Edit3 size={16} color="#2563eb" /> Edit Strategy Setup
+              </div>
+              <button onClick={() => setEditingStrategy(null)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveEditedStrategy} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Strategy Name</label>
+                <input type="text" required value={editingStrategy.name} onChange={e => setEditingStrategy({ ...editingStrategy, name: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
+                  <select value={editingStrategy.category} onChange={e => setEditingStrategy({ ...editingStrategy, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="Momentum">Momentum</option>
+                    <option value="Reversal">Reversal</option>
+                    <option value="Options">Options</option>
+                    <option value="Scalping">Scalping</option>
+                    <option value="Mean Reversion">Mean Reversion</option>
+                    <option value="Breakout">Breakout</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Target R:R</label>
+                  <input type="text" value={editingStrategy.target_rr} onChange={e => setEditingStrategy({ ...editingStrategy, target_rr: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Timeframe</label>
+                  <input type="text" placeholder="e.g. 5-Min / 15-Min" value={editingStrategy.timeframe || ''} onChange={e => setEditingStrategy({ ...editingStrategy, timeframe: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Target Win Rate %</label>
+                  <input type="number" min="1" max="100" value={editingStrategy.win_rate || ''} onChange={e => setEditingStrategy({ ...editingStrategy, win_rate: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Setup Description / Context</label>
+                <textarea rows={2} value={editingStrategy.description || ''} onChange={e => setEditingStrategy({ ...editingStrategy, description: e.target.value })} placeholder="Brief logic explaining the technical setup" style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Confluence Checklist Rules (One per line)</label>
+                <textarea rows={3} value={editingStrategy.rulesText || ''} onChange={e => setEditingStrategy({ ...editingStrategy, rulesText: e.target.value })} placeholder="1. Rule one&#10;2. Rule two" style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button type="button" onClick={() => setEditingStrategy(null)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Update Strategy</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. ADD NEW STRATEGY MODAL */}
       {showAddStrategyModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Add New Strategy</div>
-              <button onClick={() => setShowAddStrategyModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} color="#2563eb" /> Add New Strategy Setup
+              </div>
+              <button onClick={() => setShowAddStrategyModal(false)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <form onSubmit={handleAddStrategy} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
@@ -4937,14 +5785,34 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
                     <option value="Reversal">Reversal</option>
                     <option value="Options">Options</option>
                     <option value="Scalping">Scalping</option>
+                    <option value="Mean Reversion">Mean Reversion</option>
+                    <option value="Breakout">Breakout</option>
                   </select>
                 </div>
                 <div>
                   <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Target R:R</label>
-                  <input type="text" value={newStrategyForm.target_rr} onChange={e => setNewStrategyForm({ ...newStrategyForm, target_rr: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                  <input type="text" placeholder="1:2.5" value={newStrategyForm.target_rr} onChange={e => setNewStrategyForm({ ...newStrategyForm, target_rr: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Timeframe</label>
+                  <input type="text" placeholder="e.g. 5-Min / 15-Min" value={newStrategyForm.timeframe} onChange={e => setNewStrategyForm({ ...newStrategyForm, timeframe: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Target Win Rate %</label>
+                  <input type="number" min="1" max="100" placeholder="65" value={newStrategyForm.win_rate} onChange={e => setNewStrategyForm({ ...newStrategyForm, win_rate: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Setup Description / Context</label>
+                <textarea rows={2} placeholder="Brief logic explaining how this setup generates edge" value={newStrategyForm.description} onChange={e => setNewStrategyForm({ ...newStrategyForm, description: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Confluence Checklist Rules (One per line)</label>
+                <textarea rows={3} placeholder="1. Wait for candle close confirmation&#10;2. Volume > 1.5x 20-period average&#10;3. Predefined stop-loss" value={newStrategyForm.rulesText} onChange={e => setNewStrategyForm({ ...newStrategyForm, rulesText: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
                 <button type="button" onClick={() => setShowAddStrategyModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Save Strategy</button>
               </div>
