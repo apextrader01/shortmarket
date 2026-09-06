@@ -441,12 +441,79 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
       active: true
     }
   ]);
+  // Mistake Tracker State & Controls
+  const [editingMistake, setEditingMistake] = useState(null);
+  const [mistakesCategoryFilter, setMistakesCategoryFilter] = useState('ALL');
+  const [mistakesSortBy, setMistakesSortBy] = useState('LOSS');
+  const [mistakeToast, setMistakeToast] = useState(null);
+
   const [mistakes, setMistakes] = useState([
-    { id: 1, name: 'FOMO Entry on extended green candle', category: 'PSYCHOLOGY', loss: 14500, count: 4, note: 'Wait for pullback to 20 EMA before entering' },
-    { id: 2, name: 'Moving Stoploss further down in losing position', category: 'RISK', loss: 22800, count: 2, note: 'Accept initial predefined loss without hesitation' },
-    { id: 3, name: 'Trading without setup checklist confirmation', category: 'EXECUTION', loss: 9200, count: 3, note: 'Tick all 4 checklist points prior to order trigger' },
-    { id: 4, name: 'Over-leveraged oversized position size', category: 'RISK', loss: 18400, count: 2, note: 'Calculate exact lot size with Risk Calculator first' },
-    { id: 5, name: 'Exiting winners too early before target', category: 'PSYCHOLOGY', loss: 11200, count: 5, note: 'Trail stoploss with 9 EMA instead of manual early exit' }
+    {
+      id: 1,
+      name: 'FOMO Entry on extended green candle',
+      category: 'PSYCHOLOGY',
+      severity: 'CRITICAL',
+      loss: 14500,
+      count: 4,
+      trigger: 'Panicking that the market will rocket higher without you after a big green candle.',
+      antidote: 'Wait for 20-EMA pullback or flag consolidation. Never chase market orders into resistance.',
+      resolved: false
+    },
+    {
+      id: 2,
+      name: 'Moving Stoploss further down in losing position',
+      category: 'RISK',
+      severity: 'CRITICAL',
+      loss: 22800,
+      count: 2,
+      trigger: 'Refusal to accept loss, hoping price will bounce back and save the trade.',
+      antidote: 'System hard stop-loss is inviolable. Accept predefined loss immediately without hesitation.',
+      resolved: false
+    },
+    {
+      id: 3,
+      name: 'Trading without setup checklist confirmation',
+      category: 'EXECUTION',
+      severity: 'HIGH',
+      loss: 9200,
+      count: 3,
+      trigger: 'Boredom or impulsive anticipation before technical confluence is met.',
+      antidote: 'Check all 4 pre-trade criteria (trend, volume, candle close, risk/reward) before placing order.',
+      resolved: false
+    },
+    {
+      id: 4,
+      name: 'Over-leveraged oversized position size',
+      category: 'RISK',
+      severity: 'CRITICAL',
+      loss: 18400,
+      count: 2,
+      trigger: 'Greed attempting to make big fast profits or recover a previous loss quickly.',
+      antidote: 'Calculate exact lot size with Risk Calculator to strictly cap downside at 1% portfolio equity.',
+      resolved: false
+    },
+    {
+      id: 5,
+      name: 'Exiting winners too early before target',
+      category: 'EXIT_TIMING',
+      severity: 'HIGH',
+      loss: 11200,
+      count: 5,
+      trigger: 'Anxiety and fear of giving back unrealized green profits.',
+      antidote: 'Trail stop-loss using the 9-EMA or supertrend rather than manual emotional exits.',
+      resolved: false
+    },
+    {
+      id: 6,
+      name: 'Revenge trading right after taking a Stop-Loss',
+      category: 'PSYCHOLOGY',
+      severity: 'CRITICAL',
+      loss: 16500,
+      count: 3,
+      trigger: 'Anger and ego hurt from a red trade demanding immediate market payback.',
+      antidote: 'Mandatory 15-minute terminal lock and screen detachment after any loss.',
+      resolved: false
+    }
   ]);
 
   // Form states
@@ -490,8 +557,11 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   const [newMistakeForm, setNewMistakeForm] = useState({
     name: '',
     category: 'PSYCHOLOGY',
-    loss: '',
-    note: ''
+    severity: 'CRITICAL',
+    loss: '5000',
+    count: '1',
+    trigger: '',
+    antidote: ''
   });
 
   const [newSetupForm, setNewSetupForm] = useState({
@@ -1309,18 +1379,83 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
   // Add Mistake Handler
   const handleAddMistake = (e) => {
     e.preventDefault();
-    if (!newMistakeForm.name) return;
+    if (!newMistakeForm.name.trim()) return;
+    const lossVal = parseFloat(newMistakeForm.loss) || 5000;
+    const countVal = parseInt(newMistakeForm.count, 10) || 1;
+
     const newM = {
       id: Date.now(),
-      name: newMistakeForm.name,
-      category: newMistakeForm.category,
-      loss: parseFloat(newMistakeForm.loss) || 5000,
-      count: 1,
-      note: newMistakeForm.note || 'Review rules before order placement'
+      name: newMistakeForm.name.trim(),
+      category: newMistakeForm.category || 'PSYCHOLOGY',
+      severity: newMistakeForm.severity || 'CRITICAL',
+      loss: lossVal,
+      count: countVal,
+      trigger: newMistakeForm.trigger.trim() || 'Emotional trade execution',
+      antidote: newMistakeForm.antidote.trim() || 'Strictly follow predefined plan'
     };
     setMistakes(prev => [...prev, newM]);
     setShowAddMistakeModal(false);
-    setNewMistakeForm({ name: '', category: 'PSYCHOLOGY', loss: '', note: '' });
+    setMistakeToast('✓ Mistake logged with cost & corrective antidote!');
+    setTimeout(() => setMistakeToast(null), 3000);
+    setNewMistakeForm({
+      name: '',
+      category: 'PSYCHOLOGY',
+      severity: 'CRITICAL',
+      loss: '5000',
+      count: '1',
+      trigger: '',
+      antidote: ''
+    });
+  };
+
+  // Save Edited Mistake
+  const handleSaveEditedMistake = (e) => {
+    e.preventDefault();
+    if (!editingMistake) return;
+    const updated = {
+      ...editingMistake,
+      name: editingMistake.name.trim(),
+      category: editingMistake.category,
+      severity: editingMistake.severity || 'HIGH',
+      loss: parseFloat(editingMistake.loss) || 0,
+      count: parseInt(editingMistake.count, 10) || 1,
+      trigger: editingMistake.trigger || '',
+      antidote: editingMistake.antidote || ''
+    };
+    setMistakes(prev => prev.map(m => m.id === updated.id ? updated : m));
+    setEditingMistake(null);
+    setMistakeToast('✓ Mistake audit updated successfully!');
+    setTimeout(() => setMistakeToast(null), 3000);
+  };
+
+  // Delete Mistake
+  const handleDeleteMistake = (mistakeId) => {
+    if (!window.confirm('Are you sure you want to delete this mistake from your tracker?')) return;
+    setMistakes(prev => prev.filter(m => m.id !== mistakeId));
+    if (editingMistake && editingMistake.id === mistakeId) {
+      setEditingMistake(null);
+    }
+    setMistakeToast('✓ Mistake record removed.');
+    setTimeout(() => setMistakeToast(null), 3000);
+  };
+
+  // Log Mistake Recurrence (+1)
+  const handleRecurMistake = (mistakeId) => {
+    setMistakes(prev => prev.map(m => {
+      if (m.id === mistakeId) {
+        const avgPerEvent = (parseFloat(m.loss) || 0) / (m.count || 1);
+        const newCount = (m.count || 1) + 1;
+        const newLoss = Math.round((parseFloat(m.loss) || 0) + (avgPerEvent || 3000));
+        return {
+          ...m,
+          count: newCount,
+          loss: newLoss
+        };
+      }
+      return m;
+    }));
+    setMistakeToast('⚠️ Recurrence logged (+1). Review your antidote protocol!');
+    setTimeout(() => setMistakeToast(null), 3500);
   };
 
   // Add Community Post
@@ -4577,87 +4712,520 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 6. MISTAKES TRACKER SUB-VIEW                                   */}
           {/* ══════════════════════════════════════════════════════════════ */}
-          {activeTab === 'MISTAKES' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '800', color: colors.textPrimary, margin: 0 }}>Mistake Tracker & Cost</h2>
-                  <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>Quantify the exact financial cost of emotional decisions to eliminate them.</p>
+          {activeTab === 'MISTAKES' && (() => {
+            // Compute Global Mistake & Financial Leak KPIs
+            const totalMistakeLoss = mistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0);
+            const totalOccurrences = mistakes.reduce((acc, m) => acc + (m.count || 1), 0);
+            
+            // Top Most Expensive Leak
+            const topLossMistake = [...mistakes].sort((a, b) => (parseFloat(b.loss) || 0) - (parseFloat(a.loss) || 0))[0];
+            
+            // Most Frequent Pattern
+            const topFreqMistake = [...mistakes].sort((a, b) => (b.count || 1) - (a.count || 1))[0];
+
+            // Category Loss Breakdown
+            const catLossMap = { PSYCHOLOGY: 0, RISK: 0, EXECUTION: 0, EXIT_TIMING: 0 };
+            mistakes.forEach(m => {
+              const cat = m.category || 'PSYCHOLOGY';
+              const l = parseFloat(m.loss) || 0;
+              if (catLossMap[cat] !== undefined) catLossMap[cat] += l;
+              else catLossMap.PSYCHOLOGY += l;
+            });
+
+            // Filter & Sort Mistakes
+            let filteredMistakes = mistakes.filter(m => {
+              if (mistakesCategoryFilter !== 'ALL' && m.category !== mistakesCategoryFilter) return false;
+              return true;
+            });
+
+            if (mistakesSortBy === 'LOSS') {
+              filteredMistakes.sort((a, b) => (parseFloat(b.loss) || 0) - (parseFloat(a.loss) || 0));
+            } else if (mistakesSortBy === 'COUNT') {
+              filteredMistakes.sort((a, b) => (b.count || 1) - (a.count || 1));
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
+                {/* Header with Title & Action */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+                  <div>
+                    <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertTriangle size={22} color={colors.accentRed} /> Mistake Tracker & Cost Audit
+                    </h2>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '3px 0 0 0' }}>
+                      Quantify the exact financial cost of emotional decisions to permanently eliminate them.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddMistakeModal(true)}
+                    style={{
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      padding: '9px 16px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                      alignSelf: isMobile ? 'flex-start' : 'auto'
+                    }}
+                  >
+                    <Plus size={16} /> + Log Mistake
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowAddMistakeModal(true)}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    padding: '8px 14px',
+
+                {/* Toast Notification */}
+                {mistakeToast && (
+                  <div style={{
+                    padding: '10px 14px',
                     borderRadius: '8px',
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    border: `1px solid ${colors.accentRed}`,
+                    color: colors.accentRed,
                     fontSize: '12px',
                     fontWeight: '700',
-                    border: 'none',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Plus size={15} /> Log Mistake
-                </button>
-              </div>
-
-              {/* Total Loss Banner */}
-              <div style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '12px',
-                padding: '16px 20px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentRed, textTransform: 'uppercase' }}>TOTAL COST OF MISTAKES</div>
-                  <div style={{ fontSize: '24px', fontWeight: '800', color: colors.accentRed, marginTop: '2px' }}>
-                    -₹{mistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0).toLocaleString('en-IN')}
+                    gap: '8px'
+                  }}>
+                    <AlertTriangle size={16} /> {mistakeToast}
                   </div>
-                </div>
-                <div style={{ fontSize: '11px', color: colors.textSecondary, maxWidth: '240px', textAlign: 'right' }}>
-                  Eliminating these recurring errors immediately increases your net profitability.
-                </div>
-              </div>
+                )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {mistakes.map((m) => (
-                  <div key={m.id} style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '14px' : '18px 20px', 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    gap: '10px',
+                {/* Institutional Financial Leak KPI Strip */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)',
+                  gap: isMobile ? '8px' : '12px'
+                }}>
+                  {/* Total Capital Destroyed */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
                     boxShadow: colors.cardShadow
                   }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <AlertTriangle size={15} color={colors.accentRed} style={{ flexShrink: 0 }} />
-                        <span style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>{m.name || m.mistake_name}</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: colors.textSecondary, marginTop: '3px', lineHeight: 1.3 }}>
-                        Lesson: {m.note || m.lessons_learned || 'Stick strictly to predefined plan'}
-                      </div>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.accentRed, textTransform: 'uppercase' }}>💸 TOTAL CAPITAL DESTROYED</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentRed }}>
+                      -{formatMoneyPlain(totalMistakeLoss, marketSegment)}
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '800', color: colors.accentRed }}>
-                        -₹{Number(m.loss || m.loss_incurred || 5000).toLocaleString('en-IN')}
-                      </div>
-                      <div style={{ fontSize: '10px', color: colors.textMuted }}>Occurred {m.count || m.frequency || 1}x</div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Across {totalOccurrences} total events</div>
+                  </div>
+
+                  {/* #1 Most Expensive Leak */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🩸 #1 BIGGEST LEAK</div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {topLossMistake ? (topLossMistake.name || topLossMistake.mistake_name) : 'None'}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentRed, marginTop: '2px' }}>
+                      {topLossMistake ? `-${formatMoneyPlain(topLossMistake.loss, marketSegment)} (${topLossMistake.count || 1}x)` : '₹0'}
                     </div>
                   </div>
-                ))}
+
+                  {/* Most Repeated Pattern */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>🔁 MOST FREQUENT ERROR</div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {topFreqMistake ? (topFreqMistake.name || topFreqMistake.mistake_name) : 'None'}
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#f59e0b', marginTop: '2px' }}>
+                      {topFreqMistake ? `${topFreqMistake.count || 1}x Occurrences` : '0x'}
+                    </div>
+                  </div>
+
+                  {/* Recoverable Alpha Target */}
+                  <div style={{
+                    backgroundColor: colors.bgCard,
+                    border: `1px solid ${colors.borderColor}`,
+                    borderRadius: '12px',
+                    padding: isMobile ? '12px' : '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    boxShadow: colors.cardShadow
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: colors.accentGreen, textTransform: 'uppercase' }}>💡 RECOVERABLE ALPHA</div>
+                    <div style={{ fontSize: '20px', fontWeight: '800', color: colors.accentGreen }}>
+                      +{formatMoneyPlain(totalMistakeLoss, marketSegment)}
+                    </div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted }}>Direct profit boost if plugged</div>
+                  </div>
+                </div>
+
+                {/* Cognitive Leak Distribution Bar */}
+                <div style={{
+                  backgroundColor: colors.bgCard,
+                  border: `1px solid ${colors.borderColor}`,
+                  borderRadius: '12px',
+                  padding: isMobile ? '12px 14px' : '14px 18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  boxShadow: colors.cardShadow
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary }}>
+                      Financial Loss Distribution by Behavioral Category
+                    </span>
+                    <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                      Total Leak: <span style={{ color: colors.accentRed, fontWeight: '700' }}>-{formatMoneyPlain(totalMistakeLoss, marketSegment)}</span>
+                    </span>
+                  </div>
+
+                  {/* Multi-color segment bar */}
+                  <div style={{ height: '8px', width: '100%', borderRadius: '4px', overflow: 'hidden', display: 'flex', backgroundColor: colors.bgInner }}>
+                    <div style={{ width: `${totalMistakeLoss > 0 ? (catLossMap.RISK / totalMistakeLoss) * 100 : 0}%`, backgroundColor: '#ef4444' }} title="Risk Sizing" />
+                    <div style={{ width: `${totalMistakeLoss > 0 ? (catLossMap.PSYCHOLOGY / totalMistakeLoss) * 100 : 0}%`, backgroundColor: '#8b5cf6' }} title="Psychology" />
+                    <div style={{ width: `${totalMistakeLoss > 0 ? (catLossMap.EXECUTION / totalMistakeLoss) * 100 : 0}%`, backgroundColor: '#f59e0b' }} title="Execution" />
+                    <div style={{ width: `${totalMistakeLoss > 0 ? (catLossMap.EXIT_TIMING / totalMistakeLoss) * 100 : 0}%`, backgroundColor: '#3b82f6' }} title="Exit Timing" />
+                  </div>
+
+                  {/* Legend chips */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '11px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                      🛡️ Risk Sizing: {totalMistakeLoss > 0 ? Math.round((catLossMap.RISK / totalMistakeLoss) * 100) : 0}%
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#8b5cf6' }} />
+                      🧠 Psychology: {totalMistakeLoss > 0 ? Math.round((catLossMap.PSYCHOLOGY / totalMistakeLoss) * 100) : 0}%
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                      ⚡ Execution: {totalMistakeLoss > 0 ? Math.round((catLossMap.EXECUTION / totalMistakeLoss) * 100) : 0}%
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: colors.textSecondary }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3b82f6' }} />
+                      📉 Exit Timing: {totalMistakeLoss > 0 ? Math.round((catLossMap.EXIT_TIMING / totalMistakeLoss) * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Filters & Sorting Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  {/* Category Pills */}
+                  <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {[
+                      { id: 'ALL', label: '🎯 All Mistakes' },
+                      { id: 'PSYCHOLOGY', label: '🧠 Psychology' },
+                      { id: 'RISK', label: '🛡️ Risk & Sizing' },
+                      { id: 'EXECUTION', label: '⚡ Execution' },
+                      { id: 'EXIT_TIMING', label: '📉 Exit Timing' }
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setMistakesCategoryFilter(cat.id)}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          border: `1px solid ${mistakesCategoryFilter === cat.id ? '#2563eb' : colors.borderColor}`,
+                          backgroundColor: mistakesCategoryFilter === cat.id ? '#2563eb' : colors.bgCard,
+                          color: mistakesCategoryFilter === cat.id ? '#ffffff' : colors.textSecondary,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sorting Pills */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[
+                      { id: 'LOSS', label: '💰 Highest Loss ($)' },
+                      { id: 'COUNT', label: '🔁 Most Frequent' }
+                    ].map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => setMistakesSortBy(s.id)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          border: `1px solid ${mistakesSortBy === s.id ? (isLight ? '#334155' : '#64748b') : colors.borderColor}`,
+                          backgroundColor: mistakesSortBy === s.id ? (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)') : 'transparent',
+                          color: mistakesSortBy === s.id ? colors.textPrimary : colors.textMuted,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mistakes Cards List */}
+                {filteredMistakes.length === 0 ? (
+                  <div style={{
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    backgroundColor: colors.bgCard,
+                    borderRadius: '12px',
+                    border: `1px dashed ${colors.borderColor}`
+                  }}>
+                    <AlertTriangle size={32} color={colors.textMuted} style={{ margin: '0 auto 10px auto' }} />
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: colors.textPrimary }}>No mistakes match your filter</div>
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '4px 0 14px 0' }}>All clear in this category</p>
+                    <button
+                      onClick={() => setMistakesCategoryFilter('ALL')}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Show All Mistakes
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {filteredMistakes.map((m) => {
+                      const lossVal = parseFloat(m.loss) || 0;
+                      const countVal = m.count || 1;
+                      const avgLossPerEvent = countVal > 0 ? Math.round(lossVal / countVal) : lossVal;
+                      const lossShare = totalMistakeLoss > 0 ? Math.round((lossVal / totalMistakeLoss) * 100) : 0;
+                      const severity = m.severity || 'HIGH';
+
+                      return (
+                        <div
+                          key={m.id}
+                          style={{
+                            backgroundColor: colors.bgCard,
+                            border: `1px solid ${colors.borderColor}`,
+                            borderRadius: '14px',
+                            padding: isMobile ? '14px' : '18px 20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px',
+                            boxShadow: colors.cardShadow,
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Accent Top Bar */}
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '3px',
+                            backgroundColor: severity === 'CRITICAL' ? colors.accentRed : '#f59e0b'
+                          }} />
+
+                          {/* Card Header Row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{
+                                fontSize: '9px',
+                                fontWeight: '800',
+                                color: severity === 'CRITICAL' ? colors.accentRed : '#f59e0b',
+                                backgroundColor: severity === 'CRITICAL' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase'
+                              }}>
+                                {severity === 'CRITICAL' ? '🔴 CRITICAL FINANCIAL LEAK' : '🟠 HIGH SEVERITY'}
+                              </span>
+
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                color: colors.textMuted,
+                                backgroundColor: colors.bgInner,
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                border: `1px solid ${colors.borderColor}`
+                              }}>
+                                {m.category || 'PSYCHOLOGY'}
+                              </span>
+                            </div>
+
+                            {/* Total Loss Display */}
+                            <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                              <div style={{ fontSize: '16px', fontWeight: '800', color: colors.accentRed }}>
+                                -{formatMoneyPlain(lossVal, marketSegment)}
+                              </div>
+                              <div style={{ fontSize: '10px', color: colors.textMuted }}>
+                                Occurred {countVal}x • Avg: -{formatMoneyPlain(avgLossPerEvent, marketSegment)}/ea
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Mistake Title */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: colors.accentRed,
+                              flexShrink: 0,
+                              marginTop: '2px'
+                            }}>
+                              <AlertTriangle size={16} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>
+                                {m.name || m.mistake_name}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Two-Part Deep Learning Box: Trigger vs Antidote */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                            gap: '8px'
+                          }}>
+                            {/* Root Cause / Trigger */}
+                            <div style={{
+                              backgroundColor: colors.bgInner,
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: `1px solid ${colors.borderColor}`
+                            }}>
+                              <div style={{ fontSize: '10px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', marginBottom: '3px' }}>
+                                🎯 Emotional Trigger / Root Cause
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: colors.textSecondary, lineHeight: 1.35 }}>
+                                {m.trigger || 'Impulsive emotional reaction without technical confirmation.'}
+                              </div>
+                            </div>
+
+                            {/* Corrective Action Protocol / Antidote */}
+                            <div style={{
+                              backgroundColor: isLight ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.1)',
+                              padding: '10px 12px',
+                              borderRadius: '8px',
+                              border: `1px solid rgba(16, 185, 129, 0.25)`
+                            }}>
+                              <div style={{ fontSize: '10px', fontWeight: '800', color: colors.accentGreen, textTransform: 'uppercase', marginBottom: '3px' }}>
+                                🛡️ Corrective Antidote & Action Protocol
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: colors.textPrimary, lineHeight: 1.35 }}>
+                                {m.antidote || m.note || m.lessons_learned || 'Stick strictly to predefined plan.'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Financial Impact Meter */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.textMuted, marginBottom: '3px' }}>
+                              <span>Impact on Total Mistake Loss</span>
+                              <span style={{ fontWeight: '700', color: colors.accentRed }}>{lossShare}% of all leaks</span>
+                            </div>
+                            <div style={{ height: '4px', width: '100%', borderRadius: '4px', backgroundColor: colors.bgInner, overflow: 'hidden' }}>
+                              <div style={{ width: `${lossShare}%`, backgroundColor: colors.accentRed, height: '100%', borderRadius: '4px' }} />
+                            </div>
+                          </div>
+
+                          {/* Action Buttons Row */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', paddingTop: '8px', borderTop: `1px solid ${colors.borderColor}` }}>
+                            <button
+                              onClick={() => handleRecurMistake(m.id)}
+                              title="Log Recurrence (+1 Event)"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                color: colors.accentRed,
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                border: `1px solid rgba(239, 68, 68, 0.3)`,
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              +1 Recurred ({countVal}x)
+                            </button>
+
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button
+                                onClick={() => setEditingMistake(m)}
+                                title="Edit Mistake"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.textSecondary,
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Edit3 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMistake(m.id)}
+                                title="Delete Mistake"
+                                style={{
+                                  backgroundColor: 'transparent',
+                                  border: `1px solid ${colors.borderColor}`,
+                                  color: colors.accentRed,
+                                  padding: '5px 8px',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 7. AI SUMMARIZER SUB-VIEW                                      */}
@@ -6461,13 +7029,75 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
         </div>
       )}
 
-      {/* 4. LOG MISTAKE MODAL */}
+      {/* 4. EDIT MISTAKE MODAL */}
+      {editingMistake && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Edit3 size={16} color="#2563eb" /> Edit Mistake Audit & Antidote
+              </div>
+              <button onClick={() => setEditingMistake(null)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleSaveEditedMistake} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Mistake Name</label>
+                <input type="text" required value={editingMistake.name} onChange={e => setEditingMistake({ ...editingMistake, name: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
+                  <select value={editingMistake.category} onChange={e => setEditingMistake({ ...editingMistake, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="PSYCHOLOGY">🧠 PSYCHOLOGY</option>
+                    <option value="RISK">🛡️ RISK & SIZING</option>
+                    <option value="EXECUTION">⚡ EXECUTION</option>
+                    <option value="EXIT_TIMING">📉 EXIT TIMING</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Severity Level</label>
+                  <select value={editingMistake.severity || 'CRITICAL'} onChange={e => setEditingMistake({ ...editingMistake, severity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="CRITICAL">🔴 CRITICAL LEAK</option>
+                    <option value="HIGH">🟠 HIGH SEVERITY</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Total Loss Incurred ({currencySymbol})</label>
+                  <input type="number" required value={editingMistake.loss} onChange={e => setEditingMistake({ ...editingMistake, loss: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Occurrences Count</label>
+                  <input type="number" min="1" required value={editingMistake.count} onChange={e => setEditingMistake({ ...editingMistake, count: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Emotional Trigger / Root Cause</label>
+                <textarea rows={2} placeholder="What triggered the emotional impulse?" value={editingMistake.trigger || ''} onChange={e => setEditingMistake({ ...editingMistake, trigger: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Corrective Antidote & Action Protocol</label>
+                <textarea rows={2} placeholder="What will you do to prevent this next time?" value={editingMistake.antidote || ''} onChange={e => setEditingMistake({ ...editingMistake, antidote: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                <button type="button" onClick={() => setEditingMistake(null)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Update Mistake</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LOG NEW MISTAKE MODAL */}
       {showAddMistakeModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
-          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Log Mistake & Cost</div>
-              <button onClick={() => setShowAddMistakeModal(false)} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Plus size={16} color="#2563eb" /> Log Mistake, Cost & Antidote
+              </div>
+              <button onClick={() => setShowAddMistakeModal(false)} aria-label="Close modal" style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <form onSubmit={handleAddMistake} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
@@ -6476,23 +7106,41 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
-                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Loss Incurred (₹)</label>
-                  <input type="number" required placeholder="5000" value={newMistakeForm.loss} onChange={e => setNewMistakeForm({ ...newMistakeForm, loss: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
-                </div>
-                <div>
                   <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Category</label>
                   <select value={newMistakeForm.category} onChange={e => setNewMistakeForm({ ...newMistakeForm, category: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
-                    <option value="PSYCHOLOGY">PSYCHOLOGY</option>
-                    <option value="RISK">RISK</option>
-                    <option value="EXECUTION">EXECUTION</option>
+                    <option value="PSYCHOLOGY">🧠 PSYCHOLOGY</option>
+                    <option value="RISK">🛡️ RISK & SIZING</option>
+                    <option value="EXECUTION">⚡ EXECUTION</option>
+                    <option value="EXIT_TIMING">📉 EXIT TIMING</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Severity Level</label>
+                  <select value={newMistakeForm.severity} onChange={e => setNewMistakeForm({ ...newMistakeForm, severity: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
+                    <option value="CRITICAL">🔴 CRITICAL LEAK</option>
+                    <option value="HIGH">🟠 HIGH SEVERITY</option>
                   </select>
                 </div>
               </div>
-              <div>
-                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Corrective Lesson Learned</label>
-                <textarea rows={2} placeholder="What will you do differently next time?" value={newMistakeForm.note} onChange={e => setNewMistakeForm({ ...newMistakeForm, note: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Loss Incurred ({currencySymbol})</label>
+                  <input type="number" required placeholder="5000" value={newMistakeForm.loss} onChange={e => setNewMistakeForm({ ...newMistakeForm, loss: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Occurrences Count</label>
+                  <input type="number" min="1" required placeholder="1" value={newMistakeForm.count} onChange={e => setNewMistakeForm({ ...newMistakeForm, count: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }} />
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Emotional Trigger / Root Cause</label>
+                <textarea rows={2} placeholder="What triggered the emotional impulse?" value={newMistakeForm.trigger} onChange={e => setNewMistakeForm({ ...newMistakeForm, trigger: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Corrective Antidote & Action Protocol</label>
+                <textarea rows={2} placeholder="What will you do differently next time to prevent this?" value={newMistakeForm.antidote} onChange={e => setNewMistakeForm({ ...newMistakeForm, antidote: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none', resize: 'none' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
                 <button type="button" onClick={() => setShowAddMistakeModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Save Mistake</button>
               </div>
