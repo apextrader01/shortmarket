@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
-import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap } from 'lucide-react';
+import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
 
