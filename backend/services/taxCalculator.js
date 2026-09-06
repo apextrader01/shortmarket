@@ -245,4 +245,20 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     };
 }
 
-module.exports = { calculateTaxes };
+function calculateOrderSlices(symbol, totalQty, explicitLotsize = null) {
+    const qty = Number(totalQty) || 0;
+    if (qty <= 0) return [];
+    const limit = getFreezeLimit(symbol, explicitLotsize);
+    if (qty <= limit) return [qty];
+    const slices = [];
+    let remaining = qty;
+    while (remaining > 0) {
+        const currentSlice = Math.min(remaining, limit);
+        slices.push(currentSlice);
+        remaining -= currentSlice;
+    }
+    return slices;
+}
+
+module.exports = { calculateTaxes, getFreezeLimit, calculateOrderSlices, getInstantLotsize };
+

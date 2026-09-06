@@ -3,7 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
-import { getFreezeLimit } from '../utils/freezeLimits';
+import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -385,6 +385,14 @@ export default function BasketModal() {
 
   const isInsufficient = balanceNum < finalMargin;
 
+  // Calculate total execution slices across all basket legs
+  const totalExecutionSlices = useMemo(() => {
+    return enhancedItems.reduce((sum, item) => {
+      const slices = calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize);
+      return sum + (slices.length > 0 ? slices.length : 1);
+    }, 0);
+  }, [enhancedItems]);
+
   // Bulletproof synchronous calculation of aggregated regulatory charges for all basket items
   const estimatedTaxes = useMemo(() => {
     if (!basketItems || basketItems.length === 0) return null;
@@ -399,7 +407,8 @@ export default function BasketModal() {
       sebiCharge: 0,
       stampDuty: 0,
       totalTaxes: 0,
-      legsCount: enhancedItems.length
+      legsCount: enhancedItems.length,
+      totalExecutionSlices
     };
 
     enhancedItems.forEach(item => {
@@ -416,7 +425,8 @@ export default function BasketModal() {
       const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => clean.startsWith(c));
 
       const freezeLimit = getFreezeLimit(sym, item.lotsize);
-      const slicesCount = qty > freezeLimit ? Math.ceil(qty / freezeLimit) : 1;
+      const slices = calculateOrderSlices(sym, qty, item.lotsize);
+      const slicesCount = slices.length > 0 ? slices.length : 1;
 
       let legBrokerage = 0;
       let legStt = 0;
@@ -472,7 +482,7 @@ export default function BasketModal() {
     });
 
     return agg;
-  }, [enhancedItems, basketItems, productType]);
+  }, [enhancedItems, basketItems, productType, totalExecutionSlices]);
 
   // Check market session restrictions and cutoff
   let blockedMarketReason = null;
@@ -1374,11 +1384,16 @@ export default function BasketModal() {
                       </div>
                     )}
 
-                    {/* Lots Stepper */}
-                    <div style={{ display: 'flex', flexDirection: 'column', width: '85px' }}>
-                      <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '2px' }}>
-                        LOT (×{item.lotsize || 1})
-                      </span>
+                    {/* Lots Stepper & Total Qty */}
+                    <div style={{ display: 'flex', flexDirection: 'column', width: '95px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                          LOT (×{item.lotsize || 1})
+                        </span>
+                        <span style={{ fontSize: '9.5px', color: (item.totalQuantity > getFreezeLimit(item.symbol, item.lotsize)) ? '#fbbf24' : 'var(--text-secondary)', fontWeight: '700' }}>
+                          {item.totalQuantity} Qty
+                        </span>
+                      </div>
                       <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--bg-dark)', overflow: 'hidden' }}>
                         <button
                           type="button"
@@ -1392,7 +1407,7 @@ export default function BasketModal() {
                           min="1"
                           value={item.quantity || 1}
                           onChange={(e) => updateBasketItem(index, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                          style={{ width: '36px', height: '26px', background: 'transparent', border: 'none', color: '#fff', fontSize: '11.5px', fontWeight: '700', textAlign: 'center', outline: 'none' }}
+                          style={{ width: '45px', height: '26px', background: 'transparent', border: 'none', color: '#fff', fontSize: '11.5px', fontWeight: '700', textAlign: 'center', outline: 'none' }}
                         />
                         <button
                           type="button"
@@ -1403,6 +1418,28 @@ export default function BasketModal() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Order Slicing Indicator Badge for this leg if totalQuantity > freezeLimit */}
+                    {item.totalQuantity > getFreezeLimit(item.symbol, item.lotsize) && (
+                      <div 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '4px', 
+                          background: 'rgba(245, 158, 11, 0.12)', 
+                          border: '1px solid rgba(245, 158, 11, 0.35)', 
+                          borderRadius: '4px', 
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          color: '#fbbf24',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={`Freeze limit is ${getFreezeLimit(item.symbol, item.lotsize)} qty. This leg will be auto-sliced into ${calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize).length} orders on execution.`}
+                      >
+                        ⚡ {calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize).length} Slices (Max {getFreezeLimit(item.symbol, item.lotsize)}/slice)
+                      </div>
+                    )}
 
                     {/* Order Type & Limit Price */}
                     <div style={{ display: 'flex', flexDirection: 'column', width: '115px' }}>
@@ -1470,6 +1507,31 @@ export default function BasketModal() {
 
         {/* Footer */}
         <div style={{ background: 'rgba(0,0,0,0.25)', padding: '14px 20px', borderTop: '1px solid var(--border-color)' }}>
+          {/* Order Slicing Notice Banner if quantities exceed freeze limits */}
+          {totalExecutionSlices > enhancedItems.length && basketItems.length > 0 && (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              borderRadius: '6px',
+              padding: '8px 12px',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '11.5px',
+              color: '#fbbf24'
+            }}>
+              <span>⚡ <strong>Exchange Order Slicing:</strong> Quantities exceed freeze limits and will be split into <strong>{totalExecutionSlices} orders</strong> (₹20 brokerage/order).</span>
+              <button
+                type="button"
+                onClick={() => setShowBreakup(true)}
+                style={{ background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer', fontWeight: '700', textDecoration: 'underline', padding: 0 }}
+              >
+                View Breakup
+              </button>
+            </div>
+          )}
+
           {isInsufficient && basketItems.length > 0 && (
             <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ background: 'var(--color-yellow)', color: '#000', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '11px' }}>!</div>
@@ -1560,8 +1622,39 @@ export default function BasketModal() {
               </div>
               
               <div style={{ padding: '18px 20px' }}>
+                {/* Auto-Slicing Breakdown Card */}
+                {totalExecutionSlices > enhancedItems.length && (
+                  <div style={{
+                    background: 'rgba(245, 158, 11, 0.08)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    borderRadius: '6px',
+                    padding: '10px 12px',
+                    marginBottom: '14px',
+                    fontSize: '11.5px'
+                  }}>
+                    <div style={{ fontWeight: '700', color: '#fbbf24', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      ⚡ Auto-Slicing Breakdown (Freeze limit exceeded)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {enhancedItems.map((item, idx) => {
+                        const slices = calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize);
+                        const limit = getFreezeLimit(item.symbol, item.lotsize);
+                        if (slices.length <= 1) return null;
+                        return (
+                          <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '11px' }}>
+                            <span>Leg {idx + 1} ({item.symbol}):</span>
+                            <span style={{ color: '#fff', fontWeight: '600' }}>
+                              {slices.length} orders ({slices.join(' + ')} qty)
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                  <span>Brokerage ({estimatedTaxes?.legsCount || basketItems.length} orders)</span>
+                  <span>Brokerage ({totalExecutionSlices} orders {totalExecutionSlices > enhancedItems.length ? `• ${totalExecutionSlices} sliced orders` : ''})</span>
                   <span style={{ fontWeight: '700' }}>₹{Number(estimatedTaxes?.brokerage || 0).toFixed(2)}</span>
                 </div>
                 

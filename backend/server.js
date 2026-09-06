@@ -4025,6 +4025,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         return 0;
       });
 
+      const { calculateOrderSlices } = require('./services/taxCalculator');
       const basketGroupId = 'BSK_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
       const executedOrders = [];
 
@@ -4034,21 +4035,41 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         const isMarket = type === 'MARKET';
         const effectiveProductType = product_type || 'INT';
         const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
-        
-        const [orderId] = await trx('orders').insert({
-          user_id: req.user.id,
-          symbol, type, side, quantity, price: execPrice || null, sl_price, tgt_price,
-          status,
-          margin: margin || 0, // Individual margin recorded for cancellations
-          product_type: effectiveProductType,
-          basket_group_id: basketGroupId,
-          trail_amount: trail_amount ? parseFloat(trail_amount) : null
-        }).returning('id');
+        const qtyNum = Number(quantity) || 0;
+        const slices = calculateOrderSlices(symbol, qtyNum);
+        const isSliced = slices.length > 1;
+        const sliceGroupId = isSliced ? `bsk_slice_${Date.now()}_${Math.random().toString(36).substring(2, 6)}` : null;
 
-        const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
-        executedOrders.push({
-          id: orderIdVal, symbol, status, isMarket, execPrice, type, side, quantity, sl_price, tgt_price, margin: margin || 0, product_type: effectiveProductType, basket_group_id: basketGroupId, trail_amount: trail_amount ? parseFloat(trail_amount) : null
-        });
+        for (let sIdx = 0; sIdx < slices.length; sIdx++) {
+          const sliceQty = slices[sIdx];
+          const sliceMargin = isSliced ? ((margin || 0) * (sliceQty / qtyNum)) : (margin || 0);
+
+          const [orderId] = await trx('orders').insert({
+            user_id: req.user.id,
+            symbol, type, side,
+            quantity: sliceQty,
+            price: execPrice || null,
+            sl_price, tgt_price,
+            status,
+            margin: sliceMargin,
+            product_type: effectiveProductType,
+            basket_group_id: basketGroupId,
+            slice_group_id: sliceGroupId,
+            slice_index: isSliced ? sIdx + 1 : null,
+            slice_total: isSliced ? slices.length : null,
+            trail_amount: trail_amount ? parseFloat(trail_amount) : null
+          }).returning('id');
+
+          const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
+          executedOrders.push({
+            id: orderIdVal, symbol, status, isMarket, execPrice, type, side,
+            quantity: sliceQty, sl_price, tgt_price, margin: sliceMargin,
+            product_type: effectiveProductType, basket_group_id: basketGroupId,
+            slice_group_id: sliceGroupId, slice_index: isSliced ? sIdx + 1 : null,
+            slice_total: isSliced ? slices.length : null,
+            trail_amount: trail_amount ? parseFloat(trail_amount) : null
+          });
+        }
       }
       
       req.basketOrdersToProcess = executedOrders;
