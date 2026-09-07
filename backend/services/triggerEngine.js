@@ -398,8 +398,10 @@ class TriggerEngine {
                     
                     const newQty = existingPos.quantity + qtyChange;
                     
+                    const isFullyClosed = absQty >= absPosQty;
+                    
                     // Close the position
-                    if (newQty === 0) {
+                    if (isFullyClosed) {
                         await trx('positions').where({ id: existingPos.id }).update({ 
                            quantity: 0, 
                            closed_quantity: (parseFloat(existingPos.closed_quantity) || 0) + closeQty, 

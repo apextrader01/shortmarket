@@ -179,9 +179,11 @@ export default function PositionsView() {
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       
-      const pnl = (qty !== 0) 
+      const unrealizedPnl = (qty !== 0) 
           ? (qty > 0 ? (currentValue - invested) : (invested - currentValue))
-          : parseFloat(pos.realized_pnl || 0);
+          : 0;
+      const realizedPnl = parseFloat(pos.realized_pnl || 0);
+      const pnl = unrealizedPnl + realizedPnl;
           
       const lotSize = priceData.lotsize || 1;
       
@@ -241,7 +243,7 @@ export default function PositionsView() {
     const store = useStore.getState();
     let failed = 0;
     let lastError = '';
-    for (const pos of openPositions) {
+    const results = await Promise.allSettled(openPositions.map(async (pos) => {
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const payload = {
         symbol: pos.symbol,
@@ -258,9 +260,19 @@ export default function PositionsView() {
       const res = await store.placeOrder(payload);
       if (res && res.success) {
         store.clearPendingTriggersForSymbol(pos.symbol);
+        return { success: true };
+      } else {
+        const err = store.authError || (res && res.error) || 'Failed to place exit order';
+        return { success: false, error: err };
+      }
+    }));
+
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value.success) {
+        // success
       } else {
         failed++;
-        lastError = store.authError || (res && res.error) || 'Failed to place exit order';
+        lastError = r.status === 'fulfilled' ? r.value.error : (r.reason?.message || 'Exit request failed');
       }
     }
     await store.fetchUserData();

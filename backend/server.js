@@ -2482,7 +2482,7 @@ app.get('/api/cleanup-expired', async (req, res) => {
 
 // ─── Convert Position (INT <-> DEL) ───────────────────────────────────────
 app.post('/api/position/convert', authenticateToken, async (req, res) => {
-  const { positionId, newProductType, requiredMargin } = req.body;
+  const { positionId, newProductType } = req.body;
   if (!positionId || !newProductType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -2490,44 +2490,88 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
   try {
     await db.transaction(async (trx) => {
       const position = await trx('positions').where({ id: positionId, user_id: req.user.id }).first();
-      if (!position) return res.status(404).json({ error: 'Position not found' });
+      if (!position) throw Object.assign(new Error('Position not found'), { statusCode: 404 });
       if (position.product_type === newProductType) {
-        return res.status(400).json({ error: 'Position is already in the requested product type' });
+        throw Object.assign(new Error('Position is already in the requested product type'), { statusCode: 400 });
+      }
+      if (Number(position.quantity) === 0) {
+        throw Object.assign(new Error('Cannot convert a closed position'), { statusCode: 400 });
       }
 
-      // If converting INT -> DEL, we must charge the remaining margin
-      if (position.product_type === 'INT' && newProductType === 'DEL') {
-        const user = await trx('users').where({ id: req.user.id }).first();
-        if (parseFloat(user.balance) < requiredMargin) {
-          throw new Error('Insufficient Funds to convert to Delivery');
+      // Prohibit converting short equity positions into Delivery (DEL)
+      const isDerivative = isDerivativeContract(position.symbol);
+      if (Number(position.quantity) < 0 && newProductType === 'DEL' && !isDerivative) {
+        throw Object.assign(new Error('Short equity positions cannot be converted to Delivery (CNC).'), { statusCode: 400 });
+      }
+
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      const currentPrice = priceCache[position.symbol]?.ltp || Number(position.average_price) || 0;
+      const absQty = Math.abs(Number(position.quantity));
+      const side = Number(position.quantity) > 0 ? 'BUY' : 'SELL';
+
+      const oldMargin = parseFloat(position.margin) || 0;
+      const newMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, currentPrice);
+      const marginDifference = newMargin - oldMargin;
+
+      const user = await trx('users').where({ id: req.user.id }).first();
+
+      if (marginDifference > 0) {
+        if (parseFloat(user.balance) < marginDifference) {
+          throw Object.assign(new Error('Insufficient Funds to convert position.'), { statusCode: 400 });
         }
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - requiredMargin });
-      }
-
-      // If converting DEL -> INT, we refund the 3x margin
-      if (position.product_type === 'DEL' && newProductType === 'INT') {
-        const user = await trx('users').where({ id: req.user.id }).first();
-        const refund = requiredMargin; // the frontend passes the amount to refund
+        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: -marginDifference,
+          type: 'MARGIN_BLOCK',
+          description: `Additional margin blocked for converting ${position.symbol} to ${newProductType}`
+        });
+      } else if (marginDifference < 0) {
+        const refund = Math.abs(marginDifference);
         await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refund });
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: refund,
+          type: 'MARGIN_RELEASE',
+          description: `Margin released for converting ${position.symbol} to ${newProductType}`
+        });
       }
 
-      // Update position product type
-      await trx('positions').where({ id: positionId }).update({ product_type: newProductType });
+      // Update position product type and new margin
+      await trx('positions').where({ id: positionId }).update({ 
+        product_type: newProductType,
+        margin: newMargin,
+        updated_at: new Date()
+      });
       
       // Try to merge positions if there's already an existing position for the same symbol + product_type
-      const existingPos = await trx('positions').where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType }).whereNot('id', positionId).first();
+      const existingPos = await trx('positions')
+        .where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType })
+        .whereNot('id', positionId)
+        .whereNot('quantity', 0)
+        .first();
+
       if (existingPos) {
-        // Merge them
-        const newQty = existingPos.quantity + position.quantity;
-        const newAvg = ((existingPos.quantity * parseFloat(existingPos.average_price)) + (position.quantity * parseFloat(position.average_price))) / newQty;
-        await trx('positions').where({ id: existingPos.id }).update({ quantity: newQty, average_price: newAvg });
+        const newQty = Number(existingPos.quantity) + Number(position.quantity);
+        const currentCost = Math.abs(Number(existingPos.quantity)) * parseFloat(existingPos.average_price);
+        const addedCost = Math.abs(Number(position.quantity)) * parseFloat(position.average_price);
+        const newAvg = Math.abs(newQty) > 0 ? (currentCost + addedCost) / Math.abs(newQty) : existingPos.average_price;
+        const combinedMargin = parseFloat(existingPos.margin || 0) + newMargin;
+
+        await trx('positions').where({ id: existingPos.id }).update({ 
+          quantity: newQty, 
+          average_price: newAvg,
+          margin: combinedMargin,
+          updated_at: new Date()
+        });
         await trx('positions').where({ id: positionId }).del();
       }
-      
-      res.json({ success: true });
     });
+
+    res.json({ success: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const statusCode = err.statusCode || 400;
+    res.status(statusCode).json({ error: err.message });
   }
 });
 
@@ -3123,8 +3167,12 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Note: Risk Guardian NEVER blocks closing/square-off orders for existing positions/holdings.
   const currentUser = await db('users').where({ id: req.user.id }).first();
   if (currentUser && currentUser.risk_guardian_active && !isClosingOrder) {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
 
     // 1. Check Max Daily Trades Limit
     if (currentUser.max_daily_trades && currentUser.max_daily_trades > 0) {
@@ -3855,13 +3903,18 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
     const exitOrders = [];
 
     await db.transaction(async (trx) => {
+      const LedgerService = require('./services/ledgerService');
       for (const holding of activeHoldings) {
         const qty = parseFloat(holding.quantity);
         const ltp = priceCache[holding.symbol]?.ltp || parseFloat(holding.average_price) || 0;
+        if (ltp <= 0) {
+          throw new Error(`Live price unavailable for ${holding.symbol}. Cannot exit holdings.`);
+        }
         const totalValue = qty * ltp;
         totalSoldAmount += totalValue;
 
         const realizedPnl = (ltp - parseFloat(holding.average_price)) * qty;
+        const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, req.user.id, holding.symbol, 'DEL', 'SELL', qty, ltp);
 
         // 1. Create executed sell order
         await trx('orders').insert({
@@ -3876,6 +3929,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           product_type: 'DEL',
           margin: 0,
           realized_pnl: realizedPnl,
+          taxes: totalTaxes,
           created_at: new Date(),
           updated_at: new Date()
         });
