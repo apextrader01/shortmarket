@@ -154,7 +154,15 @@ export default function EditOrderModal() {
                 {/* Quantity */}
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
-                  <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                  <input type="number" min={1} max={10000000} value={quantity} onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') { setQuantity(''); return; }
+                    const n = parseInt(val, 10);
+                    if (!isNaN(n)) setQuantity(Math.min(10000000, Math.max(1, n)));
+                  }} onBlur={e => {
+                    const n = parseInt(e.target.value, 10);
+                    setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
+                  }} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
                 </div>
 
                 {/* Price */}

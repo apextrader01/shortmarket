@@ -17,16 +17,16 @@ export default function OrderPad() {
     if (!quantity || parseInt(quantity) < 1) return;
     if (type === 'LIMIT' && (!price || parseFloat(price) <= 0)) return;
 
-    const success = await placeOrder({
+    const result = await placeOrder({
       userId: 1,
       symbol: selectedSymbol,
       type,
       side,
-      quantity: parseInt(quantity),
+      quantity: Math.min(10000000, Math.max(1, parseInt(quantity, 10) || 1)),
       price: type === 'LIMIT' ? parseFloat(price) : null
     });
 
-    setStatus(success ? 'success' : 'error');
+    setStatus((result && result.success) ? 'success' : 'error');
     setTimeout(() => setStatus(null), 2500);
   };
 

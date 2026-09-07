@@ -1557,7 +1557,14 @@ export const useStore = create(persist((set, get) => ({
   },
   
   // ── Mutual Fund Watchlist ──────────────────────────────────────────────────
-  mfWatchlist: JSON.parse(localStorage.getItem('mfWatchlist') || '[]'),
+  mfWatchlist: (() => {
+    try {
+      const saved = localStorage.getItem('mfWatchlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  })(),
   
   toggleMfWatchlist: (symbol) => {
     let current = get().mfWatchlist;

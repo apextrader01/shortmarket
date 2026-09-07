@@ -74,10 +74,10 @@ const TopIndexTicker = React.memo(() => {
           >
             {p && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
             {idx.split('-')[0]}{' '}
-            {p ? `${p.ltp.toFixed(2)}` : '...'}
-            {p && (
+            {p && p.ltp !== undefined && !isNaN(p.ltp) ? Number(p.ltp).toFixed(2) : '...'}
+            {p && p.change !== undefined && !isNaN(p.change) && (
               <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
-                {p.change !== undefined ? `${p.change > 0 ? '+' : ''}${Number(p.change).toFixed(2)} (${p.pct > 0 ? '+' : ''}${Number(p.pct).toFixed(2)}%)` : ''}
+                {Number(p.change) > 0 ? '+' : ''}{Number(p.change).toFixed(2)} ({Number(p.pct || 0) > 0 ? '+' : ''}{Number(p.pct || 0).toFixed(2)}%)
               </span>
             )}
           </div>

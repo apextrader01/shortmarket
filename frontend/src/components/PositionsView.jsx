@@ -173,7 +173,7 @@ export default function PositionsView() {
 
       const priceData = prices[pos.symbol] || {};
       const avg = parseFloat(pos.average_price) || 0;
-      const ltp = priceData.ltp || (isMutualFund(pos.symbol) ? avg : 0);
+      const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : (avg || 0);
       const qty = posQty;
       
       const invested = avg * Math.abs(qty);
@@ -252,6 +252,7 @@ export default function PositionsView() {
         sl_price: null,
         tgt_price: null,
         margin: 0,
+        lotsize: pos.lotSize || 1,
         product_type: pos.product_type || 'DEL'
       };
       const res = await store.placeOrder(payload);
@@ -781,17 +782,18 @@ export default function PositionsView() {
                     type: partialExitType,
                     side: exitSide,
                     quantity: qtyToExit,
+                    lotsize: ls,
                     price: partialExitType === 'MARKET' ? 0 : parseFloat(partialExitPrice),
                     sl_price: null,
                     tgt_price: null,
                     margin: 0,
                     product_type: partialExitPos.product_type || 'DEL'
                   });
-                  if (ok) {
+                  if (ok && ok.success) {
                     setPartialExitPos(null);
                   } else {
                     const storeErr = useStore.getState().authError;
-                    alert(`Exit failed: ${storeErr || 'Check the browser console (F12) for error details.'}`);
+                    alert(`Exit failed: ${(ok && ok.error) || storeErr || 'Check the browser console (F12) for error details.'}`);
                   }
                 }}
                 style={{
