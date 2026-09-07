@@ -365,6 +365,7 @@ export default function PositionsView() {
                 if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
                 try {
                   const res = await fetch(`${API}/api/holdings/exit-all`, {
+                    credentials: 'include',
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                   });
@@ -471,11 +472,11 @@ export default function PositionsView() {
                       <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
                       <td data-label="LTP" style={{ fontWeight: '500' }}>{viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
                       </td>
-                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
-                        {viewMode === 'CLOSED' ? '-' : `${pos.pnl > 0 ? '+ ' : ''}₹${Math.abs(pos.pnl).toFixed(2)}`}
+                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (pos.unrealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                        {viewMode === 'CLOSED' ? '-' : `${pos.unrealizedPnl > 0 ? '+' : (pos.unrealizedPnl < 0 ? '-' : '')}₹${Math.abs(pos.unrealizedPnl).toFixed(2)}`}
                       </td>
                       <td data-label="Realized P&L" style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
-                        {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+ ' : ''}₹${Math.abs(realizedPnl).toFixed(2)}` : '0'}
+                        {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+' : '-'}₹${Math.abs(realizedPnl).toFixed(2)}` : '₹0.00'}
                       </td>
                       <td data-label="Segment" style={{ fontWeight: '500' }}>{pos.segment}</td>
                       <td data-label="Exchange" style={{ fontWeight: '500' }}>{pos.exchange}</td>
@@ -632,7 +633,7 @@ export default function PositionsView() {
                           </span>
                         </div>
                         <div style={{ fontSize: '12px', fontWeight: '700', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                          {viewMode === 'CLOSED' ? 'Realized: ' : 'MTM: '}{isDisplayProfit ? '+' : ''}₹{displayPnl.toFixed(2)}
+                          {viewMode === 'CLOSED' ? 'Realized: ' : 'MTM: '}{displayPnl > 0 ? '+' : (displayPnl < 0 ? '-' : '')}₹{Math.abs(displayPnl).toFixed(2)}
                         </div>
                       </div>
 

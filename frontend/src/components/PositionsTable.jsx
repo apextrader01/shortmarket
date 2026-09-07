@@ -55,7 +55,9 @@ export default function PositionsTable() {
         ? (ltp - pos.average_price) * Number(pos.quantity) 
         : parseFloat(pos.realized_pnl || 0);
     const pnlPct = isPosOpen && Number(pos.average_price) > 0 
-        ? ((ltp - pos.average_price) / pos.average_price) * 100 
+        ? (Number(pos.quantity) < 0 
+            ? ((pos.average_price - ltp) / pos.average_price) * 100 
+            : ((ltp - pos.average_price) / pos.average_price) * 100) 
         : 0;
     return { ...pos, ltp, pnl, pnlPct };
   });

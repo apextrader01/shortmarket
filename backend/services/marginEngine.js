@@ -82,22 +82,42 @@ function calculateRequiredMargin(symbol, product_type, side, quantity, price, as
     return contractValue;
 }
 
+let lotsizeMap = {};
+try {
+    const lotsPath = require('path').join(__dirname, '..', 'database', 'lotsizeMap.json');
+    if (require('fs').existsSync(lotsPath)) {
+        lotsizeMap = JSON.parse(require('fs').readFileSync(lotsPath, 'utf8'));
+    }
+} catch (e) {}
+
 function getLotSize(symbol) {
-    // Lookup lot size from instruments master
-    const deriv = lookupDerivativeBySymbol(symbol);
+    if (!symbol) return 1;
+    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+
+    // 1. Lookup lot size from instruments master
+    const deriv = lookupDerivativeBySymbol(symbol) || lookupDerivativeBySymbol(cleanSym);
     if (deriv && deriv.lotsize) {
         return Number(deriv.lotsize);
     }
-    // Fallback estimates if lookup fails
-    if (symbol.startsWith('SENSEX')) return 10;
-    if (symbol.startsWith('BANKNIFTY')) return 15;
-    if (symbol.startsWith('NIFTY')) return 25;
-    if (symbol.startsWith('FINNIFTY')) return 25;
-    if (symbol.startsWith('MIDCPNIFTY')) return 50;
-    if (symbol.startsWith('BSE')) return 10;
+
+    // 2. Lookup in lotsizeMap.json
+    if (lotsizeMap[cleanSym]) return lotsizeMap[cleanSym];
+    const sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        if (cleanSym.startsWith(key)) return lotsizeMap[key];
+    }
+
+    // 3. Fallback estimates for indices
+    if (cleanSym.startsWith('SENSEX')) return 10;
+    if (cleanSym.startsWith('BANKNIFTY')) return 15;
+    if (cleanSym.startsWith('NIFTY')) return 25;
+    if (cleanSym.startsWith('FINNIFTY')) return 25;
+    if (cleanSym.startsWith('MIDCPNIFTY') || cleanSym.startsWith('MIDCAPNIFTY')) return 50;
+    if (cleanSym.startsWith('BSE') || cleanSym.startsWith('BANKEX')) return 10;
     return 1;
 }
 
 module.exports = {
-    calculateRequiredMargin
+    calculateRequiredMargin,
+    getLotSize
 };

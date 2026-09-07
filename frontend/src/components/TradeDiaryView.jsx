@@ -1468,7 +1468,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
   // Rule Follow/Broken Handlers
   const handleRuleFollow = async (ruleId) => {
-    setRules(prev => prev.map(r => r.id === ruleId ? { ...r, followed: (r.followed || 0) + 1 } : r));
+    let nextFollowed = 1;
+    setRules(prev => prev.map(r => {
+      if (r.id === ruleId) {
+        nextFollowed = (r.followed || 0) + 1;
+        return { ...r, followed: nextFollowed };
+      }
+      return r;
+    }));
     setRuleToast('✓ Rule followed logged! Keep up the discipline.');
     setTimeout(() => setRuleToast(null), 3000);
     try {
@@ -1477,7 +1484,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         await fetch(`${API}/api/journal/rules/${ruleId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ followed: 1 })
+          body: JSON.stringify({ times_followed: nextFollowed, followed: nextFollowed })
         });
       }
     } catch (e) {
@@ -1486,7 +1493,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   };
 
   const handleRuleBreak = async (ruleId) => {
-    setRules(prev => prev.map(r => r.id === ruleId ? { ...r, broken: (r.broken || 0) + 1 } : r));
+    let nextBroken = 1;
+    setRules(prev => prev.map(r => {
+      if (r.id === ruleId) {
+        nextBroken = (r.broken || 0) + 1;
+        return { ...r, broken: nextBroken };
+      }
+      return r;
+    }));
     setRuleToast('⚠️ Rule breach recorded. Step back and reset your discipline!');
     setTimeout(() => setRuleToast(null), 3000);
     try {
@@ -1495,7 +1509,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         await fetch(`${API}/api/journal/rules/${ruleId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ broken: 1 })
+          body: JSON.stringify({ times_broken: nextBroken, broken: nextBroken })
         });
       }
     } catch (e) {

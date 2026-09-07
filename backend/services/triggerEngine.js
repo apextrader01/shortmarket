@@ -143,15 +143,18 @@ class TriggerEngine {
 
                 let updated = false;
                 let newTriggerPrice = Number(tOrder.trigger_price || tOrder.sl_price || tOrder.price);
+                const step = Number(tOrder.trail_amount) || 0.5;
 
                 if (tOrder.side === 'SELL') {
                     // Long position SL: trails upward as LTP increases
-                    const highWater = Number(tOrder.high_water_mark || tOrder.price || ltp);
+                    const highWater = Number(tOrder.high_water_mark || ltp);
                     if (ltp > highWater) {
                         const gain = ltp - highWater;
-                        if (gain >= 0.5) {
-                            tOrder.high_water_mark = ltp;
-                            newTriggerPrice = Number((newTriggerPrice + gain).toFixed(2));
+                        if (gain >= step) {
+                            const stepsCount = Math.floor(gain / step);
+                            const ratchet = stepsCount * step;
+                            tOrder.high_water_mark = Number((highWater + ratchet).toFixed(2));
+                            newTriggerPrice = Number((newTriggerPrice + ratchet).toFixed(2));
                             tOrder.trigger_price = newTriggerPrice;
                             tOrder.sl_price = newTriggerPrice;
                             updated = true;
@@ -159,12 +162,14 @@ class TriggerEngine {
                     }
                 } else if (tOrder.side === 'BUY') {
                     // Short position SL: trails downward as LTP decreases
-                    const lowWater = Number(tOrder.low_water_mark || tOrder.price || ltp);
+                    const lowWater = Number(tOrder.low_water_mark || ltp);
                     if (ltp < lowWater) {
                         const drop = lowWater - ltp;
-                        if (drop >= 0.5) {
-                            tOrder.low_water_mark = ltp;
-                            newTriggerPrice = Number((newTriggerPrice - drop).toFixed(2));
+                        if (drop >= step) {
+                            const stepsCount = Math.floor(drop / step);
+                            const ratchet = stepsCount * step;
+                            tOrder.low_water_mark = Number((lowWater - ratchet).toFixed(2));
+                            newTriggerPrice = Number((newTriggerPrice - ratchet).toFixed(2));
                             tOrder.trigger_price = newTriggerPrice;
                             tOrder.sl_price = newTriggerPrice;
                             updated = true;
@@ -305,7 +310,7 @@ class TriggerEngine {
             const qtyChange = order.side === 'BUY' ? Number(order.quantity) : -Number(order.quantity);
 
             // Helper to handle inserting new positions or offsetting holdings
-            const handleRemainingPos = async (trx, remainingQty, execPrice) => {
+            const handleRemainingPos = async (trx, remainingQty, execPrice, customMargin = undefined) => {
                 if (order.product_type === 'DEL' && remainingQty < 0) {
                     const holding = await trx('holdings').where({ user_id: order.user_id, symbol: order.symbol }).first();
                     if (holding && holding.quantity > 0) {
@@ -360,10 +365,11 @@ class TriggerEngine {
                 
                 // If there's still a remaining quantity, insert an OPEN position
                 if (remainingQty !== 0) {
+                    const finalMargin = customMargin !== undefined ? Number(customMargin.toFixed(2)) : Number(order.margin || 0);
                     await trx('positions').insert({
                         user_id: order.user_id, symbol: order.symbol, quantity: remainingQty,
                         average_price: execPrice, product_type: order.product_type,
-                        margin: Number(order.margin || 0), updated_at: new Date()
+                        margin: finalMargin, updated_at: new Date()
                     });
                 }
             };
@@ -465,7 +471,8 @@ class TriggerEngine {
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
                         const remainingQty = order.side === 'BUY' ? (absQty - absPosQty) : -(absQty - absPosQty);
-                        await handleRemainingPos(trx, remainingQty, execPrice);
+                        const proportionalMargin = absQty > 0 ? (Number(order.margin || 0) * (Math.abs(remainingQty) / absQty)) : 0;
+                        await handleRemainingPos(trx, remainingQty, execPrice, proportionalMargin);
                     }
                 } else {
                     // Averaging

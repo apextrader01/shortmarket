@@ -44,8 +44,8 @@ export default function DOMLadderModal() {
   const rawBids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
   const rawAsks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
 
-  const bids = rawBids.map(b => ({ ...b, qty: Math.round(b.qty / lotsize) }));
-  const asks = rawAsks.map(a => ({ ...a, qty: Math.round(a.qty / lotsize) }));
+  const bids = rawBids;
+  const asks = rawAsks;
 
   // Determine tick size based on exchange/symbol
   let tickSize = 0.05;

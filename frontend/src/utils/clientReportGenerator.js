@@ -1,12 +1,27 @@
 // frontend/src/utils/clientReportGenerator.js
 // High-Precision Financial Reports & Statements Generator (Excel + PDF + HTML)
 
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /**
  * Escape CSV string values properly
  */
 function esc(val) {
   if (val === null || val === undefined) return '""';
-  let str = String(val).replace(/"/g, '""');
+  let str = String(val);
+  // Prevent CSV Formula Injection
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
+  str = str.replace(/"/g, '""');
   return `"${str}"`;
 }
 
@@ -209,14 +224,16 @@ export function triggerHtmlDownload(htmlContent, filename) {
  */
 export function buildReportHtml(title, clientMeta = {}, summaryCards = [], tablesHtml = '') {
   const generatedDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const clientName = clientMeta.username || clientMeta.name || 'Valued Trader';
-  const clientId = clientMeta.client_id || (clientMeta.id ? `SE${String(clientMeta.id).padStart(6, '0')}` : 'SE000001');
-  const pan = clientMeta.pan_card || clientMeta.pan || 'XXXXX0000X';
+  const clientName = escapeHtml(clientMeta.username || clientMeta.name || 'Valued Trader');
+  const clientId = escapeHtml(clientMeta.client_id || (clientMeta.id ? `SE${String(clientMeta.id).padStart(6, '0')}` : 'SE000001'));
+  const pan = escapeHtml(clientMeta.pan_card || clientMeta.pan || 'XXXXX0000X');
+  const safeTitle = escapeHtml(title);
+  const safePeriod = escapeHtml(clientMeta.period || 'All Records');
 
   const cardsHtml = (summaryCards || []).map(c => `
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; flex: 1; min-width: 140px;">
-      <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">${c.label}</div>
-      <div style="font-size: 15px; font-weight: 700; color: ${c.color || '#0f172a'};">${c.value}</div>
+      <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">${escapeHtml(c.label)}</div>
+      <div style="font-size: 15px; font-weight: 700; color: ${escapeHtml(c.color || '#0f172a')};">${escapeHtml(c.value)}</div>
     </div>
   `).join('');
 
@@ -224,7 +241,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title} - ${clientId}</title>
+  <title>${safeTitle} - ${clientId}</title>
   <style>
     @page { size: A4 landscape; margin: 12mm; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; padding: 16px; background: #fff; font-size: 11.5px; }
@@ -252,7 +269,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   <div class="no-print">
     <div style="font-size: 13px; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 8px;">
       <span style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SHORT EDGE</span>
-      <span>${title} - Statement Preview</span>
+      <span>${safeTitle} - Statement Preview</span>
     </div>
     <div style="display: flex; gap: 8px;">
       <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">🖨️ Print / Save as PDF</button>
@@ -263,7 +280,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   <div class="header">
     <div>
       <div class="logo-title">SHORT EDGE</div>
-      <div class="doc-title">${title}</div>
+      <div class="doc-title">${safeTitle}</div>
     </div>
     <div style="text-align: right; font-size: 10px; color: #475569;">
       <div>Short Edge Trading Platform</div>
@@ -276,7 +293,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
     <div><strong>Client Name:</strong> ${clientName}</div>
     <div><strong>Client ID:</strong> <span style="font-family: monospace; font-weight: 700;">${clientId}</span></div>
     <div><strong>PAN:</strong> ${pan}</div>
-    <div><strong>Period:</strong> ${clientMeta.period || 'All Records'}</div>
+    <div><strong>Period:</strong> ${safePeriod}</div>
   </div>
 
   ${summaryCards && summaryCards.length ? `<div class="summary-grid">${cardsHtml}</div>` : ''}

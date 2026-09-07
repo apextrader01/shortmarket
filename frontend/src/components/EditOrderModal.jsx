@@ -9,6 +9,7 @@ export default function EditOrderModal() {
   
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
+  const [triggerPrice, setTriggerPrice] = useState('');
   const [productType, setProductType] = useState('INT');
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
@@ -31,15 +32,16 @@ export default function EditOrderModal() {
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
+      const trg = order.trigger_price ?? order.triggerPrice;
+      const prc = order.price ?? order.limitPrice;
+      setTriggerPrice(trg ? parseFloat(trg).toFixed(2) : '');
       if (isPendingTrigger) {
-        const trg = order.trigger_price ?? order.triggerPrice;
-        const prc = order.price ?? order.limitPrice;
         setPrice(order.type === 'SL-M' ? (trg ? parseFloat(trg).toFixed(2) : '') : (prc ? parseFloat(prc).toFixed(2) : (trg ? parseFloat(trg).toFixed(2) : '')));
       } else {
-        const prc = order.price ?? order.limitPrice;
         setPrice(prc ? parseFloat(prc).toFixed(2) : '');
       }
-      if (order.productType || order.product_type) setProductType(order.productType || order.product_type);
+      const prod = order.productType || order.product_type || 'INT';
+      setProductType(prod);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
       setIsMarket(false);
@@ -55,9 +57,9 @@ export default function EditOrderModal() {
   let marginDifference = 0;
   if (!isPendingTrigger && !order.parent_order_id) {
     const oldMargin = parseFloat(order.margin || 0);
-    const rawPrice = parseFloat(price) || 0;
+    const rawPrice = parseFloat(price) || livePrice || 0;
     const contractValue = (Number(quantity) || 0) * rawPrice;
-    const effectiveProductType = productType || order.product_type || 'DEL';
+    const effectiveProductType = order.product_type || order.productType || 'INT';
     const isLeveraged = ['INT', 'INTRADAY', 'CO', 'BO'].includes(effectiveProductType);
     const newMargin = isLeveraged ? contractValue * 0.20 : contractValue;
     marginDifference = newMargin - oldMargin;
@@ -71,8 +73,9 @@ export default function EditOrderModal() {
     const sl = slPrice ? parseFloat(slPrice) : null;
     const tgt = tgtPrice ? parseFloat(tgtPrice) : null;
     const marketFlag = isPendingTrigger ? isMarket : false;
+    const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
 
-    const success = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag);
+    const success = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
 
     if (success) {
       closeEditOrderModal();
@@ -131,16 +134,30 @@ export default function EditOrderModal() {
               </div>
 
               {!isMarket && (
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    {order.type === 'SL-M' ? 'Trigger Price' : 'Limit Price'}
+                <div style={{ display: 'grid', gridTemplateColumns: order.type === 'SL' ? '1fr 1fr' : '1fr', gap: '12px' }}>
+                  {order.type === 'SL' && (
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Limit Price</div>
+                      <input 
+                        type="text" 
+                        value={price} 
+                        onChange={e => setPrice(e.target.value)} 
+                        style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>Trigger Price</div>
+                    <input 
+                      type="text" 
+                      value={order.type === 'SL' ? triggerPrice : (triggerPrice || price)} 
+                      onChange={e => { 
+                        setTriggerPrice(e.target.value); 
+                        if (order.type !== 'SL') setPrice(e.target.value); 
+                      }} 
+                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                    />
                   </div>
-                  <input 
-                    type="text" 
-                    value={price} 
-                    onChange={e => setPrice(e.target.value)} 
-                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '12px', borderRadius: '4px', color: '#fff', fontSize: '16px', outline: 'none', fontWeight: '600' }} 
-                  />
                 </div>
               )}
             </div>
@@ -148,14 +165,11 @@ export default function EditOrderModal() {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 
-                {/* Product Type */}
+                {/* Product Type (Read-Only) */}
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
-                  <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div onClick={() => setProductType('INT')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-                    {!(isBO || isCO) && (
-                      <div onClick={() => setProductType('DEL')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
-                    )}
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: 'var(--color-blue-light)' }}>
+                    {order.product_type || order.productType || 'INT'}
                   </div>
                 </div>
 
@@ -180,6 +194,21 @@ export default function EditOrderModal() {
                 </div>
 
               </div>
+
+              {/* Stop-Loss Trigger Price (if SL order) */}
+              {(order.type === 'SL' || order.type === 'SL-M' || order.trigger_price) && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>
+                    Trigger Price
+                  </div>
+                  <input 
+                    type="text" 
+                    value={triggerPrice} 
+                    onChange={e => setTriggerPrice(e.target.value)} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                  />
+                </div>
+              )}
 
               {/* BO/CO Fields */}
               {(isBO || isCO) && (

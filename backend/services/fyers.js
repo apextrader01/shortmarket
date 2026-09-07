@@ -292,19 +292,26 @@ function startLiveWebSocket() {
         watchdogInterval = setInterval(() => {
             const staleSec = (Date.now() - lastTickTime) / 1000;
             const uptimeSec = process.uptime();
-            // MCX is open until 23:30/23:55, so we need to run watchdog until hour 23
-            const d = new Date();
-            const h = d.getHours();
-            const day = d.getDay();
-            const isWeekend = (day === 0 || day === 6);
-            // Only restart if:
-            // 1. Not a weekend
-            // 2. Within market hours
-            // 3. No tick in 60 seconds (not 45)
-            // 4. There ARE active subscriptions (means clients are watching)
-            // 5. Server has been up for at least 90 seconds (avoid restart loops on boot)
-            if (!isWeekend && staleSec > 60 && (h >= 9 && h <= 23) && clientSubscriptions.size > 0 && uptimeSec > 90) {
-                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck. Forcing PM2 restart...`);
+            
+            // Timezone-safe IST calculation
+            const istTimeParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(new Date());
+            const istH = parseInt(istTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
+            const istM = parseInt(istTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
+            const istDay = istTimeParts.find(p => p.type === 'weekday')?.value;
+            const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
+
+            // Verify if any active subscription is in a currently open trading session
+            const hasActiveMarketSubscriptions = Array.from(clientSubscriptions).some(sym => {
+                const isCom = sym.includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => sym.includes(c));
+                if (isCom) {
+                    return (istH >= 9 && (istH < 23 || (istH === 23 && istM <= 30)));
+                } else {
+                    return ((istH > 9 || (istH === 9 && istM >= 15)) && (istH < 15 || (istH === 15 && istM <= 30)));
+                }
+            });
+
+            if (!isWeekend && staleSec > 60 && hasActiveMarketSubscriptions && uptimeSec > 90) {
+                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck during active market hours. Forcing PM2 restart...`);
                 process.exit(0);
             }
         }, 15000);
@@ -545,7 +552,7 @@ async function garbageCollectSubscriptions() {
         ordRows.forEach(r => protectSymbol(r.symbol));
             
         // 3. Protect Open Positions
-        const posRows = await db('positions').where('qty', '!=', 0).distinct('symbol').catch(()=>[]);
+        const posRows = await db('positions').where('quantity', '!=', 0).distinct('symbol').catch(()=>[]);
         posRows.forEach(r => protectSymbol(r.symbol));
 
         if (wsInstance && isFyersConnected && subQueue.length > 0) {

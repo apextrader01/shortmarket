@@ -1,12 +1,26 @@
 // frontend/src/utils/adminExport.js
 // Client-side zero-cost Excel & PDF export utilities
 
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /**
  * Escapes a cell value for standard CSV/Excel format.
  */
 function escapeCSVValue(val) {
   if (val === null || val === undefined) return '""';
   let str = String(val);
+  // Prevent CSV Formula Injection
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
   str = str.replace(/"/g, '""');
   return `"${str}"`;
 }
@@ -73,7 +87,7 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
 
   // Build Table HTML
   const headerHtml = columns
-    .map(c => `<th style="text-align: ${c.align || 'left'};">${c.header}</th>`)
+    .map(c => `<th style="text-align: ${c.align || 'left'};">${escapeHTML(c.header)}</th>`)
     .join('');
 
   const rowsHtml = data
@@ -86,7 +100,7 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
           } else if (c.key) {
             val = item[c.key] !== null && item[c.key] !== undefined ? item[c.key] : '';
           }
-          return `<td style="text-align: ${c.align || 'left'};">${val}</td>`;
+          return `<td style="text-align: ${c.align || 'left'};">${escapeHTML(val)}</td>`;
         })
         .join('');
       return `<tr>${cells}</tr>`;
@@ -98,7 +112,7 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title} - ${filename}</title>
+  <title>${escapeHTML(title)} - ${escapeHTML(filename)}</title>
   <style>
     @page {
       size: A4 landscape;

@@ -32,6 +32,7 @@ export default function OrdersView() {
     try {
       setIsSavingTag(true);
       const res = await fetch(`${API}/api/order/${tagModalOrder.id}/tag`, {
+        credentials: 'include',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag: tagToSave, notes: notesToSave })
@@ -459,9 +460,9 @@ export default function OrdersView() {
                       <td style={{ padding: '12px 16px' }}>{Number(trigger.quantity)}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--color-blue)' }}>₹{(trigger.triggerPrice || trigger.limitPrice || 0).toFixed(2)}</td>
                       <td style={{ padding: '12px 16px' }}>{trigger.trailingJump ? `₹${trigger.trailingJump}` : '—'}</td>
-                      <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.type.replace('_', ' ')}</td>
+                      <td style={{ padding: '12px 16px', fontWeight: '600' }}>{trigger.type?.replace?.('_', ' ') || trigger.type || ''}</td>
                       <td style={{ padding: '12px 16px', fontWeight: '600', color: trigger.status === 'PENDING_TRIGGER' ? 'var(--color-yellow)' : 'var(--color-green-light)' }}>
-                        {trigger.status.replace('_', ' ')}
+                        {trigger.status?.replace?.('_', ' ') || trigger.status || ''}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         {trigger.status === 'PENDING_TRIGGER' && (
@@ -556,7 +557,7 @@ export default function OrdersView() {
                           Trg: ₹{parseFloat(order.trigger_price).toFixed(2)}
                           {order.price && parseFloat(order.price) > 0 ? <><br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Lmt: ₹{parseFloat(order.price).toFixed(2)}</span></> : null}
                         </span>
-                      ) : (order.price && parseFloat(order.price) > 0 ? `₹${parseFloat(order.price).toFixed(2)}` : '—')}
+                      ) : (order.average_price && parseFloat(order.average_price) > 0 ? `₹${parseFloat(order.average_price).toFixed(2)}` : (order.price && parseFloat(order.price) > 0 ? `₹${parseFloat(order.price).toFixed(2)}` : '—'))}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
                       {order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}
@@ -773,7 +774,7 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>{selectedOrder.type === 'TRAILING_STOP' ? 'Trigger Price:' : 'Average Price:'}</span>
-                <span style={{ fontWeight: '600' }}>₹{parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0).toFixed(2)}</span>
+                <span style={{ fontWeight: '600' }}>₹{parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
@@ -781,7 +782,7 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Order Value:</span>
-                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : selectedOrder.price) || 0) * Number(selectedOrder.quantity)).toFixed(2)}</span>
+                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0) * Number(selectedOrder.quantity)).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>

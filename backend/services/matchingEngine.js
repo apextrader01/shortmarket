@@ -5,8 +5,8 @@ const db = require('../database/db');
 
 async function processTick(symbol, ltp) {
     try {
-        // 1. Get all pending limit/market orders for this symbol
-        const pendingOrders = await db('orders').where({ status: 'PENDING', symbol });
+        // 1. Get all pending limit/market/trigger orders for this symbol
+        const pendingOrders = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).where({ symbol });
         
         for (const order of pendingOrders) {
             let shouldExecute = false;
@@ -58,21 +58,26 @@ async function processTick(symbol, ltp) {
                     }
                 }
             }
-
+            
             if (shouldExecute) {
                 await executeOrder(order, executionPrice);
             }
         }
     } catch (err) {
-        console.error(`Tick processing error for ${symbol}:`, err);
+        console.error('Error processing tick in matchingEngine:', err);
     }
 }
 
 async function executeOrder(order, executionPrice) {
     try {
         await db.transaction(async (trx) => {
-            // Update order status
-            await trx('orders').where({ id: order.id }).update({ status: 'EXECUTED', price: executionPrice });
+            // Atomic update: only execute if order is still pending/trigger to prevent double execution
+            const updatedRows = await trx('orders')
+                .where({ id: order.id })
+                .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                .update({ status: 'EXECUTED', price: executionPrice });
+
+            if (!updatedRows) return; // Already processed by another concurrent tick
 
             const totalCost = executionPrice * order.quantity;
 
@@ -93,14 +98,17 @@ async function executeOrder(order, executionPrice) {
 
             let orderRealizedPnl = 0;
 
-            const position = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' }).first();
+            const position = await trx('positions')
+                .where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type || 'DEL' })
+                .whereNot({ quantity: 0 })
+                .first();
             
             if (position) {
                 let pnl = 0;
                 let marginToReturn = 0;
                 let newQuantity = position.quantity;
                 let newAvgPrice = position.average_price;
-                const leverageMultiplier = position.product_type === 'INT' ? 0.25 : 1.0;
+                const leverageMultiplier = position.product_type === 'INT' ? 0.20 : 1.0;
                 const user = await trx('users').where({ id: order.user_id }).first();
 
                 if (order.side === 'BUY') {
@@ -190,8 +198,8 @@ async function executeOrder(order, executionPrice) {
                 await trx('orders')
                     .where({ parent_order_id: order.parent_order_id })
                     .whereNot('id', order.id)
-                    .where('status', 'PENDING')
-                    .update({ status: 'CANCELLED' });
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                    .update({ status: 'CANCELLED', updated_at: new Date() });
             }
         });
         console.log(`✅ Order ${order.id} (${order.side} ${order.quantity} ${order.symbol}) EXECUTED successfully at ₹${executionPrice}`);

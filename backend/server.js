@@ -4395,9 +4395,9 @@ app.get('/api/admin/cleanup', async (req, res) => {
 
 // ─── Edit Order ─────────────────────────────────────────────────────────
 app.put('/api/order/:id', authenticateToken, async (req, res) => {
-      const { isMarket, quantity, price, sl_price, tgt_price } = req.body;
-      if (!isMarket && (!quantity || price === undefined)) {
-        return res.status(400).json({ error: 'Missing quantity or price' });
+      const { isMarket, quantity, price, sl_price, tgt_price, trigger_price } = req.body;
+      if (!isMarket && (!quantity || (price === undefined && trigger_price === undefined))) {
+        return res.status(400).json({ error: 'Missing quantity, price, or trigger price' });
       }
 
       try {
@@ -4430,7 +4430,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           const oldMargin = parseFloat(order.margin || 0);
           let newMargin = oldMargin;
           if (!order.parent_order_id) {
-              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), parseFloat(price));
+              const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
+              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
           }
 
           const marginDifference = newMargin - oldMargin;
@@ -4446,16 +4447,17 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
              const parent = await trx('orders').where({ id: order.parent_order_id }).first();
              if (parent) {
                  const entryPrice = parseFloat(parent.price);
+                 const checkPrice = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
                  if (order.type === 'SL-M') {
-                     if (order.side === 'SELL' && parseFloat(price) >= entryPrice) {
+                     if (order.side === 'SELL' && checkPrice >= entryPrice) {
                          throw Object.assign(new Error('BO Buy: Stop-Loss must be lower than execution price.'), { statusCode: 400 });
-                     } else if (order.side === 'BUY' && parseFloat(price) <= entryPrice) {
+                     } else if (order.side === 'BUY' && checkPrice <= entryPrice) {
                          throw Object.assign(new Error('BO Sell: Stop-Loss must be higher than execution price.'), { statusCode: 400 });
                      }
                  } else if (order.type === 'LIMIT') {
-                     if (order.side === 'SELL' && parseFloat(price) <= entryPrice) {
+                     if (order.side === 'SELL' && checkPrice <= entryPrice) {
                          throw Object.assign(new Error('BO Buy: Target must be higher than execution price.'), { statusCode: 400 });
-                     } else if (order.side === 'BUY' && parseFloat(price) >= entryPrice) {
+                     } else if (order.side === 'BUY' && checkPrice >= entryPrice) {
                          throw Object.assign(new Error('BO Sell: Target must be lower than execution price.'), { statusCode: 400 });
                      }
                  }
@@ -4464,14 +4466,20 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           // Build update object
           const updateObj = { 
-              quantity: Number(quantity), 
-              price: parseFloat(price),
+              quantity: Number(quantity),
               margin: newMargin,
               updated_at: new Date()
           };
 
+          if (price !== undefined && price !== null && !isNaN(parseFloat(price))) {
+              updateObj.price = parseFloat(price);
+          }
+          if (trigger_price !== undefined && trigger_price !== null && !isNaN(parseFloat(trigger_price))) {
+              updateObj.trigger_price = parseFloat(trigger_price);
+          }
+
           if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M') {
-              updateObj.trigger_price = parseFloat(price);
+              updateObj.trigger_price = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
               updateObj.price = null; // SL-M is a market order when triggered
           }
 
@@ -5076,43 +5084,49 @@ app.post('/api/user/bank_details', authenticateToken, async (req, res) => {
 app.post('/api/withdrawals/request', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
-    if (!amount || isNaN(amount) || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
-    // Check if user has bank details
-    const user = await db('users').where({ id: req.user.id }).first();
-    if (!user.upi_id && (!user.bank_account_no || !user.bank_ifsc)) {
-      return res.status(400).json({ error: 'Please update your Bank or UPI details in Settings before withdrawing' });
-    }
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
 
-    // Calculate available balance
-    const referrals = await db('referrals').where({ referrer_id: req.user.id, status: 'completed' });
-    const totalEarned = referrals.reduce((sum, r) => sum + parseFloat(r.reward_amount || 0), 0);
-    
-    const withdrawals = await db('reward_withdrawals').where({ user_id: req.user.id });
-    const blockedAmount = withdrawals.filter(w => ['PENDING', 'PROCESSING', 'CREDITED'].includes(w.status)).reduce((sum, w) => sum + parseFloat(w.amount), 0);
-    
-    const availableRewardBalance = totalEarned - blockedAmount;
+      // Check if user has bank details
+      const user = await trx('users').where({ id: req.user.id }).first();
+      if (!user.upi_id && (!user.bank_account_no || !user.bank_ifsc)) {
+        throw Object.assign(new Error('Please update your Bank or UPI details in Settings before withdrawing'), { statusCode: 400 });
+      }
 
-    if (amount > availableRewardBalance) {
-      return res.status(400).json({ error: 'Insufficient reward balance' });
-    }
+      // Calculate available balance inside transaction
+      const referrals = await trx('referrals').where({ referrer_id: req.user.id, status: 'completed' });
+      const totalEarned = referrals.reduce((sum, r) => sum + parseFloat(r.reward_amount || 0), 0);
+      
+      const withdrawals = await trx('reward_withdrawals').where({ user_id: req.user.id });
+      const blockedAmount = withdrawals.filter(w => ['PENDING', 'PROCESSING', 'CREDITED'].includes(w.status)).reduce((sum, w) => sum + parseFloat(w.amount), 0);
+      
+      const availableRewardBalance = totalEarned - blockedAmount;
 
-    await db('reward_withdrawals').insert({
-      user_id: req.user.id,
-      amount: amount,
-      status: 'PENDING'
+      if (parsedAmount > availableRewardBalance) {
+        throw Object.assign(new Error('Insufficient reward balance'), { statusCode: 400 });
+      }
+
+      await trx('reward_withdrawals').insert({
+        user_id: req.user.id,
+        amount: parsedAmount,
+        status: 'PENDING',
+        created_at: new Date()
+      });
     });
 
     res.json({ success: true, message: 'Withdrawal request submitted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
 app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
-    if (!caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
 
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
@@ -5217,6 +5231,32 @@ app.get('/api/admin/withdrawals', authenticateToken, async (req, res) => {
     }
 
     res.json({ success: true, withdrawals: enhanced, total, page, totalPages });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+
+    const { status, remarks, utr } = req.body;
+    if (!['PENDING', 'PROCESSING', 'CREDITED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid withdrawal status' });
+    }
+
+    const withdrawal = await db('reward_withdrawals').where({ id: req.params.id }).first();
+    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal record not found' });
+
+    await db('reward_withdrawals').where({ id: req.params.id }).update({
+      status,
+      remarks: remarks || null,
+      utr: utr || null,
+      updated_at: new Date()
+    });
+
+    res.json({ success: true, message: `Withdrawal #${req.params.id} marked as ${status}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -6177,14 +6217,16 @@ app.post('/api/journal/rules', authenticateToken, async (req, res) => {
 
 app.put('/api/journal/rules/:id', authenticateToken, async (req, res) => {
   try {
-    const { rule_text, is_active, times_followed, times_broken } = req.body;
+    const { rule_text, is_active, times_followed, times_broken, followed, broken } = req.body;
+    const finalFollowed = times_followed !== undefined ? times_followed : followed;
+    const finalBroken = times_broken !== undefined ? times_broken : broken;
     const [rule] = await db('trading_rules')
       .where({ id: req.params.id, user_id: req.user.id })
       .update({
         ...(rule_text !== undefined ? { rule_text } : {}),
         ...(is_active !== undefined ? { is_active } : {}),
-        ...(times_followed !== undefined ? { times_followed } : {}),
-        ...(times_broken !== undefined ? { times_broken } : {}),
+        ...(finalFollowed !== undefined ? { times_followed: finalFollowed } : {}),
+        ...(finalBroken !== undefined ? { times_broken: finalBroken } : {}),
         updated_at: new Date()
       })
       .returning('*');

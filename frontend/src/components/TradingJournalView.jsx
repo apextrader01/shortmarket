@@ -96,7 +96,7 @@ export default function TradingJournalView({ onBack }) {
           rawId: p.id,
           symbol: p.symbol,
           product_type: p.product_type || 'INT',
-          side: pnl >= 0 ? 'BUY' : 'SELL',
+          side: p.side || (Number(p.quantity) < 0 ? 'SELL' : 'BUY'),
           qty: Math.abs(p.closed_quantity || p.quantity || 1),
           avg: Number(p.average_price || 0),
           exit_price: Number(p.exit_price || p.average_price || 0),
@@ -195,7 +195,8 @@ export default function TradingJournalView({ onBack }) {
     });
 
     const totalTrades = tradesList.length;
-    const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : '0.0';
+    const completedTrades = wins + losses;
+    const winRate = completedTrades > 0 ? ((wins / completedTrades) * 100).toFixed(1) : '0.0';
 
     // Best strategy
     let bestStrat = 'None';

@@ -77,7 +77,7 @@ export default function PortfolioView() {
   let countMutualFunds = 0;
   let unrealizedPnl = 0;
 
-  // Only use T+1 holdings representing the portfolio view
+  // Merge T+1 holdings and T+0 open delivery positions
   const allMergedHoldingsMap = {};
 
   (holdings || []).forEach(h => {
@@ -94,6 +94,25 @@ export default function PortfolioView() {
       const weightedAvg = totalQty > 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / totalQty : 0;
       existing.quantity = totalQty;
       existing.average_price = weightedAvg;
+    }
+  });
+
+  (positions || []).forEach(p => {
+    if (p.product_type === 'DEL' && Number(p.quantity) > 0) {
+      const sym = p.symbol;
+      if (!allMergedHoldingsMap[sym]) {
+        allMergedHoldingsMap[sym] = { ...p, quantity: Number(p.quantity) || 0, average_price: Number(p.average_price) || 0, isT0: true };
+      } else {
+        const existing = allMergedHoldingsMap[sym];
+        const prevQty = Number(existing.quantity) || 0;
+        const prevPrice = Number(existing.average_price) || 0;
+        const addQty = Number(p.quantity) || 0;
+        const addPrice = Number(p.average_price) || 0;
+        const totalQty = prevQty + addQty;
+        const weightedAvg = totalQty > 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / totalQty : 0;
+        existing.quantity = totalQty;
+        existing.average_price = weightedAvg;
+      }
     }
   });
 
@@ -157,7 +176,7 @@ export default function PortfolioView() {
   if (orders) {
     orders.forEach(o => {
       const isExecuted = o.status === 'EXECUTED' || o.status === 'COMPLETED' || o.status === 'COMPLETE';
-      if (isExecuted && o.realized_pnl !== null && o.realized_pnl !== undefined && isToday(o.created_at || o.updated_at)) {
+      if (isExecuted && o.realized_pnl !== null && o.realized_pnl !== undefined && isToday(o.updated_at || o.created_at)) {
         todayRealizedPnl += parseFloat(o.realized_pnl);
         todayTradesCount++;
       }

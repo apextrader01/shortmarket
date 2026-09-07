@@ -198,7 +198,7 @@ export default function MarketDepthModal() {
                       symbol,
                       type: 'MARKET',
                       side: 'BUY',
-                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      quantity: lotSize * (oneClickMultiplier || 1),
                       price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
                       trigger_price: null,
                       sl_price: null,
@@ -209,7 +209,7 @@ export default function MarketDepthModal() {
                     placeOrder(payload);
                   } else {
                     closeMarketDepthModal();
-                    openOrderModal(symbol, 'BUY', marketDepthModal.lotsize || 1);
+                    openOrderModal(symbol, 'BUY', lotSize);
                   }
                 }}
                 className={`btn btn-primary ${oneClickMode ? 'one-click-active' : ''}`}
@@ -225,7 +225,7 @@ export default function MarketDepthModal() {
                       symbol,
                       type: 'MARKET',
                       side: 'SELL',
-                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      quantity: lotSize * (oneClickMultiplier || 1),
                       price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
                       trigger_price: null,
                       sl_price: null,
@@ -236,7 +236,7 @@ export default function MarketDepthModal() {
                     placeOrder(payload);
                   } else {
                     closeMarketDepthModal();
-                    openOrderModal(symbol, 'SELL', marketDepthModal.lotsize || 1);
+                    openOrderModal(symbol, 'SELL', lotSize);
                   }
                 }}
                 className={`btn btn-secondary ${oneClickMode ? 'one-click-active' : ''}`}
