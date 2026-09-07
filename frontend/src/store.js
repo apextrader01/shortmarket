@@ -93,6 +93,10 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
     if (symbol.includes(':')) {
         const rawSym = symbol.split(':')[1];
         newPrices[rawSym] = { ...newPrices[rawSym], ...data, tick };
+    } else {
+        newPrices[`NSE:${symbol}`] = { ...newPrices[`NSE:${symbol}`], ...data, tick };
+        newPrices[`BSE:${symbol}`] = { ...newPrices[`BSE:${symbol}`], ...data, tick };
+        newPrices[`MCX:${symbol}`] = { ...newPrices[`MCX:${symbol}`], ...data, tick };
     }
   }
   return newPrices;
@@ -228,7 +232,13 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Watchlists ──────────────────────────────────────────────────────────────
   watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
-  activeWatchlistId: 1,
+  activeWatchlistId: (function() {
+    try {
+      const saved = localStorage.getItem('active_watchlist_id');
+      if (saved) return saved;
+    } catch(e) {}
+    return 1;
+  })(),
   lastWatchlistEdit: 0, // Timestamp to prevent background fetchUserData from overwriting optimistic UI
 
   createWatchlist: (name) => {
@@ -254,35 +264,46 @@ export const useStore = create(persist((set, get) => ({
   deleteWatchlist: (id) => {
     let newWatchlists = get().watchlists.filter(w => String(w.id) !== String(id));
     if (newWatchlists.length === 0) newWatchlists = [{ id: 1, name: 'Watchlist 1', symbols: [] }];
+    const nextActiveId = String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId;
+    try { localStorage.setItem('active_watchlist_id', String(nextActiveId)); } catch(e) {}
     set({
       watchlists:        newWatchlists,
-      activeWatchlistId: String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId,
+      activeWatchlistId: nextActiveId,
       lastWatchlistEdit: Date.now()
     });
     get().syncWatchlists(newWatchlists);
   },
 
   setActiveWatchlist: (id) => {
+    try { localStorage.setItem('active_watchlist_id', String(id)); } catch(e) {}
     set({ activeWatchlistId: id });
     get().pingSubscriptions();
   },
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
+    const targetWlId = String(watchlistId);
     const newWatchlists = get().watchlists.map(w => {
-      if (String(w.id) === String(watchlistId) && !w.symbols.includes(uniqueSymbol)) {
-        return { ...w, symbols: [...w.symbols, uniqueSymbol] };
+      if (String(w.id) === targetWlId && !(w.symbols || []).includes(uniqueSymbol)) {
+        return { ...w, symbols: [...(w.symbols || []), uniqueSymbol] };
       }
       return w;
     });
     set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
+
+    // ⚡ Immediately subscribe via WebSocket so ticks stream with 0 delay
+    socket.emit('subscribe', uniqueSymbol);
+    if (uniqueSymbol && uniqueSymbol.includes(':')) {
+      socket.emit('subscribe', uniqueSymbol.split(':')[1]);
+    }
     get().pingSubscriptions();
     get().fetchBatchPrices([uniqueSymbol], true);
   },
 
   removeStockFromWatchlist: (watchlistId, uniqueSymbol) => {
+    const targetWlId = String(watchlistId);
     const newWatchlists = get().watchlists.map(w => {
-      if (w.id === watchlistId) return { ...w, symbols: w.symbols.filter(s => s !== uniqueSymbol) };
+      if (String(w.id) === targetWlId) return { ...w, symbols: (w.symbols || []).filter(s => s !== uniqueSymbol) };
       return w;
     });
     set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
@@ -428,7 +449,7 @@ export const useStore = create(persist((set, get) => ({
   },
   pingSubscriptions: () => {
     const { watchlists, activeWatchlistId, positions } = get();
-    const activeWl = watchlists.find(w => w.id === activeWatchlistId) || watchlists[0];
+    const activeWl = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
     
     const symbols = new Set();
     if (activeWl?.symbols) {

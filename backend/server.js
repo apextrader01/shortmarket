@@ -3557,7 +3557,8 @@ app.post('/api/ltp-batch', async (req, res) => {
       const sym = typeof item === 'string' ? item : item.symbol;
       if (!sym) continue;
       
-      const cached = priceCache[sym];
+      const rawSym = sym.includes(':') ? sym.split(':')[1] : null;
+      const cached = priceCache[sym] || (rawSym ? priceCache[rawSym] : null) || priceCache[`NSE:${sym}`] || priceCache[`BSE:${sym}`] || priceCache[`MCX:${sym}`];
       const isStale = cached && cached.timestamp ? (now - cached.timestamp > 15000) : false;
       
       if (!force && cached && cached.ltp > 0 && !isStale) {
@@ -3578,7 +3579,17 @@ app.post('/api/ltp-batch', async (req, res) => {
         fetchPromise = fetchBatchLTPs(missingSymbols).then(data => {
           // Write results into priceCache for future requests
           for (const [sym, ltpData] of Object.entries(data)) {
-            if (ltpData && ltpData.ltp > 0) priceCache[sym] = ltpData;
+            if (ltpData && ltpData.ltp > 0) {
+              priceCache[sym] = ltpData;
+              const rSym = sym.includes(':') ? sym.split(':')[1] : null;
+              if (rSym) priceCache[rSym] = ltpData;
+              
+              // ⚡ Real-time broadcast to socket rooms immediately
+              if (io) {
+                io.to(sym).emit('price_snapshot', { [sym]: ltpData });
+                if (rSym) io.to(rSym).emit('price_snapshot', { [rSym]: ltpData });
+              }
+            }
           }
           return data;
         }).finally(() => {
@@ -5650,11 +5661,16 @@ server.listen(PORT, async () => {
           const { addSubscriptionBatch } = require('./services/fyers');
           if (!addSubscriptionBatch) return;
           const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
-          const wlRows = await db('watchlists').select('symbols').catch(() => []);
-          wlRows.forEach(row => {
+          const userRows = await db('users').select('watchlists').catch(() => []);
+          userRows.forEach(row => {
             try {
-              const syms = typeof row.symbols === 'string' ? JSON.parse(row.symbols) : (row.symbols || []);
-              syms.forEach(s => { const sym = typeof s === 'string' ? s : s && s.symbol; if (sym && !sym.endsWith('-MF')) allSymbols.add(sym); });
+              const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);
+              wls.forEach(wl => {
+                (wl.symbols || []).forEach(sym => {
+                  const s = typeof sym === 'string' ? sym : sym && sym.symbol;
+                  if (s && !s.endsWith('-MF')) allSymbols.add(s);
+                });
+              });
             } catch(e) {}
           });
           const posRows = await db('positions').where('qty', '!=', 0).select('symbol').catch(() => []);

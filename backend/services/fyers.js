@@ -348,8 +348,12 @@ function startLiveWebSocket() {
                     let oldPriceObj = sharedPriceCache[uniqueSymbol] || {};
                     
                     const prev = tick.prev_close_price !== undefined ? tick.prev_close_price : (oldPriceObj.close !== undefined ? oldPriceObj.close : ltp);
-                    const change = tick.ch !== undefined ? tick.ch : (ltp - prev);
-                    const pct = tick.chp !== undefined ? tick.chp : (prev > 0 ? (change / prev) * 100 : 0);
+                    let change = tick.ch !== undefined ? tick.ch : (ltp - prev);
+                    let pct = tick.chp !== undefined ? tick.chp : (prev > 0 ? (change / prev) * 100 : 0);
+                    if ((!change || change === 0) && prev && prev > 0 && ltp > 0 && ltp !== prev) {
+                        change = ltp - prev;
+                        pct = (change / prev) * 100;
+                    }
                     
                     const priceObj = {
                         symbol: uniqueSymbol,
@@ -670,17 +674,25 @@ async function fetchBatchLTPs(symbols) {
                                 
                                 if (syms && syms.length > 0) {
                                     syms.forEach(uniqueSymbol => {
+                                        const close = Number(item.v.prev_close_price) || Number(item.v.close_price) || null;
+                                        const ltp = Number(item.v.lp) || close || 0;
+                                        let change = Number(item.v.ch) || 0;
+                                        let pct = Number(item.v.chp) || 0;
+                                        if ((!change || change === 0) && close && close > 0 && ltp > 0 && ltp !== close) {
+                                            change = ltp - close;
+                                            pct = (change / close) * 100;
+                                        }
                                         const priceObj = {
                                             symbol: uniqueSymbol,
                                             timestamp: Date.now(),
-                                            ltp: Number(item.v.lp) || Number(item.v.prev_close_price) || Number(item.v.close_price) || 0,
+                                            ltp: ltp,
                                             open: Number(item.v.open_price) || null,
                                             high: Number(item.v.high_price) || null,
                                             low: Number(item.v.low_price) || null,
-                                            close: Number(item.v.prev_close_price) || Number(item.v.close_price) || null,
+                                            close: close,
                                             volume: Number(item.v.volume) || 0,
-                                            change: Number(item.v.ch) || 0,
-                                            pct: Number(item.v.chp) || 0
+                                            change: change,
+                                            pct: pct
                                         };
                                         results[uniqueSymbol] = priceObj;
                                         sharedPriceCache[uniqueSymbol] = priceObj;

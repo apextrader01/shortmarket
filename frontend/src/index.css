@@ -1290,6 +1290,36 @@ input:checked + .slider:before {
   border-left: 2px solid var(--color-blue);
 }
 
+/* Pure CSS Watchlist Hover Actions (eliminates stuck React onMouseLeave state) */
+.watchlist-hover-actions {
+  display: none;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-panel, #111827);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.watchlist-item:hover .watchlist-hover-actions {
+  display: flex !important;
+}
+
+.watchlist-item:hover .watchlist-price-container {
+  opacity: 0;
+  visibility: hidden;
+}
+
+[data-theme='light'] .watchlist-hover-actions {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
 /* Exchange Badges */
 .badge-mcx { background: rgba(234, 179, 8, 0.15); color: #FDE047; border: 1px solid rgba(234, 179, 8, 0.3); }
 .badge-nse { background: rgba(59, 130, 246, 0.15); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.3); }
