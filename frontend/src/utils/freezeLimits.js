@@ -81,17 +81,31 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
   return 100000;
 }
 
+export function getOrderSlicesCount(symbol, totalQty, explicitLotsize = null) {
+  const qty = Number(totalQty) || 0;
+  if (qty <= 0) return 0;
+  const limit = getFreezeLimit(symbol, explicitLotsize);
+  if (!limit || limit <= 0) return 1;
+  return Math.min(100, Math.ceil(qty / limit));
+}
+
 export function calculateOrderSlices(symbol, totalQty, explicitLotsize = null) {
   const qty = Number(totalQty) || 0;
   if (qty <= 0) return [];
   const limit = getFreezeLimit(symbol, explicitLotsize);
+  if (!limit || limit <= 0) return [qty];
   if (qty <= limit) return [qty];
+
+  const MAX_SLICES = 100;
   const slices = [];
-  let remaining = qty;
-  while (remaining > 0) {
+  const maxAllowed = limit * MAX_SLICES;
+  let remaining = Math.min(qty, maxAllowed);
+
+  while (remaining > 0 && slices.length < MAX_SLICES) {
     const currentSlice = Math.min(remaining, limit);
     slices.push(currentSlice);
     remaining -= currentSlice;
   }
   return slices;
 }
+

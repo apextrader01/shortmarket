@@ -131,7 +131,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE') || symbol.includes('NATURALGAS') || symbol.includes('COPPER') || symbol.includes('ZINC');
 
     const freezeLimit = getFreezeLimit(symbol);
-    const slicesCount = slicesOverride || (quantity > freezeLimit ? Math.ceil(quantity / freezeLimit) : 1);
+    const slicesCount = slicesOverride || (quantity > freezeLimit ? Math.min(100, Math.ceil(quantity / freezeLimit)) : 1);
 
     let brokerage = 0;
     let stt = 0;
@@ -249,10 +249,13 @@ function calculateOrderSlices(symbol, totalQty, explicitLotsize = null) {
     const qty = Number(totalQty) || 0;
     if (qty <= 0) return [];
     const limit = getFreezeLimit(symbol, explicitLotsize);
+    if (!limit || limit <= 0) return [qty];
     if (qty <= limit) return [qty];
+    const MAX_SLICES = 100;
     const slices = [];
-    let remaining = qty;
-    while (remaining > 0) {
+    const maxAllowed = limit * MAX_SLICES;
+    let remaining = Math.min(qty, maxAllowed);
+    while (remaining > 0 && slices.length < MAX_SLICES) {
         const currentSlice = Math.min(remaining, limit);
         slices.push(currentSlice);
         remaining -= currentSlice;

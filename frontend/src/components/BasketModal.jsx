@@ -3,7 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react';
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
-import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
 
 function extractOptionStrike(symbol) {
@@ -433,8 +433,8 @@ export default function BasketModal() {
   // Calculate total execution slices across all basket legs
   const totalExecutionSlices = useMemo(() => {
     return enhancedItems.reduce((sum, item) => {
-      const slices = calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize);
-      return sum + (slices.length > 0 ? slices.length : 1);
+      const count = getOrderSlicesCount(item.symbol, item.totalQuantity, item.lotsize);
+      return sum + (count > 0 ? count : 1);
     }, 0);
   }, [enhancedItems]);
 
@@ -470,8 +470,7 @@ export default function BasketModal() {
       const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => clean.startsWith(c));
 
       const freezeLimit = getFreezeLimit(sym, item.lotsize);
-      const slices = calculateOrderSlices(sym, qty, item.lotsize);
-      const slicesCount = slices.length > 0 ? slices.length : 1;
+      const slicesCount = getOrderSlicesCount(sym, qty, item.lotsize) || 1;
 
       let legBrokerage = 0;
       let legStt = 0;
@@ -1493,9 +1492,9 @@ export default function BasketModal() {
                           color: '#d97706',
                           whiteSpace: 'nowrap'
                         }}
-                        title={`Freeze limit is ${getFreezeLimit(item.symbol, item.lotsize)} qty. This leg will be auto-sliced into ${calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize).length} orders on execution.`}
+                        title={`Freeze limit is ${getFreezeLimit(item.symbol, item.lotsize)} qty. This leg will be auto-sliced into ${getOrderSlicesCount(item.symbol, item.totalQuantity, item.lotsize)} orders on execution.`}
                       >
-                        ⚡ {calculateOrderSlices(item.symbol, item.totalQuantity, item.lotsize).length} Slices (Max {getFreezeLimit(item.symbol, item.lotsize)}/slice)
+                        ⚡ {getOrderSlicesCount(item.symbol, item.totalQuantity, item.lotsize)} Slices (Max {getFreezeLimit(item.symbol, item.lotsize)}/slice)
                       </div>
                     )}
 
@@ -1702,7 +1701,7 @@ export default function BasketModal() {
                           <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '11px' }}>
                             <span>Leg {idx + 1} ({item.symbol}):</span>
                             <span style={{ color: '#fff', fontWeight: '600' }}>
-                              {slices.length} orders ({slices.join(' + ')} qty)
+                              {slices.length} orders ({slices.length > 5 ? `${slices.slice(0, 5).join(' + ')} ... (+${slices.length - 5} more)` : slices.join(' + ')} qty)
                             </span>
                           </div>
                         );

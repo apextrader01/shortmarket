@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
 import { getInstantLotsize } from '../utils/lotsizeHelper';
-import { getFreezeLimit, calculateOrderSlices } from '../utils/freezeLimits';
+import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin } from '../utils/marginCalculator';
 
 export default function OrderModal() {
@@ -87,7 +87,9 @@ export default function OrderModal() {
   }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
 
   const balanceNum = Number(user?.balance) || 0;
-  const totalQuantity = quantity * (orderModal.lotsize || 1);
+  const totalQuantity = (parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1);
+  const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
+  const slicesCount = getOrderSlicesCount(symbol, totalQuantity, orderModal.lotsize);
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
@@ -514,23 +516,24 @@ export default function OrderModal() {
                   type="number" 
                   step={1}
                   min={1}
+                  max={10000000}
                   value={quantity} 
                   onChange={e => {
                     const val = e.target.value;
                     if (val === '') { setQuantity(''); return; }
                     const num = parseInt(val, 10);
-                    if (!isNaN(num)) setQuantity(Math.max(1, num));
+                    if (!isNaN(num)) setQuantity(Math.min(10000000, Math.max(1, num)));
                   }}
                   onBlur={e => {
                     const num = parseInt(e.target.value, 10);
-                    setQuantity(Math.max(1, isNaN(num) ? 1 : num));
+                    setQuantity(Math.min(10000000, Math.max(1, isNaN(num) ? 1 : num)));
                   }}
                   style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
               {orderModal.lotsize > 1 && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', paddingLeft: '2px' }}>
-                  Total Qty: {(parseInt(quantity) || 0) * orderModal.lotsize}
+                  Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
                 </div>
               )}
             </div>
@@ -616,7 +619,7 @@ export default function OrderModal() {
           )}
 
           {/* Slicing Notice Banner */}
-          {totalQuantity > getFreezeLimit(symbol, orderModal.lotsize) && (
+          {totalQuantity > freezeLimit && (
             <div style={{ 
               fontSize: '11.5px', 
               color: '#93c5fd', 
@@ -631,7 +634,7 @@ export default function OrderModal() {
             }}>
               <Zap size={14} color="#60a5fa" />
               <span>
-                Order Slicing: <strong>{getFreezeLimit(symbol, orderModal.lotsize).toLocaleString('en-IN')} Qty</strong> allowed per order; <strong>{calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
+                Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} Qty</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
               </span>
             </div>
           )}
@@ -856,7 +859,7 @@ export default function OrderModal() {
       )}
 
       {/* Charges Breakup Modal */}
-      {showBreakup && estimatedTaxes && (
+      {showBreakup && estimatedTaxes && typeof estimatedTaxes === 'object' && (
          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
             <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', width: '380px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', border: '1px solid var(--border-color)' }}>
                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
@@ -869,40 +872,40 @@ export default function OrderModal() {
                
                <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                     <span>Brokerage {calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length > 1 ? `(${calculateOrderSlices(symbol, totalQuantity, orderModal.lotsize).length} sliced orders)` : ''}</span>
-                     <span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                     <span>Brokerage {slicesCount > 1 ? `(${slicesCount} sliced orders)` : ''}</span>
+                     <span>₹{(Number(estimatedTaxes.brokerage) || 0).toFixed(2)}</span>
                   </div>
                   
                   <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>Others</div>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                      <span>Transaction (Exch. + Clearing)</span>
-                     <span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.exchangeCharge) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                      <span>CTT/STT</span>
-                     <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.stt) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                       <span>CGST (9%)</span>
-                      <span>₹{(estimatedTaxes.cgst !== undefined ? estimatedTaxes.cgst : (estimatedTaxes.gst / 2)).toFixed(2)}</span>
+                      <span>₹{(Number(estimatedTaxes.cgst !== undefined ? estimatedTaxes.cgst : (Number(estimatedTaxes.gst) / 2)) || 0).toFixed(2)}</span>
                    </div>
                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                       <span>SGST (9%)</span>
-                      <span>₹{(estimatedTaxes.sgst !== undefined ? estimatedTaxes.sgst : (estimatedTaxes.gst / 2)).toFixed(2)}</span>
+                      <span>₹{(Number(estimatedTaxes.sgst !== undefined ? estimatedTaxes.sgst : (Number(estimatedTaxes.gst) / 2)) || 0).toFixed(2)}</span>
                    </div>
                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                       <span>SEBI</span>
-                      <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
+                      <span>₹{(Number(estimatedTaxes.sebiCharge) || 0).toFixed(2)}</span>
                    </div>
                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                       <span>Stamp duty</span>
-                      <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
+                      <span>₹{(Number(estimatedTaxes.stampDuty) || 0).toFixed(2)}</span>
                    </div>
-                   {estimatedTaxes.dpCharge > 0 && (
+                   {Number(estimatedTaxes.dpCharge) > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                          <span>DP Charge</span>
-                         <span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
+                         <span>₹{(Number(estimatedTaxes.dpCharge) || 0).toFixed(2)}</span>
                       </div>
                    )}
                    {isMutualFund && (
@@ -920,7 +923,7 @@ export default function OrderModal() {
                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
                      <span>Total</span>
-                     <span>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.totalTaxes) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                      *Actual charges may vary based on order execution. <span style={{ color: 'var(--color-blue)', cursor: 'pointer' }}>Learn more</span>
