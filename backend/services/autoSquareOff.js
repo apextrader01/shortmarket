@@ -282,7 +282,27 @@ async function runWatchlistCleanup() {
 }
 
 function startSquareOffJobs() {
-    // MIDNIGHT WATCHLIST CLEANUP (12:00 AM)
+    // 1. INTRADAY EQUITIES SQUARE-OFF (03:20 PM IST Monday-Friday)
+    schedule.scheduleJob({ rule: '20 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runIntradaySquareOff('NSE_NFO_BFO');
+    });
+
+    // 2. DERIVATIVE EXPIRY SQUARE-OFF EQUITIES (03:25 PM IST Monday-Friday)
+    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runAutoSquareOff('NSE_NFO_BFO');
+    });
+
+    // 3. INTRADAY MCX SQUARE-OFF (11:00 PM IST Monday-Friday)
+    schedule.scheduleJob({ rule: '0 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runIntradaySquareOff('MCX');
+    });
+
+    // 4. MCX EXPIRY SQUARE-OFF (11:25 PM IST Monday-Friday)
+    schedule.scheduleJob({ rule: '25 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
+        runAutoSquareOff('MCX');
+    });
+
+    // 5. MIDNIGHT WATCHLIST CLEANUP (12:00 AM IST)
     schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
         runWatchlistCleanup();
     });
@@ -290,7 +310,7 @@ function startSquareOffJobs() {
     // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
     runWatchlistCleanup();
 
-    console.log('✅ Watchlist Cleanup schedule initialized (Cleanup: 12:00am).');
+    console.log('✅ Auto Square-Off and Watchlist schedules initialized.');
 }
 
 

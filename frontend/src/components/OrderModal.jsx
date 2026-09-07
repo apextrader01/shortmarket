@@ -7,10 +7,11 @@ import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../ut
 import { calculateOrderMargin } from '../utils/marginCalculator';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
     orderModal: state.orderModal, 
     closeOrderModal: state.closeOrderModal, 
     user: state.user, 
+    orders: state.orders,
     restrictedStocks: state.restrictedStocks, 
     openMarketDepthModal: state.openMarketDepthModal, 
     marketDepthModal: state.marketDepthModal, 
@@ -241,6 +242,30 @@ export default function OrderModal() {
     if (isRestricted && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
+    }
+
+    if (user && user.risk_guardian_active && !orderModal.isExit) {
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const todayOrders = (orders || []).filter(o => {
+        if (o.status !== 'COMPLETED' && o.status !== 'COMPLETE' && o.status !== 'EXECUTED') return false;
+        const oDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(o.created_at));
+        return oDate === todayIST;
+      });
+      const todayTradesCount = todayOrders.length;
+      let todayRealizedPnl = 0;
+      todayOrders.forEach(o => {
+        if (o.realized_pnl !== null && o.realized_pnl !== undefined && !isNaN(parseFloat(o.realized_pnl))) {
+          todayRealizedPnl += parseFloat(o.realized_pnl);
+        }
+      });
+      const maxTrades = Number(user.max_daily_trades) || 0;
+      const maxLoss = Number(user.max_daily_loss) || 0;
+      const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;
+      const isLossLocked = maxLoss > 0 && todayRealizedPnl < 0 && Math.abs(todayRealizedPnl) >= maxLoss;
+      if (isTradesLocked || isLossLocked) {
+        alert(`🛡️ Risk Guardian Active: Trading is locked for today (${isTradesLocked ? `Max trades limit of ${maxTrades} reached` : `Daily loss limit of ₹${maxLoss.toLocaleString('en-IN')} reached`}). Only exit orders are allowed.`);
+        return;
+      }
     }
 
     if (!totalQuantity || totalQuantity <= 0 || isNaN(totalQuantity)) {

@@ -102,7 +102,7 @@ const STRATEGY_PRESETS = [
 ];
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, orders, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, orders: state.orders, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
@@ -613,6 +613,30 @@ export default function BasketModal() {
     if (isAnyRestricted && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
+    }
+
+    if (user && user.risk_guardian_active) {
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const todayOrders = (orders || []).filter(o => {
+        if (o.status !== 'COMPLETED' && o.status !== 'COMPLETE' && o.status !== 'EXECUTED') return false;
+        const oDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(o.created_at));
+        return oDate === todayIST;
+      });
+      const todayTradesCount = todayOrders.length;
+      let todayRealizedPnl = 0;
+      todayOrders.forEach(o => {
+        if (o.realized_pnl !== null && o.realized_pnl !== undefined && !isNaN(parseFloat(o.realized_pnl))) {
+          todayRealizedPnl += parseFloat(o.realized_pnl);
+        }
+      });
+      const maxTrades = Number(user.max_daily_trades) || 0;
+      const maxLoss = Number(user.max_daily_loss) || 0;
+      const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;
+      const isLossLocked = maxLoss > 0 && todayRealizedPnl < 0 && Math.abs(todayRealizedPnl) >= maxLoss;
+      if (isTradesLocked || isLossLocked) {
+        alert(`🛡️ Risk Guardian Active: Trading is locked for today (${isTradesLocked ? `Max trades limit of ${maxTrades} reached` : `Daily loss limit of ₹${maxLoss.toLocaleString('en-IN')} reached`}).`);
+        return;
+      }
     }
 
     setIsSubmitting(true);

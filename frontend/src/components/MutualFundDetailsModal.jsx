@@ -30,12 +30,10 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     // Calculator
     const [investmentYears, setInvestmentYears] = useState(5);
 
-    // Identify Fund Symbol (support legacy symbol format and new format)
-    const legacySymbol = `${fund.amc?.substring(0,4).toUpperCase()}-MF`;
+    // Uniquely identify Fund Symbol by ID/schemeCode to prevent AMC prefix collisions
     const fundSymbol = `${fund.id || fund.schemeCode}-MF`;
-    
-    const userHolding = holdings.find(h => h.symbol === legacySymbol || h.symbol === fundSymbol);
-    const actualSymbolToUse = userHolding ? userHolding.symbol : fundSymbol; // Use legacy if they already own it
+    const userHolding = holdings.find(h => h.symbol === fundSymbol);
+    const actualSymbolToUse = fundSymbol;
 
     useEffect(() => {
         let mounted = true;

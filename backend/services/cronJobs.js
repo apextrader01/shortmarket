@@ -140,9 +140,9 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
 
-                    const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                    const ltp = priceCache[pos.symbol]?.ltp;
                     if (!ltp || ltp <= 0) {
-                        console.warn(`[CRON] Phase 3: No LTP for ${pos.symbol}, skipping square-off.`);
+                        console.warn(`[CRON] Phase 3: No live LTP for ${pos.symbol}, skipping square-off to avoid artificial ₹0 PnL.`);
                         continue;
                     }
 
@@ -236,18 +236,23 @@ function initCronJobs(priceCache, triggerEngine) {
                               description: `Auto SIP installment blocked for ${sip.symbol}`
                           });
                           
-                          // Execute Market Order
-                        const qty = parseFloat((finalMargin / execPrice).toFixed(4));
+                          // Execute Market Order for Indian Cash Equity (Integer Quantity)
+                        const qty = Math.floor(finalMargin / execPrice);
+                        if (qty <= 0) {
+                            console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - SIP amount ₹${finalMargin} is less than 1 share of ${sip.symbol} (₹${execPrice})`);
+                            continue;
+                        }
+                        const orderCost = parseFloat((qty * execPrice).toFixed(2));
                         
                         const [id] = await trx('orders').insert({
                             user_id: sip.user_id, symbol: sip.symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-                            status: 'PENDING', product_type: 'DEL', margin: finalMargin
+                            status: 'PENDING', product_type: 'DEL', margin: orderCost
                         }).returning('id');
                         const orderId = typeof id === 'object' ? id.id : id;
                         
                         triggerEngine.executeOrder({
                             id: orderId, user_id: sip.user_id, symbol: sip.symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-                            status: 'PENDING', product_type: 'DEL', margin: finalMargin
+                            status: 'PENDING', product_type: 'DEL', margin: orderCost
                         }, execPrice).catch(e => console.error('SIP execution error:', e));
                         
                         // Calculate next date

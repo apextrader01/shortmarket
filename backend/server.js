@@ -2365,9 +2365,14 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       if (hasHoldings) {
         await trx('holdings').where({ user_id: req.user.id }).del();
       }
-      // 5. Delete ledger history
+      // 5. Clear active/scheduled SIPs
+      const hasSips = await trx.schema.hasTable('sips');
+      if (hasSips) {
+        await trx('sips').where({ user_id: req.user.id }).del();
+      }
+      // 6. Delete ledger history
       await trx('ledger').where({ user_id: req.user.id }).del();
-      // 6. Reset balance to 10 Lakh (1,000,000)
+      // 7. Reset balance to 10 Lakh (1,000,000)
       await trx('users').where({ id: req.user.id }).update({ balance: 1000000.0 });
     });
     res.json({ success: true, message: 'Account successfully reset to ₹10,00,000.' });

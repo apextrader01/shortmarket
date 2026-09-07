@@ -94,9 +94,13 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         const rawSym = symbol.split(':')[1];
         newPrices[rawSym] = { ...newPrices[rawSym], ...data, tick };
     } else {
-        newPrices[`NSE:${symbol}`] = { ...newPrices[`NSE:${symbol}`], ...data, tick };
-        newPrices[`BSE:${symbol}`] = { ...newPrices[`BSE:${symbol}`], ...data, tick };
-        newPrices[`MCX:${symbol}`] = { ...newPrices[`MCX:${symbol}`], ...data, tick };
+        const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => symbol.startsWith(c)) || symbol.includes('-MCX');
+        if (isCommodity) {
+            newPrices[`MCX:${symbol}`] = { ...newPrices[`MCX:${symbol}`], ...data, tick };
+        } else {
+            newPrices[`NSE:${symbol}`] = { ...newPrices[`NSE:${symbol}`], ...data, tick };
+            newPrices[`BSE:${symbol}`] = { ...newPrices[`BSE:${symbol}`], ...data, tick };
+        }
     }
   }
   return newPrices;
@@ -1248,7 +1252,7 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         // Optimistically update local state to reflect the wipe
-        set({ positions: [], orders: [], pendingTriggers: [], alerts: [], user: { ...user, balance: 1000000.0 } });
+        set({ positions: [], orders: [], holdings: [], sips: [], pendingTriggers: [], alerts: [], user: { ...user, balance: 1000000.0 } });
         return { success: true };
       }
       return { success: false, error: data.error };
