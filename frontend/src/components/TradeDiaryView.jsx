@@ -56,7 +56,8 @@ import {
   ArrowUpRight, ArrowDownRight, Wallet, Award, BarChart3, Clock, 
   Flame, Check, X, Edit3, Trash2, Search, Filter, RefreshCw, ExternalLink,
   BookOpen, ChevronRight, ChevronLeft, Lock, PlayCircle, Star, ThumbsUp, AlertCircle, Menu,
-  Copy, CheckCircle, DollarSign, PieChart, Target, MessageSquare, Download, Play, ShieldAlert, Heart, Share, LogOut
+  Copy, CheckCircle, DollarSign, PieChart, Target, MessageSquare, Download, Play, ShieldAlert, Heart, Share, LogOut,
+  Loader2
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
