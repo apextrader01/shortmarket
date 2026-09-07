@@ -287,7 +287,6 @@ export default function OrderModal() {
     let finalType = orderType;
     if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
     if (tab === 'Trailing SL') finalType = 'TRAILING_STOP';
-    if (tab === 'GTT') finalType = 'GTT';
 
     const payload = {
       symbol,
@@ -295,7 +294,7 @@ export default function OrderModal() {
       side,
       quantity: totalQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
-      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') && slTrigger ? parseFloat(slTrigger) : null,
+      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL') && slTrigger ? parseFloat(slTrigger) : null,
       trail_amount: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
@@ -478,23 +477,6 @@ export default function OrderModal() {
               {isOption || isFuture ? 'Overnight' : 'Delivery'}
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setTab(tab === 'GTT' ? 'Regular' : 'GTT')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: '1px solid var(--border-color)',
-              background: tab === 'GTT' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)',
-              color: tab === 'GTT' ? '#2563eb' : 'var(--text-secondary)',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            GTT
-          </button>
         </div>
         )}
 

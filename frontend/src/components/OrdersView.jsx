@@ -198,7 +198,7 @@ export default function OrdersView() {
               let Icon = Box;
               let subtitle = '';
               if (activeTab === 'Open Orders') { Icon = Clock; subtitle = 'Limit and Stop orders waiting to be executed will appear here.'; }
-              else if (activeTab === 'Pending Triggers') { Icon = Target; subtitle = 'Bracket (BO), Cover (CO), and GTT orders waiting for a price trigger will be listed here.'; }
+              else if (activeTab === 'Pending Triggers') { Icon = Target; subtitle = 'Bracket (BO) and Cover (CO) orders waiting for a price trigger will be listed here.'; }
               else if (activeTab === 'Order History') { Icon = History; subtitle = 'Your executed, cancelled, and rejected orders for today will appear here.'; }
               else if (activeTab === 'Basket Orders') { Icon = ShoppingBag; subtitle = 'Create and execute multiple orders simultaneously.'; }
 
@@ -225,9 +225,17 @@ export default function OrdersView() {
               {activeTab === 'Open Orders' && displayOrders.length > 0 && (
                 <button
                   onClick={async () => {
-                    if (window.confirm('Are you sure you want to cancel ALL open orders?')) {
-                      for (const order of displayOrders) {
-                        await useStore.getState().cancelOrder(order.id);
+                    if (window.confirm(`Are you sure you want to cancel all ${displayOrders.length} open orders?`)) {
+                      const cancelPromises = displayOrders.map(order => 
+                        useStore.getState().cancelOrder(order.id)
+                      );
+                      const results = await Promise.allSettled(cancelPromises);
+                      const succeeded = results.filter(r => r.status === 'fulfilled' && r.value).length;
+                      await useStore.getState().fetchUserData().catch(() => {});
+                      if (succeeded > 0) {
+                        alert(`Successfully cancelled ${succeeded} order(s).`);
+                      } else {
+                        alert('Could not cancel orders. Please check their status.');
                       }
                     }
                   }}
@@ -237,7 +245,7 @@ export default function OrdersView() {
                     boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                   }}
                 >
-                  CANCEL ALL OPEN ORDERS
+                  CANCEL ALL OPEN ORDERS ({displayOrders.length})
                 </button>
               )}
             </div>

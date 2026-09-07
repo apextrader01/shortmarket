@@ -51,9 +51,17 @@ export default function EditOrderModal() {
   const balanceNum = Number(user?.balance) || 0;
   
   // Calculate margin difference
-  const oldMargin = order.quantity * parseFloat(order.price || 0);
-  const newMargin = quantity * (parseFloat(price) || 0);
-  const marginDifference = newMargin - oldMargin;
+  // Child legs (SL/Target of BO/CO) and pending trigger orders do not require additional margin
+  let marginDifference = 0;
+  if (!isPendingTrigger && !order.parent_order_id) {
+    const oldMargin = parseFloat(order.margin || 0);
+    const rawPrice = parseFloat(price) || 0;
+    const contractValue = (Number(quantity) || 0) * rawPrice;
+    const effectiveProductType = productType || order.product_type || 'DEL';
+    const isLeveraged = ['INT', 'INTRADAY', 'CO', 'BO'].includes(effectiveProductType);
+    const newMargin = isLeveraged ? contractValue * 0.20 : contractValue;
+    marginDifference = newMargin - oldMargin;
+  }
   
   const isInsufficient = marginDifference > 0 && balanceNum < marginDifference;
   const isBuy = order.side === 'BUY';

@@ -135,11 +135,7 @@ const BackgroundPriceMonitor = React.memo(() => {
       let isBreached = false;
       let newTriggerPrice = trigger.triggerPrice;
       
-      if (trigger.type === 'GTT') {
-         if (trigger.side === 'BUY' && ltp <= trigger.triggerPrice) isBreached = true;
-         if (trigger.side === 'SELL' && ltp >= trigger.triggerPrice) isBreached = true;
-      } 
-      else if (trigger.type === 'SL' || trigger.type === 'TRAILING_SL') {
+      if (trigger.type === 'SL' || trigger.type === 'TRAILING_SL') {
          if (trigger.side === 'BUY' && ltp >= trigger.triggerPrice) isBreached = true;
          if (trigger.side === 'SELL' && ltp <= trigger.triggerPrice) isBreached = true;
          

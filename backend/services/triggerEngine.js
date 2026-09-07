@@ -66,20 +66,20 @@ class TriggerEngine {
                 // But if they do, we can just give them a 0 (Buy) or Infinity (Sell) score to trigger instantly.
                 key = `trigger:${order.symbol}:${order.side}:LIMIT`;
                 score = order.side === 'BUY' ? 999999999 : 0;
-            } else if (order.type && (order.type.startsWith('SL') || order.type === 'GTT' || order.type === 'TRAILING_STOP')) {
+            } else if (order.type && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) {
                 const trigger = Number(order.trigger_price || order.price);
                 let isGreaterOrEqual = false;
-                if (order.side === 'BUY' && order.type.startsWith('SL')) isGreaterOrEqual = true;
+                if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
                 if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
                 key = isGreaterOrEqual ? `trigger:${order.symbol}:GTE` : `trigger:${order.symbol}:LTE`;
                 score = trigger;
             }
         } else if (order.status === 'PENDING_TRIGGER') {
             const trigger = Number(order.trigger_price || order.price);
-            if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'GTT' || order.type === 'TRAILING_STOP')) {
+            if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'TRAILING_STOP')) {
                 // Determine if this leg triggers on >= or <=
                 let isGreaterOrEqual = false;
-                if (order.side === 'BUY' && order.type.startsWith('SL')) isGreaterOrEqual = true;
+                if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
                 if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
                 
                 if (isGreaterOrEqual) {

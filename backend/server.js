@@ -3032,6 +3032,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  if (type === 'GTT') {
+    return res.status(400).json({ error: 'GTT orders are not supported.' });
+  }
+
   // Validate Quantity is a multiple of Lot Size for Options/Futures
   if (isDerivativeContract(symbol)) {
     const { getLotSizes } = require('./services/instrumentsCache');
@@ -3206,7 +3210,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   try {
     await db.transaction(async (trx) => {
       // 1. Determine execution status
-      const hasTrigger = Boolean((type && (type.startsWith('SL') || type === 'GTT' || type === 'TRAILING_STOP')) || (trigger_price !== undefined && trigger_price !== null && Number(trigger_price) > 0));
+      const hasTrigger = Boolean((type && (type.startsWith('SL') || type === 'TRAILING_STOP')) || (trigger_price !== undefined && trigger_price !== null && Number(trigger_price) > 0));
       const isMarket = type === 'MARKET' && !hasTrigger;
       const isTriggerOrder = hasTrigger;
       const status = isTriggerOrder ? 'PENDING_TRIGGER' : 'PENDING';
@@ -4219,6 +4223,9 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                  
                  if (exitQty > 0) {
                    autoExitLtp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                   if (autoExitLtp <= 0) {
+                     throw Object.assign(new Error('Live market price unavailable for auto-exit. Cannot cancel bracket protection without a valid price.'), { statusCode: 400 });
+                   }
                    const [exitOrderId] = await trx('orders').insert({
                      user_id: req.user.id,
                      symbol: pos.symbol,
@@ -4417,26 +4424,25 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           await trx('orders').where({ id: req.params.id }).update(updateObj);
           updatedOrder = { ...order, ...updateObj };
           
-          // Update child OCO orders (SL and Target legs) if sl_price or tgt_price changed
-          if (sl_price !== undefined || tgt_price !== undefined) {
-            const childOrders = await trx('orders')
-              .where({ parent_order_id: req.params.id, status: 'PENDING_TRIGGER' });
-            
+          // Update child OCO orders (SL and Target legs) - synchronize quantity and sl/tgt prices
+          const childOrders = await trx('orders')
+            .where({ parent_order_id: req.params.id, status: 'PENDING_TRIGGER' });
+          
+          if (childOrders.length > 0) {
             for (const child of childOrders) {
+              const childUpdate = {
+                quantity: Number(quantity),
+                updated_at: new Date()
+              };
               if (child.type === 'SL-M' && sl_price !== undefined) {
-                await trx('orders').where({ id: child.id }).update({ 
-                  trigger_price: sl_price,
-                  price: sl_price,
-                  updated_at: new Date()
-                });
-                updatedChildOrders.push({ ...child, trigger_price: sl_price, price: sl_price });
+                childUpdate.trigger_price = sl_price;
+                childUpdate.price = null;
               } else if (child.type === 'LIMIT' && tgt_price !== undefined) {
-                await trx('orders').where({ id: child.id }).update({ 
-                  price: tgt_price,
-                  updated_at: new Date()
-                });
-                updatedChildOrders.push({ ...child, price: tgt_price });
+                childUpdate.price = tgt_price;
+                childUpdate.trigger_price = tgt_price;
               }
+              await trx('orders').where({ id: child.id }).update(childUpdate);
+              updatedChildOrders.push({ ...child, ...childUpdate });
             }
           }
 
