@@ -46,7 +46,7 @@ export const MARKET_CONFIGS = {
   }
 };
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { 
@@ -56,7 +56,7 @@ import {
   ArrowUpRight, ArrowDownRight, Wallet, Award, BarChart3, Clock, 
   Flame, Check, X, Edit3, Trash2, Search, Filter, RefreshCw, ExternalLink,
   BookOpen, ChevronRight, ChevronLeft, Lock, PlayCircle, Star, ThumbsUp, AlertCircle, Menu,
-  Copy, CheckCircle, DollarSign, PieChart, Target, MessageSquare, Download, Play, ShieldAlert, Heart, Share
+  Copy, CheckCircle, DollarSign, PieChart, Target, MessageSquare, Download, Play, ShieldAlert, Heart, Share, LogOut
 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
@@ -220,19 +220,35 @@ const QUIZ_QUESTIONS = [
   }
 ];
 
-export default function TradeDiaryView({ onOpenPaperTrading, onBack }) {
-  const { user, positions, orders, theme, toggleTheme, prices } = useStore(useShallow(state => ({
+export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfile, onNavigate }) {
+  const { user, positions, orders, theme, toggleTheme, prices, logout } = useStore(useShallow(state => ({
     user: state.user,
     positions: state.positions,
     orders: state.orders,
     theme: state.theme,
     toggleTheme: state.toggleTheme,
-    prices: state.prices
+    prices: state.prices,
+    logout: state.logout
   })));
 
   // Navigation state: which Trade Diary sub-view is active
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef(null);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileMenu]);
   
   // Responsive Breakpoints
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -2206,39 +2222,274 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               </div>
             </button>
 
-            {/* User Profile Pill */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: isMobile ? '3px' : '4px 10px',
-              borderRadius: '20px',
-              backgroundColor: isLight ? '#f1f5f9' : '#1e293b',
-              border: `1px solid ${colors.borderColor}`,
-              cursor: 'pointer',
-              flexShrink: 0
-            }}>
-              <div style={{
-                width: '22px',
-                height: '22px',
-                borderRadius: '50%',
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: '700'
-              }}>
-                {(user?.username || 'U').charAt(0).toUpperCase()}
+            {/* User Profile Pill & Dropdown Menu */}
+            <div style={{ position: 'relative' }} ref={profileMenuRef}>
+              <div 
+                onClick={() => setShowProfileMenu(prev => !prev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: isMobile ? '3px' : '4px 10px',
+                  borderRadius: '20px',
+                  backgroundColor: showProfileMenu ? (isLight ? '#e2e8f0' : '#334155') : (isLight ? '#f1f5f9' : '#1e293b'),
+                  border: `1px solid ${showProfileMenu ? '#2563eb' : colors.borderColor}`,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>
+                  {(user?.username || 'U').charAt(0).toUpperCase()}
+                </div>
+                {!isMobile && (
+                  <>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textPrimary, maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {user?.username || 'Trader'}
+                    </span>
+                    <ChevronDown size={13} color={colors.textSecondary} style={{ transform: showProfileMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                  </>
+                )}
               </div>
-              {!isMobile && (
-                <>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: colors.textPrimary, maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user?.username || 'Trader'}
-                  </span>
-                  <ChevronDown size={13} color={colors.textSecondary} />
-                </>
+
+              {/* Profile Dropdown Floating Menu */}
+              {showProfileMenu && (
+                <div style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 'calc(100% + 8px)',
+                  width: '260px',
+                  backgroundColor: colors.bgSidebar,
+                  border: `1px solid ${colors.borderColor}`,
+                  borderRadius: '14px',
+                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+                  padding: '12px',
+                  zIndex: 99999,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  {/* User Profile Header Card */}
+                  <div style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    backgroundColor: colors.bgInner,
+                    border: `1px solid ${colors.borderColor}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '15px',
+                      fontWeight: '800',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                    }}>
+                      {(user?.username || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {user?.username || 'Trader'}
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: colors.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {user?.email || 'Verified Prop Trader'}
+                      </div>
+                      <div style={{ marginTop: '3px' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 6px', borderRadius: '10px', backgroundColor: 'rgba(34, 197, 94, 0.15)', color: colors.accentGreen }}>
+                          ● ACTIVE TRADER
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Navigation Options */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        if (onOpenProfile) onOpenProfile();
+                        else if (onNavigate) onNavigate('ClientData');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <User size={15} color="#2563eb" />
+                      <span>My Profile & KYC</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        if (onOpenProfile) onOpenProfile();
+                        else if (onNavigate) onNavigate('ClientData');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Wallet size={15} color={colors.accentGreen} />
+                      <span>Funds & Ledger</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setActiveTab('RISK_MANAGEMENT');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <ShieldCheck size={15} color="#06b6d4" />
+                      <span>Risk & Capital Defense</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setActiveTab('CHALLENGE');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Trophy size={15} color="#f59e0b" />
+                      <span>Prop Trader Challenge</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setActiveTab('AFFILIATE');
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <Share2 size={15} color="#ec4899" />
+                      <span>Affiliate Partner Program</span>
+                    </button>
+                  </div>
+
+                  <div style={{ borderTop: `1px solid ${colors.borderColor}`, marginTop: '4px', paddingTop: '4px' }}>
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        logout();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: colors.accentRed,
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        width: '100%',
+                        textAlign: 'left',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <LogOut size={15} color={colors.accentRed} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

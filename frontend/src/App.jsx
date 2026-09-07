@@ -511,7 +511,12 @@ function App() {
 
       {activeTab === 'TradeDiary' ? (
         <Suspense fallback={<TabLoader />}>
-          <TradeDiaryView onOpenPaperTrading={() => setActiveTab('Markets')} onBack={() => setActiveTab('Markets')} />
+          <TradeDiaryView 
+            onOpenPaperTrading={() => setActiveTab('Markets')} 
+            onBack={() => setActiveTab('Markets')} 
+            onOpenProfile={() => setActiveTab('ClientData')}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
         </Suspense>
       ) : (
         <>
