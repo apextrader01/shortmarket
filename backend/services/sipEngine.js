@@ -179,6 +179,11 @@ class SIPEngine {
 
       for (const sip of dueSips) {
         try {
+          // Exclusively process Mutual Fund SIPs here (Equity SIPs are executed as whole-share delivery orders in cronJobs.js)
+          const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
+          if (!isMf) {
+            continue;
+          }
           const result = await SIPEngine.executeSingleSip(sip.id, priceCache);
           if (result && result.success) {
             successCount++;
