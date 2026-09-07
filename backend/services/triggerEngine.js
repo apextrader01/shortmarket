@@ -471,8 +471,8 @@ class TriggerEngine {
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
                         const remainingQty = order.side === 'BUY' ? (absQty - absPosQty) : -(absQty - absPosQty);
-                        const proportionalMargin = absQty > 0 ? (Number(order.margin || 0) * (Math.abs(remainingQty) / absQty)) : 0;
-                        await handleRemainingPos(trx, remainingQty, execPrice, proportionalMargin);
+                        const newPosMargin = Number(order.margin || 0);
+                        await handleRemainingPos(trx, remainingQty, execPrice, newPosMargin);
                     }
                 } else {
                     // Averaging

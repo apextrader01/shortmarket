@@ -75,12 +75,13 @@ export default function EditOrderModal() {
     const marketFlag = isPendingTrigger ? isMarket : false;
     const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
 
-    const success = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
+    const res = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
 
-    if (success) {
+    if (res && res.success) {
       closeEditOrderModal();
     } else {
-      alert("Failed to update order. Please check your balance or parameters.");
+      const err = (res && res.error) || useStore.getState().authError || "Failed to update order. Please check your balance or parameters.";
+      alert(err);
     }
   };
 

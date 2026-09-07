@@ -3262,6 +3262,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   try {
     await db.transaction(async (trx) => {
+      // Serialize order operations per-user to prevent race conditions with execution/cancel
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+
       // 1. Determine execution status
       const hasTrigger = Boolean((type && (type.startsWith('SL') || type === 'TRAILING_STOP')) || (trigger_price !== undefined && trigger_price !== null && Number(trigger_price) > 0));
       const isMarket = type === 'MARKET' && !hasTrigger;
@@ -3272,6 +3275,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       
       // 2. Deduct Margin from User Balance
       let requiresMargin = true;
+      let marginQty = Number(quantity);
+
       if (side === 'SELL') {
           const isDerivative = isDerivativeContract(symbol);
           if (effectiveProductType === 'DEL' && !isDerivative) {
@@ -3319,8 +3324,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   })
                   .where('quantity', '>', 0)
                   .first();
-              if (existingPos && Number(existingPos.quantity) >= Number(quantity)) {
-                  requiresMargin = false;
+              if (existingPos) {
+                  const excessQty = Math.max(0, Number(quantity) - Number(existingPos.quantity));
+                  if (excessQty === 0) {
+                      requiresMargin = false;
+                  } else {
+                      marginQty = excessQty;
+                  }
               }
           } else if (isDerivative && effectiveProductType === 'DEL') {
               const existingPos = await trx('positions')
@@ -3330,8 +3340,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   })
                   .where('quantity', '>', 0)
                   .first();
-              if (existingPos && Number(existingPos.quantity) >= Number(quantity)) {
-                  requiresMargin = false;
+              if (existingPos) {
+                  const excessQty = Math.max(0, Number(quantity) - Number(existingPos.quantity));
+                  if (excessQty === 0) {
+                      requiresMargin = false;
+                  } else {
+                      marginQty = excessQty;
+                  }
               }
           }
       } else if (side === 'BUY') {
@@ -3345,8 +3360,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   })
                   .where('quantity', '<', 0)
                   .first();
-              if (existingPos && Math.abs(Number(existingPos.quantity)) >= Number(quantity)) {
-                  requiresMargin = false;
+              if (existingPos) {
+                  const excessQty = Math.max(0, Number(quantity) - Math.abs(Number(existingPos.quantity)));
+                  if (excessQty === 0) {
+                      requiresMargin = false;
+                  } else {
+                      marginQty = excessQty;
+                  }
               }
           }
       }
@@ -3354,7 +3374,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       let finalMargin = 0;
       if (requiresMargin) {
           const { calculateRequiredMargin } = require('./services/marginEngine');
-          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, Number(quantity), execPrice);
+          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, execPrice);
       }
 
       if (requiresMargin && finalMargin > 0) {
@@ -3908,6 +3928,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
     const exitOrders = [];
 
     await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const LedgerService = require('./services/ledgerService');
       for (const holding of activeHoldings) {
         const qty = parseFloat(holding.quantity);
@@ -4251,7 +4272,8 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
     let autoExitLtp = 0;
 
     await db.transaction(async (trx) => {
-      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+      const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).forUpdate().first();
       // BUG FIX: Use throw instead of return res.status() inside a transaction.
       // 'return' only exits the callback arrow function, NOT the transaction — throw aborts it properly.
       if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
@@ -4407,7 +4429,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         let updatedChildOrders = [];
         
         await db.transaction(async (trx) => {
-          const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).first();
+          await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+          const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).forUpdate().first();
           if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
           if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
             throw Object.assign(new Error('Only PENDING or PENDING_TRIGGER orders can be modified'), { statusCode: 400 });
@@ -5644,22 +5667,6 @@ app.post('/api/admin/contests/:id/award', authenticateToken, async (req, res) =>
   } catch (err) {
     console.error('Error awarding contest:', err);
     res.status(500).json({ error: 'Failed to award contest rewards' });
-  }
-});
-
-app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, res) => {
-  try {
-    const caller = await db('users').where({ id: req.user.id }).first();
-    if (!caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
-
-    const { status } = req.body; // 'PROCESSING', 'CREDITED', 'REJECTED'
-    if (!['PROCESSING', 'CREDITED', 'REJECTED'].includes(status)) return res.status(400).json({ error: 'Invalid status' });
-
-    await db('reward_withdrawals').where({ id: req.params.id }).update({ status, updated_at: db.fn.now() });
-
-    res.json({ success: true, message: 'Withdrawal status updated' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 

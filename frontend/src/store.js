@@ -864,19 +864,21 @@ export const useStore = create(persist((set, get) => ({
 
   updateOrder: async (id, quantity, price, sl_price, tgt_price, isMarket = false, trigger_price = null) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
         headers: { 
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ quantity, price, sl_price, tgt_price, isMarket, trigger_price })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Failed to update order');
       await get().fetchUserData();
-      return true;
+      return { success: true };
     } catch (err) {
       set({ authError: err.message });
-      return false;
+      return { success: false, error: err.message };
     }
   },
 
@@ -1217,12 +1219,19 @@ export const useStore = create(persist((set, get) => ({
   },
 
   cancelOrder: async (orderId) => {
-    
     try {
-      const res  = await fetch(`${API}/api/order/${orderId}/cancel`, { credentials: 'include', method:  'POST',
+      const token = localStorage.getItem('token');
+      const res  = await fetch(`${API}/api/order/${orderId}/cancel`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
       });
       const data = await res.json();
       if (data.success) { get().fetchUserData(); return true; }
+      if (data.error) set({ authError: data.error });
       return false;
     } catch (_) { return false; }
   },

@@ -742,13 +742,13 @@ export default function PositionsView() {
               <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                    {partialExitPos.lotSize > 1 ? 'Lots' : 'Qty'} (Max: {Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)})
+                    {partialExitPos.lotSize > 1 ? 'Lots' : 'Qty'} (Max: {Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)})
                   </label>
                   <input
                     type="number"
                     value={partialExitQty}
                     onChange={(e) => setPartialExitQty(e.target.value)}
-                    max={Math.abs(partialExitPos.qty) / (partialExitPos.lotSize || 1)}
+                    max={Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)}
                     min="1"
                     step="any"
                     style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}

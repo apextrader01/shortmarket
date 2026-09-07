@@ -61,7 +61,7 @@ export default function OrderModal() {
       }
 
       if (orderModal.totalExitQty) {
-          setQuantity(Math.max(1, Math.round(orderModal.totalExitQty / effectiveLotsize)));
+          setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / effectiveLotsize)));
       } else {
           setQuantity(1);
       }
@@ -79,7 +79,7 @@ export default function OrderModal() {
               const ls = data[orderModal.symbol];
               useStore.getState().setOrderModalLotsize(ls);
               if (orderModal.totalExitQty) {
-                  setQuantity(Math.max(1, Math.round(orderModal.totalExitQty / ls)));
+                  setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / ls)));
               }
             }
           }).catch(console.error);

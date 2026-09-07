@@ -220,36 +220,36 @@ function initCronJobs(priceCache, triggerEngine) {
                               continue;
                           }
 
-                          if (Number(user.balance) < finalMargin) {
-                              console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - Insufficient Funds`);
-                              continue;
-                          }
-                          
-                          // Deduct balance
-                          const newBalance = Number(user.balance) - finalMargin;
-                          await trx('users').where({ id: sip.user_id }).update({ balance: newBalance });
-                          
-                          await trx('ledger').insert({
-                              user_id: sip.user_id,
-                              amount: -finalMargin,
-                              type: 'MARGIN_BLOCK',
-                              description: `Auto SIP installment blocked for ${sip.symbol}`
-                          });
-                          
-                          // Execute Market Order for Indian Cash Equity (Integer Quantity)
+                        // Execute Market Order for Indian Cash Equity (Integer Quantity)
                         const qty = Math.floor(finalMargin / execPrice);
                         if (qty <= 0) {
-                            console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - SIP amount ₹${finalMargin} is less than 1 share of ${sip.symbol} (₹${execPrice})`);
+                            console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - SIP amount ₹${finalMargin} is less than 1 share of ${sip.symbol} (₹${execPrice}). Retrying next cycle.`);
                             continue;
                         }
                         const orderCost = parseFloat((qty * execPrice).toFixed(2));
-                        
+
+                        if (Number(user.balance) < orderCost) {
+                            console.log(`[SIP] Skipped ${sip.id} for user ${user.id} - Insufficient Funds (Needed ₹${orderCost}, Available ₹${user.balance})`);
+                            continue;
+                        }
+
+                        // Deduct balance ONLY for the actual integer shares purchased
+                        const newBalance = Number(user.balance) - orderCost;
+                        await trx('users').where({ id: sip.user_id }).update({ balance: newBalance });
+
+                        await trx('ledger').insert({
+                            user_id: sip.user_id,
+                            amount: -orderCost,
+                            type: 'MARGIN_BLOCK',
+                            description: `Auto SIP installment: ${qty} share(s) of ${sip.symbol} @ ₹${execPrice}`
+                        });
+
                         const [id] = await trx('orders').insert({
                             user_id: sip.user_id, symbol: sip.symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
                             status: 'PENDING', product_type: 'DEL', margin: orderCost
                         }).returning('id');
                         const orderId = typeof id === 'object' ? id.id : id;
-                        
+
                         triggerEngine.executeOrder({
                             id: orderId, user_id: sip.user_id, symbol: sip.symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
                             status: 'PENDING', product_type: 'DEL', margin: orderCost

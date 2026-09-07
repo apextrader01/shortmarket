@@ -10,8 +10,9 @@ set -e # Exit immediately if a command exits with a non-zero status
 echo "🚀 Starting Deployment Process..."
 
 # 1. Pull Latest Code
-echo "📦 Pulling latest changes from Git..."
-git pull origin main || git pull origin development
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "development")
+echo "📦 Pulling latest changes from Git (branch: $CURRENT_BRANCH)..."
+git pull origin "$CURRENT_BRANCH"
 
 # 2. Build Frontend
 echo "🌐 Building Frontend..."
