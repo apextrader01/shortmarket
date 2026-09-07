@@ -539,7 +539,7 @@ export default function PositionsView() {
                               style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
                               onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                              onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                              onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
                             />
                           )}
                         </div>
@@ -608,7 +608,7 @@ export default function PositionsView() {
                           setPartialExitType('MARKET');
                           setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
                         } else if (viewMode === 'HOLDINGS') {
-                          useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity);
+                          useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity);
                         }
                       }}
                       style={{

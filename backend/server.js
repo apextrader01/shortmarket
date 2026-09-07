@@ -3119,7 +3119,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Determine if this order is strictly closing/reducing an existing open position or holding
-  const effectiveProductType = product_type || 'DEL';
+  const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || !product_type) ? 'DEL' : product_type;
   const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
   let isClosingOrder = false;
 
@@ -3346,8 +3346,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
           }
       }
 
-      let finalMargin = Number(margin) || 0;
-      if (requiresMargin && finalMargin <= 0) {
+      let finalMargin = 0;
+      if (requiresMargin) {
           const { calculateRequiredMargin } = require('./services/marginEngine');
           finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, Number(quantity), execPrice);
       }

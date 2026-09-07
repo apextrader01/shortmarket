@@ -382,6 +382,7 @@ export default function BasketModal() {
       if (buy.remainingQty <= 0) break;
       if (!sell.isOption || sell.optionStrike <= 0 || sell.remainingQty <= 0) continue;
       if (sell.typeStr !== buy.typeStr) continue;
+      if (sell.underlying !== buy.underlying) continue;
 
       // Match quantities between buy and sell
       const matchQty = Math.min(buy.remainingQty, sell.remainingQty);

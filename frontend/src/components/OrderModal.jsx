@@ -243,6 +243,15 @@ export default function OrderModal() {
        return;
     }
 
+    if (!totalQuantity || totalQuantity <= 0 || isNaN(totalQuantity)) {
+      alert("Please enter a valid quantity greater than 0.");
+      return;
+    }
+    if (orderType === 'LIMIT' && (!price || parseFloat(price) <= 0 || isNaN(parseFloat(price)))) {
+      alert("Please enter a valid limit price greater than 0.");
+      return;
+    }
+
     // Validate Bracket Order (BO) and Cover Order (CO) formats
     if (isBO || isCO) {
       const entryPrice = orderType === 'MARKET' ? livePrice : parseFloat(price);
@@ -284,9 +293,12 @@ export default function OrderModal() {
       }
     }
 
+    const parsedTrail = parseFloat(trailingJump);
     let finalType = orderType;
     if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
-    if (tab === 'Trailing SL') finalType = 'TRAILING_STOP';
+    if (tab === 'Trailing SL' || (parsedTrail > 0 && (tab === 'Stop Loss' || tab === 'Trailing SL'))) {
+      finalType = 'TRAILING_STOP';
+    }
 
     const payload = {
       symbol,
@@ -294,8 +306,8 @@ export default function OrderModal() {
       side,
       quantity: totalQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
-      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL') && slTrigger ? parseFloat(slTrigger) : null,
-      trail_amount: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
+      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || parsedTrail > 0) && slTrigger ? parseFloat(slTrigger) : null,
+      trail_amount: parsedTrail > 0 ? parsedTrail : null,
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this

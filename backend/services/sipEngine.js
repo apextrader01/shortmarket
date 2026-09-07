@@ -41,7 +41,7 @@ class SIPEngine {
     if (priceCache && priceCache[symbol]?.ltp > 0) {
       return priceCache[symbol].ltp;
     }
-    return 100.00; // safe default fallback
+    return null; // Don't use fake fallback price; return null to retry when live NAV is fetched
   }
 
   /**
@@ -90,17 +90,21 @@ class SIPEngine {
 
       // Fetch latest NAV
       const nav = await SIPEngine.getLatestNav(sip.symbol, priceCache);
+      if (!nav || nav <= 0) {
+        console.warn(`[SIPEngine] Latest NAV unavailable for ${sip.symbol}. Skipping SIP #${sip.id} for retry.`);
+        return { success: false, reason: 'NAV_UNAVAILABLE' };
+      }
       const units = parseFloat((amount / nav).toFixed(4));
 
       // 1. Deduct user balance
       const newBalance = parseFloat(user.balance) - amount;
       await trx('users').where({ id: user.id }).update({ balance: newBalance });
 
-      // 2. Insert into ledger
+      // 2. Insert into ledger (MARGIN_BLOCK compliant with ledger table check constraint)
       await trx('ledger').insert({
         user_id: user.id,
         amount: -amount,
-        type: 'SIP_DEBIT',
+        type: 'MARGIN_BLOCK',
         description: `SIP Installment (${sip.frequency}): Bought ${units} units of ${sip.symbol} @ NAV ₹${nav.toFixed(2)}`
       });
 

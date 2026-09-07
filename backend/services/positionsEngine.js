@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const cron = require('node-cron');
 const triggerEngine = require('./triggerEngine');
+const { parseExpiryDate, formatDate } = require('./autoSquareOff');
 
 const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
 
@@ -248,9 +249,21 @@ class PositionsEngine {
                 orderQuery = orderQuery.whereNot('symbol', 'like', '%MCX%');
             }
 
-            const expiringPositions = await posQuery;
-            const expiringHoldings = await holdQuery;
-            const expiringOrders = await orderQuery;
+            // Filter to ensure contracts actually expire TODAY (prevents matching strike numbers like 26805 as expiry tokens)
+            const isActuallyExpiringToday = (sym) => {
+                if (expiringUniqueSymbols.includes(sym)) return true;
+                const expDate = parseExpiryDate(sym);
+                if (expDate) {
+                    const now = new Date();
+                    const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                    return formatDate(expDate) === formatDate(istNow);
+                }
+                return false;
+            };
+
+            const expiringPositions = (await posQuery).filter(p => isActuallyExpiringToday(p.symbol));
+            const expiringHoldings = (await holdQuery).filter(h => isActuallyExpiringToday(h.symbol));
+            const expiringOrders = (await orderQuery).filter(o => isActuallyExpiringToday(o.symbol));
 
             // Globally cancel all open orders for expiring contracts
             for (const stale of expiringOrders) {
@@ -385,7 +398,7 @@ class PositionsEngine {
                 const month = parts.find(p => p.type === 'month').value;
                 const day = parts.find(p => p.type === 'day').value;
                 const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-                await trx('positions').where('created_at', '<', startOfToday).del();
+                await trx('positions').where('created_at', '<', startOfToday).where({ quantity: 0 }).del();
                 
                 console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions and wiped old history.`);
             });

@@ -55,8 +55,9 @@ class MTMRiskManager {
                 .whereIn('id', userIdsWithPositions)
                 .select('id', 'balance', 'risk_guardian_active', 'max_daily_loss');
 
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
+            const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+            const istDateStr = formatter.format(new Date()); // "YYYY-MM-DD"
+            const todayStart = new Date(`${istDateStr}T00:00:00+05:30`);
 
             // Fetch today's executed orders to calculate today's realized P&L for Risk Guardian users
             const todayOrders = await db('orders')
@@ -83,10 +84,12 @@ class MTMRiskManager {
                 }
 
                 let totalUnrealizedPnl = 0;
-                let intradayMtmLoss = 0;
+                let netIntradayMtm = 0;
+                let totalMarginBlocked = 0;
 
                 for (const pos of positions) {
                     const ltp = this.priceCache[pos.symbol]?.ltp || parseFloat(pos.average_price) || 0;
+                    totalMarginBlocked += (parseFloat(pos.margin) || 0);
                     if (ltp <= 0) continue;
 
                     const qty = parseFloat(pos.quantity) || 0;
@@ -100,14 +103,15 @@ class MTMRiskManager {
 
                     totalUnrealizedPnl += pnl;
 
-                    if (pos.product_type !== 'DEL' && pnl < 0) {
-                        intradayMtmLoss += Math.abs(pnl);
+                    if (pos.product_type !== 'DEL') {
+                        netIntradayMtm += pnl;
                     }
                 }
 
                 const todayRealized = userRealizedPnl[uid] || 0;
                 const totalDailyPnl = todayRealized + totalUnrealizedPnl;
                 const availableBalance = Number(user.balance) || 0;
+                const totalCapital = availableBalance + totalMarginBlocked;
 
                 // ── CHECK 1: 🛡️ Risk Guardian Max Daily Loss Auto-Exit ──
                 if (user.risk_guardian_active && user.max_daily_loss && Number(user.max_daily_loss) > 0) {
@@ -120,11 +124,11 @@ class MTMRiskManager {
                     }
                 }
 
-                // ── CHECK 2: ⚡ RMS 95% Account Balance Loss Liquidation (Intraday) ──
+                // ── CHECK 2: ⚡ RMS 95% Account Capital Loss Liquidation (Intraday) ──
                 const intradayPositions = positions.filter(p => p.product_type !== 'DEL');
-                if (intradayPositions.length > 0 && availableBalance > 0) {
-                    if (intradayMtmLoss >= (availableBalance * 0.95)) {
-                        console.log(`[RMS ALERT] User ${uid} hit 95% MTM Loss (${intradayMtmLoss} >= ${availableBalance * 0.95}). Liquidating intraday positions!`);
+                if (intradayPositions.length > 0 && totalCapital > 0) {
+                    if (netIntradayMtm < 0 && Math.abs(netIntradayMtm) >= (totalCapital * 0.95)) {
+                        console.log(`[RMS ALERT] User ${uid} hit 95% MTM Loss (Net Loss ₹${Math.abs(netIntradayMtm).toFixed(2)} >= ₹${(totalCapital * 0.95).toFixed(2)} [95% of ₹${totalCapital.toFixed(2)} capital]). Liquidating intraday positions!`);
                         this.lastLiquidationTime[uid] = now;
                         await this.liquidateUser(uid, intradayPositions, 'RMS 95% Margin Call Liquidation', true);
                     }
@@ -150,14 +154,7 @@ class MTMRiskManager {
                 for (const ord of pendingOrders) {
                     const refund = parseFloat(ord.margin) || 0;
                     if (refund > 0) {
-                        const user = await trx('users').where({ id: userId }).first();
-                        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + refund });
-                        await trx('ledger').insert({
-                            user_id: userId,
-                            amount: refund,
-                            type: 'MARGIN_RELEASE',
-                            description: `${reason}: margin refunded for cancelled order ${ord.quantity} ${ord.symbol}`
-                        });
+                        await LedgerService.releaseMargin(trx, userId, refund, `${reason}: margin refunded for cancelled order ${ord.quantity} ${ord.symbol}`);
                     }
                     await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                     cancelledOrders.push(ord);

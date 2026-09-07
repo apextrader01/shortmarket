@@ -81,7 +81,20 @@ export default function PortfolioView() {
   const allMergedHoldingsMap = {};
 
   (holdings || []).forEach(h => {
-    allMergedHoldingsMap[h.symbol] = { ...h };
+    const sym = h.symbol;
+    if (!allMergedHoldingsMap[sym]) {
+      allMergedHoldingsMap[sym] = { ...h, quantity: Number(h.quantity) || 0, average_price: Number(h.average_price) || 0 };
+    } else {
+      const existing = allMergedHoldingsMap[sym];
+      const prevQty = Number(existing.quantity) || 0;
+      const prevPrice = Number(existing.average_price) || 0;
+      const addQty = Number(h.quantity) || 0;
+      const addPrice = Number(h.average_price) || 0;
+      const totalQty = prevQty + addQty;
+      const weightedAvg = totalQty > 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / totalQty : 0;
+      existing.quantity = totalQty;
+      existing.average_price = weightedAvg;
+    }
   });
 
   const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);
@@ -834,7 +847,7 @@ export default function PortfolioView() {
                       return (
                         <div
                           key={pos.id || idx}
-                          onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                          onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
                           style={{
                             padding: '12px 16px',
                             borderBottom: '1px solid var(--border-color)',
@@ -960,7 +973,7 @@ export default function PortfolioView() {
                             <td style={{ padding: '14px 20px', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                 <button
-                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotsize || 1, 'DEL', false)}
+                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotSize || pos.lotsize || 1, 'DEL', false)}
                                   title="Buy More"
                                   style={{
                                     background: 'rgba(0, 230, 118, 0.1)',
@@ -977,7 +990,7 @@ export default function PortfolioView() {
                                   + BUY
                                 </button>
                                 <button
-                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
                                   title="Exit / Sell"
                                   style={{
                                     background: 'rgba(255, 59, 48, 0.1)',

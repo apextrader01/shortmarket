@@ -10,9 +10,12 @@ const MONTH_MAP = {
 };
 
 let _symbolToExpiryMap = null;
+let _lastMapLoadTime = 0;
 function getSymbolToExpiryMap() {
-    if (_symbolToExpiryMap) return _symbolToExpiryMap;
+    const now = Date.now();
+    if (_symbolToExpiryMap && (now - _lastMapLoadTime < 3600000)) return _symbolToExpiryMap;
     _symbolToExpiryMap = {};
+    _lastMapLoadTime = now;
     try {
         const futData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8'));
         Object.values(futData).flat().forEach(f => _symbolToExpiryMap[f.symbol] = f.expiry);
@@ -73,7 +76,7 @@ async function runAutoSquareOff(exchangeFilter) {
     const todayStr = formatDate(istTime);
 
     try {
-        const openPositions = await db('positions').whereRaw('quantity != closed_quantity');
+        const openPositions = await db('positions').whereNot({ quantity: 0 });
         
         console.log(`Found ${openPositions.length} open positions total. Checking for expiries...`);
         
@@ -101,8 +104,8 @@ async function runAutoSquareOff(exchangeFilter) {
             const batch = positionsToClose.slice(i, i + BATCH_SIZE);
             
             await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
-                const side = pos.quantity > 0 ? 'SELL' : 'BUY';
+                const remainingQty = Math.abs(Number(pos.quantity));
+                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
 
                 const orderPayload = {
                     symbol: pos.symbol,
@@ -151,7 +154,7 @@ async function runIntradaySquareOff(exchangeFilter) {
 
     try {
         const openPositions = await db('positions')
-            .whereRaw('quantity != closed_quantity')
+            .whereNot({ quantity: 0 })
             .andWhere({ product_type: 'INT' });
         
         console.log(`Found ${openPositions.length} open INTRADAY positions total.`);
@@ -176,8 +179,8 @@ async function runIntradaySquareOff(exchangeFilter) {
             const batch = positionsToClose.slice(i, i + BATCH_SIZE);
             
             await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
-                const side = pos.quantity > 0 ? 'SELL' : 'BUY';
+                const remainingQty = Math.abs(Number(pos.quantity));
+                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
 
                 const orderPayload = {
                     symbol: pos.symbol,
@@ -297,7 +300,7 @@ async function runMasterSquareOff() {
     console.log(`=========================================\n`);
 
     try {
-        const openPositions = await db('positions').whereRaw('quantity != closed_quantity');
+        const openPositions = await db('positions').whereNot({ quantity: 0 });
         
         console.log(`Found ${openPositions.length} open positions total.`);
         
@@ -311,8 +314,8 @@ async function runMasterSquareOff() {
             const batch = openPositions.slice(i, i + BATCH_SIZE);
             
             await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
-                const side = pos.quantity > 0 ? 'SELL' : 'BUY';
+                const remainingQty = Math.abs(Number(pos.quantity));
+                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
 
                 const orderPayload = {
                     symbol: pos.symbol,

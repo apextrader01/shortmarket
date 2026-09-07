@@ -767,10 +767,10 @@ export const useStore = create(persist((set, get) => ({
       const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
       
       set({
-        positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
-        holdings: Array.isArray(holdData) ? holdData : (holdData.error ? [] : get().holdings),
-        sips: sipsData.success ? sipsData.sips : get().sips,
-        orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
+        positions: Array.isArray(positions) ? positions : get().positions, 
+        holdings: Array.isArray(holdData) ? holdData : get().holdings,
+        sips: (sipsData && sipsData.success && Array.isArray(sipsData.sips)) ? sipsData.sips : get().sips,
+        orders: Array.isArray(orders) ? orders : get().orders, 
         user: (user && !user.error) ? user : get().user,
         watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
       });
@@ -1077,23 +1077,6 @@ export const useStore = create(persist((set, get) => ({
     } catch(err) {
       throw err;
     }
-  },
-
-  updateUserDetails: async (details) => {
-    
-    
-    try {
-      const res = await fetch(`${API}/api/user/details`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
-        body: JSON.stringify(details)
-      });
-      const data = await res.json();
-      if (data.success) { 
-        get().fetchUserData(); 
-        return { success: true }; 
-      }
-      return { success: false, error: data.error };
-    } catch (err) { return { success: false, error: err.message }; }
   },
 
   updateKycDocuments: async (kycDocs) => {
@@ -1497,7 +1480,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  updateUserDetails: async (userId, details) => {
+  adminUpdateUserDetails: async (userId, details) => {
     try {
       const res = await fetch(`${API}/api/admin/user/${userId}`, { 
         credentials: 'include', 

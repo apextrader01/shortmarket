@@ -134,7 +134,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                     side: 'SELL',
                     quantity: parseFloat(qtyToSell.toFixed(4)),
                     price: currentNav,
-                    product_type: 'CNC' // Mutual fund delivery sell
+                    product_type: 'DEL' // Mutual fund delivery sell
                 });
             }
 

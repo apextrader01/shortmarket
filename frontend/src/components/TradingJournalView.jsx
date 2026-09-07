@@ -81,14 +81,16 @@ export default function TradingJournalView({ onBack }) {
   const tradesList = useMemo(() => {
     const list = [];
     const seen = new Set();
+    const closedPosSignatures = new Set();
 
-    // 1. Closed positions
+    // 1. Closed positions (represent completed round-trip trades)
     (positions || []).forEach(p => {
       const pnl = Number(p.realized_pnl || 0);
       const isClosed = Number(p.quantity) === 0 || p.closed_quantity > 0;
       const key = `pos-${p.id || p.symbol}`;
       if (isClosed && !seen.has(key)) {
         seen.add(key);
+        closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}`);
         list.push({
           id: key,
           rawId: p.id,
@@ -105,11 +107,15 @@ export default function TradingJournalView({ onBack }) {
       }
     });
 
-    // 2. Executed Orders
+    // 2. Executed Orders (only add if not a duplicate exit order of a closed position above)
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
       const pnl = Number(o.realized_pnl || 0);
       const key = `ord-${o.id}`;
+      // Skip if this exit order's PnL is already captured by a closed position
+      if (pnl !== 0 && closedPosSignatures.has(`${o.symbol}_${Math.round(pnl * 100)}`)) {
+        return;
+      }
       if (isExecuted && !seen.has(key)) {
         seen.add(key);
         list.push({

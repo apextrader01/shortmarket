@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const db = require('../database/db');
 const LedgerService = require('./ledgerService');
+const { parseExpiryDate, formatDate } = require('./autoSquareOff');
 
 // Timezone configured to Asia/Kolkata
 const TZ = { timezone: "Asia/Kolkata" };
@@ -35,6 +36,26 @@ function initCronJobs(priceCache, triggerEngine) {
         return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
     };
 
+    // Helper: Check if a symbol is an expiring derivative
+    const isDerivativeSymbol = (symbol) => {
+        if (!symbol || typeof symbol !== 'string') return false;
+        const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        return /(CE|PE|FUT|OPT)/i.test(clean) || symbol.includes('-MCX');
+    };
+
+    // Helper: Check if symbol expires today
+    const isExpiringToday = (symbol) => {
+        try {
+            const expDate = parseExpiryDate(symbol);
+            if (!expDate) return false;
+            const now = new Date();
+            const istTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+            return formatDate(expDate) === formatDate(istTime);
+        } catch (e) {
+            return false;
+        }
+    };
+
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
         console.log(`[CRON] Phase 2 (${assetType}): Sweeping pending Intraday/CO/BO entry orders...`);
@@ -47,7 +68,16 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;  // Skip commodities during EQ sweep
                     if (assetType === 'COM' && !isCom) continue; // Skip equities during COM sweep
                     
-                    // Sweep ALL pending entry orders (INT, BO, CO, DEL, CNC) atomically
+                    // User Rule: Delivery (DEL/CNC) orders for regular cash equities stay open until 15:30.
+                    // Only cancel DEL/CNC orders if the contract is an expiring derivative that expires TODAY.
+                    if (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') {
+                        const isExpiring = isDerivativeSymbol(order.symbol) && isExpiringToday(order.symbol);
+                        if (!isExpiring) {
+                            continue; // Keep regular cash equity limit orders open until 15:30
+                        }
+                    }
+                    
+                    // Sweep pending intraday/BO/CO entry orders (or expiring derivative delivery orders) atomically
                     const updated = await trx('orders')
                         .where({ id: order.id, status: 'PENDING' })
                         .update({ status: 'CANCELLED', updated_at: new Date() });
@@ -67,6 +97,12 @@ function initCronJobs(priceCache, triggerEngine) {
                     const isCom = isCommoditySymbol(trigger.symbol);
                     if (assetType === 'EQ' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
+
+                    // If trigger order is DEL/CNC, do not cancel unless expiring today
+                    if (trigger.product_type === 'DEL' || trigger.product_type === 'CNC' || trigger.product_type === 'DELIVERY') {
+                        const isExpiring = isDerivativeSymbol(trigger.symbol) && isExpiringToday(trigger.symbol);
+                        if (!isExpiring) continue;
+                    }
 
                     const updated = await trx('orders')
                         .where({ id: trigger.id, status: 'PENDING_TRIGGER' })
@@ -114,8 +150,10 @@ function initCronJobs(priceCache, triggerEngine) {
                     await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
                     console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
                     
-                    // Cancel all PENDING_TRIGGER brackets for this user+symbol
-                    const triggers = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' });
+                    // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
+                    const triggers = await trx('orders')
+                        .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' })
+                        .whereIn('product_type', ['INT', 'BO', 'CO']);
                     for (const t of triggers) {
                         const updated = await trx('orders')
                             .where({ id: t.id, status: 'PENDING_TRIGGER' })
@@ -128,8 +166,10 @@ function initCronJobs(priceCache, triggerEngine) {
                         }
                     }
                     
-                    // Also cancel any remaining PENDING orders for this user+symbol
-                    const pendingOrders = await trx('orders').where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' });
+                    // Also cancel any remaining PENDING orders for this user+symbol (only intraday types)
+                    const pendingOrders = await trx('orders')
+                        .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' })
+                        .whereIn('product_type', ['INT', 'BO', 'CO']);
                     for (const o of pendingOrders) {
                         const updated = await trx('orders')
                             .where({ id: o.id, status: 'PENDING' })
@@ -166,6 +206,11 @@ function initCronJobs(priceCache, triggerEngine) {
                 
                 for (const sip of dueSips) {
                     try {
+                        // Skip Mutual Funds (handled by sipEngine.js via mfapi.in)
+                        if (sip.symbol && (sip.symbol.endsWith('-MF') || sip.is_mf || sip.scheme_code)) {
+                            continue;
+                        }
+
                         const user = await trx('users').where({ id: sip.user_id }).first();
                         const finalMargin = Number(sip.amount);
                         

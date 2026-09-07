@@ -87,7 +87,7 @@ export function calculateIndianCharges(order) {
   const qty = Math.abs(Number(order.quantity) || 0);
   const price = Number(order.average_price || order.price || order.execution_price || 0);
   const tradeValue = qty * price;
-  const isDelivery = order.product_type === 'DELIVERY';
+  const isDelivery = (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY');
   const isOption = /(CE|PE|OPT)/i.test(order.symbol || '');
   const isFuture = /FUT/i.test(order.symbol || '');
   const isMCX = /(MCX|GOLD|SILVER|CRUDE|NATURALGAS|COPPER)/i.test(order.symbol || '');
@@ -354,7 +354,7 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
     if (!scripMap[sym]) {
       scripMap[sym] = {
         symbol: sym,
-        segment: /(CE|PE|OPT)/i.test(sym) ? 'F&O Options' : (/FUT/i.test(sym) ? 'F&O Futures' : (o.product_type === 'DELIVERY' ? 'Equity Delivery' : 'Equity Intraday')),
+        segment: /(CE|PE|OPT)/i.test(sym) ? 'F&O Options' : (/FUT/i.test(sym) ? 'F&O Futures' : ((o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') ? 'Equity Delivery' : 'Equity Intraday')),
         buyQty: 0,
         buyVal: 0,
         sellQty: 0,
@@ -538,7 +538,7 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
     if (/(CE|PE|OPT)/i.test(sym)) seg = 'F&O Options';
     else if (/FUT/i.test(sym)) seg = 'F&O Futures';
     else if (/(MCX|GOLD|SILVER|CRUDE)/i.test(sym)) seg = 'Commodity (MCX)';
-    else if (o.product_type === 'DELIVERY') seg = 'Equity Delivery';
+    else if (o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') seg = 'Equity Delivery';
 
     const ch = calculateIndianCharges(o);
     segments[seg].trades += 1;
