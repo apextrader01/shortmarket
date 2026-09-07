@@ -768,8 +768,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   const [copiedPromoKey, setCopiedPromoKey] = useState(null);
   const [showCustomSlugModal, setShowCustomSlugModal] = useState(false);
   const [customReferralSlug, setCustomReferralSlug] = useState('');
-  const [payoutForm, setPayoutForm] = useState({ method: 'UPI', address: '', amount: '4800' });
+  const [payoutForm, setPayoutForm] = useState({ method: 'UPI', address: '', amount: '' });
   const [payoutSuccess, setPayoutSuccess] = useState(false);
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [payoutError, setPayoutError] = useState('');
+  const [referralsData, setReferralsData] = useState({
+    referrals: [],
+    withdrawals: [],
+    stats: { totalEarned: 0, pendingCount: 0, completedCount: 0, totalCount: 0, availableRewardBalance: 0, totalWithdrawn: 0, pendingWithdrawalAmount: 0 }
+  });
+  const [loadingReferrals, setLoadingReferrals] = useState(false);
+  const [referralWithdrawAmount, setReferralWithdrawAmount] = useState('');
+  const [referralWithdrawLoading, setReferralWithdrawLoading] = useState(false);
+  const [referralWithdrawMsg, setReferralWithdrawMsg] = useState({ type: '', text: '' });
   const [riskProfilePreset, setRiskProfilePreset] = useState('STANDARD');
 
   const [communityPosts, setCommunityPosts] = useState([
@@ -965,6 +976,81 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
   useEffect(() => {
     fetchJournalData();
   }, []);
+
+  const fetchReferralsData = async () => {
+    try {
+      setLoadingReferrals(true);
+      const token = localStorage.getItem('token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${API}/api/referrals`, { credentials: 'include', headers });
+      const json = await res.json();
+      if (json.success) {
+        setReferralsData({
+          referrals: json.referrals || [],
+          withdrawals: json.withdrawals || [],
+          stats: {
+            totalEarned: json.stats?.totalEarned || 0,
+            pendingCount: json.stats?.pendingCount || 0,
+            completedCount: json.stats?.completedCount || 0,
+            totalCount: json.stats?.totalCount || 0,
+            totalWithdrawn: json.stats?.totalWithdrawn || 0,
+            pendingWithdrawalAmount: json.stats?.pendingWithdrawalAmount || 0,
+            availableRewardBalance: json.stats?.availableRewardBalance || 0
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch referrals data:', e);
+    } finally {
+      setLoadingReferrals(false);
+    }
+  };
+
+  const handleReferralWithdraw = async (customAmt) => {
+    const rawAmt = customAmt !== undefined ? customAmt : referralWithdrawAmount;
+    const amt = parseFloat(rawAmt);
+    if (!amt || isNaN(amt) || amt <= 0) {
+      setReferralWithdrawMsg({ type: 'error', text: 'Please enter a valid withdrawal amount.' });
+      return;
+    }
+    if (amt < 100) {
+      setReferralWithdrawMsg({ type: 'error', text: 'Minimum withdrawal amount is ₹100.' });
+      return;
+    }
+    if (amt > (referralsData.stats?.availableRewardBalance || 0)) {
+      setReferralWithdrawMsg({ type: 'error', text: 'Amount exceeds available reward balance.' });
+      return;
+    }
+    try {
+      setReferralWithdrawLoading(true);
+      setReferralWithdrawMsg({ type: '', text: '' });
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+      const res = await fetch(`${API}/api/withdrawals/request`, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ amount: amt })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit withdrawal request');
+      }
+      setReferralWithdrawMsg({ type: 'success', text: 'Withdrawal request submitted! Funds will be dispatched to your registered Bank/UPI account.' });
+      setReferralWithdrawAmount('');
+      fetchReferralsData();
+    } catch (err) {
+      setReferralWithdrawMsg({ type: 'error', text: err.message });
+    } finally {
+      setReferralWithdrawLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'AFFILIATE') {
+      fetchReferralsData();
+    }
+  }, [activeTab]);
 
   // Save checklist handler
   // Toggle custom checklist item
@@ -1799,7 +1885,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     { id: 'COMMUNITY', label: 'Community', icon: Users },
     { id: 'CHALLENGE', label: 'Challenge', icon: Trophy },
     { id: 'CALENDAR', label: 'Calendar', icon: Calendar },
-    { id: 'AFFILIATE', label: 'Affiliate', icon: Share2 },
+    { id: 'AFFILIATE', label: 'Invite & Earn', icon: Share2, badge: '10%' },
     { id: 'TRADING_QUIZ', label: 'Trading Quiz', icon: HelpCircle },
     { id: 'TUTORIALS', label: 'Tutorials', icon: Video }
   ];
@@ -2421,8 +2507,8 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.06)'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <Share2 size={15} color="#ec4899" />
-                      <span>Affiliate Partner Program</span>
+                      <Share2 size={15} color="#10b981" />
+                      <span>Invite & Earn 10%</span>
                     </button>
                   </div>
 
@@ -8108,53 +8194,52 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           })()}
 
           {/* ══════════════════════════════════════════════════════════════ */}
-          {/* 13. AFFILIATE & PARTNER SUB-VIEW                                */}
+          {/* 13. INVITE & EARN 10% REFERRAL SUB-VIEW                         */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'AFFILIATE' && (() => {
             const defaultRefCode = user?.client_id || user?.id || (user?.username ? user.username.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() : 'trader');
             const referralSlug = customReferralSlug || defaultRefCode;
             const fullReferralUrl = `${window.location.origin}/register?ref=${referralSlug}`;
 
-            const referralList = [
-              { id: 1, name: 'Karan Mehra', date: '04 Sep 2026', market: 'Indian', plan: 'Pro Annual (₹7,999)', comm: '₹2,400', commVal: 2400, status: 'ACTIVE', trades: 42, avatar: 'KM' },
-              { id: 2, name: 'Rohan Sharma', date: '01 Sep 2026', market: 'Crypto', plan: 'Pro Monthly ($29)', comm: '₹600', commVal: 600, status: 'ACTIVE', trades: 88, avatar: 'RS' },
-              { id: 3, name: 'David Miller', date: '28 Aug 2026', market: 'US', plan: 'Pro Monthly ($29)', comm: '₹600', commVal: 600, status: 'ACTIVE', trades: 19, avatar: 'DM' },
-              { id: 4, name: 'Ananya Roy', date: '24 Aug 2026', market: 'Indian', plan: 'Pro Annual (₹7,999)', comm: '₹2,400', commVal: 2400, status: 'ACTIVE', trades: 65, avatar: 'AR' },
-              { id: 5, name: 'Marcus Vance', date: '19 Aug 2026', market: 'Forex', plan: 'Pro Monthly ($29)', comm: '₹600', commVal: 600, status: 'ACTIVE', trades: 31, avatar: 'MV' },
-              { id: 6, name: 'Priya Patel', date: '12 Aug 2026', market: 'Indian', plan: 'Free 14-Day Trial', comm: '₹0 (Pending)', commVal: 0, status: 'TRIAL', trades: 14, avatar: 'PP' },
-              { id: 7, name: 'Alex Chen', date: '08 Aug 2026', market: 'Crypto', plan: 'Pro Annual ($249)', comm: '₹5,800', commVal: 5800, status: 'ACTIVE', trades: 140, avatar: 'AC' },
-              { id: 8, name: 'Siddharth Rao', date: '02 Aug 2026', market: 'Indian', plan: 'Pro Monthly (₹1,999)', comm: '₹600', commVal: 600, status: 'ACTIVE', trades: 52, avatar: 'SR' }
-            ];
+            const stats = referralsData.stats || {};
+            const totalEarned = Number(stats.totalEarned || 0);
+            const availableRewardBalance = Number(stats.availableRewardBalance || 0);
+            const totalCount = Number(stats.totalCount || 0);
+            const pendingCount = Number(stats.pendingCount || 0);
+            const completedCount = Number(stats.completedCount || 0);
+            const referrals = referralsData.referrals || [];
+            const withdrawals = referralsData.withdrawals || [];
 
-            const filteredReferrals = referralList.filter(r => {
+            const filteredReferrals = referrals.filter(r => {
               if (affiliateStatusFilter === 'ALL') return true;
-              return r.status === affiliateStatusFilter;
+              return String(r.status).toUpperCase() === affiliateStatusFilter;
             });
 
-            const payoutLedger = [
-              { id: 'PAY-89201', date: '15 Aug 2026', amount: '₹12,600 ($152.00)', method: 'UPI (trader@okhdfcbank)', utr: 'UPI-99201481920', status: 'COMPLETED' },
-              { id: 'PAY-78142', date: '15 Jul 2026', amount: '₹8,400 ($101.50)', method: 'USDT TRC20 (TX99a...48b)', utr: '0x89f41b9...a24', status: 'COMPLETED' },
-              { id: 'PAY-65019', date: '15 Jun 2026', amount: '₹7,400 ($89.40)', method: 'Bank IMPS (HDFC Bank)', utr: 'IMPS-89201940', status: 'COMPLETED' }
-            ];
+            const maskEmail = (email) => {
+              if (!email) return '***@***.com';
+              const parts = email.split('@');
+              if (parts.length !== 2) return '***@***.com';
+              return `${parts[0].substring(0, 3)}***@${parts[1]}`;
+            };
 
             const promoSwipes = [
               {
                 key: 'twitter',
                 title: '🐦 Twitter / X Alpha Thread Swipe',
                 category: 'Social Media',
-                text: `Most traders blow up because of poor sizing and emotional revenge trading.\n\nI started using @ShortEdgeTrade to systematically audit every trade, calculate 1% risk per trade, and follow automated pre-market checklists.\n\nLevel up your trading edge with 20% off: ${fullReferralUrl}`
+                text: `Most traders blow up because of poor sizing and emotional revenge trading.\n\nI started using @ShortEdgeTrade to systematically audit every trade, calculate 1% risk per trade, and follow automated pre-market checklists.\n\nLevel up your trading edge with an instant Pro trial: ${fullReferralUrl}`
               },
               {
                 key: 'whatsapp',
                 title: '💬 WhatsApp & Telegram Community Broadcast',
                 category: 'Community Groups',
-                text: `Hey guys! I have been journaling my trades and managing risk using ShortEdge Trade Diary. It includes automated P&L calendars, mistake leak trackers, and multi-market risk calculators.\n\nCheck it out here and get an instant Pro trial: ${fullReferralUrl}`
+                text: `Hey guys! I have been journaling my trades and managing risk using ShortEdge Trade Diary. It includes automated P&L calendars, mistake leak trackers, and multi-market risk calculators.\n\nCheck it out here and join the community: ${fullReferralUrl}`
               },
               {
-                key: 'embed',
-                title: '🌐 Web & Blog HTML Badge Embed',
-                category: 'Website Widget',
-                text: `<a href="${fullReferralUrl}" target="_blank" rel="noopener"><img src="https://shortedge.trade/badges/verified-partner-dark.svg" alt="Tracked with ShortEdge Trade Diary" width="220" /></a>`
+                key: 'discord',
+                title: '🎮 Discord & Telegram Direct Invite',
+                category: 'Direct Message',
+                text: `Check out ShortEdge Trade Diary — zero-latency trading tools, institutional execution calculators, and AI risk guardian: ${fullReferralUrl}`
               }
             ];
 
@@ -8165,10 +8250,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: colors.textPrimary, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Share2 size={22} color="#2563eb" /> Affiliate & Partner Program
+                      <TrendingUp size={22} color="#10b981" /> Invite & Earn 10%
                     </h2>
-                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '2px 0 0 0' }}>
-                      Earn up to 50% lifetime recurring commissions on every trader you invite across Indian, Crypto, US, and Forex markets.
+                    <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '3px 0 0 0' }}>
+                      Share your referral link with your network. When they sign up and purchase a Pro subscription, you will automatically receive 10% of their subscription fee directly into your wallet!
                     </p>
                   </div>
 
@@ -8193,97 +8278,64 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     </button>
 
                     <button
-                      onClick={() => setShowPayoutModal(true)}
+                      onClick={() => {
+                        setPayoutForm(prev => ({ ...prev, amount: String(Math.floor(availableRewardBalance)) }));
+                        setShowPayoutModal(true);
+                      }}
+                      disabled={availableRewardBalance < 100}
                       style={{
-                        backgroundColor: '#2563eb',
+                        backgroundColor: availableRewardBalance >= 100 ? '#10b981' : (isLight ? '#cbd5e1' : '#334155'),
                         color: '#ffffff',
                         padding: '7px 14px',
                         borderRadius: '8px',
                         fontSize: '12px',
                         fontWeight: '700',
                         border: 'none',
-                        cursor: 'pointer',
+                        cursor: availableRewardBalance >= 100 ? 'pointer' : 'not-allowed',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                        boxShadow: availableRewardBalance >= 100 ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
                       }}
                     >
-                      <DollarSign size={14} /> Request Payout (₹4,800)
+                      <DollarSign size={14} /> Request Payout (₹{availableRewardBalance.toFixed(2)})
                     </button>
                   </div>
                 </div>
 
-                {/* 5 KPI Metric Cards Strip */}
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '10px' }}>
+                {/* 4 Real Metric KPI Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
                   {[
-                    { label: 'TOTAL LINK CLICKS', val: '142', sub: '12.6% Conv. Rate', color: colors.textPrimary },
-                    { label: 'TOTAL REFERRALS', val: '18', sub: '6 Active Pro Users', color: '#2563eb' },
-                    { label: 'LIFETIME EARNINGS', val: '₹28,400', sub: '$345.00 USD Equivalent', color: colors.accentGreen },
-                    { label: 'UNPAID COMMISSIONS', val: '₹4,800', sub: 'Next Payout: 15 Sep', color: colors.accentGreen, highlight: true },
-                    { label: 'CURRENT PARTNER TIER', val: '🥈 Silver (30%)', sub: '2 to Gold Tier (40%)', color: colors.accentBlueLight }
+                    { label: 'TOTAL EARNED', val: `₹${totalEarned.toFixed(2)}`, sub: 'Lifetime Referral Rewards', color: '#10b981' },
+                    { label: 'AVAILABLE TO WITHDRAW', val: `₹${availableRewardBalance.toFixed(2)}`, sub: 'Ready for Bank / UPI Payout', color: '#10b981', highlight: true },
+                    { label: 'TOTAL SIGNUPS', val: String(totalCount), sub: 'Friends Registered with Link', color: '#2563eb' },
+                    { label: 'PENDING SUBSCRIPTIONS', val: String(pendingCount), sub: 'Signups Waiting to Upgrade', color: '#f59e0b' }
                   ].map((s, i) => (
-                    <div key={i} style={{ backgroundColor: colors.bgCard, border: s.highlight ? '1px solid rgba(16, 185, 129, 0.4)' : `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
+                    <div key={i} style={{ backgroundColor: colors.bgCard, border: s.highlight ? '1px solid rgba(16, 185, 129, 0.5)' : `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px 14px', boxShadow: colors.cardShadow }}>
                       <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>{s.label}</div>
-                      <div style={{ fontSize: '17px', fontWeight: '800', color: s.color, marginTop: '2px' }}>{s.val}</div>
+                      <div style={{ fontSize: '18px', fontWeight: '800', color: s.color, marginTop: '2px' }}>{s.val}</div>
                       <div style={{ fontSize: '10px', color: colors.textSecondary, marginTop: '2px' }}>{s.sub}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Partner Tier Progression Ladder Card */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Award size={16} color="#f59e0b" /> Partner Commission Tier Ladder
+                {/* Invite & Earn 10% Hero Sharing Card */}
+                <div style={{ backgroundColor: colors.bgCard, border: '1px solid rgba(16, 185, 129, 0.3)', background: isLight ? '#f0fdf4' : 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(37, 99, 235, 0.04) 100%)', borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '800' }}>
+                        <TrendingUp size={13} /> FLAT 10% REWARD ON EVERY PRO SUBSCRIPTION
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, marginTop: '6px' }}>
+                        Your Unique Referral Link
+                      </div>
                     </div>
-                    <span style={{ fontSize: '11px', fontWeight: '700', color: colors.accentGreen }}>
-                      🎯 18 / 20 Referrals (90% to Gold Partner 40% Tier)
+                    <span style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
+                      Client ID: <b style={{ color: '#2563eb' }}>{user?.client_id || 'SE000001'}</b>
                     </span>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div style={{ width: '100%', height: '8px', backgroundColor: colors.bgInner, borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '90%', height: '100%', background: 'linear-gradient(90deg, #2563eb, #10b981)', borderRadius: '4px' }} />
-                  </div>
-
-                  {/* 4 Tiers Badges */}
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '8px', marginTop: '4px' }}>
-                    {[
-                      { name: '🥉 Bronze Partner', req: '1–5 Referrals', rate: '20% Lifetime', active: false },
-                      { name: '🥈 Silver Partner', req: '6–20 Referrals', rate: '30% Lifetime', active: true },
-                      { name: '🥇 Gold Partner', req: '21–50 Referrals', rate: '40% Lifetime', active: false },
-                      { name: '💎 Diamond VIP', req: '50+ Referrals', rate: '50% Lifetime', active: false }
-                    ].map((t, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          backgroundColor: t.active ? (isLight ? 'rgba(37, 99, 235, 0.08)' : 'rgba(37, 99, 235, 0.15)') : colors.bgInner,
-                          border: t.active ? '1.5px solid #2563eb' : `1px solid ${colors.borderColor}`,
-                          borderRadius: '8px',
-                          padding: '8px 10px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '2px'
-                        }}
-                      >
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: t.active ? '#2563eb' : colors.textPrimary }}>
-                          {t.name} {t.active && '✓'}
-                        </div>
-                        <div style={{ fontSize: '10px', color: colors.textMuted }}>{t.req}</div>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: colors.accentGreen, marginTop: '2px' }}>{t.rate}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Unique Referral Link & Quick Social Share Box */}
-                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: colors.cardShadow }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary }}>Your Unique Partner Referral Link</div>
-                    <span style={{ fontSize: '11px', color: colors.textMuted }}>30-Day Cookie Attribution + 30% Lifetime Recurring RevShare</span>
-                  </div>
-
+                  {/* Referral Link & Copy */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <input
                       type="text"
@@ -8297,14 +8349,14 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         setCopiedLink(true);
                         setTimeout(() => setCopiedLink(false), 2000);
                       }}
-                      style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '9px 18px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <Copy size={14} /> {copiedLink ? 'Copied to Clipboard!' : 'Copy Link'}
                     </button>
                   </div>
 
                   {/* 1-Click Social Share Buttons */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '4px', borderTop: `1px solid ${colors.borderColor}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '6px', borderTop: `1px solid ${colors.borderColor}` }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>QUICK SHARE:</span>
                     
                     {/* WhatsApp */}
@@ -8312,7 +8364,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ShortEdge Trading Diary to level up your trading discipline and risk management: ${fullReferralUrl}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ textDecoration: 'none', backgroundColor: '#25D366', color: '#ffffff', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      style={{ textDecoration: 'none', backgroundColor: '#25D366', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <span>💬 WhatsApp</span>
                     </a>
@@ -8322,7 +8374,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       href={`https://t.me/share/url?url=${encodeURIComponent(fullReferralUrl)}&text=${encodeURIComponent('Level up your trading edge with ShortEdge Trade Diary!')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ textDecoration: 'none', backgroundColor: '#0088cc', color: '#ffffff', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      style={{ textDecoration: 'none', backgroundColor: '#0088cc', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <span>✈️ Telegram</span>
                     </a>
@@ -8332,18 +8384,133 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Master your risk and eliminate emotional trading mistakes with @ShortEdgeTrade: ${fullReferralUrl}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ textDecoration: 'none', backgroundColor: '#1da1f2', color: '#ffffff', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      style={{ textDecoration: 'none', backgroundColor: '#1da1f2', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <span>🐦 Twitter / X</span>
                     </a>
+                  </div>
+
+                  {/* 3 Simple Steps */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px', marginTop: '4px', paddingTop: '10px', borderTop: `1px solid ${colors.borderColor}` }}>
+                    {[
+                      { step: '1', title: 'Share Your Link', desc: `Send your unique Client ID link to friends and trading communities.` },
+                      { step: '2', title: 'Friend Subscribes', desc: 'When your friend joins and activates a ShortEdge Pro subscription.' },
+                      { step: '3', title: 'Earn 10% Instantly', desc: '10% of their subscription fee is automatically deposited into your wallet.' }
+                    ].map((st, i) => (
+                      <div key={i} style={{ backgroundColor: colors.bgInner, borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#10b981', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '800', flexShrink: 0 }}>
+                          {st.step}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11.5px', fontWeight: '700', color: colors.textPrimary }}>{st.title}</div>
+                          <div style={{ fontSize: '10.5px', color: colors.textSecondary, marginTop: '2px', lineHeight: 1.35 }}>{st.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Instant In-Page Withdrawal Section */}
+                <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: colors.cardShadow }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <DollarSign size={16} color="#10b981" /> Withdraw Referral Rewards
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: colors.textSecondary }}>
+                      Available Balance: <strong style={{ color: '#10b981', fontSize: '13px' }}>₹{availableRewardBalance.toFixed(2)}</strong>
+                    </div>
+                  </div>
+
+                  {referralWithdrawMsg.text && (
+                    <div style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                      backgroundColor: referralWithdrawMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: referralWithdrawMsg.type === 'success' ? '#10b981' : colors.accentRed,
+                      border: referralWithdrawMsg.type === 'success' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
+                    }}>
+                      {referralWithdrawMsg.text}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', alignItems: isMobile ? 'stretch' : 'center' }}>
+                    <input
+                      type="number"
+                      min="100"
+                      placeholder="Enter amount to withdraw (min ₹100)"
+                      value={referralWithdrawAmount}
+                      onChange={e => setReferralWithdrawAmount(e.target.value)}
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.bgInput,
+                        border: `1px solid ${colors.borderColor}`,
+                        borderRadius: '8px',
+                        padding: '9px 12px',
+                        color: colors.textPrimary,
+                        fontSize: '12px',
+                        outline: 'none'
+                      }}
+                    />
+
+                    {/* Quick Preset Buttons */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {[
+                        { label: '₹100', val: '100' },
+                        { label: '₹500', val: '500' },
+                        { label: '₹1,000', val: '1000' },
+                        { label: 'Max', val: String(Math.floor(availableRewardBalance)) }
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setReferralWithdrawAmount(preset.val)}
+                          style={{
+                            backgroundColor: colors.bgInner,
+                            border: `1px solid ${colors.borderColor}`,
+                            color: colors.textSecondary,
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReferralWithdraw()}
+                      disabled={referralWithdrawLoading || !referralWithdrawAmount || parseFloat(referralWithdrawAmount) < 100 || parseFloat(referralWithdrawAmount) > availableRewardBalance}
+                      style={{
+                        backgroundColor: (availableRewardBalance >= 100 && referralWithdrawAmount && parseFloat(referralWithdrawAmount) >= 100) ? '#10b981' : (isLight ? '#cbd5e1' : '#334155'),
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '9px 18px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: (availableRewardBalance >= 100 && referralWithdrawAmount && parseFloat(referralWithdrawAmount) >= 100) ? 'pointer' : 'not-allowed',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {referralWithdrawLoading ? 'Submitting...' : 'Request Withdrawal'}
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize: '11px', color: colors.textMuted }}>
+                    💡 Note: Update your Bank or UPI details in Settings before withdrawing. Minimum withdrawal threshold is ₹100.
                   </div>
                 </div>
 
                 {/* Sub-View Navigation Tabs */}
                 <div style={{ display: 'flex', gap: '6px', borderBottom: `1px solid ${colors.borderColor}`, paddingBottom: '8px' }}>
                   {[
-                    { id: 'REFERRALS', label: `👥 Referrals & Activity (${referralList.length})` },
-                    { id: 'PAYOUTS', label: `💸 Payout Ledger (${payoutLedger.length})` },
+                    { id: 'REFERRALS', label: `👥 Referral History (${referrals.length})` },
+                    { id: 'PAYOUTS', label: `💸 Withdrawal History (${withdrawals.length})` },
                     { id: 'MARKETING', label: `🎨 Marketing Swipes & Assets` },
                     { id: 'TERMS', label: `📋 Program Terms & FAQ` }
                   ].map(tab => (
@@ -8351,7 +8518,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       key={tab.id}
                       onClick={() => setAffiliateSubTab(tab.id)}
                       style={{
-                        backgroundColor: affiliateSubTab === tab.id ? '#2563eb' : colors.bgCard,
+                        backgroundColor: affiliateSubTab === tab.id ? '#10b981' : colors.bgCard,
                         color: affiliateSubTab === tab.id ? '#ffffff' : colors.textSecondary,
                         border: `1px solid ${colors.borderColor}`,
                         borderRadius: '6px',
@@ -8370,15 +8537,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {affiliateSubTab === 'REFERRALS' && (
                   <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>Referral Conversions Ledger</div>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>Referred Friends & Status</div>
                       
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        {['ALL', 'ACTIVE', 'TRIAL'].map(st => (
+                        {['ALL', 'COMPLETED', 'PENDING'].map(st => (
                           <button
                             key={st}
                             onClick={() => setAffiliateStatusFilter(st)}
                             style={{
-                              backgroundColor: affiliateStatusFilter === st ? '#2563eb' : colors.bgInner,
+                              backgroundColor: affiliateStatusFilter === st ? '#10b981' : colors.bgInner,
                               color: affiliateStatusFilter === st ? '#ffffff' : colors.textSecondary,
                               border: `1px solid ${colors.borderColor}`,
                               borderRadius: '6px',
@@ -8388,103 +8555,128 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                               cursor: 'pointer'
                             }}
                           >
-                            {st === 'ALL' ? 'All (8)' : (st === 'ACTIVE' ? 'Active (7)' : 'Trial (1)')}
+                            {st === 'ALL' ? `All (${referrals.length})` : (st === 'COMPLETED' ? `Completed (${completedCount})` : `Pending (${pendingCount})`)}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
-                        <thead>
-                          <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
-                            <th style={{ padding: '8px' }}>TRADER</th>
-                            <th style={{ padding: '8px' }}>SIGNUP DATE</th>
-                            <th style={{ padding: '8px' }}>MARKET</th>
-                            <th style={{ padding: '8px' }}>SUBSCRIPTION PLAN</th>
-                            <th style={{ padding: '8px' }}>TRADES LOGGED</th>
-                            <th style={{ padding: '8px' }}>COMMISSION</th>
-                            <th style={{ padding: '8px' }}>STATUS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredReferrals.map((r, i) => (
-                            <tr key={i} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
-                              <td style={{ padding: '8px', fontWeight: '700', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: colors.bgInner, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800', color: '#2563eb' }}>
-                                  {r.avatar}
-                                </div>
-                                {r.name}
-                              </td>
-                              <td style={{ padding: '8px', color: colors.textSecondary }}>{r.date}</td>
-                              <td style={{ padding: '8px', color: colors.textSecondary }}>
-                                <span style={{ backgroundColor: colors.bgInner, padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '600' }}>
-                                  {r.market}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px', color: colors.accentBlueLight, fontWeight: '600' }}>{r.plan}</td>
-                              <td style={{ padding: '8px', color: colors.textPrimary, fontWeight: '700' }}>{r.trades}</td>
-                              <td style={{ padding: '8px', fontWeight: '800', color: r.commVal > 0 ? colors.accentGreen : colors.textMuted }}>{r.comm}</td>
-                              <td style={{ padding: '8px' }}>
-                                <span style={{ backgroundColor: r.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: r.status === 'ACTIVE' ? colors.accentGreen : '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
-                                  {r.status}
-                                </span>
-                              </td>
+                    {loadingReferrals ? (
+                      <div style={{ padding: '30px', textAlign: 'center', color: colors.textSecondary }}>
+                        <Loader2 className="spinner" size={24} style={{ margin: '0 auto 8px auto' }} />
+                        <div style={{ fontSize: '12px' }}>Loading referral history...</div>
+                      </div>
+                    ) : filteredReferrals.length === 0 ? (
+                      <div style={{ padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <Users size={36} style={{ opacity: 0.3 }} />
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>No referrals found</div>
+                        <div style={{ fontSize: '11.5px', color: colors.textMuted, maxWidth: '340px' }}>
+                          You haven't referred any traders yet. Share your unique link above to start earning 10% on every subscription!
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
+                              <th style={{ padding: '8px' }}>TRADER</th>
+                              <th style={{ padding: '8px' }}>SIGNUP DATE</th>
+                              <th style={{ padding: '8px' }}>REWARD (10%)</th>
+                              <th style={{ padding: '8px' }}>STATUS</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {filteredReferrals.map((r, i) => (
+                              <tr key={i} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
+                                <td style={{ padding: '8px', fontWeight: '700', color: colors.textPrimary }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {r.client_id && (
+                                      <span style={{ fontSize: '10.5px', color: '#60a5fa', fontWeight: '800', backgroundColor: 'rgba(37,99,235,0.1)', padding: '1px 5px', borderRadius: '4px' }}>
+                                        [{r.client_id}]
+                                      </span>
+                                    )}
+                                    <span>{r.username}</span>
+                                  </div>
+                                  <div style={{ fontSize: '10.5px', color: colors.textMuted, marginTop: '2px' }}>{maskEmail(r.email)}</div>
+                                </td>
+                                <td style={{ padding: '8px', color: colors.textSecondary }}>
+                                  {r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Recent'}
+                                </td>
+                                <td style={{ padding: '8px', fontWeight: '800', color: Number(r.reward_amount || 0) > 0 ? '#10b981' : colors.textMuted }}>
+                                  ₹{Number(r.reward_amount || 0).toFixed(2)}
+                                </td>
+                                <td style={{ padding: '8px' }}>
+                                  <span style={{
+                                    backgroundColor: String(r.status).toUpperCase() === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: String(r.status).toUpperCase() === 'COMPLETED' ? '#10b981' : '#f59e0b',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '700'
+                                  }}>
+                                    {String(r.status).toUpperCase()}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* SUB-TAB 2: PAYOUT HISTORY */}
+                {/* SUB-TAB 2: WITHDRAWAL HISTORY */}
                 {affiliateSubTab === 'PAYOUTS' && (
                   <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '14px' : '18px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>Completed Payout Settlements</div>
-                      <span style={{ fontSize: '11px', color: colors.textMuted }}>Automatic settlements are dispatched on the 15th of each month</span>
+                      <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>Withdrawal Requests & Settlements</div>
+                      <span style={{ fontSize: '11px', color: colors.textMuted }}>Dispatched directly to your registered UPI / Bank</span>
                     </div>
 
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
-                        <thead>
-                          <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
-                            <th style={{ padding: '8px' }}>INVOICE ID</th>
-                            <th style={{ padding: '8px' }}>SETTLEMENT DATE</th>
-                            <th style={{ padding: '8px' }}>AMOUNT PAID</th>
-                            <th style={{ padding: '8px' }}>METHOD & DESTINATION</th>
-                            <th style={{ padding: '8px' }}>TRANSACTION REF / UTR</th>
-                            <th style={{ padding: '8px' }}>STATUS</th>
-                            <th style={{ padding: '8px' }}>RECEIPT</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {payoutLedger.map((p, i) => (
-                            <tr key={i} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
-                              <td style={{ padding: '8px', fontWeight: '700', color: colors.textPrimary }}>{p.id}</td>
-                              <td style={{ padding: '8px', color: colors.textSecondary }}>{p.date}</td>
-                              <td style={{ padding: '8px', fontWeight: '800', color: colors.accentGreen }}>{p.amount}</td>
-                              <td style={{ padding: '8px', color: colors.textSecondary }}>{p.method}</td>
-                              <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '11px', color: colors.textMuted }}>{p.utr}</td>
-                              <td style={{ padding: '8px' }}>
-                                <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: colors.accentGreen, padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>
-                                  {p.status}
-                                </span>
-                              </td>
-                              <td style={{ padding: '8px' }}>
-                                <button
-                                  onClick={() => window.print()}
-                                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700' }}
-                                >
-                                  <Download size={12} /> PDF
-                                </button>
-                              </td>
+                    {withdrawals.length === 0 ? (
+                      <div style={{ padding: '36px 16px', textAlign: 'center', color: colors.textSecondary, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <DollarSign size={36} style={{ opacity: 0.3 }} />
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: colors.textPrimary }}>No withdrawal requests yet</div>
+                        <div style={{ fontSize: '11.5px', color: colors.textMuted, maxWidth: '340px' }}>
+                          When you refer friends and earn rewards, you can withdraw your balance anytime above ₹100.
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px', textAlign: 'left' }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${colors.borderColor}`, color: colors.textMuted }}>
+                              <th style={{ padding: '8px' }}>REQUEST ID</th>
+                              <th style={{ padding: '8px' }}>REQUEST DATE</th>
+                              <th style={{ padding: '8px' }}>AMOUNT</th>
+                              <th style={{ padding: '8px' }}>STATUS</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {withdrawals.map((w, i) => (
+                              <tr key={i} style={{ borderBottom: `1px solid ${colors.borderColor}` }}>
+                                <td style={{ padding: '8px', fontWeight: '700', color: colors.textPrimary }}>#WTH-{w.id}</td>
+                                <td style={{ padding: '8px', color: colors.textSecondary }}>{w.created_at ? new Date(w.created_at).toLocaleDateString() : 'Recent'}</td>
+                                <td style={{ padding: '8px', fontWeight: '800', color: '#10b981' }}>₹{Number(w.amount).toFixed(2)}</td>
+                                <td style={{ padding: '8px' }}>
+                                  <span style={{
+                                    backgroundColor: w.status === 'CREDITED' ? 'rgba(16, 185, 129, 0.15)' : (w.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'),
+                                    color: w.status === 'CREDITED' ? '#10b981' : (w.status === 'REJECTED' ? colors.accentRed : '#f59e0b'),
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '700'
+                                  }}>
+                                    {w.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -8495,7 +8687,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       <div key={idx} style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '10px', boxShadow: colors.cardShadow }}>
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#2563eb', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#10b981', backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '4px' }}>
                               {sw.category}
                             </span>
                           </div>
@@ -8514,7 +8706,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             setTimeout(() => setCopiedPromoKey(null), 2000);
                           }}
                           style={{
-                            backgroundColor: copiedPromoKey === sw.key ? colors.accentGreen : '#2563eb',
+                            backgroundColor: copiedPromoKey === sw.key ? '#10b981' : '#2563eb',
                             color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
@@ -8538,18 +8730,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 {/* SUB-TAB 4: PROGRAM RULES & FAQ */}
                 {affiliateSubTab === 'TERMS' && (
                   <div style={{ backgroundColor: colors.bgCard, border: `1px solid ${colors.borderColor}`, borderRadius: '12px', padding: isMobile ? '16px' : '22px', boxShadow: colors.cardShadow, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>Partner Program Policies & Guidelines</div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>Invite & Earn 10% — Program Policies & Guidelines</div>
                     
                     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '12px' }}>
                       {[
-                        { title: '📅 Lifetime Recurring RevShare', desc: 'You receive your tier commission percentage on every subsequent renewal, monthly or annually, for the lifetime of that trader account.' },
-                        { title: '🍪 30-Day Cookie Tracking', desc: 'When a prospective trader clicks your link, a 30-day tracking cookie is stored. If they subscribe anytime within 30 days, credit is assigned to you.' },
-                        { title: '⚡ Fast Payout Thresholds', desc: 'Minimum payout is ₹1,000 INR or $25 USD. Automated payouts are executed on the 15th of every month or instantly upon request.' },
-                        { title: '🚫 Anti-Fraud & Self-Referral Policy', desc: 'Self-referrals using the same payment method or IP are strictly prohibited and will result in forfeiture of commission balances.' }
+                        { title: '🎁 Flat 10% Commission', desc: 'You receive 10% cash reward on every Pro subscription fee purchased by traders who sign up through your referral link.' },
+                        { title: '⚡ Instant Wallet Credit', desc: 'When your referred user completes their subscription payment, your 10% commission is immediately calculated and credited to your reward balance.' },
+                        { title: '🏦 Low ₹100 Payout Threshold', desc: 'You can request withdrawal of your rewards straight to your registered UPI ID or Bank Account whenever your balance is at least ₹100.' },
+                        { title: '🚫 Anti-Fraud & Self-Referral Policy', desc: 'Creating duplicate accounts or using self-referrals is strictly prohibited and will void pending reward balances.' }
                       ].map((term, i) => (
                         <div key={i} style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{term.title}</div>
-                          <p style={{ fontSize: '11px', color: colors.textSecondary, margin: 0, lineHeight: 1.4 }}>{term.desc}</p>
+                          <div style={{ fontSize: '12px', fontWeight: '800', color: colors.textPrimary }}>{term.title}</div>
+                          <div style={{ fontSize: '11px', color: colors.textSecondary, lineHeight: 1.4 }}>{term.desc}</div>
                         </div>
                       ))}
                     </div>
@@ -8559,6 +8751,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               </div>
             );
           })()}
+
 
           {/* ══════════════════════════════════════════════════════════════ */}
           {/* 14. TRADING QUIZ SUB-VIEW                                      */}
@@ -10556,40 +10749,81 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         </div>
       )}
 
-      {/* 7. AFFILIATE PAYOUT REQUEST MODAL */}
+      {/* 7. REFERRAL REWARDS PAYOUT REQUEST MODAL */}
       {showPayoutModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '12px' }}>
           <div style={{ backgroundColor: colors.bgSidebar, border: `1px solid ${colors.borderColor}`, borderRadius: '16px', width: '100%', maxWidth: '480px', padding: isMobile ? '16px' : '22px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <DollarSign size={18} color="#2563eb" /> Request Commission Settlement
+                <DollarSign size={18} color="#10b981" /> Request Referral Reward Payout
               </div>
-              <button onClick={() => { setShowPayoutModal(false); setPayoutSuccess(false); }} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => { setShowPayoutModal(false); setPayoutSuccess(false); setPayoutError(''); }} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
             {payoutSuccess ? (
               <div style={{ textAlign: 'center', padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                 <CheckCircle size={44} color={colors.accentGreen} />
-                <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Payout Request Dispatched!</div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: colors.textPrimary }}>Withdrawal Request Dispatched!</div>
                 <p style={{ fontSize: '12px', color: colors.textSecondary, margin: '0 10px', lineHeight: 1.4 }}>
-                  ₹4,800 ($58 USD equivalent) has been submitted for automated processing. You will receive an instant credit confirmation via SMS & Email.
+                  ₹{Number(payoutForm.amount || referralsData?.stats?.availableRewardBalance || 0).toFixed(2)} has been submitted for automated processing. Payout will be credited to your destination account.
                 </p>
-                <div style={{ backgroundColor: colors.bgInner, padding: '10px 16px', borderRadius: '8px', border: `1px solid ${colors.borderColor}`, fontSize: '11px', color: colors.textMuted }}>
-                  Transaction Reference: <b>REQ-{Math.floor(100000 + Math.random() * 900000)}</b>
-                </div>
-                <button onClick={() => { setShowPayoutModal(false); setPayoutSuccess(false); }} style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', marginTop: '6px' }}>Close</button>
+                <button onClick={() => { setShowPayoutModal(false); setPayoutSuccess(false); }} style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '8px 20px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', marginTop: '6px' }}>Close</button>
               </div>
             ) : (
-              <form onSubmit={(e) => { e.preventDefault(); setPayoutSuccess(true); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setPayoutError('');
+                const amt = parseFloat(payoutForm.amount);
+                if (!amt || amt < 100) {
+                  setPayoutError('Minimum withdrawal amount is ₹100.');
+                  return;
+                }
+                const avail = referralsData?.stats?.availableRewardBalance || 0;
+                if (amt > avail) {
+                  setPayoutError(`Amount exceeds available reward balance (₹${avail.toFixed(2)}).`);
+                  return;
+                }
+                try {
+                  setPayoutSubmitting(true);
+                  await handleReferralWithdraw(amt);
+                  setPayoutSuccess(true);
+                } catch (err) {
+                  setPayoutError(err.message || 'Failed to submit withdrawal request.');
+                } finally {
+                  setPayoutSubmitting(false);
+                }
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                
                 {/* Available Balance Strip */}
                 <div style={{ backgroundColor: colors.bgInner, border: `1px solid ${colors.borderColor}`, borderRadius: '10px', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>AVAILABLE UNPAID COMMISSION</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: colors.accentGreen }}>₹4,800 <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: '600' }}>($58.00)</span></div>
+                    <div style={{ fontSize: '10px', color: colors.textMuted, fontWeight: '700' }}>AVAILABLE REWARD BALANCE</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#10b981' }}>
+                      ₹{Number(referralsData?.stats?.availableRewardBalance || 0).toFixed(2)}
+                    </div>
                   </div>
-                  <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: colors.accentGreen, padding: '3px 8px', borderRadius: '4px' }}>
-                    READY FOR PAYOUT
+                  <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '3px 8px', borderRadius: '4px' }}>
+                    10% REWARDS
                   </span>
+                </div>
+
+                {payoutError && (
+                  <div style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '12px', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: colors.accentRed, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    {payoutError}
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Withdrawal Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="100"
+                    required
+                    placeholder="Enter amount (min ₹100)"
+                    value={payoutForm.amount}
+                    onChange={e => setPayoutForm({ ...payoutForm, amount: e.target.value })}
+                    style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
+                  />
                 </div>
 
                 <div>
@@ -10597,19 +10831,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <select value={payoutForm.method} onChange={e => setPayoutForm({ ...payoutForm, method: e.target.value })} style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}>
                     <option value="UPI">🇮🇳 UPI ID (Instant — GPay, PhonePe, Paytm)</option>
                     <option value="BANK">🏦 Bank Wire Transfer (IMPS / NEFT)</option>
-                    <option value="USDT">🪙 Crypto USDT (TRC-20 / BEP-20 Network)</option>
-                    <option value="PAYPAL">🌐 PayPal / Wise (International USD)</option>
                   </select>
                 </div>
 
                 <div>
                   <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>
-                    {payoutForm.method === 'UPI' ? 'UPI Virtual Payment Address' : (payoutForm.method === 'USDT' ? 'USDT TRC-20 Wallet Address' : (payoutForm.method === 'BANK' ? 'Bank Account Number & IFSC' : 'PayPal Email Address'))}
+                    {payoutForm.method === 'UPI' ? 'UPI Virtual Payment Address' : 'Bank Account Number & IFSC'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder={payoutForm.method === 'UPI' ? 'e.g. trader@okhdfcbank' : (payoutForm.method === 'USDT' ? 'e.g. TX982ha...902' : 'e.g. A/C 919201948, IFSC HDFC0001234')}
+                    placeholder={payoutForm.method === 'UPI' ? 'e.g. trader@okhdfcbank' : 'e.g. A/C 919201948, IFSC HDFC0001234'}
                     value={payoutForm.address}
                     onChange={e => setPayoutForm({ ...payoutForm, address: e.target.value })}
                     style={{ width: '100%', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '8px 10px', color: colors.textPrimary, fontSize: '12px', marginTop: '3px', outline: 'none' }}
@@ -10617,8 +10849,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
-                  <button type="button" onClick={() => setShowPayoutModal(false)} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 18px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Disburse ₹4,800 Now</button>
+                  <button type="button" onClick={() => { setShowPayoutModal(false); setPayoutError(''); }} style={{ backgroundColor: 'transparent', border: `1px solid ${colors.borderColor}`, color: colors.textSecondary, padding: '7px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" disabled={payoutSubmitting} style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '7px 18px', fontSize: '12px', fontWeight: '700', cursor: payoutSubmitting ? 'not-allowed' : 'pointer' }}>
+                    {payoutSubmitting ? 'Submitting...' : 'Request Payout'}
+                  </button>
                 </div>
               </form>
             )}

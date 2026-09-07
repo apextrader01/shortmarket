@@ -5559,14 +5559,24 @@ app.get('/api/referrals', authenticateToken, async (req, res) => {
     const pendingCount = referrals.filter(r => r.status === 'pending').length;
     const completedCount = referrals.filter(r => r.status === 'completed').length;
 
+    const withdrawals = await db('reward_withdrawals').where({ user_id: req.user.id }).orderBy('created_at', 'desc');
+    const blockedAmount = withdrawals.filter(w => ['PENDING', 'PROCESSING', 'CREDITED'].includes(w.status)).reduce((sum, w) => sum + parseFloat(w.amount), 0);
+    const totalWithdrawn = withdrawals.filter(w => w.status === 'CREDITED').reduce((sum, w) => sum + parseFloat(w.amount), 0);
+    const pendingWithdrawalAmount = withdrawals.filter(w => ['PENDING', 'PROCESSING'].includes(w.status)).reduce((sum, w) => sum + parseFloat(w.amount), 0);
+    const availableRewardBalance = Math.max(0, totalEarned - blockedAmount);
+
     res.json({
       success: true,
       referrals,
+      withdrawals,
       stats: {
         totalEarned,
         pendingCount,
         completedCount,
-        totalCount: referrals.length
+        totalCount: referrals.length,
+        totalWithdrawn,
+        pendingWithdrawalAmount,
+        availableRewardBalance
       }
     });
   } catch (err) {
