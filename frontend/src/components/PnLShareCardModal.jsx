@@ -85,8 +85,11 @@ export default function PnLShareCardModal({ trade, onClose }) {
   const productType = trade?.product_type || trade?.productLabel || 'INTRADAY';
   const side = trade?.side || (isProfit ? 'BUY' : 'SELL');
   const tag = trade?.tag || (isProfit ? 'Breakout Setup' : 'Risk Managed');
-  const dateStr = trade?.date || new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const marketSeg = trade?.market_segment || 'Indian';
+  const currency = (marketSeg === 'US' || marketSeg === 'Crypto' || marketSeg === 'Forex') ? '$' : '₹';
+  const locale = currency === '$' ? 'en-US' : 'en-IN';
+  const dateStr = trade?.date || new Date().toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
+  const timeStr = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
   const drawCard = () => {
     const canvas = canvasRef.current;
@@ -231,7 +234,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
     ctx.font = '600 20px sans-serif';
     ctx.fillText(isProfit ? 'TOTAL REALIZED NET PROFIT' : 'TOTAL REALIZED LOSS', 115, heroY + 50);
 
-    const pnlFormatted = (isProfit ? '+' : '-') + '₹' + Math.abs(pnl).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pnlFormatted = (isProfit ? '+' : '-') + currency + Math.abs(pnl).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     ctx.fillStyle = isProfit ? t.profitColor : t.lossColor;
     ctx.font = '900 76px sans-serif';
     ctx.fillText(pnlFormatted, 115, heroY + 135);
@@ -249,8 +252,8 @@ export default function PnLShareCardModal({ trade, onClose }) {
     const gridY = 625;
     const colWidth = (width - 160 - 36) / 3;
     const metrics = [
-      { label: 'ENTRY PRICE', val: '₹' + entryPrice.toFixed(2) },
-      { label: 'EXIT / LTP', val: '₹' + exitPrice.toFixed(2) },
+      { label: 'ENTRY PRICE', val: currency + entryPrice.toFixed(2) },
+      { label: 'EXIT / LTP', val: currency + exitPrice.toFixed(2) },
       { label: 'QUANTITY', val: quantity + ' Qty' }
     ];
 
@@ -340,7 +343,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
           setCopySuccess(true);
           setTimeout(() => setCopySuccess(false), 2500);
         } else {
-          const text = 'Short Edge Trade:\n' + displaySymbol + ' ' + side + ' | P&L: ' + (isProfit ? '+' : '') + '₹' + pnl.toFixed(2) + ' (' + pnlPercent.toFixed(2) + '%)\nExecuted on Short Edge Terminal';
+          const text = 'Short Edge Trade:\n' + displaySymbol + ' ' + side + ' | P&L: ' + (isProfit ? '+' : '') + currency + pnl.toFixed(2) + ' (' + pnlPercent.toFixed(2) + '%)\nExecuted on Short Edge Terminal';
           await navigator.clipboard.writeText(text);
           setCopySuccess(true);
           setTimeout(() => setCopySuccess(false), 2500);
@@ -357,7 +360,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
       'Short Edge Trade Result:\n' +
       'Symbol: ' + displaySymbol + '\n' +
       'Side: ' + side + ' (' + productType + ')\n' +
-      'Realized P&L: ' + (isProfit ? '+' : '') + '₹' + Math.abs(pnl).toLocaleString('en-IN') + '\n' +
+      'Realized P&L: ' + (isProfit ? '+' : '') + currency + Math.abs(pnl).toLocaleString(locale) + '\n' +
       'ROI: ' + (isProfit ? '+' : '') + pnlPercent.toFixed(2) + '%\n' +
       'Trader: @' + (user?.username || 'Trader') + '\n\n' +
       'Trade seamlessly on Short Edge: https://shortedge.in'

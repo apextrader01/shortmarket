@@ -1172,6 +1172,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         wins: 0,
         losses: 0,
         confidenceScore: 0,
+        profitFactor: '0.00',
+        expectancy: 0,
+        totalWinPnl: 0,
+        totalLossPnl: 0,
         topTrades: []
       };
     }
@@ -1188,7 +1192,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     filteredTrades.forEach(t => {
       const pnl = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
       const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
-      const chg = Number(t.charges || (marketSegment === 'Indian' ? 40 : (marketSegment === 'US' ? 0 : 2)));
+      const chg = Number(t.charges !== undefined && t.charges !== null && t.charges !== '' ? t.charges : (marketSegment === 'Indian' ? 40 : (marketSegment === 'US' ? 0 : 2)));
       totalNet += pnl;
       totalGross += gross;
       totalCharges += chg;
@@ -1206,9 +1210,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     const totalTrades = filteredTrades.length;
     const winRate = totalTrades > 0 ? Math.round((winCount / totalTrades) * 100) : 0;
     const avgWin = winCount > 0 ? totalWinPnl / winCount : 0;
-    const avgLoss = lossCount > 0 ? totalLossPnl / lossCount : 1;
-    const rrRatio = avgLoss > 0 ? `1:${(avgWin / avgLoss).toFixed(1)}` : '1:2.0';
+    const avgLoss = lossCount > 0 ? totalLossPnl / lossCount : 0;
+    const rrRatio = avgLoss > 0 ? `1:${(avgWin / avgLoss).toFixed(1)}` : (winCount > 0 ? '1:3.0+' : '1:0');
     const confidence = Math.min(100, Math.max(10, Math.round((winRate * 0.7) + (winCount > 5 ? 25 : 10))));
+
+    // Real Institutional Profit Factor (Gross Wins / Gross Losses)
+    const profitFactor = totalLossPnl > 0
+      ? (totalWinPnl / totalLossPnl).toFixed(2)
+      : (totalWinPnl > 0 ? (totalTrades > 0 ? (totalWinPnl / Math.max(1, totalCharges)).toFixed(2) : '3.50') : '0.00');
+
+    // Real Expectancy per Trade = (Win% * AvgWin) - (Loss% * AvgLoss)
+    const winRateDec = totalTrades > 0 ? winCount / totalTrades : 0;
+    const lossRateDec = totalTrades > 0 ? lossCount / totalTrades : 0;
+    const expectancy = Math.round((winRateDec * avgWin) - (lossRateDec * avgLoss));
 
     const topTrades = [...filteredTrades]
       .filter(t => Number(t.net_pnl !== undefined ? t.net_pnl : t.realized_pnl) > 0)
@@ -1226,6 +1240,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       wins: winCount,
       losses: lossCount,
       confidenceScore: confidence,
+      profitFactor,
+      expectancy,
+      totalWinPnl,
+      totalLossPnl,
       topTrades
     };
   }, [filteredTrades, marketSegment]);
@@ -2494,11 +2512,11 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     <div>
                       <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>PROFIT FACTOR</div>
                       <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: colors.accentGreen, marginTop: '4px' }}>
-                        {metrics.losses > 0 ? (metrics.wins > 0 ? (metrics.totalGross / Math.max(1, (metrics.losses * 1400))).toFixed(2) : '0.00') : (metrics.wins > 0 ? '4.85' : '0.00')}
+                        {metrics.profitFactor}
                       </div>
                     </div>
                     <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Expectancy: 2.1x
+                      Expectancy: {formatMoneyPlain(metrics.expectancy, marketSegment)}/tr
                     </div>
                   </div>
 
@@ -2832,7 +2850,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                                 {/* X-Axis Timeline Labels */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: colors.textMuted, marginTop: '2px', padding: '0 4px' }}>
                                   <span>{coords[0]?.date || 'Start'}</span>
-                                  {coords.length > 2 && <span>{coords[Math.floor(coords.length / 2)]?.label || coords[Math.floor(coords.length / 2)]?.date}</span>}
+                                  {coords.length > 2 && <span>{coords[Math.floor(coords.length / 2)]?.date || coords[Math.floor(coords.length / 2)]?.label}</span>}
                                   <span>{coords[coords.length - 1]?.date || 'Latest'} ({pnlPeriod === 'D' ? 'Daily' : (pnlPeriod === 'W' ? 'Weekly' : 'Monthly')})</span>
                                 </div>
                               </div>
@@ -5511,7 +5529,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
             // Compute Live Dynamic Metrics from Dataset
             const tradesAnalyzedCount = filteredTrades.length > 0 ? filteredTrades.length : allTrades.length;
             const winRate = metrics.winRate || 65;
-            const profitFactor = metrics.tradesCount > 0 ? (metrics.losses > 0 ? ((metrics.wins * 1.5) / (metrics.losses || 1)).toFixed(2) : '2.40') : '2.10';
+            const profitFactor = metrics.profitFactor || '0.00';
             const totalMistakesLoss = mistakes.reduce((acc, m) => acc + (parseFloat(m.loss) || 0), 0);
             
             // Dynamic Grade Calculation
@@ -5938,7 +5956,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               }
               const net = Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0));
               const gross = Number(t.realized_pnl !== undefined ? t.realized_pnl : (t.net_pnl || 0));
-              const chg = Number(t.charges || (marketSegment === 'Indian' ? 40 : 1.5));
+              const chg = Number(t.charges !== undefined && t.charges !== null && t.charges !== '' ? t.charges : (marketSegment === 'Indian' ? 40 : 1.5));
               const m = liveStatsMap[monthKey];
               m.totalTrades += 1;
               if (net > 0) m.wins += 1;
@@ -7550,7 +7568,18 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               let isRed = false;
               let pnlVal = 0;
 
-              if (marketSegment === 'Crypto') {
+              // Incorporate live logged trades for this date if present
+              const dayLoggedTrades = allTrades.filter(t => {
+                const seg = (t.market_segment || 'Indian').toLowerCase();
+                return seg === marketSegment.toLowerCase() && (t.trade_date === dateStr);
+              });
+
+              if (dayLoggedTrades.length > 0) {
+                const liveDayPnl = dayLoggedTrades.reduce((acc, t) => acc + Number(t.net_pnl !== undefined ? t.net_pnl : (t.realized_pnl || 0)), 0);
+                pnlVal = liveDayPnl;
+                isGreen = liveDayPnl > 0;
+                isRed = liveDayPnl < 0;
+              } else if (marketSegment === 'Crypto') {
                 // Crypto trades 7 days/week
                 isGreen = [1, 2, 4, 6, 7, 8, 9, 11, 13, 14, 15, 16, 18, 20, 21, 22, 25, 27, 28, 29].includes(dayNum);
                 isRed = [3, 5, 10, 12, 17, 19, 23, 24, 26].includes(dayNum);
@@ -9625,7 +9654,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: `1px solid ${colors.borderColor}` }}>
                 <span style={{ color: colors.textSecondary }}>Brokerage & Charges:</span>
-                <span style={{ fontWeight: '700', color: colors.textMuted }}>{formatMoneyPlain(viewingTrade.charges || 40, viewingTrade.market_segment || marketSegment)}</span>
+                <span style={{ fontWeight: '700', color: colors.textMuted }}>{formatMoneyPlain(viewingTrade.charges !== undefined && viewingTrade.charges !== null ? viewingTrade.charges : (viewingTrade.market_segment === 'US' ? 0 : 40), viewingTrade.market_segment || marketSegment)}</span>
               </div>
             </div>
 

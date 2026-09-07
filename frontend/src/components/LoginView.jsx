@@ -8,7 +8,17 @@ export default function LoginView() {
   const { login, preLogin, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, preLogin: state.preLogin, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset'
-  const [view, setView] = useState('login');
+  const [view, setView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      const urlParams = new URLSearchParams(window.location.search);
+      if (p.includes('/register') || p.includes('/signup') || p.includes('/ref/') || urlParams.get('ref')) {
+        return 'register';
+      }
+    }
+    return 'login';
+  });
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     let ref = urlParams.get('ref');
@@ -22,10 +32,10 @@ export default function LoginView() {
     }
     if (ref) {
       localStorage.setItem('referral_code', ref);
+      setView('register');
     }
   }, []);
 
-  
   const [username, setUsername] = useState('');
   const [phone,    setPhone]    = useState('');
   const [email,    setEmail]    = useState('');
