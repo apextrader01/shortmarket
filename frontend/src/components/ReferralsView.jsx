@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Copy, CheckCircle, Clock, TrendingUp, Loader2, ArrowLeft } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
@@ -40,7 +40,8 @@ export default function ReferralsView({ setActiveTab }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ referrals: [], stats: { totalEarned: 0, pendingCount: 0, completedCount: 0, totalCount: 0, totalWithdrawn: 0, pendingWithdrawalAmount: 0, availableRewardBalance: 0 } });
   
-  const refLink = `${window.location.origin}/register?ref=${user?.id || 'unknown'}`;
+  const refCode = user?.client_id || user?.id || 'unknown';
+  const refLink = `${window.location.origin}/register?ref=${refCode}`;
 
   useEffect(() => {
     fetchReferrals();
@@ -181,7 +182,10 @@ export default function ReferralsView({ setActiveTab }) {
             {data.referrals.map(ref => (
               <div key={ref.id} style={{ padding: '12px', background: 'var(--bg-hover)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '13px' }}>{ref.username}</div>
+                  <div style={{ fontWeight: '700', fontSize: '13px' }}>
+                    {ref.client_id && <span style={{ fontSize: '11px', color: '#60a5fa', marginRight: '6px', fontWeight: '800' }}>[{ref.client_id}]</span>}
+                    {ref.username}
+                  </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{maskEmail(ref.email)}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>{new Date(ref.created_at).toLocaleDateString()}</div>
                 </div>
@@ -211,7 +215,10 @@ export default function ReferralsView({ setActiveTab }) {
                 {data.referrals.map(ref => (
                   <tr key={ref.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
                     <td style={{ padding: '16px' }}>
-                      <div style={{ fontWeight: '600' }}>{ref.username}</div>
+                      <div style={{ fontWeight: '600' }}>
+                        {ref.client_id && <span style={{ fontSize: '11px', color: '#60a5fa', marginRight: '6px', fontWeight: '700' }}>[{ref.client_id}]</span>}
+                        {ref.username}
+                      </div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{maskEmail(ref.email)}</div>
                     </td>
                     <td style={{ padding: '16px' }}>

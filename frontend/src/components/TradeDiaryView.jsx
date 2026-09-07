@@ -221,10 +221,8 @@ const QUIZ_QUESTIONS = [
 ];
 
 export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfile, onNavigate }) {
-  const { user, positions, orders, theme, toggleTheme, prices, logout } = useStore(useShallow(state => ({
+  const { user, theme, toggleTheme, prices, logout } = useStore(useShallow(state => ({
     user: state.user,
-    positions: state.positions,
-    orders: state.orders,
     theme: state.theme,
     toggleTheme: state.toggleTheme,
     prices: state.prices,
@@ -1087,42 +1085,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
     }
   };
 
-  // Compile combined trades list (database trades + closed paper trading positions)
+  // Compile trades list (strictly from Trade Diary database records - isolated from paper trading)
   const allTrades = useMemo(() => {
-    const list = [...dbTrades];
-    const seen = new Set(list.map(t => t.trade_id || t.id));
-
-    // Also bring in closed paper trading positions from active session
-    (positions || []).forEach(p => {
-      const pnl = Number(p.realized_pnl || 0);
-      const isClosed = Number(p.quantity) === 0 || p.closed_quantity > 0;
-      const key = `POS-${p.id || p.symbol}`;
-      if (isClosed && !seen.has(key)) {
-        seen.add(key);
-        list.push({
-          id: key,
-          trade_id: key,
-          symbol: p.symbol,
-          trade_type: p.side || 'BUY',
-          product_type: p.product_type || 'INT',
-          market_segment: 'Indian',
-          entry_price: Number(p.average_price || 0),
-          exit_price: Number(p.exit_price || p.average_price || 0),
-          quantity: Math.abs(p.closed_quantity || p.quantity || 1),
-          realized_pnl: pnl,
-          charges: 40,
-          net_pnl: pnl - 40,
-          strategy: '⚡ Paper Trading',
-          emotion: pnl >= 0 ? '🎯 Disciplined Execution' : '🛡️ Plan Followed',
-          setup_rating: 5,
-          trade_date: p.updated_at ? p.updated_at.split('T')[0] : todayStr,
-          notes: 'Auto-imported from Paper Trading Terminal'
-        });
-      }
-    });
-
-    return list.sort((a, b) => new Date(b.trade_date || 0) - new Date(a.trade_date || 0));
-  }, [dbTrades, positions, todayStr]);
+    return [...dbTrades].sort((a, b) => new Date(b.trade_date || 0) - new Date(a.trade_date || 0));
+  }, [dbTrades]);
 
     // Market Currency & Formatting Helpers
   const currentMarketConfig = MARKET_CONFIGS[marketSegment] || MARKET_CONFIGS.Indian;
@@ -8145,9 +8111,9 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
           {/* 13. AFFILIATE & PARTNER SUB-VIEW                                */}
           {/* ══════════════════════════════════════════════════════════════ */}
           {activeTab === 'AFFILIATE' && (() => {
-            const rawSlug = user?.username ? user.username.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() : 'trader';
-            const referralSlug = customReferralSlug || rawSlug;
-            const fullReferralUrl = `https://shortedge.trade/ref/${referralSlug}`;
+            const defaultRefCode = user?.client_id || user?.id || (user?.username ? user.username.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() : 'trader');
+            const referralSlug = customReferralSlug || defaultRefCode;
+            const fullReferralUrl = `${window.location.origin}/register?ref=${referralSlug}`;
 
             const referralList = [
               { id: 1, name: 'Karan Mehra', date: '04 Sep 2026', market: 'Indian', plan: 'Pro Annual (₹7,999)', comm: '₹2,400', commVal: 2400, status: 'ACTIVE', trades: 42, avatar: 'KM' },
@@ -10685,7 +10651,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
               <div>
                 <label style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '600' }}>Vanity Slug</label>
                 <div style={{ display: 'flex', alignItems: 'center', backgroundColor: colors.bgInput, border: `1px solid ${colors.borderColor}`, borderRadius: '8px', padding: '0 10px', marginTop: '3px' }}>
-                  <span style={{ fontSize: '11px', color: colors.textMuted }}>shortedge.trade/ref/</span>
+                  <span style={{ fontSize: '11px', color: colors.textMuted }}>{window.location.host}/register?ref=</span>
                   <input
                     type="text"
                     required

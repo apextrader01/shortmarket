@@ -619,10 +619,31 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     // Generate Professional Client ID: SE + Base36(userId) padded to 6 chars
     const clientId = 'SE' + Number(userId).toString(36).toUpperCase().padStart(6, '0');
     await db('users').where({ id: userId }).update({ client_id: clientId });
-    // Handle Referral Logic
+    // Handle Referral Logic (supports client_id like 'SE000001', numeric user id, or username)
     if (referral_code) {
       try {
-        const referrer = await db('users').where({ id: referral_code }).first();
+        const codeTrimmed = String(referral_code).trim();
+        let referrer = null;
+        
+        // 1. Try lookup by client_id (case-insensitive)
+        referrer = await db('users')
+          .whereRaw('LOWER(client_id) = ?', [codeTrimmed.toLowerCase()])
+          .first();
+
+        // 2. Try lookup by numeric user id if it is purely digits
+        if (!referrer && /^\d+$/.test(codeTrimmed)) {
+          referrer = await db('users')
+            .where({ id: parseInt(codeTrimmed, 10) })
+            .first();
+        }
+
+        // 3. Try lookup by username (case-insensitive)
+        if (!referrer) {
+          referrer = await db('users')
+            .whereRaw('LOWER(username) = ?', [codeTrimmed.toLowerCase()])
+            .first();
+        }
+
         if (referrer && referrer.id !== userId) {
           await db('referrals').insert({
             referrer_id: referrer.id,
@@ -753,7 +774,28 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       sameSite: isHttps ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
-    res.json({ success: true, token, user: { id: user.id, username: user.username, balance: user.balance || 1000000.0, is_admin: Boolean(user.is_admin), is_onboarded: Boolean(user.is_onboarded), watchlists, subscription_tier: user.subscription_tier || 'BASIC', subscription_expires: user.subscription_expires } });
+    let clientId = user.client_id;
+    if (!clientId) {
+      clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+    }
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        client_id: clientId,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        balance: user.balance || 1000000.0,
+        is_admin: Boolean(user.is_admin),
+        is_onboarded: Boolean(user.is_onboarded),
+        watchlists,
+        subscription_tier: user.subscription_tier || 'BASIC',
+        subscription_expires: user.subscription_expires
+      }
+    });
   } catch (err) {
     const errorMsg = err.message || String(err);
     if (errorMsg.includes('ECONNREFUSED') || String(err).includes('ECONNREFUSED')) {
@@ -912,6 +954,10 @@ app.get('/api/user', authenticateToken, async (req, res) => {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
     delete user.password_hash;
+    if (!user.client_id) {
+      user.client_id = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: user.id }).update({ client_id: user.client_id }).catch(() => {});
+    }
     if (typeof user.watchlists === 'string') user.watchlists = JSON.parse(user.watchlists);
     user.balance = parseFloat(user.balance || 0);
     user.is_admin = Boolean(user.is_admin);
@@ -5506,7 +5552,7 @@ app.get('/api/referrals', authenticateToken, async (req, res) => {
     const referrals = await db('referrals')
       .join('users', 'referrals.referred_user_id', 'users.id')
       .where('referrals.referrer_id', req.user.id)
-      .select('referrals.*', 'users.username', 'users.email')
+      .select('referrals.*', 'users.username', 'users.email', 'users.client_id')
       .orderBy('referrals.created_at', 'desc');
 
     const totalEarned = referrals.filter(r => r.status === 'completed').reduce((sum, r) => sum + parseFloat(r.reward_amount || 0), 0);
