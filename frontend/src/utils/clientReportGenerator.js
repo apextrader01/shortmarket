@@ -95,6 +95,18 @@ export function filterRecordsByPeriod(records = [], period = 'All Time', customS
   });
 }
 
+function isDerivativeOption(sym) {
+  if (!sym) return false;
+  const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+  return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+}
+
+function isDerivativeFuture(sym) {
+  if (!sym) return false;
+  const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+  return /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+}
+
 /**
  * Standard Indian Regulatory Charges Calculator
  */
@@ -103,8 +115,8 @@ export function calculateIndianCharges(order) {
   const price = Number(order.average_price || order.price || order.execution_price || 0);
   const tradeValue = qty * price;
   const isDelivery = (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY');
-  const isOption = /(CE|PE|OPT)/i.test(order.symbol || '');
-  const isFuture = /FUT/i.test(order.symbol || '');
+  const isOption = isDerivativeOption(order.symbol || '');
+  const isFuture = !isOption && isDerivativeFuture(order.symbol || '');
   const isMCX = /(MCX|GOLD|SILVER|CRUDE|NATURALGAS|COPPER)/i.test(order.symbol || '');
   const isSell = (order.side === 'SELL' || order.type === 'SELL');
 
@@ -371,7 +383,7 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
     if (!scripMap[sym]) {
       scripMap[sym] = {
         symbol: sym,
-        segment: /(CE|PE|OPT)/i.test(sym) ? 'F&O Options' : (/FUT/i.test(sym) ? 'F&O Futures' : ((o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') ? 'Equity Delivery' : 'Equity Intraday')),
+        segment: isDerivativeOption(sym) ? 'F&O Options' : (isDerivativeFuture(sym) ? 'F&O Futures' : ((o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') ? 'Equity Delivery' : 'Equity Intraday')),
         buyQty: 0,
         buyVal: 0,
         sellQty: 0,
@@ -552,8 +564,8 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
   executed.forEach(o => {
     const sym = o.symbol || '';
     let seg = 'Equity Intraday';
-    if (/(CE|PE|OPT)/i.test(sym)) seg = 'F&O Options';
-    else if (/FUT/i.test(sym)) seg = 'F&O Futures';
+    if (isDerivativeOption(sym)) seg = 'F&O Options';
+    else if (isDerivativeFuture(sym)) seg = 'F&O Futures';
     else if (/(MCX|GOLD|SILVER|CRUDE)/i.test(sym)) seg = 'Commodity (MCX)';
     else if (o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') seg = 'Equity Delivery';
 

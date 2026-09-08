@@ -38,8 +38,9 @@ function lookupDerivativeBySymbol(symbol) {
  * @returns {number} The required margin in INR.
  */
 function calculateRequiredMargin(symbol, product_type, side, quantity, price, assetDetails = {}) {
-    const isOptions = symbol.match(/(CE|PE)$/i);
-    const isFutures = symbol.match(/FUT$/i);
+    const cleanSym = String(symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+    const isOptions = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+    const isFutures = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
     const contractValue = quantity * price;
     
     // 1. Equity Margin Rules

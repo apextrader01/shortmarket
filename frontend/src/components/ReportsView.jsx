@@ -961,9 +961,12 @@ const TradingInsights = () => {
       // Segment Filter
       if (selectedSegment !== 'All') {
         const sym = entry.symbol || '';
-        if (selectedSegment === 'Equity' && (/(CE|PE|OPT|FUT|MCX)/i.test(sym))) return false;
-        if (selectedSegment === 'F&O' && (!/(CE|PE|OPT|FUT)/i.test(sym) || /MCX/i.test(sym))) return false;
-        if (selectedSegment === 'Commodity' && !/(MCX|GOLD|SILVER|CRUDE)/i.test(sym)) return false;
+        const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+        const isDeriv = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+        const isComm = /(MCX|GOLD|SILVER|CRUDE|NATURALGAS|COPPER)/i.test(sym);
+        if (selectedSegment === 'Equity' && (isDeriv || isComm)) return false;
+        if (selectedSegment === 'F&O' && (!isDeriv || isComm)) return false;
+        if (selectedSegment === 'Commodity' && !isComm) return false;
       }
 
       const entryDate = new Date(entry.created_at);

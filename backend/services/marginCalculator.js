@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const fs = require('fs');
 
 let lotsizeMap = {};
@@ -146,7 +146,7 @@ function calculateOrderMargin({
 
   const isOpt = isOption !== null 
     ? isOption 
-    : (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('CE') || cleanSym.endsWith('PE'));
+    : /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   const isFut = !isOpt && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT'));
   const isEq = !isOpt && !isFut;
 

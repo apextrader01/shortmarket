@@ -40,7 +40,7 @@ function initCronJobs(priceCache, triggerEngine) {
     const isDerivativeSymbol = (symbol) => {
         if (!symbol || typeof symbol !== 'string') return false;
         const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-        return /(CE|PE|FUT|OPT)/i.test(clean) || symbol.includes('-MCX');
+        return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || symbol.includes('-MCX');
     };
 
     // Helper: Check if symbol expires today

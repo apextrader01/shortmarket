@@ -148,8 +148,8 @@ export default function PortfolioView() {
         totalInvestedMutualFunds += invested;
         countMutualFunds++;
       } else if (
-        symbolStr.endsWith('CE') || symbolStr.endsWith('PE') || symbolStr.endsWith('FUT') ||
         symbolStr.includes('-MCX') || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym) ||
+        /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT') ||
         ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSym.startsWith(c))
       ) {
         totalInvestedDerivatives += invested;

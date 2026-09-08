@@ -1,4 +1,4 @@
-﻿import { getInstantLotsize, isDerivativeContract, isCommodityContract } from './lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract } from './lotsizeHelper';
 
 let dynamicMarginOverrides = {};
 
@@ -125,7 +125,7 @@ export function calculateOrderMargin({
   // Determine contract category
   const isOpt = isOption !== null 
     ? isOption 
-    : (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('CE') || cleanSym.endsWith('PE'));
+    : /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   const isFut = !isOpt && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT'));
   const isEq = !isOpt && !isFut;
 
