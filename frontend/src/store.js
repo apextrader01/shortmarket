@@ -54,13 +54,16 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         symbol: symbol,
         ltp: rawData[0],
         ch: rawData[1],
+        change: rawData[1],
         chp: rawData[2],
+        pct: rawData[2],
         timestamp: rawData[3],
         open: rawData[4],
         high: rawData[5],
         low: rawData[6],
         close: rawData[7],
         vol: rawData[8],
+        volume: rawData[8],
         totBuyQuan: rawData[9],
         totSellQuan: rawData[10]
       };

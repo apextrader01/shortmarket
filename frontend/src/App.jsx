@@ -93,18 +93,12 @@ const TopIndexTicker = React.memo(() => {
   );
 });
 
-// ⚡ Isolated Background Alert Monitor: Runs checks only when alerts exist
-const BackgroundPriceMonitor = React.memo(() => {
+// ⚡ Isolated Background Alert Monitor: Runs checks only when active alerts exist
+const ActiveAlertChecker = React.memo(({ activeAlerts }) => {
   const prices = useStore(state => state.prices);
-  const alerts = useStore(state => state.alerts);
   const updateAlert = useStore(state => state.updateAlert);
 
-  // Background Alert Checking Engine
   useEffect(() => {
-    if (!alerts || alerts.length === 0) return;
-    const activeAlerts = alerts.filter(a => !a.triggered);
-    if (activeAlerts.length === 0) return;
-
     activeAlerts.forEach(alert => {
       const priceData = prices[alert.symbol];
       if (!priceData) return;
@@ -128,16 +122,22 @@ const BackgroundPriceMonitor = React.memo(() => {
         }
       }
     });
-  }, [prices, alerts, updateAlert]);
+  }, [prices, activeAlerts, updateAlert]);
 
   return null;
+});
+
+const BackgroundPriceMonitor = React.memo(() => {
+  const activeAlerts = useStore(state => (state.alerts || []).filter(a => !a.triggered));
+  if (!activeAlerts || activeAlerts.length === 0) return null;
+  return <ActiveAlertChecker activeAlerts={activeAlerts} />;
 });
 
 function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement })));
+  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
@@ -664,12 +664,12 @@ function App() {
       {editOrderModal?.isOpen && <EditOrderModal />}
       {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       <Suspense fallback={null}>
-        <MarketDepthModal />
-        <DOMLadderModal />
-        <ChartModal />
+        {marketDepthModal?.isOpen && <MarketDepthModal />}
+        {domLadderModal?.isOpen && <DOMLadderModal />}
+        {chartModalSymbol && <ChartModal />}
       </Suspense>
-      <AlertModal />
-      <BasketModal />
+      {alertModalSymbol && <AlertModal />}
+      {basketModalOpen && <BasketModal />}
       {user && isLocked && isUserPinEnabled(user.id) && (
         <BiometricLockModal onUnlock={() => setIsLocked(false)} />
       )}

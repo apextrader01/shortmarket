@@ -221,12 +221,43 @@ const QUIZ_QUESTIONS = [
   }
 ];
 
+const DiaryIndexChip = React.memo(({ idx, isMobile, isLight, colors }) => {
+  const live = useStore(state => state.prices[idx.key]);
+  const pct = live ? Number(live.pct) : idx.fallbackPct;
+  const isPositive = pct >= 0;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        fontSize: isMobile ? '11px' : '12px',
+        fontWeight: '600',
+        whiteSpace: 'nowrap',
+        backgroundColor: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)',
+        padding: isMobile ? '3px 7px' : '4px 9px',
+        borderRadius: '6px',
+        border: `1px solid ${colors.borderColor}`,
+        flexShrink: 0
+      }}
+    >
+      <span style={{ color: colors.textSecondary }}>{idx.name}:</span>
+      <span style={{
+        color: isPositive ? colors.accentGreen : colors.accentRed,
+        fontWeight: '700'
+      }}>
+        {isPositive ? '+' : ''}{pct.toFixed(2)}%
+      </span>
+    </div>
+  );
+});
+
 export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfile, onNavigate }) {
-  const { user, theme, toggleTheme, prices, logout } = useStore(useShallow(state => ({
+  const { user, theme, toggleTheme, logout } = useStore(useShallow(state => ({
     user: state.user,
     theme: state.theme,
     toggleTheme: state.toggleTheme,
-    prices: state.prices,
     logout: state.logout
   })));
 
@@ -2196,38 +2227,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 paddingRight: '6px'
               }}
             >
-              {indexList.map((idx) => {
-                const live = prices[idx.key];
-                const pct = live ? Number(live.pct) : idx.fallbackPct;
-                const isPositive = pct >= 0;
-
-                return (
-                  <div
-                    key={idx.name}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: isMobile ? '11px' : '12px',
-                      fontWeight: '600',
-                      whiteSpace: 'nowrap',
-                      backgroundColor: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.04)',
-                      padding: isMobile ? '3px 7px' : '4px 9px',
-                      borderRadius: '6px',
-                      border: `1px solid ${colors.borderColor}`,
-                      flexShrink: 0
-                    }}
-                  >
-                    <span style={{ color: colors.textSecondary }}>{idx.name}:</span>
-                    <span style={{
-                      color: isPositive ? colors.accentGreen : colors.accentRed,
-                      fontWeight: '700'
-                    }}>
-                      {isPositive ? '+' : ''}{pct.toFixed(2)}%
-                    </span>
-                  </div>
-                );
-              })}
+              {indexList.map((idx) => (
+                <DiaryIndexChip
+                  key={idx.name}
+                  idx={idx}
+                  isMobile={isMobile}
+                  isLight={isLight}
+                  colors={colors}
+                />
+              ))}
             </div>
           </div>
 

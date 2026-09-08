@@ -5,8 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignR
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect }) => {
-  const isSelected = useStore(state => state.selectedSymbol) === stock.uniqueSymbol;
-  const setSelectedSymbol = useStore(state => state.setSelectedSymbol);
+  const isSelected = useStore(state => state.selectedSymbol === stock.uniqueSymbol);
   const data = useStore(state => 
     state.prices[stock.uniqueSymbol] || 
     state.prices[stock.symbol] || 
@@ -16,12 +15,6 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
     state.prices[`BSE:${stock.symbol}`]
   );
   
-  const addStockToWatchlist = useStore(state => state.addStockToWatchlist);
-  const removeStockFromWatchlist = useStore(state => state.removeStockFromWatchlist);
-  const openOrderModal = useStore(state => state.openOrderModal);
-  const openMarketDepthModal = useStore(state => state.openMarketDepthModal);
-  const setAlertModalSymbol = useStore(state => state.setAlertModalSymbol);
-  
   const isUp = data?.pct >= 0;
   const isDown = data?.pct < 0;
   
@@ -29,13 +22,15 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
   const isInWatchlist = (activeWatchlist?.symbols || []).includes(stock.uniqueSymbol);
   const currentLotsize = (stock.lotsize && Number(stock.lotsize) > 1) ? Number(stock.lotsize) : (data?.lotsize && Number(data.lotsize) > 1) ? Number(data.lotsize) : getInstantLotsize(stock.uniqueSymbol);
 
+  const handleSelect = () => {
+    useStore.getState().setSelectedSymbol(stock.uniqueSymbol);
+    if (onStockSelect) onStockSelect();
+  };
+
   return (
     <div
       onClick={() => {
-        if (!isSearchMode) {
-          setSelectedSymbol(stock.uniqueSymbol);
-          if (onStockSelect) onStockSelect();
-        }
+        if (!isSearchMode) handleSelect();
       }}
       className={`watchlist-item ${isSelected ? 'selected' : ''}`}
       style={{
@@ -53,10 +48,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
       <div 
         style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}
         onClick={() => {
-          if (isSearchMode) {
-            setSelectedSymbol(stock.uniqueSymbol);
-            if (onStockSelect) onStockSelect();
-          }
+          if (isSearchMode) handleSelect();
         }}
       >
         <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
@@ -76,7 +68,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
+                useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
               }}
               style={{
                 display: 'inline-flex',
@@ -101,7 +93,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol);
+                useStore.getState().addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol);
               }}
               style={{
                 display: 'inline-flex',
@@ -145,11 +137,11 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
 
           {/* Action Buttons - revealed purely via CSS :hover (cannot get stuck on mouse sweep) */}
           <div className="watchlist-hover-actions">
-            <div onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>B</div>
-            <div onClick={(e) => { e.stopPropagation(); openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>S</div>
-            <div onClick={(e) => { e.stopPropagation(); setAlertModalSymbol(stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Set Price Alert"><Bell size={12} color="var(--color-yellow)" /></div>
-            <div onClick={(e) => { e.stopPropagation(); removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Remove"><Trash2 size={12} color="var(--color-red-light)" /></div>
-            <div onClick={(e) => { e.stopPropagation(); openMarketDepthModal(stock.uniqueSymbol, currentLotsize); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Market Depth"><AlignRight size={12} color="var(--color-blue)" /></div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>B</div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>S</div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().setAlertModalSymbol(stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Set Price Alert"><Bell size={12} color="var(--color-yellow)" /></div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Remove"><Trash2 size={12} color="var(--color-red-light)" /></div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openMarketDepthModal(stock.uniqueSymbol, currentLotsize); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Market Depth"><AlignRight size={12} color="var(--color-blue)" /></div>
           </div>
         </div>
       )}

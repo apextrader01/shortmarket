@@ -1209,13 +1209,12 @@ const TradingInsights = () => {
 // 5. DOWNLOAD REPORTS WITH REPORT CONFIGURATION MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 const DownloadReports = () => {
-  const { positions, orders, holdings, token, user, prices } = useStore(useShallow(state => ({ 
+  const { positions, orders, holdings, token, user } = useStore(useShallow(state => ({ 
     positions: state.positions, 
     orders: state.orders, 
     holdings: state.holdings,
     token: state.token,
-    user: state.user,
-    prices: state.prices
+    user: state.user
   })));
 
   const [activeCard, setActiveCard] = useState('tax_pnl');
@@ -1278,7 +1277,8 @@ const DownloadReports = () => {
       } else if (reportId === 'contract_note') {
         generateContractNoteReport(effectiveOrders, user, contractDate, format);
       } else if (reportId === 'dp_holdings') {
-        generateDPHoldingReport(holdings, prices, user, format);
+        const currentPrices = useStore.getState().prices || {};
+        generateDPHoldingReport(holdings, currentPrices, user, format);
       }
 
       showToast(`✅ ${reportTitle} (${format.toUpperCase()}) triggered successfully!`);

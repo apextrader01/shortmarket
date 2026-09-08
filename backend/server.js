@@ -4947,11 +4947,21 @@ io.on('connection', (socket) => {
     symbolsArray.forEach(sym => {
       if (sym && typeof sym === 'string') {
         socket.join(sym);
-        if (priceCache[sym]) {
-          requestedCache[sym] = priceCache[sym];
-        } else {
-          const raw = sym.includes(':') ? sym.split(':')[1] : null;
-          if (raw && priceCache[raw]) requestedCache[sym] = priceCache[raw];
+        const p = priceCache[sym] || (sym.includes(':') ? priceCache[sym.split(':')[1]] : null);
+        if (p) {
+          requestedCache[sym] = [
+            p.ltp,
+            p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),
+            p.pct !== undefined ? p.pct : (p.chp !== undefined ? p.chp : 0),
+            p.timestamp || p.ts || Date.now(),
+            p.open,
+            p.high,
+            p.low,
+            p.close,
+            p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
+            p.totBuyQuan || 0,
+            p.totSellQuan || 0
+          ];
         }
       }
     });
@@ -5864,7 +5874,7 @@ server.listen(PORT, async () => {
               });
             } catch(e) {}
           });
-          const posRows = await db('positions').where('qty', '!=', 0).select('symbol').catch(() => []);
+          const posRows = await db('positions').where('quantity', '!=', 0).select('symbol').catch(() => []);
           posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
           const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
           ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
@@ -5876,7 +5886,15 @@ server.listen(PORT, async () => {
       setTimeout(bootSubscribeFromDB, 5000);
       setTimeout(bootSubscribeFromDB, 15000);
       setTimeout(bootSubscribeFromDB, 30000);
-      setInterval(bootSubscribeFromDB, 5 * 60 * 1000);
+      setInterval(async () => {
+        // ⚡ Guard: If markets are closed across all segments, skip heavy recurring DB scans
+        try {
+          if (!isSegmentMarketOpen('NSE') && !isSegmentMarketOpen('MCX') && !isSegmentMarketOpen('BSE')) {
+            return;
+          }
+        } catch(e) {}
+        bootSubscribeFromDB();
+      }, 5 * 60 * 1000);
       // ---------------------------------
 
       // Update options master in background
