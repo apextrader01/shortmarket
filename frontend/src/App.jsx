@@ -43,6 +43,8 @@ import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen } from 'lucide-react';
 
+const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
+
 // ⚡ Isolated Index Chip: Only re-renders when its own index ticks
 const IndexChip = React.memo(({ label, price }) => {
   const isUp = price?.pct >= 0;
