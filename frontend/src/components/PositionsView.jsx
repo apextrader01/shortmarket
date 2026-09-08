@@ -4,6 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2 } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
+const EMPTY_PRICES = {};
+
 export default function PositionsView() {
   const isToday = (dateString) => {
     if (!dateString) return false;
@@ -21,7 +23,7 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, prices, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, prices: state.prices, orders: state.orders })));
+  const { positions, holdings, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, orders: state.orders })));
   
   const mergedHoldingsMap = {};
   if (viewMode === 'HOLDINGS') {
@@ -116,6 +118,26 @@ export default function PositionsView() {
     }
   }, [sourceData]);
 
+  // ⚡ Performance optimization: closed positions have fixed realized PnL and do not re-render on ticks.
+  // Open and holding positions subscribe exclusively to their own held symbols, ignoring unrelated ticks.
+  const relevantSymbols = useMemo(() => {
+    if (viewMode === 'CLOSED') return [];
+    const syms = new Set();
+    (sourceData || []).forEach(p => {
+      if (p.symbol) syms.add(p.symbol);
+    });
+    return Array.from(syms);
+  }, [sourceData, viewMode]);
+
+  const relevantPrices = useStore(useShallow(state => {
+    if (relevantSymbols.length === 0) return EMPTY_PRICES;
+    const map = {};
+    for (const sym of relevantSymbols) {
+      if (state.prices[sym]) map[sym] = state.prices[sym];
+    }
+    return map;
+  }));
+
   // Group positions by Symbol + Product Type (Flat List)
   const { flatPositions, globalMTM } = useMemo(() => {
     let globalMTM = 0;
@@ -171,7 +193,7 @@ export default function PositionsView() {
       const posQty = Number(pos.quantity) || 0;
       if (posQty === 0 && viewMode === 'OPEN') return;
 
-      const priceData = prices[pos.symbol] || {};
+      const priceData = relevantPrices[pos.symbol] || {};
       const avg = parseFloat(pos.average_price) || 0;
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : (avg || 0);
       const qty = posQty;
@@ -231,7 +253,7 @@ export default function PositionsView() {
     });
 
     return { flatPositions: flatList, globalMTM };
-  }, [sourceData, prices, viewMode]);
+  }, [sourceData, relevantPrices, viewMode]);
 
   const exitAllPositions = async () => {
     const openPositions = flatPositions.filter(p => Number(p.qty) !== 0 && Number(p.unencumberedQty) > 0 && p.product_type !== 'BO' && p.product_type !== 'CO');

@@ -205,7 +205,11 @@ const isMarketHours = () => {
 function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLoading }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { marketStatus, updateMarketStatus, fetchMarketStatus } = useStore();
+  const { marketStatus, updateMarketStatus, fetchMarketStatus } = useStore(useShallow(state => ({
+    marketStatus: state.marketStatus,
+    updateMarketStatus: state.updateMarketStatus,
+    fetchMarketStatus: state.fetchMarketStatus
+  })));
   const [marketUpdating, setMarketUpdating] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -496,7 +500,13 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
 }
 
 function MarketCalendarTab({ isMobile }) {
-  const { marketCalendar, fetchMarketCalendar, saveMarketCalendarDate, deleteMarketCalendarDate, seedMarketHolidays } = useStore();
+  const { marketCalendar, fetchMarketCalendar, saveMarketCalendarDate, deleteMarketCalendarDate, seedMarketHolidays } = useStore(useShallow(state => ({
+    marketCalendar: state.marketCalendar,
+    fetchMarketCalendar: state.fetchMarketCalendar,
+    saveMarketCalendarDate: state.saveMarketCalendarDate,
+    deleteMarketCalendarDate: state.deleteMarketCalendarDate,
+    seedMarketHolidays: state.seedMarketHolidays
+  })));
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);

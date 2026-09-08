@@ -75,19 +75,23 @@ class MTMRiskManager {
             const istDateStr = formatter.format(new Date()); // "YYYY-MM-DD"
             const todayStart = new Date(`${istDateStr}T00:00:00+05:30`);
 
-            // Fetch today's executed orders to calculate today's realized P&L for Risk Guardian users
-            const todayOrders = await db('orders')
-                .whereIn('user_id', userIdsWithPositions)
-                .where('created_at', '>=', todayStart)
-                .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
-                .select('user_id', 'realized_pnl');
-
+            // Fetch today's executed orders ONLY for users with active Risk Guardian
+            const rgUsers = users.filter(u => u.risk_guardian_active && Number(u.max_daily_loss) > 0);
             const userRealizedPnl = {};
-            todayOrders.forEach(ord => {
-                if (ord.realized_pnl !== null && ord.realized_pnl !== undefined) {
-                    userRealizedPnl[ord.user_id] = (userRealizedPnl[ord.user_id] || 0) + parseFloat(ord.realized_pnl);
-                }
-            });
+            if (rgUsers.length > 0) {
+                const rgUserIds = rgUsers.map(u => u.id);
+                const todayOrders = await db('orders')
+                    .whereIn('user_id', rgUserIds)
+                    .where('created_at', '>=', todayStart)
+                    .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
+                    .select('user_id', 'realized_pnl');
+
+                todayOrders.forEach(ord => {
+                    if (ord.realized_pnl !== null && ord.realized_pnl !== undefined) {
+                        userRealizedPnl[ord.user_id] = (userRealizedPnl[ord.user_id] || 0) + parseFloat(ord.realized_pnl);
+                    }
+                });
+            }
 
             for (const user of users) {
                 const uid = user.id;

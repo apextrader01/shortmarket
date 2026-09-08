@@ -4,10 +4,14 @@ import { useStore, socket } from '../store';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
-  const { domLadderModal, closeDomLadderModal, marketDepthData, prices, oneClickMode, oneClickMultiplier, placeOrder, openOrderModal } = useStore(useShallow(state => ({ domLadderModal: state.domLadderModal, closeDomLadderModal: state.closeDomLadderModal, marketDepthData: state.marketDepthData, prices: state.prices, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder, openOrderModal: state.openOrderModal })));
-
+  const domLadderModal = useStore(state => state.domLadderModal);
   const symbol = domLadderModal.symbol;
-  const basicData = prices[symbol] || {};
+  const basicData = useStore(state => symbol ? state.prices[symbol] : null) || {};
+  const marketDepthData = useStore(state => state.marketDepthData);
+  const oneClickMode = useStore(state => state.oneClickMode);
+  const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
+  const { closeDomLadderModal, placeOrder, openOrderModal } = useStore.getState();
+
   const lotsize = domLadderModal.lotsize || basicData.lotsize || 1;
   
   const [centerPrice, setCenterPrice] = useState(0);

@@ -23,6 +23,8 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 
+const EMPTY_PRICES = {};
+
 export default function PortfolioView() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   React.useEffect(() => {
@@ -36,11 +38,10 @@ export default function PortfolioView() {
   const [sortBy, setSortBy] = useState('VALUE_DESC'); // 'VALUE_DESC', 'PNL_DESC', 'PNL_ASC', 'NAME_ASC'
   const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'PROFIT', 'LOSS'
 
-  const { positions, holdings, prices, orders } = useStore(
+  const { positions, holdings, orders } = useStore(
     useShallow(state => ({ 
       positions: state.positions, 
       holdings: state.holdings, 
-      prices: state.prices, 
       orders: state.orders 
     }))
   );
@@ -119,9 +120,28 @@ export default function PortfolioView() {
   const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);
   const deliveryPositions = allMergedHoldings.filter(h => !h.symbol.endsWith('-MF'));
 
+  // ⚡ Performance: subscribe exclusively to prices of held assets
+  const portfolioSymbols = useMemo(() => {
+    const syms = new Set();
+    (holdings || []).forEach(h => { if (h.symbol) syms.add(h.symbol); });
+    (positions || []).forEach(p => { if (p.symbol) syms.add(p.symbol); });
+    return Array.from(syms);
+  }, [holdings, positions]);
+
+  const portfolioPrices = useStore(
+    useShallow(state => {
+      if (portfolioSymbols.length === 0) return EMPTY_PRICES;
+      const map = {};
+      for (const sym of portfolioSymbols) {
+        if (state.prices[sym]) map[sym] = state.prices[sym];
+      }
+      return map;
+    })
+  );
+
   const calculatePnL = (pos, isHolding = false) => {
     if (!pos) return;
-    const priceData = prices[pos.symbol] || {};
+    const priceData = portfolioPrices[pos.symbol] || {};
     const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
     const qty = Math.abs(Number(pos.quantity) || 0);
     
@@ -205,7 +225,7 @@ export default function PortfolioView() {
   // Filter & Sort Holdings
   const processedHoldings = useMemo(() => {
     let list = deliveryPositions.map(pos => {
-      const priceData = prices[pos.symbol] || {};
+      const priceData = portfolioPrices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
       const qty = Math.abs(pos.quantity);
       const invested = parseFloat(pos.average_price) * qty;
@@ -247,7 +267,7 @@ export default function PortfolioView() {
     });
 
     return list;
-  }, [deliveryPositions, prices, searchTerm, filterType, sortBy]);
+  }, [deliveryPositions, portfolioPrices, searchTerm, filterType, sortBy]);
 
   // Asset percentage helper
   const getAssetPct = (val) => {

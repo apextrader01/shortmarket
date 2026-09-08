@@ -6,10 +6,15 @@ import { socket } from '../store'; // Import socket to emit subscribe events
 import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function MarketDepthModal() {
-  const { marketDepthModal, closeMarketDepthModal, marketDepthData, prices, oneClickMode, oneClickMultiplier, placeOrder, openOrderModal, orderModal } = useStore(useShallow(state => ({ marketDepthModal: state.marketDepthModal, closeMarketDepthModal: state.closeMarketDepthModal, marketDepthData: state.marketDepthData, prices: state.prices, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder, openOrderModal: state.openOrderModal, orderModal: state.orderModal })));
-
+  const marketDepthModal = useStore(state => state.marketDepthModal);
   const symbol = marketDepthModal.symbol;
-  const basicData = prices[symbol] || {};
+  const basicData = useStore(state => symbol ? state.prices[symbol] : null) || {};
+  const marketDepthData = useStore(state => state.marketDepthData);
+  const oneClickMode = useStore(state => state.oneClickMode);
+  const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
+  const orderModal = useStore(state => state.orderModal);
+  const { closeMarketDepthModal, placeOrder, openOrderModal } = useStore.getState();
+
   const lotSize = (marketDepthModal.lotsize && Number(marketDepthModal.lotsize) > 1) ? Number(marketDepthModal.lotsize) : (basicData.lotsize && Number(basicData.lotsize) > 1) ? Number(basicData.lotsize) : getInstantLotsize(symbol);
 
   useEffect(() => {

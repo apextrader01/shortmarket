@@ -4,7 +4,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { X, Maximize2, Info } from 'lucide-react';
 
 export default function EditOrderModal() {
-  const { editOrderModal, closeEditOrderModal, user, updateOrder, prices } = useStore(useShallow(state => ({ editOrderModal: state.editOrderModal, closeEditOrderModal: state.closeEditOrderModal, user: state.user, updateOrder: state.updateOrder, prices: state.prices })));
+  const editOrderModal = useStore(state => state.editOrderModal);
+  const user = useStore(state => state.user);
+  const { closeEditOrderModal, updateOrder } = useStore.getState();
   const order = editOrderModal.order;
   
   const [quantity, setQuantity] = useState(1);
@@ -16,8 +18,9 @@ export default function EditOrderModal() {
   const [isMarket, setIsMarket] = useState(false);
 
   const symbol = order ? order.symbol : null;
-  const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
-  const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
+  const priceData = useStore(state => symbol ? state.prices[symbol] : null);
+  const isUp = priceData ? priceData.pct >= 0 : true;
+  const livePrice = priceData ? priceData.ltp || 0 : 0;
 
   // Determine if BO or CO (handles both Parent Open Orders and Child Pending Legs)
   const isBOParent = order ? !!(order.sl_price && order.tgt_price) : false;

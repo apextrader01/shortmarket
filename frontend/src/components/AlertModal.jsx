@@ -4,14 +4,11 @@ import { X, Bell } from 'lucide-react';
 
 export default function AlertModal() {
   const symbol = useStore(state => state.alertModalSymbol);
-  const setAlertModalSymbol = useStore(state => state.setAlertModalSymbol);
-  const addAlert = useStore(state => state.addAlert);
-  const prices = useStore(state => state.prices);
+  const ltp = useStore(state => symbol ? state.prices[symbol]?.ltp || 0 : 0);
+  const { setAlertModalSymbol, addAlert } = useStore.getState();
 
   const [condition, setCondition] = useState('ABOVE');
   const [targetPrice, setTargetPrice] = useState('');
-
-  const ltp = prices[symbol]?.ltp || 0;
 
   useEffect(() => {
     if (symbol) {

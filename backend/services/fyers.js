@@ -607,9 +607,7 @@ async function garbageCollectSubscriptions() {
     if (staleFyersSymbols.length > 0) {
         console.log(`[GC] Unsubscribing ${staleFyersSymbols.length} stale symbols from Fyers...`);
         try {
-            for (let i = 0; i < staleFyersSymbols.length; i++) {
-                wsInstance.unsubscribe([staleFyersSymbols[i]]);
-            }
+            wsInstance.unsubscribe(staleFyersSymbols);
         } catch(e) {}
     }
 }

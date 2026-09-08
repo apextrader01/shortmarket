@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Trophy, RefreshCw, Users, ShieldCheck, Flame, Gift, Calendar, Award, Sparkles, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function LeaderboardView() {
-  const { leaderboard, leaderboardLoading, fetchLeaderboard, activeContest, activeContestLoading, fetchActiveContest } = useStore();
+  const { leaderboard, leaderboardLoading, fetchLeaderboard, activeContest, activeContestLoading, fetchActiveContest } = useStore(useShallow(state => ({
+    leaderboard: state.leaderboard,
+    leaderboardLoading: state.leaderboardLoading,
+    fetchLeaderboard: state.fetchLeaderboard,
+    activeContest: state.activeContest,
+    activeContestLoading: state.activeContestLoading,
+    fetchActiveContest: state.fetchActiveContest
+  })));
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showRules, setShowRules] = useState(false);
 
