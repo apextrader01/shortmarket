@@ -94,11 +94,14 @@ const TopIndexTicker = React.memo(() => {
 });
 
 // ⚡ Isolated Background Alert Monitor: Runs checks only when active alerts exist
-const ActiveAlertChecker = React.memo(({ activeAlerts }) => {
+const ActiveAlertChecker = React.memo(() => {
+  const alerts = useStore(state => state.alerts);
   const prices = useStore(state => state.prices);
   const updateAlert = useStore(state => state.updateAlert);
 
   useEffect(() => {
+    if (!alerts || alerts.length === 0) return;
+    const activeAlerts = alerts.filter(a => !a.triggered);
     activeAlerts.forEach(alert => {
       const priceData = prices[alert.symbol];
       if (!priceData) return;
@@ -122,15 +125,16 @@ const ActiveAlertChecker = React.memo(({ activeAlerts }) => {
         }
       }
     });
-  }, [prices, activeAlerts, updateAlert]);
+  }, [prices, alerts, updateAlert]);
 
   return null;
 });
 
 const BackgroundPriceMonitor = React.memo(() => {
-  const activeAlerts = useStore(state => (state.alerts || []).filter(a => !a.triggered));
-  if (!activeAlerts || activeAlerts.length === 0) return null;
-  return <ActiveAlertChecker activeAlerts={activeAlerts} />;
+  // ⚡ Uses boolean primitive (true/false) so Zustand never re-triggers when alerts are empty
+  const hasActiveAlerts = useStore(state => Boolean(state.alerts && state.alerts.some(a => !a.triggered)));
+  if (!hasActiveAlerts) return null;
+  return <ActiveAlertChecker />;
 });
 
 function App() {
