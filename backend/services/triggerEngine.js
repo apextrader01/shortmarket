@@ -28,9 +28,12 @@ class TriggerEngine {
             // Clear existing triggers in Redis
             const { generalClient } = require('./redisClient');
             if (generalClient && generalClient.isReady) {
-                const keys = await generalClient.keys('trigger:*');
-                if (keys.length > 0) {
-                    await generalClient.del(keys);
+                const triggerKeys = [];
+                for await (const k of generalClient.scanIterator({ MATCH: 'trigger:*', COUNT: 100 })) {
+                    triggerKeys.push(k);
+                }
+                if (triggerKeys.length > 0) {
+                    await generalClient.del(triggerKeys);
                 }
             }
             

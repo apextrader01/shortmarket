@@ -27,9 +27,25 @@ class MTMRiskManager {
     start() {
         if (this.isRunning) return;
         this.isRunning = true;
-        // Run the MTM & Risk Guardian evaluation every 2.5 seconds
-        setInterval(() => this.evaluateMTM(), 2500);
-        console.log('🛡️  MTM & Risk Guardian Auto-Exit Manager active (evaluating every 2.5s).');
+        this.scheduleNextEvaluation();
+        console.log('🛡️  MTM & Risk Guardian Auto-Exit Manager active (evaluating every 1 minute / 60s).');
+    }
+
+    scheduleNextEvaluation() {
+        if (!this.isRunning) return;
+        const isMarketActive = this.marketChecker ? this.marketChecker() : isAnyMarketOpen();
+        const nextDelay = 60000; // 1 minute (60,000 ms)
+        this.evalTimer = setTimeout(async () => {
+            try {
+                if (isMarketActive) {
+                    await this.evaluateMTM();
+                }
+            } catch (err) {
+                console.error('MTM Evaluation error:', err);
+            } finally {
+                this.scheduleNextEvaluation();
+            }
+        }, nextDelay);
     }
 
     async evaluateMTM() {
@@ -40,8 +56,8 @@ class MTMRiskManager {
         this.isChecking = true;
         try {
             const now = Date.now();
-            // Cache positions for 2 seconds to reduce DB pressure while keeping checks fast
-            if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 2000) {
+            // Cache positions for 30 seconds to reduce DB pressure while keeping checks fast
+            if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 30000) {
                 this.cachedPositions = await db('positions')
                     .whereNot({ quantity: 0 });
                 this.lastCacheTime = now;
@@ -75,7 +91,7 @@ class MTMRiskManager {
             const istDateStr = formatter.format(new Date()); // "YYYY-MM-DD"
             const todayStart = new Date(`${istDateStr}T00:00:00+05:30`);
 
-            // Fetch today's executed orders ONLY for users with active Risk Guardian
+            // Fetch today's executed orders ONLY for users with active Risk Guardian (aggregated in SQL)
             const rgUsers = users.filter(u => u.risk_guardian_active && Number(u.max_daily_loss) > 0);
             const userRealizedPnl = {};
             if (rgUsers.length > 0) {
@@ -84,12 +100,11 @@ class MTMRiskManager {
                     .whereIn('user_id', rgUserIds)
                     .where('created_at', '>=', todayStart)
                     .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
-                    .select('user_id', 'realized_pnl');
+                    .groupBy('user_id')
+                    .select('user_id', db.raw('COALESCE(SUM(realized_pnl), 0) as total_pnl'));
 
                 todayOrders.forEach(ord => {
-                    if (ord.realized_pnl !== null && ord.realized_pnl !== undefined) {
-                        userRealizedPnl[ord.user_id] = (userRealizedPnl[ord.user_id] || 0) + parseFloat(ord.realized_pnl);
-                    }
+                    userRealizedPnl[ord.user_id] = parseFloat(ord.total_pnl) || 0;
                 });
             }
 
@@ -137,9 +152,10 @@ class MTMRiskManager {
                 if (user.risk_guardian_active && user.max_daily_loss && Number(user.max_daily_loss) > 0) {
                     const maxLossLimit = parseFloat(user.max_daily_loss);
                     if (totalDailyPnl < 0 && Math.abs(totalDailyPnl) >= maxLossLimit) {
-                        console.log(`[RISK GUARDIAN AUTO-EXIT] User ${uid} hit Max Daily Loss Limit (Total Loss: ₹${Math.abs(totalDailyPnl).toFixed(2)} >= Limit: ₹${maxLossLimit}). Auto-squaring off all open positions!`);
+                        const auditReason = `Risk Guardian: Daily loss limit ₹${maxLossLimit.toLocaleString('en-IN')} reached (Realized: ₹${todayRealized.toFixed(2)}, Open P&L: ₹${totalUnrealizedPnl.toFixed(2)}, Total Daily P&L: ₹${totalDailyPnl.toFixed(2)})`;
+                        console.log(`[RISK GUARDIAN AUTO-EXIT] User ${uid} hit Max Daily Loss Limit. ${auditReason}. Auto-squaring off all open positions!`);
                         this.lastLiquidationTime[uid] = now;
-                        await this.liquidateUser(uid, positions, `Risk Guardian: Daily loss limit ₹${maxLossLimit.toLocaleString('en-IN')} reached`, false);
+                        await this.liquidateUser(uid, positions, auditReason, false);
                         continue;
                     }
                 }
@@ -148,9 +164,10 @@ class MTMRiskManager {
                 const intradayPositions = positions.filter(p => p.product_type !== 'DEL');
                 if (intradayPositions.length > 0 && totalCapital > 0) {
                     if (netIntradayMtm < 0 && Math.abs(netIntradayMtm) >= (totalCapital * 0.95)) {
-                        console.log(`[RMS ALERT] User ${uid} hit 95% MTM Loss (Net Loss ₹${Math.abs(netIntradayMtm).toFixed(2)} >= ₹${(totalCapital * 0.95).toFixed(2)} [95% of ₹${totalCapital.toFixed(2)} capital]). Liquidating intraday positions!`);
+                        const auditReason = `RMS 95% Margin Call Liquidation (Net Intraday Loss: ₹${Math.abs(netIntradayMtm).toFixed(2)} reached 95% of ₹${totalCapital.toFixed(2)} capital)`;
+                        console.log(`[RMS ALERT] User ${uid} hit 95% MTM Loss. ${auditReason}. Liquidating intraday positions!`);
                         this.lastLiquidationTime[uid] = now;
-                        await this.liquidateUser(uid, intradayPositions, 'RMS 95% Margin Call Liquidation', true);
+                        await this.liquidateUser(uid, intradayPositions, auditReason, true);
                     }
                 }
             }
@@ -180,12 +197,13 @@ class MTMRiskManager {
                     cancelledOrders.push(ord);
                 }
 
-                // 2. Liquidate / Auto-exit all positions
+                // 2. Liquidate / Auto-exit all positions with full audit detail
+                const auditTag = isRMSPenalty ? `Auto-Square-Off (RMS: ${reason})` : `Risk Guardian Auto-Exit (${reason})`;
                 for (const pos of positions) {
                     const ltp = this.priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
                     if (ltp <= 0) continue;
 
-                    await LedgerService.closePosition(trx, userId, pos.id, ltp, isRMSPenalty, isRMSPenalty ? 'Auto-Square-Off (RMS)' : 'Risk Guardian Auto-Exit');
+                    await LedgerService.closePosition(trx, userId, pos.id, ltp, isRMSPenalty, auditTag);
                     console.log(`[AUTO-EXIT EXECUTED] Closed ${pos.symbol} for user ${userId} at ₹${ltp} (${reason})`);
                 }
             });

@@ -775,28 +775,60 @@ export const useStore = create(persist((set, get) => ({
       try {
         syncClientTelemetry(API).catch(() => {});
         const headers = {  };
-        const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
-          fetch(`${API}/api/positions`, { credentials: 'include', headers }),
-          fetch(`${API}/api/orders`, { credentials: 'include', headers }),
-          fetch(`${API}/api/user`, { credentials: 'include', headers }),
-          fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
-          fetch(`${API}/api/sips`, { credentials: 'include', headers }),
-        ]);
-        const [positions, orders, user, holdData, sipsData] = await Promise.all([
-          posRes.json().catch(() => ({})), 
-          ordRes.json().catch(() => ({})), 
-          userRes.json().catch(() => ({})),
-          holdRes.json().catch(() => ({})),
-          sipsRes.json().catch(() => ({}))
-        ]);
+
+        let positions, orders, user, holdData, sipsList;
+        let authFailed = false;
+
+        try {
+          const bootRes = await fetch(`${API}/api/user/bootstrap`, { credentials: 'include', headers });
+          if (bootRes.status === 401 || bootRes.status === 403) {
+            authFailed = true;
+          } else if (bootRes.ok) {
+            const data = await bootRes.json();
+            user = data.user;
+            positions = data.positions;
+            orders = data.orders;
+            holdData = data.holdings;
+            sipsList = data.sips;
+          }
+        } catch (_) {
+          // Network or parsing error on bootstrap, will fallback below
+        }
+
+        // Graceful Fallback to individual requests if bootstrap endpoint fails
+        if (!user && !authFailed) {
+          const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
+            fetch(`${API}/api/positions`, { credentials: 'include', headers }),
+            fetch(`${API}/api/orders`, { credentials: 'include', headers }),
+            fetch(`${API}/api/user`, { credentials: 'include', headers }),
+            fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
+            fetch(`${API}/api/sips`, { credentials: 'include', headers }),
+          ]);
+          const [pData, oData, uData, hData, sData] = await Promise.all([
+            posRes.json().catch(() => ({})), 
+            ordRes.json().catch(() => ({})), 
+            userRes.json().catch(() => ({})),
+            holdRes.json().catch(() => ({})),
+            sipsRes.json().catch(() => ({}))
+          ]);
+          if (userRes.status === 401 || userRes.status === 403 || uData?.error) {
+            authFailed = true;
+          } else {
+            positions = pData;
+            orders = oData;
+            user = uData;
+            holdData = hData;
+            sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
+          }
+        }
         
-        if (userRes.status === 401 || userRes.status === 403 || user?.error) {
+        if (authFailed || user?.error) {
           console.error("Auth failed during fetchUserData, logging out.", user?.error);
           get().logout();
           return;
         }
         
-        if (!get().user) return;
+        if (!get().user && !user) return;
         
         const now = Date.now();
         const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
@@ -804,7 +836,7 @@ export const useStore = create(persist((set, get) => ({
         set({
           positions: Array.isArray(positions) ? positions : get().positions, 
           holdings: Array.isArray(holdData) ? holdData : get().holdings,
-          sips: (sipsData && sipsData.success && Array.isArray(sipsData.sips)) ? sipsData.sips : get().sips,
+          sips: Array.isArray(sipsList) ? sipsList : get().sips,
           orders: Array.isArray(orders) ? orders : get().orders, 
           user: (user && !user.error) ? user : get().user,
           watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists

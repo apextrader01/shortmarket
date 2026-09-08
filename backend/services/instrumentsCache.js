@@ -89,14 +89,22 @@ function getLotSizes(symbols) {
 
 function getAllStocks() {
     // Only return stocks and spots for the main API response
-    // Filter out futures and options
-    return allInstruments.filter(item => {
-        const clean = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
-        const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
-        const isFut = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
-        const isNSE_BSE = item.exchange === 'NSE' || item.exchange === 'BSE';
-        return isNSE_BSE && !isOpt && !isFut;
-    });
+    // Filter out futures and options, and slim payload to essential fields
+    return allInstruments
+        .filter(item => {
+            const clean = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
+            const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+            const isFut = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+            const isNSE_BSE = item.exchange === 'NSE' || item.exchange === 'BSE';
+            return isNSE_BSE && !isOpt && !isFut;
+        })
+        .map(item => ({
+            symbol: item.symbol,
+            name: item.name,
+            exchange: item.exchange,
+            lotsize: item.lotsize || 1,
+            token: item.token || ''
+        }));
 }
 
 function searchInstruments(query) {

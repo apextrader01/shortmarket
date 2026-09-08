@@ -86,6 +86,14 @@ async function callTelegramApi(chatId, messageText, parseMode = 'HTML') {
 /**
  * Background Queue Worker - Processes messages smoothly without blocking Node.js event loop
  */
+function triggerQueue() {
+  if (isProcessingQueue || alertQueue.length === 0 || !systemConfig.global_enabled) return;
+  processQueue().catch(err => console.error('[TelegramService] Error in queue worker:', err));
+}
+
+/**
+ * Background Queue Worker - Processes messages smoothly without blocking Node.js event loop
+ */
 async function processQueue() {
   if (isProcessingQueue || alertQueue.length === 0) return;
   isProcessingQueue = true;
@@ -93,7 +101,7 @@ async function processQueue() {
   try {
     while (alertQueue.length > 0) {
       if (!systemConfig.global_enabled) {
-        alertQueue.length = 0; // Clear queue if disabled
+        alertQueue.length = 0; // Clear queue if disabled/paused by admin
         break;
       }
 
@@ -110,8 +118,8 @@ async function processQueue() {
         if (elapsed < (systemConfig.batch_delay_seconds || 10)) {
           // Re-queue and wait delay
           alertQueue.unshift(item);
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
+          setTimeout(triggerQueue, 1000);
+          break;
         }
       }
 
@@ -123,11 +131,14 @@ async function processQueue() {
     console.error('[TelegramService] Error in queue worker:', err);
   } finally {
     isProcessingQueue = false;
+    if (alertQueue.length > 0 && systemConfig.global_enabled) {
+      setImmediate(triggerQueue);
+    }
   }
 }
 
-// Queue worker interval
-setInterval(processQueue, 250);
+// Fallback safety-net check once every 60s instead of 250ms (saves 345,600 timer wakes/day)
+setInterval(triggerQueue, 60000).unref();
 
 /**
  * Send Telegram alert to user
@@ -211,6 +222,7 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
       text: message,
       queuedAt: Date.now()
     });
+    triggerQueue();
 
   } catch (err) {
     console.error('[TelegramService] Error queuing alert:', err.message);
@@ -255,6 +267,9 @@ async function broadcastTelegramMessage(messageText) {
         });
         count++;
       }
+    }
+    if (count > 0) {
+      triggerQueue();
     }
     return { success: true, queuedCount: count };
   } catch (err) {
@@ -415,6 +430,11 @@ function updateSystemConfig(newCfg) {
     ...systemConfig,
     ...newCfg
   };
+  if (systemConfig.global_enabled) {
+    triggerQueue();
+  } else {
+    alertQueue.length = 0; // Paused/Stopped by Admin: flush pending queue
+  }
   return getSystemConfig();
 }
 

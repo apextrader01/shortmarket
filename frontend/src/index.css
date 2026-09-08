@@ -890,7 +890,7 @@ input:checked + .slider:before {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(22, 22, 22, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: #161616;
   color: #888;
   font-size: 11px;
   font-weight: 600;
@@ -905,7 +905,7 @@ input:checked + .slider:before {
 }
 
 .option-chain-table th.header-call {
-  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: #0d0d0d;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
@@ -915,7 +915,7 @@ input:checked + .slider:before {
 }
 
 .option-chain-table th.header-put {
-  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: #0d0d0d;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
@@ -924,7 +924,7 @@ input:checked + .slider:before {
 }
 
 .option-chain-table th.header-strike {
-  background: rgba(13, 13, 13, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: #0d0d0d;
   text-align: center;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   padding: 8px;

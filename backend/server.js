@@ -416,7 +416,7 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
 app.get('/api/stocks', async (req, res) => {
   try {
     const { generalClient } = require('./services/redisClient');
-    const cacheKey = 'api:stocks:nse_bse';
+    const cacheKey = 'api:stocks:nse_bse:v2';
     
     // 1. Try Redis cache first
     if (generalClient && generalClient.isReady) {
@@ -971,6 +971,82 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   }
 });
 
+// ⚡ High-Performance 5-in-1 User Bootstrap Endpoint (Cuts Client Network Polls by 80%)
+app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [userRow, positionsRows, holdingsRows, ordersRows, sipsRows] = await Promise.all([
+      db('users').where({ id: userId }).first(),
+      db('positions').where({ user_id: userId }),
+      db('holdings').where({ user_id: userId }).whereNot({ quantity: 0 }).orderBy('id', 'desc'),
+      db('orders').where({ user_id: userId }).orderBy('created_at', 'desc').limit(5000),
+      db('sips').where({ user_id: userId })
+    ]);
+
+    if (!userRow) return res.status(404).json({ error: 'User not found' });
+
+    delete userRow.password_hash;
+    if (!userRow.client_id) {
+      userRow.client_id = 'SE' + Number(userRow.id).toString(36).toUpperCase().padStart(6, '0');
+      db('users').where({ id: userRow.id }).update({ client_id: userRow.client_id }).catch(() => {});
+    }
+    if (typeof userRow.watchlists === 'string') {
+      try {
+        userRow.watchlists = JSON.parse(userRow.watchlists);
+      } catch (_) {
+        userRow.watchlists = [];
+      }
+    }
+    userRow.balance = parseFloat(userRow.balance || 0);
+    userRow.is_admin = Boolean(userRow.is_admin);
+    userRow.is_onboarded = Boolean(userRow.is_onboarded);
+
+    const formattedPositions = (positionsRows || []).map(p => ({
+      ...p,
+      quantity: Number(p.quantity),
+      closed_quantity: Number(p.closed_quantity || 0),
+      average_price: Number(p.average_price || 0),
+      exit_price: p.exit_price !== null && p.exit_price !== undefined ? Number(p.exit_price) : null,
+      margin: Number(p.margin || 0),
+      realized_pnl: Number(p.realized_pnl || 0)
+    }));
+
+    const LEGACY_FIX_MAP = {
+      'EDEL-MF': { code: '118615', fallbackNav: 61.66 },
+      'EDEL':    { code: '118615', fallbackNav: 61.66 },
+      'MIRA-MF': { code: '118825', fallbackNav: 126.99 },
+      'MIRA':    { code: '118825', fallbackNav: 126.99 },
+      'NIPP-MF': { code: '118778', fallbackNav: 209.96 },
+      'NIPP':    { code: '118778', fallbackNav: 209.96 }
+    };
+
+    const formattedHoldings = holdingsRows || [];
+    for (const h of formattedHoldings) {
+      if (LEGACY_FIX_MAP[h.symbol] && Math.round(Number(h.average_price)) === 100) {
+        const item = LEGACY_FIX_MAP[h.symbol];
+        const realNav = priceCache[h.symbol]?.ltp || item.fallbackNav;
+        const invested = Number(h.quantity) * Number(h.average_price);
+        const correctedQty = parseFloat((invested / realNav).toFixed(4));
+        h.average_price = realNav;
+        h.quantity = correctedQty;
+        db('holdings').where({ id: h.id }).update({ average_price: realNav, quantity: correctedQty }).catch(() => {});
+      }
+    }
+
+    res.json({
+      success: true,
+      user: userRow,
+      positions: formattedPositions,
+      holdings: formattedHoldings,
+      orders: ordersRows || [],
+      sips: sipsRows || []
+    });
+  } catch (err) {
+    console.error('[User Bootstrap Error]:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/user/profile_picture', authenticateToken, async (req, res) => {
   try {
     const { profile_picture_url } = req.body;
@@ -1320,25 +1396,46 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
         }
 
         if (minutes === 0 || tf === 'all') {
-            // Cumulative All-Time Stats
-            const apiKeys = await generalClient.keys('telemetry:api:*');
-            const userKeys = await generalClient.keys('telemetry:user:*');
+            // Cumulative All-Time Stats (Non-blocking lookup)
+            let routes = await generalClient.sMembers('telemetry:routes').catch(() => []);
+            let users = await generalClient.sMembers('telemetry:users').catch(() => []);
 
-            const apiStats = [];
-            for (const k of apiKeys) {
-                const data = await generalClient.hGetAll(k);
-                apiStats.push({
-                    route: k.replace('telemetry:api:', ''),
+            // Fallback to non-blocking SCAN if sets are not yet populated
+            if (!routes || routes.length === 0) {
+                routes = [];
+                for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:api:*', COUNT: 100 })) {
+                    routes.push(k.replace('telemetry:api:', ''));
+                }
+            }
+            if (!users || users.length === 0) {
+                users = [];
+                for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:user:*', COUNT: 100 })) {
+                    users.push(k.replace('telemetry:user:', ''));
+                }
+            }
+
+            const apiPipeline = generalClient.multi();
+            routes.forEach(r => apiPipeline.hGetAll(`telemetry:api:${r}`));
+            const apiResults = routes.length > 0 ? await apiPipeline.exec() : [];
+
+            const apiStats = routes.map((route, i) => {
+                const data = apiResults[i] || {};
+                return {
+                    route,
                     count: parseInt(data.count || 0),
                     totalTime: parseInt(data.time_ms || 0),
                     totalBytes: parseInt(data.bytes || 0)
-                });
-            }
+                };
+            });
+
+            const userPipeline = generalClient.multi();
+            users.forEach(u => userPipeline.hGetAll(`telemetry:user:${u}`));
+            const userResults = users.length > 0 ? await userPipeline.exec() : [];
 
             const userStats = [];
-            for (const k of userKeys) {
-                const userId = k.replace('telemetry:user:', '');
-                const data = await generalClient.hGetAll(k);
+            for (let i = 0; i < users.length; i++) {
+                const userId = users[i];
+                const data = userResults[i] || {};
                 const dbUser = await db('users').where({ id: userId }).first();
                 userStats.push({
                     userId,
@@ -1351,7 +1448,7 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             }
             return res.json({ api: apiStats, users: userStats, system, timeframe: 'all' });
         } else {
-            // Timeframe / Minute-Bucket Aggregation
+            // Timeframe / Minute-Bucket Aggregation (Non-blocking SCAN)
             const now = Date.now();
             const targetBuckets = new Set();
             const pad = (n) => String(n).padStart(2, '0');
@@ -1361,9 +1458,8 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
                 targetBuckets.add(bucket);
             }
 
-            const mbKeys = await generalClient.keys('telemetry:mb:*');
             const validKeys = [];
-            for (const k of mbKeys) {
+            for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:mb:*', COUNT: 200 })) {
                 const parts = k.split(':');
                 if (parts.length >= 5 && targetBuckets.has(parts[2])) {
                     validKeys.push({ key: k, type: parts[3], identifier: parts.slice(4).join(':') });
@@ -1422,9 +1518,12 @@ app.post('/api/admin/telemetry/reset', authenticateToken, async (req, res) => {
         const { generalClient } = require('./services/redisClient');
         if (!generalClient || !generalClient.isReady) return res.status(503).json({ error: 'Redis offline' });
 
-        const keys = await generalClient.keys('telemetry:*');
-        if (keys.length > 0) {
-            await generalClient.del(keys);
+        const keysToDelete = [];
+        for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:*', COUNT: 200 })) {
+            keysToDelete.push(k);
+        }
+        if (keysToDelete.length > 0) {
+            await generalClient.del(keysToDelete);
         }
         res.json({ success: true, message: 'Telemetry metrics reset successfully' });
     } catch (err) {

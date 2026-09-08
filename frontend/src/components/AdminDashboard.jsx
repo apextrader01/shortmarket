@@ -233,7 +233,7 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
       }
     };
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    const interval = setInterval(fetchStatus, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1310,7 +1310,7 @@ export default function AdminDashboard() {
       finally { setFyersLoading(false); }
     };
     checkFyers();
-    const interval = setInterval(checkFyers, 3000);
+    const interval = setInterval(checkFyers, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1845,7 +1845,7 @@ export default function AdminDashboard() {
     if (activeTab !== 'telemetry' || !isLiveTelemetry) return;
     const interval = setInterval(() => {
       fetchAdminTelemetry?.(telemetryTimeframe);
-    }, 5000);
+    }, 60000);
     return () => clearInterval(interval);
   }, [activeTab, isLiveTelemetry, telemetryTimeframe]);
 
@@ -2693,6 +2693,41 @@ export default function AdminDashboard() {
                 }}>
                   {telegramAdminConfig?.config?.global_enabled ? '🟢 ENGINE ACTIVE' : '🔴 ENGINE PAUSED'}
                 </span>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTgSaving(true);
+                    const targetState = !telegramAdminConfig?.config?.global_enabled;
+                    await updateTelegramAdminConfig?.({
+                      ...tgConfigForm,
+                      global_enabled: targetState
+                    });
+                    setTgConfigForm(prev => ({ ...prev, global_enabled: targetState }));
+                    setTgSaving(false);
+                  }}
+                  disabled={tgSaving}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    padding: '6px 14px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    borderRadius: '6px',
+                    background: telegramAdminConfig?.config?.global_enabled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                    border: telegramAdminConfig?.config?.global_enabled ? '1px solid #ef4444' : '1px solid #22c55e',
+                    color: telegramAdminConfig?.config?.global_enabled ? '#f87171' : '#4ade80',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {telegramAdminConfig?.config?.global_enabled ? (
+                    <>⏸️ Pause Alerts</>
+                  ) : (
+                    <>▶️ Go Live (Resume)</>
+                  )}
+                </button>
 
                 <button
                   type="button"
