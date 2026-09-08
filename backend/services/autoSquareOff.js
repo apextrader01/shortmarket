@@ -11,26 +11,77 @@ const MONTH_MAP = {
 
 let _symbolToExpiryMap = null;
 let _lastMapLoadTime = 0;
-function getSymbolToExpiryMap() {
-    const now = Date.now();
-    if (_symbolToExpiryMap && (now - _lastMapLoadTime < 3600000)) return _symbolToExpiryMap;
-    _symbolToExpiryMap = {};
-    _lastMapLoadTime = now;
-    try {
-        const futData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8'));
-        Object.values(futData).flat().forEach(f => _symbolToExpiryMap[f.symbol] = f.expiry);
-        
-        const optData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8'));
-        for (const name in optData) {
-            for (const expiry in optData[name]) {
-                for (const strike in optData[name][expiry]) {
-                    if (optData[name][expiry][strike].CE) _symbolToExpiryMap[optData[name][expiry][strike].CE.symbol] = expiry;
-                    if (optData[name][expiry][strike].PE) _symbolToExpiryMap[optData[name][expiry][strike].PE.symbol] = expiry;
+let _isLoadingMap = false;
+
+function buildExpiryMapFromRaw(futRaw, optRaw) {
+    const newMap = {};
+    if (futRaw) {
+        try {
+            const futData = typeof futRaw === 'string' ? JSON.parse(futRaw) : futRaw;
+            Object.values(futData).flat().forEach(f => {
+                if (f && f.symbol && f.expiry) newMap[f.symbol] = f.expiry;
+            });
+        } catch (e) {}
+    }
+    if (optRaw) {
+        try {
+            const optData = typeof optRaw === 'string' ? JSON.parse(optRaw) : optRaw;
+            for (const name in optData) {
+                for (const expiry in optData[name]) {
+                    for (const strike in optData[name][expiry]) {
+                        const contract = optData[name][expiry][strike];
+                        if (contract && contract.CE && contract.CE.symbol) newMap[contract.CE.symbol] = expiry;
+                        if (contract && contract.PE && contract.PE.symbol) newMap[contract.PE.symbol] = expiry;
+                    }
                 }
             }
+        } catch (e) {}
+    }
+    return newMap;
+}
+
+function reloadSymbolToExpiryMapAsync() {
+    if (_isLoadingMap) return;
+    _isLoadingMap = true;
+    const futPath = path.join(__dirname, '../database/futures.json');
+    const optPath = path.join(__dirname, '../database/options.json');
+
+    Promise.all([
+        fs.promises.readFile(futPath, 'utf8').catch(() => null),
+        fs.promises.readFile(optPath, 'utf8').catch(() => null)
+    ]).then(([futRaw, optRaw]) => {
+        if (futRaw || optRaw) {
+            _symbolToExpiryMap = buildExpiryMapFromRaw(futRaw, optRaw);
+            _lastMapLoadTime = Date.now();
         }
+    }).catch(err => {
+        console.error("Error building symbolToExpiryMap async:", err.message);
+    }).finally(() => {
+        _isLoadingMap = false;
+    });
+}
+
+// Warm up map asynchronously on boot
+reloadSymbolToExpiryMapAsync();
+
+function getSymbolToExpiryMap() {
+    const now = Date.now();
+    if (_symbolToExpiryMap) {
+        if (now - _lastMapLoadTime >= 3600000) {
+            reloadSymbolToExpiryMapAsync();
+        }
+        return _symbolToExpiryMap;
+    }
+    
+    // One-time fallback if called before first async load completes
+    try {
+        const futRaw = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
+        const optRaw = fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8');
+        _symbolToExpiryMap = buildExpiryMapFromRaw(futRaw, optRaw);
+        _lastMapLoadTime = now;
     } catch (e) {
-        console.error("Error building symbolToExpiryMap", e.message);
+        console.error("Error building symbolToExpiryMap fallback:", e.message);
+        _symbolToExpiryMap = {};
     }
     return _symbolToExpiryMap;
 }

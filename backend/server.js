@@ -405,6 +405,7 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
   try {
     const { getLotSizes } = require('./services/instrumentsCache');
     const result = getLotSizes(symbols);
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     res.json(result);
   } catch (err) {
     console.error('/api/lotsizes Error:', err);
@@ -422,6 +423,7 @@ app.get('/api/stocks', async (req, res) => {
       const cached = await generalClient.get(cacheKey);
       if (cached) {
         res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
         return res.send(cached);
       }
     }
@@ -440,6 +442,7 @@ app.get('/api/stocks', async (req, res) => {
     }
     
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     res.send(responseData);
   } catch (err) {
     console.error('Stocks API Error:', err);
@@ -3013,6 +3016,7 @@ app.get('/api/options/symbols', async (req, res) => {
     
     // Extract and sort the list of available symbols
     const symbols = Object.keys(cachedOptionsData).sort();
+    res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
     res.json(symbols);
   } catch (err) {
     console.error('Error fetching option symbols:', err);
