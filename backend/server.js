@@ -5939,9 +5939,13 @@ server.listen(PORT, async () => {
     // Initialize EOD Positions Engine (Cron Automations)
     require('./services/positionsEngine');
 
-    // Initialize MTM Risk Manager
-    new MTMRiskManager(priceCache).start();
-    console.log('🛡️  MTM Risk Manager active (95% auto-liquidation)');
+    // Initialize MTM Risk Manager with live Admin Market Status integration
+    new MTMRiskManager(priceCache, () => {
+      const eq = isSegmentMarketOpen(false);
+      const mcx = isSegmentMarketOpen(true);
+      return eq.open || mcx.open;
+    }).start();
+    console.log('🛡️  MTM Risk Manager active (95% auto-liquidation, synced with Admin Market Status)');
 
     initCronJobs(priceCache, triggerEngine);
     startSquareOffJobs();

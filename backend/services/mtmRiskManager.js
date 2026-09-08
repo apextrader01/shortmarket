@@ -15,8 +15,9 @@ function isAnyMarketOpen() {
 }
 
 class MTMRiskManager {
-    constructor(priceCache) {
+    constructor(priceCache, marketChecker = null) {
         this.priceCache = priceCache;
+        this.marketChecker = marketChecker;
         this.isRunning = false;
         this.isChecking = false;
         this.lastLiquidationTime = {}; // debounce auto-exit per user to prevent duplicate runs
@@ -33,8 +34,9 @@ class MTMRiskManager {
 
     async evaluateMTM() {
         if (this.isChecking) return;
-        // Skip DB queries outside active trading hours / weekends
-        if (!isAnyMarketOpen()) return;
+        // Check if market is active (respects Admin manual override OPEN/CLOSED and exchange hours)
+        const isMarketActive = this.marketChecker ? this.marketChecker() : isAnyMarketOpen();
+        if (!isMarketActive) return;
         this.isChecking = true;
         try {
             const now = Date.now();
