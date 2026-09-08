@@ -65,11 +65,7 @@ function reloadSymbolToExpiryMapAsync() {
 reloadSymbolToExpiryMapAsync();
 
 function getSymbolToExpiryMap() {
-    const now = Date.now();
     if (_symbolToExpiryMap) {
-        if (now - _lastMapLoadTime >= 3600000) {
-            reloadSymbolToExpiryMapAsync();
-        }
         return _symbolToExpiryMap;
     }
     

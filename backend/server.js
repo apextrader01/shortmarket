@@ -3067,97 +3067,98 @@ app.setRestrictedStocksCache = (list) => {
   restrictedStocksCache = list;
 };
 // ─── Option Chain ───────────────────────────────────────────────────────────
+// ─── Option Chain & Futures In-Memory Caching (Zero Disk I/O on Requests) ───
 let cachedOptionsData = null;
-let lastOptionsReadTime = 0;
+let cachedFuturesData = null;
+let cachedOptionsSymbols = [];
+
+async function loadOptionsAndFuturesCache() {
+  const optionsPath = path.join(__dirname, 'database', 'options.json');
+  const futuresPath = path.join(__dirname, 'database', 'futures.json');
+
+  try {
+    const [optRaw, futRaw] = await Promise.all([
+      fs.promises.readFile(optionsPath, 'utf8').catch(() => null),
+      fs.promises.readFile(futuresPath, 'utf8').catch(() => null)
+    ]);
+    if (optRaw) {
+      cachedOptionsData = JSON.parse(optRaw);
+      cachedOptionsSymbols = Object.keys(cachedOptionsData).sort();
+    }
+    if (futRaw) {
+      cachedFuturesData = JSON.parse(futRaw);
+    }
+    console.log(`⚡ [Cache Loaded] Options (${cachedOptionsSymbols.length} underlyings) & Futures in memory.`);
+  } catch (err) {
+    console.error('Failed to load options/futures in-memory cache:', err.message);
+  }
+}
+
+// Initial async load at server boot
+loadOptionsAndFuturesCache();
 
 app.get('/api/options/chain/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const optionsPath = path.join(__dirname, 'database', 'options.json');
-  
-  if (!fs.existsSync(optionsPath)) {
+
+  if (!cachedOptionsData) {
+    await loadOptionsAndFuturesCache();
+  }
+
+  if (!cachedOptionsData) {
     return res.status(503).json({ error: 'Options database is currently being built. Please try again in a minute.' });
   }
 
-  try {
-    const stat = fs.statSync(optionsPath);
-    if (!cachedOptionsData || stat.mtimeMs > lastOptionsReadTime) {
-      const rawData = fs.readFileSync(optionsPath, 'utf8');
-      cachedOptionsData = JSON.parse(rawData);
-      lastOptionsReadTime = stat.mtimeMs;
-    }
-
-    if (!cachedOptionsData[symbol]) {
-      return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
-    }
-
-    res.json(cachedOptionsData[symbol]);
-  } catch (err) {
-    console.error('Error fetching option chain:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  if (!cachedOptionsData[symbol]) {
+    return res.status(404).json({ error: `Option chain for ${symbol} not found.` });
   }
+
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+  res.json(cachedOptionsData[symbol]);
 });
 
 // Endpoint to fetch all available underlying symbols for options (e.g., NIFTY, RELIANCE, CRUDEOIL)
 app.get('/api/options/symbols', async (req, res) => {
-  const optionsPath = path.join(__dirname, 'database', 'options.json');
-  
-  if (!fs.existsSync(optionsPath)) {
+  if (!cachedOptionsData) {
+    await loadOptionsAndFuturesCache();
+  }
+
+  if (!cachedOptionsData) {
     return res.status(503).json({ error: 'Options database is currently being built.' });
   }
 
-  try {
-    const stat = fs.statSync(optionsPath);
-    if (!cachedOptionsData || stat.mtimeMs > lastOptionsReadTime) {
-      const rawData = fs.readFileSync(optionsPath, 'utf8');
-      cachedOptionsData = JSON.parse(rawData);
-      lastOptionsReadTime = stat.mtimeMs;
-    }
-    
-    // Extract and sort the list of available symbols
-    const symbols = Object.keys(cachedOptionsData).sort();
-    res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
-    res.json(symbols);
-  } catch (err) {
-    console.error('Error fetching option symbols:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
+  res.json(cachedOptionsSymbols);
 });
 
 app.get('/api/options/futures/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
-  const futuresPath = path.join(__dirname, 'database', 'futures.json');
-  
-  if (!fs.existsSync(futuresPath)) {
+
+  if (!cachedFuturesData) {
+    await loadOptionsAndFuturesCache();
+  }
+
+  if (!cachedFuturesData) {
     return res.status(503).json({ error: 'Futures database not ready.' });
   }
 
-  try {
-    const fileData = fs.readFileSync(futuresPath, 'utf8');
-    const data = JSON.parse(fileData);
-    
-    if (data[symbol] && data[symbol].length > 0) {
-      // Find the first future that hasn't expired yet
-      const now = new Date();
-      // Reset time to start of day for accurate expiry comparison
-      now.setHours(0, 0, 0, 0); 
-      
-      const validFutures = data[symbol].filter(f => {
-        const expDate = new Date(f.expiry);
-        return expDate >= now;
-      });
+  const data = cachedFuturesData;
+  if (data[symbol] && data[symbol].length > 0) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
 
-      if (validFutures.length > 0) {
-        res.json(validFutures[0]);
-      } else {
-        // Fallback to the last expired future if no active ones exist (e.g. edge cases)
-        res.json(data[symbol][data[symbol].length - 1]);
-      }
+    const validFutures = data[symbol].filter(f => {
+      const expDate = new Date(f.expiry);
+      return expDate >= now;
+    });
+
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
+    if (validFutures.length > 0) {
+      res.json(validFutures[0]);
     } else {
-      res.status(404).json({ error: 'No futures found for symbol' });
+      res.json(data[symbol][data[symbol].length - 1]);
     }
-  } catch (err) {
-    console.error('Error fetching futures:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  } else {
+    res.status(404).json({ error: 'No futures found for symbol' });
   }
 });
 
@@ -5046,32 +5047,41 @@ io.on('connection', (socket) => {
     if (!Array.isArray(symbolsArray)) return;
     
     // Join socket.io rooms for each symbol so targeted price_snapshot broadcasts reach this client.
-    const requestedCache = {};
     symbolsArray.forEach(sym => {
       if (sym && typeof sym === 'string') {
         socket.join(sym);
-        const p = priceCache[sym] || (sym.includes(':') ? priceCache[sym.split(':')[1]] : null);
-        if (p) {
-          requestedCache[sym] = [
-            p.ltp,
-            p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),
-            p.pct !== undefined ? p.pct : (p.chp !== undefined ? p.chp : 0),
-            p.timestamp || p.ts || Date.now(),
-            p.open,
-            p.high,
-            p.low,
-            p.close,
-            p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
-            p.totBuyQuan || 0,
-            p.totSellQuan || 0
-          ];
-        }
       }
     });
 
-    // Send targeted snapshot for the client's active watchlist/portfolio
-    if (Object.keys(requestedCache).length > 0) {
-      socket.emit('price_init', requestedCache);
+    // ⚡ Send full price snapshot ONLY on initial connect/first ping for this socket.
+    // Routine 10s keepalive pings maintain room membership and Fyers GC without re-broadcasting 50+ symbols.
+    if (!socket._hasReceivedPriceInit) {
+      socket._hasReceivedPriceInit = true;
+      const requestedCache = {};
+      symbolsArray.forEach(sym => {
+        if (sym && typeof sym === 'string') {
+          const p = priceCache[sym] || (sym.includes(':') ? priceCache[sym.split(':')[1]] : null);
+          if (p) {
+            requestedCache[sym] = [
+              p.ltp,
+              p.change !== undefined ? p.change : (p.ch !== undefined ? p.ch : 0),
+              p.pct !== undefined ? p.pct : (p.chp !== undefined ? p.chp : 0),
+              p.timestamp || p.ts || Date.now(),
+              p.open,
+              p.high,
+              p.low,
+              p.close,
+              p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
+              p.totBuyQuan || 0,
+              p.totSellQuan || 0
+            ];
+          }
+        }
+      });
+
+      if (Object.keys(requestedCache).length > 0) {
+        socket.emit('price_init', requestedCache);
+      }
     }
 
     if (isMaster) {
@@ -5961,37 +5971,41 @@ server.listen(PORT, async () => {
       if (cacheSubClient.isReady) setupMasterSubscriptions();
       else cacheSubClient.on('ready', setupMasterSubscriptions);
 
-      // --- BOOT SELF-SUBSCRIPTION ---
-      const bootSubscribeFromDB = async () => {
+      // --- BOOT & RECURRING SELF-SUBSCRIPTION ---
+      const bootSubscribeFromDB = async (includeWatchlists = false) => {
         try {
           const db = require('./database/db');
           const { addSubscriptionBatch } = require('./services/fyers');
           if (!addSubscriptionBatch) return;
           const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
-          const userRows = await db('users').select('watchlists').catch(() => []);
-          userRows.forEach(row => {
-            try {
-              const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);
-              wls.forEach(wl => {
-                (wl.symbols || []).forEach(sym => {
-                  const s = typeof sym === 'string' ? sym : sym && sym.symbol;
-                  if (s && !s.endsWith('-MF')) allSymbols.add(s);
+
+          if (includeWatchlists) {
+            const userRows = await db('users').select('watchlists').catch(() => []);
+            userRows.forEach(row => {
+              try {
+                const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);
+                wls.forEach(wl => {
+                  (wl.symbols || []).forEach(sym => {
+                    const s = typeof sym === 'string' ? sym : sym && sym.symbol;
+                    if (s && !s.endsWith('-MF')) allSymbols.add(s);
+                  });
                 });
-              });
-            } catch(e) {}
-          });
+              } catch(e) {}
+            });
+          }
+
           const posRows = await db('positions').where('quantity', '!=', 0).select('symbol').catch(() => []);
           posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
           const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
           ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
           const list = Array.from(allSymbols);
-          console.log('Boot self-subscription: ' + list.length + ' symbols from DB');
-          addSubscriptionBatch(list);
-        } catch(e) { console.error('Boot self-sub error:', e.message); }
+          if (list.length > 0) {
+            addSubscriptionBatch(list);
+          }
+        } catch(e) { console.error('Self-sub error:', e.message); }
       };
-      setTimeout(bootSubscribeFromDB, 5000);
-      setTimeout(bootSubscribeFromDB, 15000);
-      setTimeout(bootSubscribeFromDB, 30000);
+      setTimeout(() => bootSubscribeFromDB(true), 5000);
+      setTimeout(() => bootSubscribeFromDB(false), 20000);
       setInterval(async () => {
         // ⚡ Guard: If markets are closed across all segments, skip heavy recurring DB scans
         try {
@@ -6001,7 +6015,7 @@ server.listen(PORT, async () => {
             return; // All markets closed (nights/weekends/holidays) — nap and skip DB scan
           }
         } catch(e) {}
-        bootSubscribeFromDB();
+        bootSubscribeFromDB(false);
       }, 5 * 60 * 1000);
       // ---------------------------------
 

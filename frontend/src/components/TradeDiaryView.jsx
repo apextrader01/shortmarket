@@ -960,17 +960,28 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
       if (!token) return;
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // Fetch trades
-      const resTrades = await fetch(`${API}/api/journal/trades`, { credentials: 'include', headers });
-      const dataTrades = await resTrades.json();
-      if (dataTrades.success && Array.isArray(dataTrades.trades)) {
+      // Fetch all journal data concurrently in parallel (cuts waterfall wait by 80%)
+      const [resTrades, resChk, resStrat, resRules, resMistakes] = await Promise.all([
+        fetch(`${API}/api/journal/trades`, { credentials: 'include', headers }).catch(() => null),
+        fetch(`${API}/api/journal/checklists?date=${todayStr}`, { credentials: 'include', headers }).catch(() => null),
+        fetch(`${API}/api/journal/strategies`, { credentials: 'include', headers }).catch(() => null),
+        fetch(`${API}/api/journal/rules`, { credentials: 'include', headers }).catch(() => null),
+        fetch(`${API}/api/journal/mistakes`, { credentials: 'include', headers }).catch(() => null)
+      ]);
+
+      const [dataTrades, dataChk, dataStrat, dataRules, dataMistakes] = await Promise.all([
+        resTrades?.ok ? resTrades.json().catch(() => ({})) : {},
+        resChk?.ok ? resChk.json().catch(() => ({})) : {},
+        resStrat?.ok ? resStrat.json().catch(() => ({})) : {},
+        resRules?.ok ? resRules.json().catch(() => ({})) : {},
+        resMistakes?.ok ? resMistakes.json().catch(() => ({})) : {}
+      ]);
+
+      if (dataTrades?.success && Array.isArray(dataTrades.trades)) {
         setDbTrades(dataTrades.trades);
       }
 
-      // Fetch checklists
-      const resChk = await fetch(`${API}/api/journal/checklists?date=${todayStr}`, { credentials: 'include', headers });
-      const dataChk = await resChk.json();
-      if (dataChk.success && dataChk.checklists && dataChk.checklists[0]) {
+      if (dataChk?.success && dataChk.checklists && dataChk.checklists[0]) {
         const c = dataChk.checklists[0];
         setTodayChecklist({
           preMarket: typeof c.pre_market_data === 'string' ? JSON.parse(c.pre_market_data) : (c.pre_market_data || {}),
@@ -980,24 +991,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
         });
       }
 
-      // Fetch strategies
-      const resStrat = await fetch(`${API}/api/journal/strategies`, { credentials: 'include', headers });
-      const dataStrat = await resStrat.json();
-      if (dataStrat.success && dataStrat.strategies && dataStrat.strategies.length > 0) {
+      if (dataStrat?.success && Array.isArray(dataStrat.strategies) && dataStrat.strategies.length > 0) {
         setStrategies(dataStrat.strategies);
       }
 
-      // Fetch rules
-      const resRules = await fetch(`${API}/api/journal/rules`, { credentials: 'include', headers });
-      const dataRules = await resRules.json();
-      if (dataRules.success && dataRules.rules && dataRules.rules.length > 0) {
+      if (dataRules?.success && Array.isArray(dataRules.rules) && dataRules.rules.length > 0) {
         setRules(dataRules.rules);
       }
 
-      // Fetch mistakes
-      const resMistakes = await fetch(`${API}/api/journal/mistakes`, { credentials: 'include', headers });
-      const dataMistakes = await resMistakes.json();
-      if (dataMistakes.success && dataMistakes.mistakes && dataMistakes.mistakes.length > 0) {
+      if (dataMistakes?.success && Array.isArray(dataMistakes.mistakes) && dataMistakes.mistakes.length > 0) {
         setMistakes(dataMistakes.mistakes);
       }
     } catch (e) {

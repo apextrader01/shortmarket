@@ -250,12 +250,12 @@ export default function BasketModal() {
       useStore.getState().fetchBatchPrices(symbols, true);
     }
 
-    // Keep LTP active and responsive
+    // Keep LTP active and responsive: only fallback poll if WebSocket is disconnected
     const interval = setInterval(() => {
-      if (symbols.length > 0 && useStore.getState().fetchBatchPrices) {
+      if (symbols.length > 0 && useStore.getState().fetchBatchPrices && !useStore.getState().isConnected) {
         useStore.getState().fetchBatchPrices(symbols, false);
       }
-    }, 2500);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [basketModalOpen, basketItems]);
