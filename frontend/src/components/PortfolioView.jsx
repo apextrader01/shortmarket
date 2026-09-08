@@ -187,17 +187,20 @@ export default function PortfolioView() {
   const overallPct = totalInvested > 0 ? (overallGain / totalInvested) * 100 : 0;
   const isGain = overallGain >= 0;
 
-  // Chart Data for Asset Allocation
-  const chartData = [
-    { name: 'Stocks', value: totalInvestedStocks, color: '#3B82F6', count: countStocks },
-    { name: 'ETFs', value: totalInvestedETFs, color: '#10B981', count: countETFs },
-    { name: 'Derivatives', value: totalInvestedDerivatives, color: '#F59E0B', count: countDerivatives },
-    { name: 'Mutual Funds', value: totalInvestedMutualFunds, color: '#A855F7', count: countMutualFunds }
-  ].filter(d => d.value > 0);
-  
-  if (chartData.length === 0) {
-    chartData.push({ name: 'Unallocated Cash', value: 100, color: 'rgba(255, 255, 255, 0.1)', count: 0 });
-  }
+  // Chart Data for Asset Allocation (Memoized to prevent unnecessary Recharts redraws)
+  const chartData = useMemo(() => {
+    const data = [
+      { name: 'Stocks', value: totalInvestedStocks, color: '#3B82F6', count: countStocks },
+      { name: 'ETFs', value: totalInvestedETFs, color: '#10B981', count: countETFs },
+      { name: 'Derivatives', value: totalInvestedDerivatives, color: '#F59E0B', count: countDerivatives },
+      { name: 'Mutual Funds', value: totalInvestedMutualFunds, color: '#A855F7', count: countMutualFunds }
+    ].filter(d => d.value > 0);
+    
+    if (data.length === 0) {
+      data.push({ name: 'Unallocated Cash', value: 100, color: 'rgba(255, 255, 255, 0.1)', count: 0 });
+    }
+    return data;
+  }, [totalInvestedStocks, totalInvestedETFs, totalInvestedDerivatives, totalInvestedMutualFunds, countStocks, countETFs, countDerivatives, countMutualFunds]);
 
   // Filter & Sort Holdings
   const processedHoldings = useMemo(() => {
@@ -548,7 +551,7 @@ export default function PortfolioView() {
                       outerRadius={88}
                       paddingAngle={4}
                       dataKey="value"
-                      isAnimationActive={true}
+                      isAnimationActive={false}
                       stroke="none"
                     >
                       {chartData.map((entry, index) => (
