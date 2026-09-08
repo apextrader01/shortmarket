@@ -1194,19 +1194,19 @@ input:checked + .slider:before {
    PREMIUM TERMINAL REDESIGN CLASSES
    ========================================= */
 
-/* Glassmorphism Panel */
+/* Glassmorphism Panel - Optimized for GPU Fill-Rate */
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .glass-header {
   background: var(--bg-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1344,15 +1344,15 @@ input:checked + .slider:before {
   box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
 }
 
-/* Micro-Animations for Price Updates */
+/* Micro-Animations for Price Updates - Hardware Accelerated (Zero Box-Shadow Churn) */
 @keyframes flash-green {
-  0% { background-color: rgba(0, 230, 118, 0.4); box-shadow: 0 0 10px rgba(0, 230, 118, 0.5); }
-  100% { background-color: transparent; box-shadow: none; }
+  0% { background-color: rgba(0, 230, 118, 0.35); }
+  100% { background-color: transparent; }
 }
 
 @keyframes flash-red {
-  0% { background-color: rgba(255, 59, 48, 0.4); box-shadow: 0 0 10px rgba(255, 59, 48, 0.5); }
-  100% { background-color: transparent; box-shadow: none; }
+  0% { background-color: rgba(255, 59, 48, 0.35); }
+  100% { background-color: transparent; }
 }
 
 .flash-up {

@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { useStore } from '../store';
+import React, { useState, useEffect } from 'react';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Check, Star, Shield, Zap, ArrowLeft, X } from 'lucide-react';
 
@@ -35,7 +35,7 @@ export default function PricingView({ setActiveTab }) {
       }
 
       const token = localStorage.getItem('token');
-      const orderRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/create-subscription`, {
+      const orderRes = await fetch(`${API}/api/payment/create-subscription`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export default function PricingView({ setActiveTab }) {
         subscription_id: orderData.subscription_id,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/verify`, {
+            const verifyRes = await fetch(`${API}/api/payment/verify`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',

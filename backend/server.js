@@ -5953,9 +5953,38 @@ server.listen(PORT, async () => {
     optionsMorningRule.minute = 15;
     optionsMorningRule.tz = 'Asia/Kolkata';
     schedule.scheduleJob(optionsMorningRule, async () => {
-      console.log('⏰ Daily 8:15 AM Cron: Updating Options & Futures Master & Lot Sizes...');
-      await updateOptionsMaster().catch(e => console.error('Morning updateOptionsMaster error:', e));
+      console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
+      try {
+        await updateOptionsMaster();
+      } catch(e) { console.error('Options Master update cron error:', e); }
     });
+
+    // RAM Optimization: Clean expired derivative contracts from priceCache daily at 08:05 AM IST
+    async function cleanStaleOptionCache() {
+      try {
+        const now = Date.now();
+        let cleaned = 0;
+        const keys = Object.keys(priceCache);
+        for (const sym of keys) {
+          if (isDerivativeContract(sym)) {
+            const inst = await db('instruments').where({ unique_symbol: sym }).whereNotNull('expiry_timestamp').first();
+            if (inst && Number(inst.expiry_timestamp) < now) {
+              delete priceCache[sym];
+              cleaned++;
+            }
+          }
+        }
+        if (cleaned > 0) {
+          console.log(`🧹 [RAM OPTIMIZATION] Purged ${cleaned} expired option contracts from memory cache.`);
+        }
+      } catch(e) {}
+    }
+    const pruneCacheRule = new schedule.RecurrenceRule();
+    pruneCacheRule.hour = 8;
+    pruneCacheRule.minute = 5;
+    pruneCacheRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(pruneCacheRule, () => cleanStaleOptionCache());
+    setTimeout(cleanStaleOptionCache, 60000); // Also prune 60s after server boot
 
 
     // Initialize TriggerEngine

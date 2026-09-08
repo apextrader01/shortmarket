@@ -48,7 +48,7 @@ export default defineConfig({
     })
   ],
   build: {
-    emptyOutDir: false,
+    emptyOutDir: true,
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {

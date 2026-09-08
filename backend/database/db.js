@@ -788,7 +788,15 @@ async function ensureCriticalColumns() {
       )
     `);
 
-    console.log('✅ Critical columns, indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
+    // High-Performance Query Indexes to eliminate full table scans & slash CPU/RAM
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_created_at ON ledger(created_at)');
+
+    console.log('✅ Critical columns, high-performance indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }

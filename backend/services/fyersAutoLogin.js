@@ -43,8 +43,7 @@ async function getFyersCredentials() {
     let pin = null;
     let totp_key = null;
     let app_id = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
-    let secret_id = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
-    let redirect_url = 'https://34-93-99-22.nip.io/api/fyers/callback';
+    let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://34-93-99-22.nip.io/api/fyers/callback');
 
     try {
         const rows = await db('system_settings').whereIn('key', [
