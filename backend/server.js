@@ -5170,8 +5170,11 @@ app.get('/api/fyers-debug', (req, res) => {
 
 // ─── Serve Frontend in Production ─────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../frontend/dist'), {
+  maxAge: '1y',
+  immutable: true,
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
+    // Dynamic entry points (HTML, Service Worker, Webmanifest) are NEVER cached
+    if (filePath.endsWith('.html') || filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
   }

@@ -85,6 +85,13 @@ class SIPEngine {
       if (!sip) throw new Error('SIP not found');
       if (sip.status !== 'ACTIVE') throw new Error('SIP is not ACTIVE');
 
+      // Atomic Idempotency Guard: Ensure this installment has not already been processed today
+      const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const endOfToday = new Date(`${istDateStr}T23:59:59.999+05:30`);
+      if (sip.next_execution_date && new Date(sip.next_execution_date) > endOfToday) {
+        return { success: false, reason: 'ALREADY_PROCESSED_OR_NOT_DUE' };
+      }
+
       const user = await trx('users').where({ id: sip.user_id }).first();
       if (!user) throw new Error('User not found');
 
