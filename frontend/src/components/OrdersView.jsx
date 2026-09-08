@@ -554,10 +554,10 @@ export default function OrdersView() {
                         </span>
                       ) : order.trigger_price ? (
                         <span title="Trigger Price">
-                          Trg: ₹{parseFloat(order.trigger_price).toFixed(2)}
-                          {order.price && parseFloat(order.price) > 0 ? <><br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Lmt: ₹{parseFloat(order.price).toFixed(2)}</span></> : null}
+                          Trg: ₹{(parseFloat(order.trigger_price) || 0).toFixed(2)}
+                          {order.price && parseFloat(order.price) > 0 ? <><br/><span style={{ fontSize: '10px', opacity: 0.8 }}>Lmt: ₹{(parseFloat(order.price) || 0).toFixed(2)}</span></> : null}
                         </span>
-                      ) : (order.average_price && parseFloat(order.average_price) > 0 ? `₹${parseFloat(order.average_price).toFixed(2)}` : (order.price && parseFloat(order.price) > 0 ? `₹${parseFloat(order.price).toFixed(2)}` : '—'))}
+                      ) : (order.average_price && parseFloat(order.average_price) > 0 ? `₹${(parseFloat(order.average_price) || 0).toFixed(2)}` : (order.price && parseFloat(order.price) > 0 ? `₹${(parseFloat(order.price) || 0).toFixed(2)}` : '—'))}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600' }}>
                       {order.type === 'TRAILING_STOP' ? 'TRAIL-SL' : (order.type || (order.price ? 'LIMIT' : 'MARKET'))}

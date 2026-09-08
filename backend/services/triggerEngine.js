@@ -107,7 +107,7 @@ class TriggerEngine {
         this.trailingOrders.delete(orderId.toString());
         if (!generalClient || !generalClient.isReady) return;
         
-        // We just attempt to remove it from all 4 possible sets to be safe
+        // Parallelize removal across all 4 sets to minimize round-trip latency
         const keys = [
             `trigger:${symbol}:BUY:LIMIT`,
             `trigger:${symbol}:SELL:LIMIT`,
@@ -115,13 +115,9 @@ class TriggerEngine {
             `trigger:${symbol}:LTE`
         ];
         
-        for (const key of keys) {
-            await generalClient.zRem(key, orderId.toString());
-        }
-        let totalRem = 0;
-        for (const key of keys) {
-            totalRem += (await generalClient.zCard(key).catch(() => 0));
-        }
+        await Promise.all(keys.map(key => generalClient.zRem(key, orderId.toString()).catch(() => {})));
+        const cards = await Promise.all(keys.map(key => generalClient.zCard(key).catch(() => 0)));
+        const totalRem = cards.reduce((sum, count) => sum + (Number(count) || 0), 0);
         if (totalRem === 0) {
             this.activeTriggerSymbols.delete(symbol);
         }
@@ -301,6 +297,9 @@ class TriggerEngine {
                 taxes: totalTaxes,
                 updated_at: new Date()
             });
+            order.status = 'EXECUTED';
+            order.price = execPrice;
+            order.taxes = totalTaxes;
 
             // 2. Position Logic
             const existingPos = await trx('positions')

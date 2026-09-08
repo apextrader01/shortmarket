@@ -3458,11 +3458,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       }
     }
 
-    // Fetch the final status after evaluation to send back to frontend
-    const finalOrder = await db('orders').where({ id: ord.id }).first();
-    const finalStatus = finalOrder ? finalOrder.status : ord.status;
+    // Final status after execution without redundant DB query delay
+    const finalStatus = ord.status || 'PENDING';
+    const finalPrice = ord.price || price;
 
-    // Send instant push & Telegram notification
+    // Send instant push & Telegram notification asynchronously (non-blocking)
     sendPushNotification(req.user.id, {
       title: `Order Placed: ${side} ${quantity} ${symbol}`,
       body: `Status: ${finalStatus} (${product_type || 'INT'})`,
@@ -3474,7 +3474,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         symbol,
         side,
         quantity,
-        price: (finalOrder && finalOrder.average_price) || (finalOrder && finalOrder.price) || price,
+        price: finalPrice,
         product_type
       }).catch(() => {});
     }

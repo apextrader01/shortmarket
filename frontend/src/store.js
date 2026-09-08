@@ -599,9 +599,13 @@ export const useStore = create(persist((set, get) => ({
       get().setMarketDepthData(data);
     });
 
+    let syncUserDataTimer = null;
     socket.off('sync_user_data');
     socket.on('sync_user_data', () => {
-      get().fetchUserData();
+      if (syncUserDataTimer) clearTimeout(syncUserDataTimer);
+      syncUserDataTimer = setTimeout(() => {
+        get().fetchUserData();
+      }, 150);
     });
 
     socket.off('market_status_updated');
@@ -741,56 +745,63 @@ export const useStore = create(persist((set, get) => ({
 
   // ── User Data ────────────────────────────────────────────────────────────────
   fetchUserData: async () => {
-    try {
-      syncClientTelemetry(API).catch(() => {});
-      const headers = {  };
-      const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
-        fetch(`${API}/api/positions`, { credentials: 'include', headers }),
-        fetch(`${API}/api/orders`, { credentials: 'include', headers }),
-        fetch(`${API}/api/user`, { credentials: 'include', headers }),
-        fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
-        fetch(`${API}/api/sips`, { credentials: 'include', headers }),
-      ]);
-      const [positions, orders, user, holdData, sipsData] = await Promise.all([
-        posRes.json().catch(() => ({})), 
-        ordRes.json().catch(() => ({})), 
-        userRes.json().catch(() => ({})),
-        holdRes.json().catch(() => ({})),
-        sipsRes.json().catch(() => ({}))
-      ]);
-      
-      if (userRes.status === 401 || userRes.status === 403 || user?.error) {
-        console.error("Auth failed during fetchUserData, logging out.", user?.error);
-        get().logout();
-        return;
+    if (window._activeFetchUserDataPromise) return window._activeFetchUserDataPromise;
+    window._activeFetchUserDataPromise = (async () => {
+      try {
+        syncClientTelemetry(API).catch(() => {});
+        const headers = {  };
+        const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
+          fetch(`${API}/api/positions`, { credentials: 'include', headers }),
+          fetch(`${API}/api/orders`, { credentials: 'include', headers }),
+          fetch(`${API}/api/user`, { credentials: 'include', headers }),
+          fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
+          fetch(`${API}/api/sips`, { credentials: 'include', headers }),
+        ]);
+        const [positions, orders, user, holdData, sipsData] = await Promise.all([
+          posRes.json().catch(() => ({})), 
+          ordRes.json().catch(() => ({})), 
+          userRes.json().catch(() => ({})),
+          holdRes.json().catch(() => ({})),
+          sipsRes.json().catch(() => ({}))
+        ]);
+        
+        if (userRes.status === 401 || userRes.status === 403 || user?.error) {
+          console.error("Auth failed during fetchUserData, logging out.", user?.error);
+          get().logout();
+          return;
+        }
+        
+        if (!get().user) return;
+        
+        const now = Date.now();
+        const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
+        
+        set({
+          positions: Array.isArray(positions) ? positions : get().positions, 
+          holdings: Array.isArray(holdData) ? holdData : get().holdings,
+          sips: (sipsData && sipsData.success && Array.isArray(sipsData.sips)) ? sipsData.sips : get().sips,
+          orders: Array.isArray(orders) ? orders : get().orders, 
+          user: (user && !user.error) ? user : get().user,
+          watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
+        });
+        
+        const posSymbols = get().positions.map(p => p.symbol);
+        const holdSymbols = get().holdings.map(h => h.symbol);
+        const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
+        if (allSymbolsToSubscribe.length > 0) {
+          get().fetchBatchPrices(allSymbolsToSubscribe);
+          allSymbolsToSubscribe.forEach(sym => socket.emit('subscribe', sym));
+        }
+        
+        // Also fetch restricted stocks on load
+        get().fetchRestrictedStocks();
+        // No initial search; let MutualFundsView handle empty state
+      } catch (_) {
+      } finally {
+        window._activeFetchUserDataPromise = null;
       }
-      
-      if (!get().user) return;
-      
-      const now = Date.now();
-      const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
-      
-      set({
-        positions: Array.isArray(positions) ? positions : get().positions, 
-        holdings: Array.isArray(holdData) ? holdData : get().holdings,
-        sips: (sipsData && sipsData.success && Array.isArray(sipsData.sips)) ? sipsData.sips : get().sips,
-        orders: Array.isArray(orders) ? orders : get().orders, 
-        user: (user && !user.error) ? user : get().user,
-        watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
-      });
-      
-      const posSymbols = get().positions.map(p => p.symbol);
-      const holdSymbols = get().holdings.map(h => h.symbol);
-      const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
-      if (allSymbolsToSubscribe.length > 0) {
-        get().fetchBatchPrices(allSymbolsToSubscribe);
-        allSymbolsToSubscribe.forEach(sym => socket.emit('subscribe', sym));
-      }
-      
-      // Also fetch restricted stocks on load
-      get().fetchRestrictedStocks();
-      // No initial search; let MutualFundsView handle empty state
-    } catch (_) {}
+    })();
+    return window._activeFetchUserDataPromise;
   },
   
   restrictedStocks: [],

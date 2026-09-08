@@ -977,8 +977,8 @@ export default function PortfolioView() {
                               </div>
                             </td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>{pos.qty}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{parseFloat(pos.average_price).toFixed(2)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right' }}>

@@ -74,49 +74,58 @@ async function spawnBracketOrders(trx, order) {
   
   // The side of the child orders is OPPOSITE to the parent order's side
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
-
   const triggerEngine = require('./triggerEngine');
   
+  const tasks = [];
+
   if (hasSL) {
-    const slOrder = {
-      user_id: order.user_id,
-      symbol: order.symbol,
-      type: 'SL-M', // Stop Loss Market
-      side: childSide,
-      quantity: order.quantity,
-      price: null,
-      status: 'PENDING_TRIGGER',
-      trigger_price: order.sl_price,
-      trail_amount: order.trail_amount || null,
-      product_type: order.product_type,
-      trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
-      parent_order_id: order.id,
-      margin: 0
-    };
-    const [slId] = await trx('orders').insert(slOrder).returning('id');
-    slOrder.id = typeof slId === 'object' ? slId.id : slId;
-    await triggerEngine.addOrderToMemory(slOrder);
+    tasks.push((async () => {
+      const slOrder = {
+        user_id: order.user_id,
+        symbol: order.symbol,
+        type: 'SL-M', // Stop Loss Market
+        side: childSide,
+        quantity: order.quantity,
+        price: null,
+        status: 'PENDING_TRIGGER',
+        trigger_price: order.sl_price,
+        trail_amount: order.trail_amount || null,
+        product_type: order.product_type,
+        trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
+        parent_order_id: order.id,
+        margin: 0
+      };
+      const [slId] = await trx('orders').insert(slOrder).returning('id');
+      slOrder.id = typeof slId === 'object' ? slId.id : slId;
+      await triggerEngine.addOrderToMemory(slOrder);
+      return slOrder;
+    })());
   }
 
   if (hasTgt) {
-    const tgtOrder = {
-      user_id: order.user_id,
-      symbol: order.symbol,
-      type: 'LIMIT',
-      side: childSide,
-      quantity: order.quantity,
-      price: order.tgt_price,
-      status: 'PENDING_TRIGGER',
-      trigger_price: order.tgt_price,
-      product_type: order.product_type,
-      trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
-      parent_order_id: order.id,
-      margin: 0
-    };
-    const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
-    tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
-    await triggerEngine.addOrderToMemory(tgtOrder);
+    tasks.push((async () => {
+      const tgtOrder = {
+        user_id: order.user_id,
+        symbol: order.symbol,
+        type: 'LIMIT',
+        side: childSide,
+        quantity: order.quantity,
+        price: order.tgt_price,
+        status: 'PENDING_TRIGGER',
+        trigger_price: order.tgt_price,
+        product_type: order.product_type,
+        trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
+        parent_order_id: order.id,
+        margin: 0
+      };
+      const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
+      tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
+      await triggerEngine.addOrderToMemory(tgtOrder);
+      return tgtOrder;
+    })());
   }
+
+  await Promise.all(tasks);
 }
 
 async function executeOrder(order, execPrice) {

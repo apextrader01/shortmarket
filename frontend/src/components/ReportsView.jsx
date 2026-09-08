@@ -1100,7 +1100,7 @@ const TradingInsights = () => {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: isMobile ? '10px' : '16px' }}>
           <StatCard title="Gross Realized P/L" value={`${grossPnl >= 0 ? '+' : ''}₹${grossPnl.toFixed(2)}`} colorClass={grossPnl >= 0 ? '--color-green-light' : '--color-red-light'} />
           <StatCard title="Profitable Day %" value={profitableDayPercent} sub={totalDays > 0 ? totalDays + " ACTIVE DAYS" : "DAYS"} colorClass={profitableDays > (totalDays/2) ? "--color-green-light" : "--text-primary"} />
-          <StatCard title="Win Rate" value={`${profitableTradePercent}%`} sub={`${profitableTrades} OF ${totalTrades} TRADES`} colorClass="--color-green-light" />
+          <StatCard title="Win Rate" value={totalTrades > 0 ? `${profitableTradePercent}%` : '0%'} sub={`${profitableTrades} OF ${totalTrades} TRADES`} colorClass="--color-green-light" />
           <StatCard title="Profit Factor" value={profitFactor} icon={Target} />
         </div>
       </div>
