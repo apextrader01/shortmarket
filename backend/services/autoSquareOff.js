@@ -155,9 +155,9 @@ async function runIntradaySquareOff(exchangeFilter) {
     try {
         const openPositions = await db('positions')
             .whereNot({ quantity: 0 })
-            .andWhere({ product_type: 'INT' });
+            .whereIn('product_type', ['INT', 'BO', 'CO']);
         
-        console.log(`Found ${openPositions.length} open INTRADAY positions total.`);
+        console.log(`Found ${openPositions.length} open INTRADAY/BO/CO positions total.`);
         
         const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
         const port = process.env.PORT || 5000;
@@ -282,27 +282,12 @@ async function runWatchlistCleanup() {
 }
 
 function startSquareOffJobs() {
-    // 1. INTRADAY EQUITIES SQUARE-OFF (03:20 PM IST Monday-Friday)
-    schedule.scheduleJob({ rule: '20 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runIntradaySquareOff('NSE_NFO_BFO');
-    });
+    // Note: Automated EOD sweeps and intraday/BO/CO square-offs (15:15, 15:19, 15:20 EQ / 22:50, 22:59, 23:00 MCX)
+    // are exclusively and atomically handled by cronJobs.js via db transactions (to prevent duplicate order execution,
+    // double RMS penalties, or reverse short position races).
+    // Expiry settlements are handled by positionsEngine.js.
 
-    // 2. DERIVATIVE EXPIRY SQUARE-OFF EQUITIES (03:25 PM IST Monday-Friday)
-    schedule.scheduleJob({ rule: '25 15 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('NSE_NFO_BFO');
-    });
-
-    // 3. INTRADAY MCX SQUARE-OFF (11:00 PM IST Monday-Friday)
-    schedule.scheduleJob({ rule: '0 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runIntradaySquareOff('MCX');
-    });
-
-    // 4. MCX EXPIRY SQUARE-OFF (11:25 PM IST Monday-Friday)
-    schedule.scheduleJob({ rule: '25 23 * * 1-5', tz: 'Asia/Kolkata' }, () => {
-        runAutoSquareOff('MCX');
-    });
-
-    // 5. MIDNIGHT WATCHLIST CLEANUP (12:00 AM IST)
+    // MIDNIGHT WATCHLIST CLEANUP (12:00 AM IST)
     schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
         runWatchlistCleanup();
     });
@@ -310,7 +295,7 @@ function startSquareOffJobs() {
     // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
     runWatchlistCleanup();
 
-    console.log('✅ Auto Square-Off and Watchlist schedules initialized.');
+    console.log('✅ Watchlist daily cleanup schedule initialized (EOD square-offs unified under cronJobs.js).');
 }
 
 

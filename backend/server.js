@@ -3168,6 +3168,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // Safety net: If this is an automated system square-off order, ensure it does not open a reverse/new position
+  if (req.body && req.body.is_system_close && !isClosingOrder) {
+    return res.json({ success: true, message: 'Position already closed or not found.' });
+  }
+
   // 🛡️ RISK GUARDIAN ENFORCEMENT 🛡️
   // Note: Risk Guardian NEVER blocks closing/square-off orders for existing positions/holdings.
   const currentUser = await db('users').where({ id: req.user.id }).first();
@@ -3514,19 +3519,7 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
       });
 
       
-      let nextExecutionDate = new Date();
-      if (frequency === 'DAILY') {
-        nextExecutionDate.setDate(nextExecutionDate.getDate() + 1);
-      } else if (frequency === 'WEEKLY') {
-        nextExecutionDate.setDate(nextExecutionDate.getDate() + 7);
-      } else {
-        nextExecutionDate.setMonth(nextExecutionDate.getMonth() + 1);
-      }
-      
-      // Ensure it's not Saturday/Sunday (skips to Monday)
-      while (nextExecutionDate.getDay() === 0 || nextExecutionDate.getDay() === 6) {
-          nextExecutionDate.setDate(nextExecutionDate.getDate() + 1);
-      }
+      const nextExecutionDate = SIPEngine.getNextExecutionDate(new Date(), frequency);
 
 
       await trx('sips').insert({
@@ -4166,12 +4159,56 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         return 0;
       });
 
+      // Calculate proportional margin allocation across all basket items
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      const itemStandaloneMargins = sortedItems.map(item => {
+        const pType = item.product_type || 'INT';
+        const pPrice = parseFloat(item.price) || priceCache[item.symbol]?.ltp || 1;
+        const pQty = Number(item.quantity) || 0;
+        if (item.margin && parseFloat(item.margin) > 0) {
+          return parseFloat(item.margin);
+        }
+        try {
+          return Math.max(0, calculateRequiredMargin(item.symbol, pType, item.side, pQty, pPrice));
+        } catch (e) {
+          return pQty * pPrice;
+        }
+      });
+      const totalStandalone = itemStandaloneMargins.reduce((sum, m) => sum + m, 0);
+
+      let distributedMarginSum = 0;
+      const itemAllocatedMargins = sortedItems.map((item, idx) => {
+        if (requiredMargin <= 0) return 0;
+        let allocated = 0;
+        if (totalStandalone > 0) {
+          allocated = parseFloat(((itemStandaloneMargins[idx] / totalStandalone) * requiredMargin).toFixed(2));
+        } else {
+          allocated = parseFloat((requiredMargin / sortedItems.length).toFixed(2));
+        }
+        distributedMarginSum += allocated;
+        return allocated;
+      });
+
+      // Adjust rounding discrepancy so sum(itemAllocatedMargins) === requiredMargin
+      if (requiredMargin > 0 && itemAllocatedMargins.length > 0) {
+        const diff = parseFloat((requiredMargin - distributedMarginSum).toFixed(2));
+        if (Math.abs(diff) > 0 && Math.abs(diff) < 1) {
+          let maxIdx = 0;
+          for (let k = 1; k < itemAllocatedMargins.length; k++) {
+            if (itemAllocatedMargins[k] > itemAllocatedMargins[maxIdx]) maxIdx = k;
+          }
+          itemAllocatedMargins[maxIdx] = parseFloat((itemAllocatedMargins[maxIdx] + diff).toFixed(2));
+        }
+      }
+
       const { calculateOrderSlices } = require('./services/taxCalculator');
       const basketGroupId = 'BSK_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
       const executedOrders = [];
 
-      for (const item of sortedItems) {
-        const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, margin, trail_amount } = item;
+      for (let itemIdx = 0; itemIdx < sortedItems.length; itemIdx++) {
+        const item = sortedItems[itemIdx];
+        const effectiveItemMargin = itemAllocatedMargins[itemIdx] || 0;
+        const { symbol, type, side, quantity, price, sl_price, tgt_price, product_type, trail_amount } = item;
         const status = 'PENDING';
         const isMarket = type === 'MARKET';
         const effectiveProductType = product_type || 'INT';
@@ -4183,7 +4220,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
         for (let sIdx = 0; sIdx < slices.length; sIdx++) {
           const sliceQty = slices[sIdx];
-          const sliceMargin = isSliced ? ((margin || 0) * (sliceQty / qtyNum)) : (margin || 0);
+          const sliceMargin = isSliced ? parseFloat(((effectiveItemMargin * sliceQty) / qtyNum).toFixed(2)) : effectiveItemMargin;
 
           const [orderId] = await trx('orders').insert({
             user_id: req.user.id,

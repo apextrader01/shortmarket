@@ -48,23 +48,29 @@ class SIPEngine {
    * Calculate next execution date based on frequency
    */
   static getNextExecutionDate(currentDate, frequency) {
-    const nextDate = new Date(currentDate || new Date());
+    const now = currentDate ? new Date(currentDate) : new Date();
+    // Parse current date in Asia/Kolkata timezone to avoid UTC drift
+    const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+    const [y, m, d] = istDateStr.split('-').map(Number);
+
+    // Default to 09:30 AM IST (04:00 AM UTC) on that target date
+    const nextDate = new Date(Date.UTC(y, m - 1, d, 4, 0, 0));
     const freq = (frequency || 'MONTHLY').toUpperCase();
     
     if (freq === 'DAILY') {
-      nextDate.setDate(nextDate.getDate() + 1);
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
     } else if (freq === 'WEEKLY') {
-      nextDate.setDate(nextDate.getDate() + 7);
+      nextDate.setUTCDate(nextDate.getUTCDate() + 7);
     } else if (freq === 'YEARLY') {
-      nextDate.setFullYear(nextDate.getFullYear() + 1);
+      nextDate.setUTCFullYear(nextDate.getUTCFullYear() + 1);
     } else {
       // Default: MONTHLY
-      nextDate.setMonth(nextDate.getMonth() + 1);
+      nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
     }
 
     // Skip Saturday (6) and Sunday (0) to Monday
-    while (nextDate.getDay() === 0 || nextDate.getDay() === 6) {
-      nextDate.setDate(nextDate.getDate() + 1);
+    while (nextDate.getUTCDay() === 0 || nextDate.getUTCDay() === 6) {
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
     }
 
     return nextDate;
@@ -167,12 +173,15 @@ class SIPEngine {
   static async processDueSips(priceCache = {}) {
     console.log('[SIPEngine] 🔄 Checking for due SIP installments...');
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      // Ensure date comparison uses Asia/Kolkata timezone
+      const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()); // "YYYY-MM-DD"
+      const endOfTodayIst = new Date(new Date(`${istDateStr}T23:59:59.999+05:30`).toISOString());
+
       const dueSips = await db('sips')
         .where('status', 'ACTIVE')
-        .where('next_execution_date', '<=', todayStr);
+        .where('next_execution_date', '<=', endOfTodayIst);
 
-      console.log(`[SIPEngine] Found ${dueSips.length} active SIP(s) due on or before ${todayStr}`);
+      console.log(`[SIPEngine] Found ${dueSips.length} active SIP(s) due on or before ${istDateStr} (IST)`);
 
       let successCount = 0;
       let failedCount = 0;

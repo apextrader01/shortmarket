@@ -639,18 +639,72 @@ export default function BasketModal() {
       }
     }
 
+    const calculateItemStandaloneMargin = (item) => {
+      const price = item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price || 0);
+      const cleanSym = (item.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const isFuture = item.symbol.includes('FUT') || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
+      const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY', 'MIDCAPNIFTY', 'NIFTYNXT50', 'BANKEX'].some(idx => cleanSym.startsWith(idx));
+      const isCommodity = item.symbol.includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => cleanSym.startsWith(c));
+
+      if (item.side === 'BUY') {
+        if (item.isOption) {
+          return item.totalQuantity * price;
+        } else if (isFuture) {
+          const marginRate = getFuturesMarginRate(item.symbol);
+          return item.totalQuantity * price * marginRate;
+        } else {
+          const leverageMultiplier = productType === 'INT' ? 0.20 : 1.0;
+          return item.totalQuantity * price * leverageMultiplier;
+        }
+      } else {
+        if (item.isOption) {
+          const sellMarginRate = isIndex ? 0.125 : (isCommodity ? 0.25 : 0.225);
+          if (item.optionStrike > 0) {
+            const grossMargin = item.optionStrike * item.totalQuantity * sellMarginRate;
+            const premium = item.totalQuantity * price;
+            return Math.max(grossMargin - premium, item.totalQuantity * (isIndex ? 40 : 80));
+          } else {
+            return item.totalQuantity * (isIndex ? 4500 : 9000);
+          }
+        } else if (isFuture) {
+          const marginRate = getFuturesMarginRate(item.symbol);
+          return item.totalQuantity * price * marginRate;
+        } else {
+          const leverageMultiplier = productType === 'INT' ? 0.20 : 1.0;
+          return item.totalQuantity * price * leverageMultiplier;
+        }
+      }
+    };
+
     setIsSubmitting(true);
-    const payload = {
-      total_margin: finalMargin,
-      items: enhancedItems.map(item => ({
+
+    // Calculate proportional margin allocation for each leg so each order carries its rightful collateral
+    const rawLegMargins = enhancedItems.map(item => Math.max(0, calculateItemStandaloneMargin(item)));
+    const totalRaw = rawLegMargins.reduce((a, b) => a + b, 0);
+
+    const itemsWithAllocatedMargin = enhancedItems.map((item, idx) => {
+      let allocatedMargin = 0;
+      if (finalMargin > 0) {
+        if (totalRaw > 0) {
+          allocatedMargin = parseFloat(((rawLegMargins[idx] / totalRaw) * finalMargin).toFixed(2));
+        } else {
+          allocatedMargin = parseFloat((finalMargin / enhancedItems.length).toFixed(2));
+        }
+      }
+      return {
         symbol: item.symbol,
         type: item.orderType,
         side: item.side,
         quantity: item.totalQuantity,
         price: item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price),
         product_type: productType,
-        margin: 0
-      }))
+        margin: allocatedMargin
+      };
+    });
+
+    const payload = {
+      total_margin: finalMargin,
+      items: itemsWithAllocatedMargin
     };
 
     const success = await placeBasketOrder(payload);
