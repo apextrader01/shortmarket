@@ -421,6 +421,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                 fill="url(#splitColor)"
                 activeDot={false}
                 name="Expiry P&L"
+                isAnimationActive={false}
               />
               
               {/* Target Payoff (Smooth Curve) */}
@@ -433,6 +434,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
                 dot={false}
                 activeDot={{ r: 6, fill: 'var(--color-blue)' }}
                 name="Target Date P&L"
+                isAnimationActive={false}
               />
             </ComposedChart>
           </ResponsiveContainer>

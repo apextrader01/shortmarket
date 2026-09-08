@@ -41,8 +41,10 @@ const temporaryOptionSubscriptions = new Set();
 
 /** Merge a price snapshot object into the current prices map, tagging each tick direction */
 function applySnapshot(snapshot, state, isFromWebSocket = false) {
-  const newPrices = { ...state.prices };
+  let hasChanges = false;
+  let newPrices = null;
   const now = Date.now();
+
   for (const [symbol, rawData] of Object.entries(snapshot)) {
     // Data Compression logic: Decompress Array to Object if needed
     let data = rawData;
@@ -64,20 +66,36 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
       };
     }
 
-    const old = newPrices[symbol];
+    const old = (newPrices || state.prices)[symbol];
     
     // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 4 seconds.
-    // 4s is enough to block REST flickering while still allowing REST to recover if WS stalls.
-    // (Previously 20s — too long; stale initial snapshots were blocking REST recovery for 20s)
     if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 4000)) {
         continue;
     }
 
     // Block stale data: Never overwrite a newer price with an older price based on backend timestamp.
-    // This fixes the "PM2 Cluster Flickering" bug where a worker node sends stale REST data.
     if (old && old.timestamp && data.timestamp && data.timestamp < old.timestamp) {
         continue;
     }
+
+    // ⚡ Value Equality Guard: If prices, volume, and change are identical, skip re-allocation
+    if (
+      old &&
+      old.ltp === data.ltp &&
+      old.ch === data.ch &&
+      old.vol === data.vol &&
+      (!data.timestamp || old.timestamp === data.timestamp)
+    ) {
+      if (isFromWebSocket) {
+        old.lastWsUpdate = now;
+      }
+      continue;
+    }
+
+    if (!newPrices) {
+      newPrices = { ...state.prices };
+    }
+    hasChanges = true;
     
     const tick = old
       ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
@@ -103,7 +121,8 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         }
     }
   }
-  return newPrices;
+
+  return hasChanges ? newPrices : state.prices;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -535,7 +554,10 @@ export const useStore = create(persist((set, get) => ({
       if (Object.keys(pendingSnapshots).length > 0) {
         const batch = pendingSnapshots;
         pendingSnapshots = {};
-        set((state) => ({ prices: applySnapshot(batch, state, true) }));
+        set((state) => {
+          const next = applySnapshot(batch, state, true);
+          return next === state.prices ? {} : { prices: next };
+        });
       }
       snapshotThrottleTimer = null;
     };

@@ -39,9 +39,9 @@ export default function ChartWidget() {
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
 
-  const { selectedSymbol, prices, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, prices: state.prices, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
+  const { selectedSymbol, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
 
-  const price   = prices[selectedSymbol];
+  const price   = useStore(state => state.prices[state.selectedSymbol]);
   const candles = candleData[selectedSymbol] || [];
   const isLight = theme === 'light';
 
@@ -297,7 +297,7 @@ export default function ChartWidget() {
       const t = price.timestamp ? Math.floor(new Date(price.timestamp).getTime() / 1000) : 0;
       if (t > 0) liveLineRef.current.update({ time: t + 19800, value: price.ltp });
     } catch (_) {}
-  }, [prices, selectedSymbol]);
+  }, [price, selectedSymbol]);
 
   const isUp   = (price?.pct ?? 0) >= 0;
   const pct    = price?.pct    != null ? Number(price.pct).toFixed(2)    : null;
@@ -394,7 +394,7 @@ export default function ChartWidget() {
         {price && !isLoadingCandles && (
           <div style={{ position: 'absolute', top: '12px', left: '0px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'SELL', prices[selectedSymbol]?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'SELL', price?.lotsize || 1)}
               style={{
                 background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -410,7 +410,7 @@ export default function ChartWidget() {
             </button>
             <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'BUY', prices[selectedSymbol]?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'BUY', price?.lotsize || 1)}
               style={{
                 background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',

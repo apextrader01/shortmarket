@@ -530,6 +530,7 @@ export default function AnalyticsView() {
                   strokeWidth={2.5} 
                   fillOpacity={1} 
                   fill={isNetPositive ? 'url(#gradientGreen)' : 'url(#gradientRed)'}
+                  isAnimationActive={false}
                   activeDot={{ 
                     r: 6, 
                     fill: isNetPositive ? '#00E676' : '#FF3B30', 

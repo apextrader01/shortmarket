@@ -45,13 +45,22 @@ import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, Li
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
-// ⚡ Isolated Top Index Ticker: Prevents App.jsx from re-rendering when index prices tick
+// ⚡ Isolated Top Index Ticker: Only re-renders when the 3 top indices tick
 const TopIndexTicker = React.memo(() => {
-  const prices = useStore(state => state.prices);
+  const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX']);
+  const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX']);
+  const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX']);
+
+  const indexPrices = useMemo(() => ({
+    'NSE:NIFTY50-INDEX': nifty,
+    'NSE:NIFTYBANK-INDEX': banknifty,
+    'BSE:SENSEX-INDEX': sensex
+  }), [nifty, banknifty, sensex]);
+
   return (
     <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
       {TOP_INDICES.map((idx) => {
-        const p = prices[idx];
+        const p = indexPrices[idx];
         const isUp = p?.pct >= 0;
         return (
           <div
@@ -87,19 +96,19 @@ const TopIndexTicker = React.memo(() => {
   );
 });
 
-// ⚡ Isolated Background Alert & Trigger Monitor: Runs checks without re-rendering App.jsx
+// ⚡ Isolated Background Alert Monitor: Runs checks only when alerts exist
 const BackgroundPriceMonitor = React.memo(() => {
   const prices = useStore(state => state.prices);
   const alerts = useStore(state => state.alerts);
   const updateAlert = useStore(state => state.updateAlert);
-  const pendingTriggers = useStore(state => state.pendingTriggers);
-  const updatePendingTrigger = useStore(state => state.updatePendingTrigger);
-  const placeOrder = useStore(state => state.placeOrder);
 
   // Background Alert Checking Engine
   useEffect(() => {
-    alerts.forEach(alert => {
-      if (alert.triggered) return;
+    if (!alerts || alerts.length === 0) return;
+    const activeAlerts = alerts.filter(a => !a.triggered);
+    if (activeAlerts.length === 0) return;
+
+    activeAlerts.forEach(alert => {
       const priceData = prices[alert.symbol];
       if (!priceData) return;
       
@@ -123,58 +132,6 @@ const BackgroundPriceMonitor = React.memo(() => {
       }
     });
   }, [prices, alerts, updateAlert]);
-
-  // Client-Side Advanced Order Trigger Engine
-  useEffect(() => {
-    pendingTriggers.forEach(trigger => {
-      if (trigger.status !== 'PENDING_TRIGGER') return;
-      const priceData = prices[trigger.symbol];
-      if (!priceData) return;
-      
-      const ltp = priceData.ltp;
-      let isBreached = false;
-      let newTriggerPrice = trigger.triggerPrice;
-      
-      if (trigger.type === 'SL' || trigger.type === 'TRAILING_SL') {
-         if (trigger.side === 'BUY' && ltp >= trigger.triggerPrice) isBreached = true;
-         if (trigger.side === 'SELL' && ltp <= trigger.triggerPrice) isBreached = true;
-         
-         if (trigger.type === 'TRAILING_SL' && trigger.trailingJump > 0 && !isBreached) {
-            if (trigger.side === 'BUY') {
-                if (ltp <= trigger.triggerPrice - trigger.trailingJump) {
-                    newTriggerPrice = trigger.triggerPrice - trigger.trailingJump;
-                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
-                }
-            } else {
-                if (ltp >= trigger.triggerPrice + trigger.trailingJump) {
-                    newTriggerPrice = trigger.triggerPrice + trigger.trailingJump;
-                    updatePendingTrigger(trigger.id, { triggerPrice: newTriggerPrice });
-                }
-            }
-         }
-      }
-      
-      if (isBreached) {
-         updatePendingTrigger(trigger.id, { status: 'EXECUTED', executedAt: new Date().toISOString(), executionPrice: ltp });
-         
-         placeOrder({
-            symbol: trigger.symbol,
-            type: trigger.limitPrice ? 'LIMIT' : 'MARKET',
-            side: trigger.side,
-            quantity: trigger.quantity,
-            price: trigger.limitPrice || 0,
-            product_type: trigger.productType
-         });
-         
-         if ("Notification" in window && Notification.permission === "granted") {
-           new Notification(`${trigger.type} Order Triggered! 🎯`, {
-             body: `${trigger.side} ${trigger.quantity} ${trigger.symbol} @ ₹${ltp.toFixed(2)}`,
-             icon: '/logo.png'
-           });
-         }
-      }
-    });
-  }, [prices, pendingTriggers, updatePendingTrigger, placeOrder]);
 
   return null;
 });

@@ -2,6 +2,18 @@ const db = require('../database/db');
 const LedgerService = require('./ledgerService');
 const { sendPushNotification } = require('./pushService');
 
+function isAnyMarketOpen() {
+    const now = new Date();
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    const day = istTime.getUTCDay(); // 0 = Sun, 6 = Sat
+    if (day === 0 || day === 6) return false;
+    const hours = istTime.getUTCHours();
+    const minutes = istTime.getUTCMinutes();
+    const currentMins = hours * 60 + minutes;
+    // Active trading window covering Equities & MCX (09:00 AM to 23:45 PM IST)
+    return currentMins >= 540 && currentMins <= 1425;
+}
+
 class MTMRiskManager {
     constructor(priceCache) {
         this.priceCache = priceCache;
@@ -21,6 +33,8 @@ class MTMRiskManager {
 
     async evaluateMTM() {
         if (this.isChecking) return;
+        // Skip DB queries outside active trading hours / weekends
+        if (!isAnyMarketOpen()) return;
         this.isChecking = true;
         try {
             const now = Date.now();
