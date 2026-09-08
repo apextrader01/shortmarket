@@ -325,10 +325,10 @@ export default function PositionsView() {
             <Activity size={18} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
             <div>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', lineHeight: 1.1 }}>
-                TOTAL PORTFOLIO MTM
+                {viewMode === 'CLOSED' ? 'TOTAL REALIZED P&L' : 'TOTAL PORTFOLIO MTM'}
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.1 }}>
-                Live market ticks
+                {viewMode === 'CLOSED' ? "Today's settled trades" : 'Live market ticks'}
               </div>
             </div>
           </div>
@@ -421,9 +421,9 @@ export default function PositionsView() {
                 <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ padding: '16px 20px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Symbol</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Buy/Sell</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Net Quantity</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>{viewMode === 'CLOSED' ? 'Closed Qty' : 'Net Quantity'}</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Avg. Price</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Last Price (LTP)</th>
+                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>{viewMode === 'CLOSED' ? 'Exit Price' : 'Last Price (LTP)'}</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Unrealized P&L</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Realized P&L</th>
                   <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Segment</th>
@@ -464,7 +464,11 @@ export default function PositionsView() {
                         )}
                       </td>
                       <td data-label="Side" style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
-                        {sideText}
+                        {viewMode === 'CLOSED' ? (
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+                            CLOSED
+                          </span>
+                        ) : sideText}
                       </td>
                       <td data-label="Net Qty" style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
                         {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)}
@@ -570,7 +574,9 @@ export default function PositionsView() {
                   boxShadow: 'var(--card-shadow, 0 2px 8px rgba(0,0,0,0.05))'
                 }}>
                   <div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Total MTM (Live)</div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      {viewMode === 'CLOSED' ? 'Realized P&L' : 'Total MTM (Live)'}
+                    </div>
                     <div style={{ fontSize: '16px', fontWeight: '800', color: globalMTM >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                       {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toFixed(2)}
                     </div>
