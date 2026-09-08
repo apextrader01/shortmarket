@@ -50,6 +50,12 @@ class PositionsEngine {
     }
 
     initCronJobs() {
+        // In PM2 cluster mode, only Worker 0 (Master) should run automated cron schedules
+        if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') {
+            console.log('[PositionsEngine] Cluster worker instance detected. Skipping duplicate cron scheduling.');
+            return;
+        }
+
         // HOLDINGS MIGRATION (T+1)
         // Phase 0: The 8:00 AM Wipe - 08:00 AM IST
         cron.schedule('0 8 * * *', () => {
@@ -157,9 +163,9 @@ class PositionsEngine {
                 const priceCache = await ensureLivePrices(positionsToExit.map(p => p.symbol));
 
                 for (const pos of positionsToExit) {
-                    const ltp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
-                    if (!ltp || ltp <= 0) {
-                        console.warn(`[EOD SQUARE-OFF] No LTP for ${pos.symbol}, skipping square-off.`);
+                    const ltp = priceCache[pos.symbol]?.ltp;
+                    if (ltp === undefined || ltp === null || ltp <= 0) {
+                        console.warn(`[EOD SQUARE-OFF] No valid LTP for ${pos.symbol}, skipping square-off.`);
                         continue;
                     }
 
@@ -291,7 +297,9 @@ class PositionsEngine {
             
             // Helper to submit settlement order
             const submitSettlementOrder = async (item, isHolding) => {
-                const ltp = priceCache[item.symbol]?.ltp || Number(item.average_price) || 0;
+                // At 3:25 PM, use live market LTP from cache. If expired with no tick, settle at 0 (never refund purchase price)
+                const cachedLtp = priceCache[item.symbol]?.ltp;
+                const ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
                 const side = item.quantity > 0 ? 'SELL' : 'BUY';
                 const orderQty = Math.abs(item.quantity);
                 const prodType = isHolding ? 'DEL' : item.product_type;

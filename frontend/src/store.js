@@ -1558,8 +1558,18 @@ export const useStore = create(persist((set, get) => ({
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('hasSkippedOnboarding');
-    set({ hasSkippedOnboarding: false });
-    set({ user: null, positions: [], orders: [] });
+    set({
+      hasSkippedOnboarding: false,
+      token: null,
+      user: null,
+      positions: [],
+      orders: [],
+      holdings: [],
+      sips: [],
+      pendingTriggers: [],
+      alerts: [],
+      basketItems: []
+    });
     fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{});
   },
   

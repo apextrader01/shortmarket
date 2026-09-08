@@ -243,7 +243,7 @@ export default function OrderModal() {
   const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
   const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = async (bypassCaution = false) => {
     if (marketSession.mode === 'CLOSED') {
       alert(marketSession.reason);
       return;
@@ -252,7 +252,7 @@ export default function OrderModal() {
        setShowIntradayBlockedPopup(true);
        return;
     }
-    if (isRestricted && !showCautionPopup) {
+    if (isRestricted && !bypassCaution && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
     }
@@ -884,7 +884,7 @@ export default function OrderModal() {
                <p style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '20px' }}>Would you like to continue?</p>
                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowCautionPopup(false)} style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>NO</button>
-                  <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
+                  <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(true); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
                </div>
             </div>
          </div>
