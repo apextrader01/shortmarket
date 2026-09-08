@@ -1390,8 +1390,8 @@ input:checked + .slider:before {
 /* Glassmorphism Watchlist enhancements */
 .sidebar {
   background: var(--bg-secondary) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-right: 1px solid var(--border-color) !important;
 }
 .premium-btn-mini {
@@ -1469,6 +1469,12 @@ select option {
 @media (max-width: 1200px) {
   .mobile-orders-table { display: none !important; }
   .mobile-orders-cards { display: block !important; }
+  
+  /* Mobile GPU Performance: soften heavy blur to relieve mobile GPU compositors */
+  .glass-panel, .glass-header, .sidebar {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
 
   /* Premium Common Base for Mobile Tables */
   table.responsive-mobile-table { min-width: 0 !important; }

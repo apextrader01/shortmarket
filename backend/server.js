@@ -5896,8 +5896,10 @@ server.listen(PORT, async () => {
       setInterval(async () => {
         // ⚡ Guard: If markets are closed across all segments, skip heavy recurring DB scans
         try {
-          if (!isSegmentMarketOpen('NSE') && !isSegmentMarketOpen('MCX') && !isSegmentMarketOpen('BSE')) {
-            return;
+          const eq = isSegmentMarketOpen(false);
+          const mcx = isSegmentMarketOpen(true);
+          if (!eq.open && !mcx.open) {
+            return; // All markets closed (nights/weekends/holidays) — nap and skip DB scan
           }
         } catch(e) {}
         bootSubscribeFromDB();

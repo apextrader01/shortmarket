@@ -13,8 +13,8 @@ const transport = new winston.transports.DailyRotateFile({
   dirname: logDir,
   datePattern: 'YYYY-MM-DD',
   zippedArchive: true,
-  maxSize: '20m',
-  maxFiles: '14d'
+  maxSize: '10m',
+  maxFiles: '7d'
 });
 
 const errorTransport = new winston.transports.DailyRotateFile({
@@ -23,8 +23,8 @@ const errorTransport = new winston.transports.DailyRotateFile({
   level: 'error',
   datePattern: 'YYYY-MM-DD',
   zippedArchive: true,
-  maxSize: '20m',
-  maxFiles: '30d'
+  maxSize: '10m',
+  maxFiles: '14d'
 });
 
 const logger = winston.createLogger({
