@@ -1,5 +1,5 @@
 import { registerServiceWorker } from './services/pushManager';
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useState, useMemo, Suspense, lazy } from 'react';
 import MarketWatch from './components/MarketWatch';
 import ChartWidget from './components/ChartWidget';
 import PositionsView from './components/PositionsView';
@@ -43,55 +43,50 @@ import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
 import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen } from 'lucide-react';
 
-const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
+// ⚡ Isolated Index Chip: Only re-renders when its own index ticks
+const IndexChip = React.memo(({ label, price }) => {
+  const isUp = price?.pct >= 0;
+  return (
+    <div
+      style={{
+        display:      'flex',
+        alignItems:   'center',
+        gap:          '4px',
+        background:   price
+          ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
+          : 'rgba(255,255,255,0.05)',
+        color: price
+          ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
+          : 'var(--text-secondary)',
+        padding:      '2px 6px',
+        borderRadius: '12px',
+        fontSize:     '10px',
+        fontWeight:   '700',
+      }}
+    >
+      {price && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
+      {label}{' '}
+      {price && price.ltp !== undefined && !isNaN(price.ltp) ? Number(price.ltp).toFixed(2) : '...'}
+      {price && price.change !== undefined && !isNaN(price.change) && (
+        <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
+          {Number(price.change) > 0 ? '+' : ''}{Number(price.change).toFixed(2)} ({Number(price.pct || 0) > 0 ? '+' : ''}{Number(price.pct || 0).toFixed(2)}%)
+        </span>
+      )}
+    </div>
+  );
+});
 
-// ⚡ Isolated Top Index Ticker: Only re-renders when the 3 top indices tick
+// ⚡ Top Index Ticker Container
 const TopIndexTicker = React.memo(() => {
   const nifty = useStore(state => state.prices['NSE:NIFTY50-INDEX']);
   const banknifty = useStore(state => state.prices['NSE:NIFTYBANK-INDEX']);
   const sensex = useStore(state => state.prices['BSE:SENSEX-INDEX']);
 
-  const indexPrices = useMemo(() => ({
-    'NSE:NIFTY50-INDEX': nifty,
-    'NSE:NIFTYBANK-INDEX': banknifty,
-    'BSE:SENSEX-INDEX': sensex
-  }), [nifty, banknifty, sensex]);
-
   return (
     <div className="hide-on-tablet" style={{ display: 'flex', gap: '6px' }}>
-      {TOP_INDICES.map((idx) => {
-        const p = indexPrices[idx];
-        const isUp = p?.pct >= 0;
-        return (
-          <div
-            key={idx}
-            style={{
-              display:      'flex',
-              alignItems:   'center',
-              gap:          '4px',
-              background:   p
-                ? (isUp ? 'rgba(34,197,94,0.12)' : 'rgba(225,42,31,0.12)')
-                : 'rgba(255,255,255,0.05)',
-              color: p
-                ? (isUp ? 'var(--color-green-light)' : 'var(--color-red-light)')
-                : 'var(--text-secondary)',
-              padding:      '2px 6px',
-              borderRadius: '12px',
-              fontSize:     '10px',
-              fontWeight:   '700',
-            }}
-          >
-            {p && (isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}
-            {idx.split('-')[0]}{' '}
-            {p && p.ltp !== undefined && !isNaN(p.ltp) ? Number(p.ltp).toFixed(2) : '...'}
-            {p && p.change !== undefined && !isNaN(p.change) && (
-              <span style={{ opacity: 0.8, fontSize: '9px', marginLeft: '2px' }}>
-                {Number(p.change) > 0 ? '+' : ''}{Number(p.change).toFixed(2)} ({Number(p.pct || 0) > 0 ? '+' : ''}{Number(p.pct || 0).toFixed(2)}%)
-              </span>
-            )}
-          </div>
-        );
-      })}
+      <IndexChip label="NSE:NIFTY50" price={nifty} />
+      <IndexChip label="NSE:NIFTYBANK" price={banknifty} />
+      <IndexChip label="BSE:SENSEX" price={sensex} />
     </div>
   );
 });
