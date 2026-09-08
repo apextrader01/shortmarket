@@ -254,8 +254,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError('Image is too large. Please select a file smaller than 2MB.');
+    if (file.size > 7 * 1024 * 1024) {
+      setUploadError('Image is too large. Please select a file smaller than 7MB.');
       if (e.target) e.target.value = '';
       return;
     }
@@ -263,30 +263,70 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     setIsUploading(true);
     setUploadError(null);
 
-      try {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64String = reader.result;
-          const res = await updateProfilePicture(base64String);
-          
-          if (!res.success) {
-            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 512;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height = Math.round((height * MAX_SIZE) / width);
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width = Math.round((width * MAX_SIZE) / height);
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to optimized JPEG at 85% quality (~30-60KB)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            const res = await updateProfilePicture(compressedBase64);
+
+            if (!res.success) {
+              setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+            }
+          } catch (err) {
+            setUploadError('Failed to process image: ' + (err.message || 'Unknown error'));
+          } finally {
+            setIsUploading(false);
+            if (e.target) e.target.value = '';
           }
-          
+        };
+
+        img.onerror = () => {
           setIsUploading(false);
+          setUploadError('Failed to load image for processing.');
           if (e.target) e.target.value = '';
         };
-        reader.onerror = () => {
-          setIsUploading(false);
-          setUploadError('Failed to read image file.');
-          if (e.target) e.target.value = '';
-        };
-        reader.readAsDataURL(file);
-      } catch (err) {
+
+        img.src = reader.result;
+      };
+
+      reader.onerror = () => {
         setIsUploading(false);
-        setUploadError(err.message || 'Failed to process image.');
+        setUploadError('Failed to read image file.');
         if (e.target) e.target.value = '';
-      }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setIsUploading(false);
+      setUploadError(err.message || 'Failed to process image.');
+      if (e.target) e.target.value = '';
+    }
   };
   if (showProfile) {
     return (
