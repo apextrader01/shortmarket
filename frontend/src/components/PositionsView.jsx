@@ -215,7 +215,7 @@ export default function PositionsView() {
       if (viewMode === 'HOLDINGS') productLabel = 'Delivery';
       
       flatList.push({ 
-        ...pos, ltp, avg, qty, pnl, invested, lotSize, isOpen: qty !== 0,
+        ...pos, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
         segment, exchange, productLabel
       });
       globalMTM += pnl;
@@ -472,8 +472,8 @@ export default function PositionsView() {
                       <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
                       <td data-label="LTP" style={{ fontWeight: '500' }}>{viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
                       </td>
-                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : (pos.unrealizedPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
-                        {viewMode === 'CLOSED' ? '-' : `${pos.unrealizedPnl > 0 ? '+' : (pos.unrealizedPnl < 0 ? '-' : '')}₹${Math.abs(pos.unrealizedPnl).toFixed(2)}`}
+                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : ((pos.unrealizedPnl || 0) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                        {viewMode === 'CLOSED' ? '-' : `${(pos.unrealizedPnl || 0) > 0 ? '+' : ((pos.unrealizedPnl || 0) < 0 ? '-' : '')}₹${Math.abs(pos.unrealizedPnl || 0).toFixed(2)}`}
                       </td>
                       <td data-label="Realized P&L" style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
                         {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+' : '-'}₹${Math.abs(realizedPnl).toFixed(2)}` : '₹0.00'}
