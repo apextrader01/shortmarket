@@ -4489,7 +4489,31 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           const { calculateRequiredMargin } = require('./services/marginEngine');
           const oldMargin = parseFloat(order.margin || 0);
           let newMargin = oldMargin;
-          if (!order.parent_order_id) {
+          const isDerivative = isDerivativeContract(order.symbol);
+          const isDelSell = order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC') && !isDerivative;
+
+          if (isDelSell) {
+            newMargin = 0;
+            // If quantity increased, verify sufficient holdings
+            const newQty = Number(quantity);
+            if (newQty > Number(order.quantity)) {
+              const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+              const holding = await trx('holdings')
+                .where({ user_id: req.user.id })
+                .where(builder => {
+                  builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` });
+                })
+                .first();
+              const holdingQty = holding ? Number(holding.quantity) : 0;
+              if (newQty > holdingQty) {
+                throw Object.assign(new Error(`Insufficient holdings. You only have ${holdingQty} shares available.`), { statusCode: 400 });
+              }
+            }
+          } else if (oldMargin === 0 && Number(quantity) === Number(order.quantity)) {
+            // If the order originally required 0 margin (e.g. position exit limit order or bracket leg) and quantity is unchanged,
+            // modifying price or trigger price must not suddenly demand entry margin.
+            newMargin = 0;
+          } else if (!order.parent_order_id) {
               const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
               newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
           }

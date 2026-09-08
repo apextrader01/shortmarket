@@ -57,12 +57,17 @@ export default function EditOrderModal() {
   let marginDifference = 0;
   if (!isPendingTrigger && !order.parent_order_id) {
     const oldMargin = parseFloat(order.margin || 0);
-    const rawPrice = parseFloat(price) || livePrice || 0;
-    const contractValue = (Number(quantity) || 0) * rawPrice;
     const effectiveProductType = order.product_type || order.productType || 'INT';
-    const isLeveraged = ['INT', 'INTRADAY', 'CO', 'BO'].includes(effectiveProductType);
-    const newMargin = isLeveraged ? contractValue * 0.20 : contractValue;
-    marginDifference = newMargin - oldMargin;
+    const isDelSell = order.side === 'SELL' && (effectiveProductType === 'DEL' || effectiveProductType === 'CNC');
+    if (isDelSell || (oldMargin === 0 && Number(quantity) === Number(order.quantity))) {
+      marginDifference = 0;
+    } else {
+      const rawPrice = parseFloat(price) || livePrice || 0;
+      const contractValue = (Number(quantity) || 0) * rawPrice;
+      const isLeveraged = ['INT', 'INTRADAY', 'CO', 'BO'].includes(effectiveProductType);
+      const newMargin = isLeveraged ? contractValue * 0.20 : contractValue;
+      marginDifference = newMargin - oldMargin;
+    }
   }
   
   const isInsufficient = marginDifference > 0 && balanceNum < marginDifference;

@@ -2,12 +2,12 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
-import { getInstantLotsize } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin } from '../utils/marginCalculator';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar } = useStore(useShallow(state => ({ 
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
     orderModal: state.orderModal, 
     closeOrderModal: state.closeOrderModal, 
     user: state.user, 
@@ -16,7 +16,9 @@ export default function OrderModal() {
     openMarketDepthModal: state.openMarketDepthModal, 
     marketDepthModal: state.marketDepthModal, 
     marketStatus: state.marketStatus,
-    marketCalendar: state.marketCalendar 
+    marketCalendar: state.marketCalendar,
+    holdings: state.holdings,
+    positions: state.positions
   })));
   const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
@@ -136,11 +138,22 @@ export default function OrderModal() {
     isOption
   });
 
+  const matchingHolding = (holdings || []).find(h => {
+    const hClean = (h.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return hClean === cleanSym || h.symbol === symbol;
+  });
+  const matchingDelPos = (positions || []).find(p => {
+    const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return (p.product_type === 'DEL' || p.product_type === 'CNC') && Number(p.quantity) > 0 && (pClean === cleanSym || p.symbol === symbol);
+  });
+  const availableHoldingQty = (matchingHolding ? Number(matchingHolding.quantity || 0) : 0) + (matchingDelPos ? Number(matchingDelPos.quantity || 0) : 0);
+  const isDelSellFromHoldings = side === 'SELL' && (productType === 'DEL' || productType === 'CNC') && !isDerivativeContract(symbol) && availableHoldingQty >= totalQuantity;
+
   const isFuture = marginCalc.isFuture;
-  const isTrueExit = orderModal.isExit && side === orderModal.type;
+  const isTrueExit = (orderModal.isExit && side === orderModal.type) || isDelSellFromHoldings;
   const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
   const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
-  const leverageText = isTrueExit ? 'Exit' : marginCalc.leverageText;
+  const leverageText = isTrueExit ? (isDelSellFromHoldings ? 'Holding Exit' : 'Exit') : marginCalc.leverageText;
 
   const isRestricted = restrictedStocks.includes(symbol);
   
