@@ -128,21 +128,6 @@ async function updateOptionsMaster() {
         }
     }
 
-    fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(options));
-    console.log(`Saved ${count} Option contracts to options.json!`);
-
-    fs.writeFileSync(path.join(__dirname, 'spots.json'), JSON.stringify(spots));
-    console.log(`Saved ${Object.keys(spots).length} Spot contracts to spots.json!`);
-
-    for (const name of Object.keys(futures)) {
-        futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);
-    }
-    fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
-    console.log(`Saved ${futCount} Future contracts to futures.json!`);
-
-    fs.writeFileSync(path.join(__dirname, 'stocks.json'), JSON.stringify(stocks));
-    console.log(`Saved ${stocks.length} Stock contracts to stocks.json!`);
-
     // Generate lotsizeMap.json for frontend
     const lotsizeMap = {};
     for (const underlying of Object.keys(options)) {
@@ -160,6 +145,24 @@ async function updateOptionsMaster() {
             lotsizeMap[underlying] = futures[underlying][0].lotsize;
         }
     }
+
+    // ⚡ Slim options data: keep active expiries & ATM ± strikes (slims from 16MB to ~2.6MB)
+    const { slim: slimmedOptions, keptCount } = slimOptionsData(options);
+    fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(slimmedOptions));
+    console.log(`Saved ${keptCount} Option contracts to options.json (Slimmed from ${count} contracts)!`);
+
+    fs.writeFileSync(path.join(__dirname, 'spots.json'), JSON.stringify(spots));
+    console.log(`Saved ${Object.keys(spots).length} Spot contracts to spots.json!`);
+
+    for (const name of Object.keys(futures)) {
+        futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);
+    }
+    fs.writeFileSync(path.join(__dirname, 'futures.json'), JSON.stringify(futures));
+    console.log(`Saved ${futCount} Future contracts to futures.json!`);
+
+    fs.writeFileSync(path.join(__dirname, 'stocks.json'), JSON.stringify(stocks));
+    console.log(`Saved ${stocks.length} Stock contracts to stocks.json!`);
+
     const backendMapPath = path.join(__dirname, 'lotsizeMap.json');
     fs.writeFileSync(backendMapPath, JSON.stringify(lotsizeMap, null, 2));
     console.log(`Saved ${Object.keys(lotsizeMap).length} lot sizes to backend lotsizeMap.json!`);
@@ -171,8 +174,50 @@ async function updateOptionsMaster() {
     }
 }
 
+function slimOptionsData(rawOptions) {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const indices = new Set(['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX']);
+    const mcx = new Set(['CRUDEOIL', 'NATURALGAS', 'GOLD', 'GOLDM', 'SILVER', 'SILVERM', 'COPPER', 'ZINC', 'ALUMINIUM', 'LEAD', 'COTTONCNDL', 'MENTHAOIL']);
+
+    const slim = {};
+    let keptCount = 0;
+
+    for (const [u, expMap] of Object.entries(rawOptions)) {
+        const isIndex = indices.has(u);
+        const isMcx = mcx.has(u);
+        const maxExps = isIndex ? 3 : (isMcx ? 2 : 2);
+        const strikeRange = isIndex ? 15 : (isMcx ? 12 : 8);
+
+        const activeExps = Object.keys(expMap)
+            .filter(e => e >= todayStr)
+            .sort()
+            .slice(0, maxExps);
+
+        if (activeExps.length === 0) continue;
+        slim[u] = {};
+
+        for (const exp of activeExps) {
+            slim[u][exp] = {};
+            const strikes = Object.keys(expMap[exp]).map(Number).sort((a, b) => a - b);
+            const midIdx = Math.floor(strikes.length / 2);
+            const start = Math.max(0, midIdx - strikeRange);
+            const end = Math.min(strikes.length, midIdx + strikeRange + 1);
+            const selectedStrikes = strikes.slice(start, end);
+
+            for (const s of selectedStrikes) {
+                slim[u][exp][s] = expMap[exp][s];
+                if (expMap[exp][s].CE) keptCount++;
+                if (expMap[exp][s].PE) keptCount++;
+            }
+        }
+    }
+    return { slim, keptCount };
+}
+
 if (require.main === module) {
     updateOptionsMaster();
 }
 
-module.exports = { updateOptionsMaster };
+module.exports = { updateOptionsMaster, slimOptionsData };
+
