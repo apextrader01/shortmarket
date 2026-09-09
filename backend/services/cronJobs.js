@@ -225,6 +225,15 @@ function initCronJobs(priceCache, triggerEngine) {
                 }
             }
             console.log(`[CRON] Watchlist cleanup complete. Removed expired symbols for ${usersUpdated} users.`);
+
+            // Purge stale user sessions older than 30 days to prevent table bloat and protect DB indexes
+            try {
+                const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+                const purgedSessions = await db('user_sessions').where('created_at', '<', thirtyDaysAgo).del();
+                if (purgedSessions > 0) {
+                    console.log(`[CRON] Purged ${purgedSessions} stale user session(s) older than 30 days.`);
+                }
+            } catch (sessErr) {}
         } catch (err) {
             console.error('[CRON] Watchlist cleanup error:', err);
         }

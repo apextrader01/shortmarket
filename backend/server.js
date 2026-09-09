@@ -2949,6 +2949,7 @@ app.get('/api/mf/search', async (req, res) => {
             };
         });
 
+        res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
         res.json(results);
     } catch (err) {
         console.error('MF Search Error:', err.message);
@@ -2968,19 +2969,22 @@ app.get('/api/mf/enrich', async (req, res) => {
                 if (mfCache[schemeCode] && (Date.now() - mfCache[schemeCode].timestamp < 86400000)) { // 24 hours cache
                     data = mfCache[schemeCode].data;
                 } else {
-                    const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
-                    data = await response.json();
-                    if (data && data.data) {
+                    const axios = require('axios');
+                    const cleanCode = String(schemeCode).replace('-MF', '');
+                    const res = await axios.get(`https://api.mfapi.in/mf/${cleanCode}`, { timeout: 4000 });
+                    if (res.data && res.data.data && res.data.data.length > 0) {
+                        data = res.data;
                         mfCache[schemeCode] = { timestamp: Date.now(), data };
                     }
                 }
 
                 if (!data || !data.data || data.data.length === 0) return null;
-
                 const historicalData = data.data;
+                const latestNav = parseFloat(historicalData[0].nav);
+
                 return {
-                    id: parseInt(schemeCode),
-                    nav: parseFloat(historicalData[0].nav),
+                    id: schemeCode,
+                    nav: latestNav,
                     return1y: calculateReturn(historicalData, 1) || 0,
                     return3y: calculateReturn(historicalData, 3) || 0,
                     return5y: calculateReturn(historicalData, 5) || 0,
@@ -2990,6 +2994,7 @@ app.get('/api/mf/enrich', async (req, res) => {
             } catch { return null; }
         }));
 
+        res.setHeader('Cache-Control', 'public, max-age=1800, stale-while-revalidate=86400');
         res.json(results.filter(Boolean));
     } catch (err) {
         console.error('MF Enrich Error:', err.message);
@@ -3006,6 +3011,7 @@ app.get('/api/mf/details', async (req, res) => {
         
         // Check cache first
         if (mfDetailsCache[name] && (Date.now() - mfDetailsCache[name].timestamp < 86400000)) { // 24 hours cache
+            res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
             return res.json(mfDetailsCache[name].data);
         }
 
@@ -3031,6 +3037,7 @@ app.get('/api/mf/details', async (req, res) => {
         }
 
         mfDetailsCache[name] = { timestamp: Date.now(), data: detailsData };
+        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
         res.json(detailsData);
     } catch (err) {
         console.error('MF Details Error:', err.message);

@@ -35,20 +35,16 @@ let isFyersConnected = false;
 // Global map to ensure Fyers symbols map perfectly back to the exact requested frontend symbol
 const globalFyersToRequested = {};
 
-// Maps for token-based symbol lookups (populated if CSV maps are loaded, empty otherwise)
-let tokenToFyers = {};
-let fyersToToken = {};
-// Fallback name-based map for indices whose Angel One token ≠ exchange token (e.g. POWER-BSE)
+// Fallback name-based map for indices whose exchange symbol requires mapping (e.g. POWER-BSE)
 let nameToFyers = {};
 
 try {
     const fyersMap = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/fyers_map.json'), 'utf8'));
     if (fyersMap.nameToFyers) nameToFyers = fyersMap.nameToFyers;
-    if (fyersMap.tokenToFyers) tokenToFyers = fyersMap.tokenToFyers;
-    if (fyersMap.fyersToToken) fyersToToken = fyersMap.fyersToToken;
 } catch (e) {
     console.error("Error loading fyers_map.json:", e);
 }
+
 
 // ── O(1) reverse lookup: fyersSymbol → our platform symbol (built once at boot) ──
 // The fromFyersSymbol() function was doing O(n) for-loop over nameToFyers on EVERY tick.
