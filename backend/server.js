@@ -1412,14 +1412,20 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             // Fallback to non-blocking SCAN if sets are not yet populated
             if (!routes || routes.length === 0) {
                 routes = [];
-                for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:api:*', COUNT: 100 })) {
-                    routes.push(k.replace('telemetry:api:', ''));
+                for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:api:*', COUNT: 100 })) {
+                    const keys = Array.isArray(chunk) ? chunk : [chunk];
+                    for (const k of keys) {
+                        if (typeof k === 'string') routes.push(k.replace('telemetry:api:', ''));
+                    }
                 }
             }
             if (!users || users.length === 0) {
                 users = [];
-                for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:user:*', COUNT: 100 })) {
-                    users.push(k.replace('telemetry:user:', ''));
+                for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:user:*', COUNT: 100 })) {
+                    const keys = Array.isArray(chunk) ? chunk : [chunk];
+                    for (const k of keys) {
+                        if (typeof k === 'string') users.push(k.replace('telemetry:user:', ''));
+                    }
                 }
             }
 
@@ -1445,11 +1451,12 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             for (let i = 0; i < users.length; i++) {
                 const userId = users[i];
                 const data = userResults[i] || {};
-                const dbUser = await db('users').where({ id: userId }).first();
+                const isNumeric = userId && !isNaN(Number(userId));
+                const dbUser = isNumeric ? await db('users').where({ id: Number(userId) }).first().catch(() => null) : null;
                 userStats.push({
                     userId,
                     clientId: dbUser ? dbUser.client_id : null,
-                    username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${userId})`),
+                    username: dbUser ? dbUser.username : (userId === 'anonymous' ? 'Anonymous / Guest' : `User (#${userId})`),
                     apiCalls: parseInt(data.api_calls || 0),
                     apiBytes: parseInt(data.api_bytes || 0),
                     wsMinutes: parseInt(data.ws_minutes || 0)
@@ -1457,20 +1464,54 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             }
             return res.json({ api: apiStats, users: userStats, system, timeframe: 'all' });
         } else {
-            // Timeframe / Minute-Bucket Aggregation (Non-blocking SCAN)
+            // Timeframe / Minute-Bucket Aggregation
             const now = Date.now();
-            const targetBuckets = new Set();
+            const targetBuckets = [];
+            const targetBucketSet = new Set();
             const pad = (n) => String(n).padStart(2, '0');
-            for (let i = 0; i < minutes; i++) {
+            for (let i = 0; i <= minutes; i++) {
                 const d = new Date(now - i * 60 * 1000);
                 const bucket = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
-                targetBuckets.add(bucket);
+                if (!targetBucketSet.has(bucket)) {
+                    targetBucketSet.add(bucket);
+                    targetBuckets.push(bucket);
+                }
+            }
+
+            // Phase 1: Fast O(1) Bucket Index Lookup via Redis Pipeline (<2ms)
+            const bucketPipeline = generalClient.multi();
+            targetBuckets.forEach(b => bucketPipeline.sMembers(`telemetry:mb_keys:${b}`));
+            const bucketKeySets = await bucketPipeline.exec().catch(() => []);
+
+            const validKeysSet = new Set();
+            if (bucketKeySets && bucketKeySets.length > 0) {
+                for (const set of bucketKeySets) {
+                    if (Array.isArray(set)) {
+                        for (const k of set) {
+                            if (typeof k === 'string') validKeysSet.add(k);
+                        }
+                    }
+                }
+            }
+
+            // Phase 2: Fallback to non-blocking SCAN if bucket index set is empty (e.g. legacy keys)
+            if (validKeysSet.size === 0) {
+                for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:mb:*', COUNT: 300 })) {
+                    const keys = Array.isArray(chunk) ? chunk : [chunk];
+                    for (const k of keys) {
+                        if (typeof k !== 'string') continue;
+                        const parts = k.split(':');
+                        if (parts.length >= 5 && targetBucketSet.has(parts[2])) {
+                            validKeysSet.add(k);
+                        }
+                    }
+                }
             }
 
             const validKeys = [];
-            for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:mb:*', COUNT: 200 })) {
+            for (const k of validKeysSet) {
                 const parts = k.split(':');
-                if (parts.length >= 5 && targetBuckets.has(parts[2])) {
+                if (parts.length >= 5) {
                     validKeys.push({ key: k, type: parts[3], identifier: parts.slice(4).join(':') });
                 }
             }
@@ -1500,11 +1541,12 @@ app.get('/api/admin/telemetry', authenticateToken, async (req, res) => {
             const apiStats = Object.values(apiMap);
             const userStats = [];
             for (const u of Object.values(userMap)) {
-                const dbUser = await db('users').where({ id: u.userId }).first();
+                const isNumeric = u.userId && !isNaN(Number(u.userId));
+                const dbUser = isNumeric ? await db('users').where({ id: Number(u.userId) }).first().catch(() => null) : null;
                 userStats.push({
                     userId: u.userId,
                     clientId: dbUser ? dbUser.client_id : null,
-                    username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `Deleted User (#${u.userId})`),
+                    username: dbUser ? dbUser.username : (u.userId === 'anonymous' ? 'Anonymous / Guest' : `User (#${u.userId})`),
                     apiCalls: u.apiCalls,
                     apiBytes: u.apiBytes,
                     wsMinutes: u.wsMinutes
@@ -1528,8 +1570,11 @@ app.post('/api/admin/telemetry/reset', authenticateToken, async (req, res) => {
         if (!generalClient || !generalClient.isReady) return res.status(503).json({ error: 'Redis offline' });
 
         const keysToDelete = [];
-        for await (const k of generalClient.scanIterator({ MATCH: 'telemetry:*', COUNT: 200 })) {
-            keysToDelete.push(k);
+        for await (const chunk of generalClient.scanIterator({ MATCH: 'telemetry:*', COUNT: 200 })) {
+            const keys = Array.isArray(chunk) ? chunk : [chunk];
+            for (const k of keys) {
+                if (typeof k === 'string') keysToDelete.push(k);
+            }
         }
         if (keysToDelete.length > 0) {
             await generalClient.del(keysToDelete);

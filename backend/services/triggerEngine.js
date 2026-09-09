@@ -29,8 +29,11 @@ class TriggerEngine {
             const { generalClient } = require('./redisClient');
             if (generalClient && generalClient.isReady) {
                 const triggerKeys = [];
-                for await (const k of generalClient.scanIterator({ MATCH: 'trigger:*', COUNT: 100 })) {
-                    triggerKeys.push(k);
+                for await (const chunk of generalClient.scanIterator({ MATCH: 'trigger:*', COUNT: 100 })) {
+                    const keys = Array.isArray(chunk) ? chunk : [chunk];
+                    for (const k of keys) {
+                        if (typeof k === 'string') triggerKeys.push(k);
+                    }
                 }
                 if (triggerKeys.length > 0) {
                     await generalClient.del(triggerKeys);

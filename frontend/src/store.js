@@ -1411,7 +1411,9 @@ export const useStore = create(persist((set, get) => ({
     try {
       const res = await fetch(`${API}/api/admin/telemetry?timeframe=${timeframe}`, { credentials: 'omit' });
       const data = await res.json();
-      set({ adminTelemetry: data });
+      if (data && !data.error) {
+        set({ adminTelemetry: data });
+      }
       return data;
     } catch (err) {
       console.error('Failed to load telemetry:', err);

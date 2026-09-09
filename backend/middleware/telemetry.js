@@ -52,6 +52,12 @@ async function flushTelemetry() {
             if (stats.api_time_ms) p.hIncrBy(mbKey, 'api_time_ms', stats.api_time_ms);
             if (stats.api_bytes) p.hIncrBy(mbKey, 'api_bytes', stats.api_bytes);
             p.expire(mbKey, 86400);
+            
+            const mbParts = mbKey.split(':');
+            if (mbParts.length >= 3 && mbParts[2]) {
+                p.sAdd(`telemetry:mb_keys:${mbParts[2]}`, mbKey);
+                p.expire(`telemetry:mb_keys:${mbParts[2]}`, 86400);
+            }
             opsCount++;
         }
 
