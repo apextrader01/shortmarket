@@ -25,7 +25,6 @@ async function updateOptionsMaster() {
     console.log('Downloading Fyers Master CSVs...');
     
     const options = {};
-    const spots = {};
     const futures = {};
     const stocks = [];
     
@@ -64,14 +63,6 @@ async function updateOptionsMaster() {
 
                 // Stocks / Spots (NSE_CM, BSE_CM)
                 if (url.includes('_CM')) {
-                    const uniqueKey = `${underlying}-${exchPrefix}`;
-                    spots[uniqueKey] = {
-                        token: exchToken,
-                        symbol: symbol,
-                        name: underlying,
-                        description: desc,
-                        exchange: exchPrefix
-                    };
                     stocks.push({
                         token: exchToken,
                         symbol: symbol,
@@ -151,8 +142,7 @@ async function updateOptionsMaster() {
     fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(slimmedOptions));
     console.log(`Saved ${keptCount} Option contracts to options.json (Slimmed from ${count} contracts)!`);
 
-    fs.writeFileSync(path.join(__dirname, 'spots.json'), JSON.stringify(spots));
-    console.log(`Saved ${Object.keys(spots).length} Spot contracts to spots.json!`);
+    fs.writeFileSync(path.join(__dirname, 'spots.json'), '{}');
 
     for (const name of Object.keys(futures)) {
         futures[name].sort((a, b) => a.expiryTimestamp - b.expiryTimestamp);

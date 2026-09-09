@@ -418,32 +418,41 @@ app.get('/api/stocks', async (req, res) => {
     const { generalClient } = require('./services/redisClient');
     const cacheKey = 'api:stocks:nse_bse:v2';
     
+    let payload = null;
+
     // 1. Try Redis cache first
     if (generalClient && generalClient.isReady) {
       const cached = await generalClient.get(cacheKey);
       if (cached) {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-        return res.send(cached);
+        payload = cached;
       }
     }
     
     // 2. Compute if not in cache (Query In-Memory JSON)
-    const { getAllStocks } = require('./services/instrumentsCache');
-    const stocksArray = getAllStocks();
+    if (!payload) {
+      const { getAllStocks } = require('./services/instrumentsCache');
+      const stocksArray = getAllStocks();
+      if (!stocksArray || stocksArray.length === 0) return res.json([]);
+      payload = JSON.stringify(stocksArray);
       
-    if (!stocksArray || stocksArray.length === 0) return res.json([]);
-      
-    const responseData = JSON.stringify(stocksArray);
+      // Save to Redis (cache for 6 hours)
+      if (generalClient && generalClient.isReady) {
+        generalClient.set(cacheKey, payload, { EX: 21600 }).catch(console.error);
+      }
+    }
+
+    // 3. ETag & HTTP 304 Handling: Save 100% of network bandwidth on conditional requests
+    const crypto = require('crypto');
+    const etag = `"${crypto.createHash('md5').update(payload).digest('hex')}"`;
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     
-    // 3. Save to Redis (cache for 6 hours)
-    if (generalClient && generalClient.isReady) {
-      generalClient.set(cacheKey, responseData, { EX: 21600 }).catch(console.error);
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end(); // 0 bytes transferred over network!
     }
     
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-    res.send(responseData);
+    res.send(payload);
   } catch (err) {
     console.error('Stocks API Error:', err);
     res.status(500).json([]);
@@ -2691,6 +2700,7 @@ const myFetch = async (...args) => {
 
 // 1. Master List Cache
 let allMutualFunds = [];
+let allMutualFundsMap = new Map();
 
 // Initialize by fetching all 10,000+ funds from mfapi.in
 
@@ -2741,6 +2751,10 @@ async function initMutualFundsList(force = false) {
             }
             
             allMutualFunds = funds;
+            allMutualFundsMap = new Map();
+            for (const f of funds) {
+                allMutualFundsMap.set(String(f.schemeCode), f);
+            }
             console.log(`Successfully parsed ${allMutualFunds.length} highly active retail mutual funds from AMFI.`);
             
         } catch (err) {
@@ -2810,6 +2824,22 @@ function determineRisk(return1y) {
     return 'Low';
 }
 
+function setLRUCache(cacheObj, key, value, maxItems = 100) {
+    const keys = Object.keys(cacheObj);
+    if (keys.length >= maxItems) {
+        let oldestKey = keys[0];
+        let oldestTs = Infinity;
+        for (const k of keys) {
+            if (cacheObj[k]?.timestamp < oldestTs) {
+                oldestTs = cacheObj[k].timestamp;
+                oldestKey = k;
+            }
+        }
+        delete cacheObj[oldestKey];
+    }
+    cacheObj[key] = value;
+}
+
 const mfCache = {};
 
 const LEGACY_MF_NAMES = {
@@ -2846,7 +2876,7 @@ app.post('/api/mf/names', async (req, res) => {
                 }
                 let cleanId = String(id).replace('-MF', '');
                 cleanId = LEGACY_MF_CODES[cleanId] || cleanId;
-                const fund = allMutualFunds.find(f => String(f.schemeCode) === cleanId);
+                const fund = allMutualFundsMap.get(cleanId);
                 if (fund) {
                     mapping[id] = fund.schemeName;
                 } else if (LEGACY_MF_NAMES[cleanId]) {
@@ -2857,7 +2887,9 @@ app.post('/api/mf/names', async (req, res) => {
                         const mfRes = await axios.get(`https://api.mfapi.in/mf/${cleanId}`, { timeout: 3000 });
                         if (mfRes.data && mfRes.data.meta && mfRes.data.meta.scheme_name) {
                             mapping[id] = mfRes.data.meta.scheme_name;
-                            allMutualFunds.push({ schemeCode: parseInt(cleanId), schemeName: mfRes.data.meta.scheme_name });
+                            const newFund = { schemeCode: parseInt(cleanId), schemeName: mfRes.data.meta.scheme_name };
+                            allMutualFunds.push(newFund);
+                            allMutualFundsMap.set(cleanId, newFund);
                         }
                     } catch (e) {}
                 }
@@ -3036,7 +3068,7 @@ app.get('/api/mf/details', async (req, res) => {
             return res.status(404).json({ error: detailsData.errorMessage || 'Details not found' });
         }
 
-        mfDetailsCache[name] = { timestamp: Date.now(), data: detailsData };
+        setLRUCache(mfDetailsCache, name, { timestamp: Date.now(), data: detailsData }, 100);
         res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
         res.json(detailsData);
     } catch (err) {
@@ -3057,7 +3089,7 @@ app.get('/api/mf/:schemeCode', async (req, res) => {
         const response = await myFetch(`https://api.mfapi.in/mf/${schemeCode}`);
         const data = await response.json();
         
-        mfCache[schemeCode] = { timestamp: Date.now(), data };
+        setLRUCache(mfCache, schemeCode, { timestamp: Date.now(), data }, 100);
         res.json(data);
     } catch (err) {
         console.error('MF History Error:', err.message);
@@ -4762,7 +4794,35 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
 
 // ─── Historical Chart Data (Candles) ──────────────────────────────────────────────────
-const candleCache = {}; // Cache to protect Fyers from rate limits (e.g. 1000 users opening charts)
+const candleCache = {}; // Cache to protect Fyers from rate limits (capped at 200 items)
+const MAX_CANDLE_CACHE_ITEMS = 200;
+
+function setCandleCache(key, data, now) {
+  const keys = Object.keys(candleCache);
+  if (keys.length >= MAX_CANDLE_CACHE_ITEMS) {
+    let oldestKey = keys[0];
+    let oldestTs = Infinity;
+    for (const k of keys) {
+      if (candleCache[k]?.timestamp < oldestTs) {
+        oldestTs = candleCache[k].timestamp;
+        oldestKey = k;
+      }
+    }
+    delete candleCache[oldestKey];
+  }
+  candleCache[key] = { timestamp: now, data };
+}
+
+// Hourly Background cleanup: Prune expired candles older than 12h to stop RAM leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, item] of Object.entries(candleCache)) {
+    if (item && item.timestamp && (now - item.timestamp > 12 * 3600 * 1000)) {
+      delete candleCache[key];
+    }
+  }
+}, 3600000).unref();
+
 // Smart Timeframe Cache: Determine cache limit based on requested resolution and Market Hours
 function getCacheDuration(interval, symbol) {
   // 1. After-Hours Mega Cache Logic (Exclude MCX Commodities)
@@ -4823,17 +4883,14 @@ app.get('/api/candles/:symbol', async (req, res) => {
       await new Promise(r => setTimeout(r, 500));
       const retryCandles = await fetchCandleData(cleanSymbol, interval);
       if (retryCandles && retryCandles.length > 0) {
-        candleCache[cacheKey] = { timestamp: now, data: retryCandles };
+        setCandleCache(cacheKey, retryCandles, now);
         return res.json(retryCandles);
       }
     }
 
     // Save to cache only if valid data is returned
     if (candles && candles.length > 0) {
-      candleCache[cacheKey] = {
-        timestamp: now,
-        data: candles
-      };
+      setCandleCache(cacheKey, candles, now);
     }
     
     res.json(candles);
@@ -4984,7 +5041,7 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
       data.news = [];
     }
 
-    stockDetailsCache[cleanName] = { timestamp: Date.now(), data };
+    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data }, 100);
     res.json(data);
   } catch (err) {
     console.error('Stock Details Fetch Error for', cleanName, err.message);

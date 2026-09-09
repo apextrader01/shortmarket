@@ -317,11 +317,8 @@ export const useStore = create(persist((set, get) => ({
     set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
 
-    // ⚡ Immediately subscribe via WebSocket so ticks stream with 0 delay
+    // ⚡ Immediately subscribe via WebSocket using canonical uniqueSymbol
     socket.emit('subscribe', uniqueSymbol);
-    if (uniqueSymbol && uniqueSymbol.includes(':')) {
-      socket.emit('subscribe', uniqueSymbol.split(':')[1]);
-    }
     get().pingSubscriptions();
     get().fetchBatchPrices([uniqueSymbol], true);
   },

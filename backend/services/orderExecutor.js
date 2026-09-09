@@ -7,8 +7,21 @@ function initOrderExecutor(priceCache) {
   setInterval(async () => {
     if (isExecuting) return;
     isExecuting = true;
-    try {
-      // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
+      // ⚡ Skip DB scan if all markets (Equities & MCX) are completely closed (nights / weekends)
+      const now = new Date();
+      const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(now);
+      const istH = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+      const istM = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+      const istDay = istParts.find(p => p.type === 'weekday')?.value;
+      const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
+      const isMarketHours = !isWeekend && ((istH > 9 || (istH === 9 && istM >= 0)) && (istH < 23 || (istH === 23 && istM <= 30)));
+      if (!isMarketHours) {
+        isExecuting = false;
+        return;
+      }
+
+      try {
+        // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
       // are owned by triggerEngine.js (in-memory, evaluated on every WS price tick) to
       // avoid double-execution races between the two engines.
       const pendingOrders = await db('orders').where({ status: 'PENDING', type: 'MARKET' });

@@ -397,9 +397,8 @@ function startLiveWebSocket() {
                     if (uniqueSymbol.includes(':')) {
                         const raw = uniqueSymbol.split(':')[1];
                         sharedPriceCache[raw] = priceObj;
-                        dirtySymbols.add(raw);
                     }
-                    dirtySymbols.add(uniqueSymbol); // Mark as dirty for the debounce interval
+                    dirtySymbols.add(uniqueSymbol); // Broadcast canonical uniqueSymbol (cuts duplicate emissions)
                     
                     // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
                     if (triggerEngine) {

@@ -34,11 +34,11 @@ function loadJSON(filename) {
 function initializeCache() {
     console.log('Loading instruments into memory cache...');
     const stocks = loadJSON('stocks.json');
-    const spots = loadJSON('spots.json');
     const futures = loadJSON('futures.json');
     const options = loadJSON('options.json');
     
-    let rawInstruments = [...stocks, ...spots, ...futures, ...options];
+    let rawInstruments = [...stocks, ...futures, ...options];
+
     
     // Filtering and Deduplication
     const symbolMap = new Map();
@@ -129,7 +129,7 @@ function searchInstruments(query) {
 
 // Watch for file changes so we can reload dynamically if updateOptionsMaster is run
 try {
-    fs.watch(path.join(__dirname, '..', 'database'), (eventType, filename) => {
+    const dbWatcher = fs.watch(path.join(__dirname, '..', 'database'), (eventType, filename) => {
         if (filename && filename.endsWith('.json')) {
             console.log(`Detected change in ${filename}, reloading instruments cache...`);
             // Debounce reloading to avoid doing it multiple times during a bulk update
@@ -137,6 +137,9 @@ try {
             global.reloadCacheTimeout = setTimeout(() => initializeCache(), 5000);
         }
     });
+    if (dbWatcher && typeof dbWatcher.unref === 'function') {
+        dbWatcher.unref();
+    }
 } catch(e) {
     console.warn("Could not watch database dir:", e);
 }

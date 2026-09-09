@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useStore, API } from '../store';
 import { SMA, RSI, MACD, EMA, BollingerBands, Stochastic, ADX, ATR } from 'technicalindicators';
 
-export default function StockDetails({ symbol, price, candles }) {
+function StockDetails({ symbol, price, candles }) {
   const cleanSym = (symbol ? String(symbol).replace(/^(NSE|BSE|MCX):/i, '').split('-')[0] : '') || 'Stock';
   const [activeTab, setActiveTab] = useState('Overview');
   const [details, setDetails] = useState(null);
@@ -23,9 +23,9 @@ export default function StockDetails({ symbol, price, candles }) {
       });
   }, [symbol]);
 
-  // Calculate Technicals
-  let technicals = null;
-  if (candles && candles.length > 50) {
+  // Calculate Technicals — Memoized so it does NOT re-run on live price ticks!
+  const technicals = useMemo(() => {
+    if (!candles || candles.length <= 50) return null;
     
     const closes = candles.map(c => c.close);
     const highs = candles.map(c => c.high);
@@ -60,14 +60,13 @@ export default function StockDetails({ symbol, price, candles }) {
     const adx = ADX.calculate({ high: highs, low: lows, close: closes, period: 14 }).pop();
     const atr = ATR.calculate({ high: highs, low: lows, close: closes, period: 14 }).pop();
 
-    technicals = { 
+    return { 
       rsi: currentRSI, macd: currentMACD, 
       sma10, sma20, sma50, sma100, sma200,
       ema10, ema20, ema50, ema200,
       bb, stoch, adx, atr 
     };
-
-  }
+  }, [candles]);
 
   const tabStyle = (tab) => ({
     padding: '8px 16px', cursor: 'pointer', fontWeight: '600', fontSize: '13px',
@@ -465,5 +464,7 @@ export default function StockDetails({ symbol, price, candles }) {
     </div>
   );
 }
+
+export default React.memo(StockDetails);
 
 

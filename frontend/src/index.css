@@ -816,7 +816,7 @@ input:checked + .slider:before {
   background: #0f172a; /* Slate 900 - matches native select look */
   border: 1px solid #334155; /* Slate 700 */
   border-radius: 6px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   z-index: 1000;
   width: 250px;
   display: flex;
@@ -1481,14 +1481,14 @@ select option {
   table.responsive-mobile-table tbody, table.responsive-mobile-table tr, table.responsive-mobile-table td { display: block; width: 100%; }
   
   table.responsive-mobile-table tr { 
-    background: linear-gradient(145deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.6) 100%);
+    background: linear-gradient(145deg, rgba(30,41,59,0.85) 0%, rgba(15,23,42,0.95) 100%);
     border: 1px solid rgba(255,255,255,0.08); 
     border-radius: 16px; 
     padding: 16px 20px; 
     margin-bottom: 16px; 
     display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; 
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05); 
-    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05); 
+    contain: paint;
   }
   
   table.responsive-mobile-table td { 

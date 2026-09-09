@@ -38,10 +38,6 @@ async function loadInstrumentMaster() {
         } catch(e) {}
         
         let bseSpots = {};
-        try {
-            const data4 = fs.readFileSync(path.join(__dirname, '../database/spots.json'), 'utf8');
-            bseSpots = JSON.parse(data4);
-        } catch(e) {}
 
         const indices = {
             "101000000026000": { symbol: "NSE:NIFTY50-INDEX", name: "Nifty 50", exchange: "NSE" },
@@ -100,14 +96,6 @@ async function loadInstrumentMaster() {
                 stock.uniqueSymbol = stock.symbol;
                 tempStockMaster[stock.token] = stock;
                 symbolToToken[stock.uniqueSymbol] = stock.token;
-            }
-        }
-
-        if (typeof bseSpots === 'object') {
-            for (const [key, info] of Object.entries(bseSpots)) {
-                info.uniqueSymbol = info.symbol;
-                tempStockMaster[info.token] = info;
-                symbolToToken[info.uniqueSymbol] = info.token;
             }
         }
 
