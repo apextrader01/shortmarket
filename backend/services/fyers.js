@@ -22,6 +22,7 @@ const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableL
 
 // Set Fyers Credentials
 const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+const SECRET_ID = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
 const REDIRECT_URL = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://34-93-99-22.nip.io/api/fyers/callback');
 
 fyers.setAppId(APP_ID);
@@ -101,11 +102,11 @@ function getFyersAuthURL() {
     return fyers.generateAuthCode();
 }
 
-async function verifyFyersAuth(auth_code) {
+async function verifyFyersAuth(auth_code, customSecretKey = null) {
     try {
         const response = await fyers.generate_access_token({
             client_id: APP_ID,
-            secret_key: SECRET_ID,
+            secret_key: customSecretKey || SECRET_ID,
             auth_code: auth_code
         });
 

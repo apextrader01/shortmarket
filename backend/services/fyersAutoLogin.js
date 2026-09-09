@@ -43,6 +43,7 @@ async function getFyersCredentials() {
     let pin = null;
     let totp_key = null;
     let app_id = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+    let secret_id = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
     let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://34-93-99-22.nip.io/api/fyers/callback');
 
     try {
@@ -69,7 +70,7 @@ async function getFyersCredentials() {
 
 async function performFyersAutoLogin(retryCount = 0) {
     const creds = await getFyersCredentials();
-    const { fy_id, pin, totp_key, app_id, redirect_url } = creds;
+    const { fy_id, pin, totp_key, app_id, secret_id, redirect_url } = creds;
 
     if (!fy_id || !pin || !totp_key) {
         const msg = 'Missing Fyers credentials (FYERS_USER_ID, FYERS_PIN, FYERS_TOTP_KEY). Please configure them in Admin Settings.';
@@ -171,7 +172,7 @@ async function performFyersAutoLogin(retryCount = 0) {
         }
 
         // Step 5: Exchange Auth Code for Access Token
-        const result = await verifyFyersAuth(authCode);
+        const result = await verifyFyersAuth(authCode, secret_id);
         if (result.success) {
             console.log('✅ [FYERS AUTO-LOGIN] Access Token successfully generated and active!');
             return { success: true, message: 'Automated Fyers login successful' };
