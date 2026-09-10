@@ -568,7 +568,7 @@ export const useStore = create(persist((set, get) => ({
       window._lastWsTick = Date.now();
       Object.assign(pendingSnapshots, snapshot);
       if (!snapshotThrottleTimer) {
-        snapshotThrottleTimer = setTimeout(flushSnapshots, 80); // ~12 updates/sec max, smooth 80ms throttle
+        snapshotThrottleTimer = setTimeout(flushSnapshots, 200); // ~5 updates/sec max, smooth 200ms throttle (60% CPU savings)
       }
     });
 

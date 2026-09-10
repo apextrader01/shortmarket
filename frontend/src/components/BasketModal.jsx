@@ -124,7 +124,24 @@ const STRATEGY_PRESETS = [
 ];
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, prices, user, orders, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, prices: state.prices, user: state.user, orders: state.orders, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, user, orders, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, user: state.user, orders: state.orders, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
+
+  // Scoped price subscription: Only re-render when prices of symbols inside the basket change!
+  const basketSymbols = useMemo(() => basketItems.map(i => i.symbol).filter(Boolean), [basketItems]);
+  const prices = useStore(useShallow(state => {
+    if (basketSymbols.length === 0) return {};
+    const map = {};
+    for (const sym of basketSymbols) {
+      if (state.prices[sym]) map[sym] = state.prices[sym];
+      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      if (clean && state.prices[clean]) map[clean] = state.prices[clean];
+      if (clean && state.prices[`NSE:${clean}`]) map[`NSE:${clean}`] = state.prices[`NSE:${clean}`];
+      if (clean && state.prices[`BSE:${clean}`]) map[`BSE:${clean}`] = state.prices[`BSE:${clean}`];
+      if (clean && state.prices[`MCX:${clean}`]) map[`MCX:${clean}`] = state.prices[`MCX:${clean}`];
+      if (clean && state.prices[`NFO:${clean}`]) map[`NFO:${clean}`] = state.prices[`NFO:${clean}`];
+    }
+    return map;
+  }));
 
   const [productType, setProductType] = useState('INT');
   const [showCautionPopup, setShowCautionPopup] = useState(false);
@@ -851,7 +868,8 @@ export default function BasketModal() {
     else if (targetUnderlying === 'BANKEX') indexKey = 'BSE:BANKEX-INDEX';
     else if (!isMCX) indexKey = `${exch}:${targetUnderlying}-EQ`;
 
-    let liveSpot = indexKey && prices[indexKey] ? prices[indexKey].ltp : 0;
+    const allPrices = useStore.getState().prices;
+    let liveSpot = indexKey && allPrices[indexKey] ? allPrices[indexKey].ltp : 0;
     if (!liveSpot && indexKey) {
       await useStore.getState().fetchBatchPrices?.([indexKey], true);
       const curPrices = useStore.getState().prices;
