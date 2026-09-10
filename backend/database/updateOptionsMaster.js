@@ -176,8 +176,7 @@ function slimOptionsData(rawOptions) {
     for (const [u, expMap] of Object.entries(rawOptions)) {
         const isIndex = indices.has(u);
         const isMcx = mcx.has(u);
-        const maxExps = isIndex ? 3 : (isMcx ? 2 : 2);
-        const strikeRange = isIndex ? 15 : (isMcx ? 12 : 8);
+        const maxExps = isIndex ? 4 : (isMcx ? 2 : 2);
 
         const activeExps = Object.keys(expMap)
             .filter(e => e >= todayStr)
@@ -189,16 +188,29 @@ function slimOptionsData(rawOptions) {
 
         for (const exp of activeExps) {
             slim[u][exp] = {};
-            const strikes = Object.keys(expMap[exp]).map(Number).sort((a, b) => a - b);
-            const midIdx = Math.floor(strikes.length / 2);
-            const start = Math.max(0, midIdx - strikeRange);
-            const end = Math.min(strikes.length, midIdx + strikeRange + 1);
-            const selectedStrikes = strikes.slice(start, end);
+            if (isIndex) {
+                // ⚡ Indices (SENSEX, NIFTY, BANKNIFTY, etc.): Keep ALL strikes for active expiries.
+                // Ensures all ATM/ITM/OTM strikes (e.g. SENSEX 74800) are always available.
+                // Total size for all 6 indices is only ~1.47 MB.
+                for (const [s, contract] of Object.entries(expMap[exp])) {
+                    slim[u][exp][s] = contract;
+                    if (contract.CE) keptCount++;
+                    if (contract.PE) keptCount++;
+                }
+            } else {
+                // Equities & MCX: Keep a reasonable strike window around midpoint
+                const strikeRange = isMcx ? 12 : 8;
+                const strikes = Object.keys(expMap[exp]).map(Number).sort((a, b) => a - b);
+                const midIdx = Math.floor(strikes.length / 2);
+                const start = Math.max(0, midIdx - strikeRange);
+                const end = Math.min(strikes.length, midIdx + strikeRange + 1);
+                const selectedStrikes = strikes.slice(start, end);
 
-            for (const s of selectedStrikes) {
-                slim[u][exp][s] = expMap[exp][s];
-                if (expMap[exp][s].CE) keptCount++;
-                if (expMap[exp][s].PE) keptCount++;
+                for (const s of selectedStrikes) {
+                    slim[u][exp][s] = expMap[exp][s];
+                    if (expMap[exp][s].CE) keptCount++;
+                    if (expMap[exp][s].PE) keptCount++;
+                }
             }
         }
     }

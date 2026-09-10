@@ -485,7 +485,7 @@ app.get('/api/stocks', async (req, res) => {
     const qLower = q.toLowerCase();
         try {
         const { generalClient } = require('./services/redisClient');
-        const cacheKey = `api:search:v4:${qLower}`;
+        const cacheKey = `api:search:v5:${qLower}`;
       
       if (generalClient && generalClient.isReady) {
         const cached = await generalClient.get(cacheKey);
@@ -526,9 +526,9 @@ app.get('/api/stocks', async (req, res) => {
           token: item.token,
           symbol: item.symbol,
           name: item.name,
-          exchange: item.exchange,
+          exchange: item.exchange || item.exch_seg || (item.symbol && item.symbol.includes(':') ? item.symbol.split(':')[0] : 'NSE'),
           lotsize: item.lotsize,
-          expiryTimestamp: item.expiry_timestamp,
+          expiryTimestamp: item.expiryTimestamp || item.expiry_timestamp || null,
           uniqueSymbol: item.unique_symbol || item.symbol,
           searchString: item.search_string
       }));
