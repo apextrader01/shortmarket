@@ -21,6 +21,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
+    "firebase-admin": "^14.3.0",
     "fyers-api-v3": "^2.0.0",
     "geoip-lite": "^2.0.3",
     "helmet": "^8.2.0",

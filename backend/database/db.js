@@ -539,6 +539,20 @@ async function ensureCriticalColumns() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_push_sub_user_id ON push_subscriptions(user_id)');
 
+    // Ensure fcm_device_tokens table exists for Android & iOS native mobile push
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS fcm_device_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20) DEFAULT 'android',
+        device_name VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_fcm_token_user_id ON fcm_device_tokens(user_id)');
+
     // Risk Guardian & Trader Journal Columns
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_loss DECIMAL(14,2)');
     await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER');

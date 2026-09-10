@@ -3969,6 +3969,67 @@ app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
   }
 });
 
+// 📱 Native Mobile App Push Endpoints (FCM)
+app.post('/api/push/fcm-subscribe', authenticateToken, async (req, res) => {
+  try {
+    const { token, platform, deviceName } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'FCM token is required' });
+    }
+
+    // Ensure fcm_device_tokens table exists defensively
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS fcm_device_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20) DEFAULT 'android',
+        device_name VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const existing = await db('fcm_device_tokens').where({ token }).first();
+    if (existing) {
+      await db('fcm_device_tokens').where({ token }).update({
+        user_id: req.user.id,
+        platform: platform || 'android',
+        device_name: deviceName || null,
+        updated_at: new Date()
+      });
+    } else {
+      await db('fcm_device_tokens').insert({
+        user_id: req.user.id,
+        token,
+        platform: platform || 'android',
+        device_name: deviceName || null
+      });
+    }
+
+    res.json({ success: true, message: 'FCM device token registered successfully' });
+  } catch (err) {
+    console.error('Failed to save FCM token:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/push/fcm-unsubscribe', authenticateToken, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (token) {
+      await db('fcm_device_tokens').where({ token }).delete();
+    } else {
+      await db('fcm_device_tokens').where({ user_id: req.user.id }).delete();
+    }
+    res.json({ success: true, message: 'Unsubscribed FCM device token' });
+  } catch (err) {
+    console.error('Failed to unsubscribe FCM token:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // 📱 Telegram Trade & Risk Alerts Endpoints 📱
 const { 
   sendTelegramAlert, 
@@ -4221,11 +4282,16 @@ app.post('/api/order/:id/tag', authenticateToken, async (req, res) => {
 
 app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
   try {
-    const { endpoint } = req.body;
+    const { endpoint, token } = req.body;
     if (endpoint) {
       await db('push_subscriptions').where({ endpoint }).delete();
-    } else {
+    }
+    if (token) {
+      await db('fcm_device_tokens').where({ token }).delete();
+    }
+    if (!endpoint && !token) {
       await db('push_subscriptions').where({ user_id: req.user.id }).delete();
+      await db('fcm_device_tokens').where({ user_id: req.user.id }).delete();
     }
     res.json({ success: true, message: 'Unsubscribed from push notifications' });
   } catch (err) {

@@ -142,7 +142,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     } else {
       // Turn ON
       try {
-        setPushStatusMsg('Requesting browser permission...');
+        setPushStatusMsg('Activating push alerts...');
         await subscribeUserToPush(token);
         setIsPushEnabled(true);
         setPushStatusMsg('Push Notifications Active! 🔔');
@@ -606,11 +606,11 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 600px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
               
-              {/* Push & Trade Alerts (PWA) */}
+              {/* Push & Trade Alerts (Web & Mobile) */}
               <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
                 <div style={{ minWidth: '200px', flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Bell size={15} color={isPushEnabled ? 'var(--color-blue-light)' : 'var(--text-secondary)'} /> Push & Trade Alerts (PWA)
+                    <Bell size={15} color={isPushEnabled ? 'var(--color-blue-light)' : 'var(--text-secondary)'} /> Push & Trade Alerts (Web & Mobile App)
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Receive real-time phone lock-screen and desktop alerts on order executions and triggers
