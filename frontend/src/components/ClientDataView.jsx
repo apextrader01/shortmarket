@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
 const ReferralsView = lazy(() => import('./ReferralsView'));
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
+import ResetPortfolioModal from './ResetPortfolioModal';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
@@ -62,6 +63,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
   const [showReferrals, setShowReferrals] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     fetchTelegramSettings?.();
@@ -330,7 +332,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   };
   if (showProfile) {
     return (
-      <div style={{ padding: isMobile ? '16px 12px' : '24px 28px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
+      <div style={{ padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
         <button 
           className="btn btn-secondary" 
           onClick={() => setShowProfile(false)} 
@@ -344,7 +346,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   }
 
   return (
-    <div style={{ flex: 1, padding: isMobile ? '16px 12px 70px 12px' : '24px 28px 60px 28px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ flex: 1, padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
@@ -444,7 +446,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s' }}>
             DEPOSIT
           </button>
-          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.15s' }}>
+          <button onClick={() => setShowResetModal(true)} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.15s' }}>
             RESET ACCOUNT
           </button>
         </div>
@@ -1291,6 +1293,12 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </Suspense>
         </div>
       )}
+
+      {/* Reset Portfolio Modal with Custom Amount up to 10 Crore */}
+      <ResetPortfolioModal 
+        isOpen={showResetModal} 
+        onClose={() => setShowResetModal(false)} 
+      />
 
     </div>
   );

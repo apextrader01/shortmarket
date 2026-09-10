@@ -27,6 +27,16 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const [amount, setAmount] = useState('5000');
     const [redeemType, setRedeemType] = useState('ALL'); // 'ALL' | 'CUSTOM'
     
+    // Mobile responsive tab state
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [mobileTab, setMobileTab] = useState('overview'); // 'overview' | 'invest'
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     // Calculator
     const [investmentYears, setInvestmentYears] = useState(5);
 
@@ -173,16 +183,18 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
             .mf-modal-content {
                 flex-direction: column !important;
                 overflow-y: auto !important;
+                flex: 1 !important;
             }
             .mf-modal-left {
                 width: 100% !important;
                 padding: 16px !important;
-                flex: none !important;
+                flex: 1 !important;
             }
             .mf-modal-right {
                 width: 100% !important;
                 border-left: none !important;
-                border-top: 1px solid var(--border-color) !important;
+                border-top: none !important;
+                flex: 1 !important;
             }
             .mf-metrics-grid {
                 flex-direction: column !important;
@@ -195,7 +207,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 font-size: 24px !important;
             }
             .mf-header {
-                padding: 16px !important;
+                padding: 14px 16px !important;
             }
         }
     `}</style>
@@ -212,38 +224,108 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                 display: 'flex', flexDirection: 'column', overflow: 'hidden'
             }}>
                 {/* Header */}
-                <div className="mf-header" style={{ padding: '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
-                    <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                <div className="mf-header" style={{ padding: isMobile ? '14px 16px' : '24px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
+                    <div style={{ display: 'flex', gap: isMobile ? '12px' : '20px', alignItems: 'center', flex: 1, minWidth: 0 }}>
                         {details?.logo_url ? (
-                            <img src={details.logo_url} alt="AMC" style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#fff', padding: '4px' }} />
+                            <img src={details.logo_url} alt="AMC" style={{ width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', borderRadius: '8px', background: '#fff', padding: '4px', flexShrink: 0 }} />
                         ) : (
-                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                                <TrendingUp size={24} />
+                            <div style={{ width: isMobile ? '38px' : '48px', height: isMobile ? '38px' : '48px', borderRadius: '8px', background: 'var(--color-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                                <TrendingUp size={isMobile ? 20 : 24} />
                             </div>
                         )}
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</div>
-                                <div style={{ fontSize: '11px', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{fund.amc}</div>
+                                <div style={{ fontSize: '10.5px', background: 'var(--bg-hover)', padding: '2px 7px', borderRadius: '10px', color: 'var(--text-secondary)' }}>{fund.category}</div>
                                 {details?.groww_rating && (
-                                    <span style={{ fontSize: '12px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontSize: '11px', background: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)', padding: '2px 7px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                         ★ {details.groww_rating}
                                     </span>
                                 )}
                             </div>
-                            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>{fund.name}</h2>
+                            <h2 style={{ fontSize: isMobile ? '16px' : '24px', fontWeight: '800', margin: 0, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fund.name}</h2>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}>
-                        <X size={24} />
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '6px', marginLeft: '8px' }}>
+                        <X size={22} />
                     </button>
                 </div>
+
+                {/* Mobile Tab Switcher */}
+                {isMobile && (
+                    <div style={{ 
+                        display: 'flex', 
+                        background: 'var(--bg-panel)', 
+                        borderBottom: '1px solid var(--border-color)', 
+                        padding: '8px 12px', 
+                        gap: '8px',
+                        flexShrink: 0
+                    }}>
+                        <button 
+                            type="button"
+                            onClick={() => setMobileTab('overview')} 
+                            style={{ 
+                                flex: 1, 
+                                padding: '9px 12px', 
+                                borderRadius: '8px', 
+                                border: 'none', 
+                                background: mobileTab === 'overview' ? 'var(--color-blue)' : 'var(--bg-card)', 
+                                color: mobileTab === 'overview' ? '#fff' : 'var(--text-secondary)', 
+                                fontWeight: '700', 
+                                fontSize: '12.5px', 
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            <Activity size={14} /> Overview & Chart
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setMobileTab('invest')} 
+                            style={{ 
+                                flex: 1, 
+                                padding: '9px 12px', 
+                                borderRadius: '8px', 
+                                border: 'none', 
+                                background: mobileTab === 'invest' ? 'var(--color-blue)' : 'var(--bg-card)', 
+                                color: mobileTab === 'invest' ? '#fff' : 'var(--text-secondary)', 
+                                fontWeight: '700', 
+                                fontSize: '12.5px', 
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            <Wallet size={14} /> Invest / Redeem
+                            {userHolding && (
+                                <span style={{
+                                    fontSize: '9.5px',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    color: '#34d399',
+                                    padding: '1px 5px',
+                                    borderRadius: '8px',
+                                    marginLeft: '3px'
+                                }}>
+                                    Active
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                )}
 
                 {/* Content */}
                 <div className="mf-modal-content" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     
                     {/* Left Column (Details & Chart) */}
-                    <div className="mf-modal-left" style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+                    {(!isMobile || mobileTab === 'overview') && (
+                    <div className="mf-modal-left" style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px' : '32px' }}>
                         {/* NAV & Key Metrics */}
                         <div className="mf-metrics-grid" style={{ display: 'flex', gap: '48px', marginBottom: '32px' }}>
                             <div>
@@ -326,7 +408,11 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Expense Ratio</span><span>{details.expense_ratio ? `${details.expense_ratio}%` : 'N/A'}</span></div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Exit Load</span><span style={{ textAlign: 'right', maxWidth: '200px' }}>{details.exit_load || 'N/A'}</span></div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Lock-in Period</span><span>{details.lock_in ? `${details.lock_in} Years` : 'No Lock-in'}</span></div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Lock-in Period</span><span>{
+                                                typeof details.lock_in === 'object' && details.lock_in !== null
+                                                    ? (details.lock_in.years ? `${details.lock_in.years} Years` : (details.lock_in.months ? `${details.lock_in.months} Months` : 'No Lock-in'))
+                                                    : (details.lock_in ? `${details.lock_in} Years` : 'No Lock-in')
+                                            }</span></div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Fund Manager</span><span style={{ textAlign: 'right' }}>{details.fund_manager || 'N/A'}</span></div>
                                         </div>
                                     </div>
@@ -373,11 +459,100 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                 </div>
                             </div>
                         ) : null}
+
+                        {/* Sticky Mobile Invest Bar at bottom of Overview */}
+                        {isMobile && (
+                            <div style={{
+                                position: 'sticky',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                margin: '24px -16px -16px -16px',
+                                background: 'var(--bg-panel)',
+                                borderTop: '1px solid var(--border-color)',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px',
+                                zIndex: 10,
+                                boxShadow: '0 -4px 16px rgba(0,0,0,0.5)'
+                            }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Current NAV</div>
+                                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)' }}>₹{fund.nav || details?.nav}</div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
+                                    {userHolding && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setActionMode('REDEEM'); setMobileTab('invest'); }}
+                                            style={{
+                                                padding: '9px 14px',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                color: '#ef4444',
+                                                fontSize: '12.5px',
+                                                fontWeight: '700',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Redeem
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setActionMode('INVEST'); setMobileTab('invest'); }}
+                                        style={{
+                                            padding: '9px 16px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            background: 'var(--color-blue)',
+                                            color: '#fff',
+                                            fontSize: '12.5px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px'
+                                        }}
+                                    >
+                                        Invest Now <ChevronRight size={15} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
+                    )}
 
                     {/* Right Column (Action Panel) */}
-                    <div className="mf-modal-right" style={{ width: '420px', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflowY: 'auto', minHeight: 0 }}>
+                    {(!isMobile || mobileTab === 'invest') && (
+                    <div className="mf-modal-right" style={{ width: isMobile ? '100%' : '420px', borderLeft: isMobile ? 'none' : '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)', overflowY: 'auto', minHeight: 0 }}>
                         
+                        {isMobile && (
+                            <div style={{ padding: '12px 16px 0 16px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileTab('overview')}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--color-blue-light)',
+                                        fontSize: '12.5px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: 0
+                                    }}
+                                >
+                                    &larr; View Fund Overview & Chart
+                                </button>
+                            </div>
+                        )}
+
                         {/* Portfolio Status */}
                         {userHolding && (
                             <div style={{ padding: '24px 24px 0 24px' }}>
@@ -563,6 +738,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
             </div>
         </div>

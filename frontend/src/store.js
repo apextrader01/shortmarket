@@ -1332,17 +1332,34 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  resetAccount: async () => {
+  resetAccount: async (amount) => {
     const { user } = get();
     if (!user) return { success: false };
     try {
-      const res = await fetch(`${API}/api/user/reset`, { credentials: 'include', method: 'POST'
+      const token = localStorage.getItem('token') || user.token;
+      const res = await fetch(`${API}/api/user/reset`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ amount: amount ? parseFloat(amount) : undefined })
       });
       const data = await res.json();
       if (data.success) {
-        // Optimistically update local state to reflect the wipe
-        set({ positions: [], orders: [], holdings: [], sips: [], pendingTriggers: [], alerts: [], user: { ...user, balance: 1000000.0 } });
-        return { success: true };
+        const newBal = data.balance !== undefined ? data.balance : (parseFloat(amount) || 1000000.0);
+        // Optimistically update local state to reflect the wipe and new balance
+        set({ 
+          positions: [], 
+          orders: [], 
+          holdings: [], 
+          sips: [], 
+          pendingTriggers: [], 
+          alerts: [], 
+          user: { ...user, balance: newBal } 
+        });
+        return { success: true, balance: newBal, message: data.message };
       }
       return { success: false, error: data.error };
     } catch (e) {

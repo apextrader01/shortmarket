@@ -184,12 +184,12 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="settings-container" style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div className="settings-container" style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: isMobile ? '90px' : '40px' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '0' }}>
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>Account Settings</h2>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Manage your profile and security preferences</div>
+          <h2 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', marginBottom: '8px' }}>Account Settings</h2>
+          <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '14px' }}>Manage your profile and security preferences</div>
         </div>
         <button 
           onClick={logout}
@@ -524,7 +524,7 @@ export default function SettingsView() {
           </div>
 
           {/* Audio Test Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
             <button
               type="button"
               onClick={() => playTargetHitSound()}

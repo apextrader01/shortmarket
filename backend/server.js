@@ -2527,6 +2527,15 @@ app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
 // ─── Reset Account ──────────────────────────────────────────────────────────
 app.post('/api/user/reset', authenticateToken, async (req, res) => {
   try {
+    let requestedAmount = parseFloat(req.body?.amount);
+    // Limit: minimum ₹10,000, maximum ₹10 Crore (100,000,000)
+    const MAX_AMOUNT = 100000000.0; // 10 Crore
+    const MIN_AMOUNT = 10000.0;     // 10 Thousand
+    let newBalance = 1000000.0;     // Default 10 Lakh
+    if (!isNaN(requestedAmount) && requestedAmount > 0) {
+      newBalance = Math.min(Math.max(requestedAmount, MIN_AMOUNT), MAX_AMOUNT);
+    }
+
     await db.transaction(async (trx) => {
       // 1. Nullify self-referencing FK links first so the batch delete doesn't
       //    trip the orders.linked_order_id / parent_order_id constraints.
@@ -2547,10 +2556,14 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       }
       // 6. Delete ledger history
       await trx('ledger').where({ user_id: req.user.id }).del();
-      // 7. Reset balance to 10 Lakh (1,000,000)
-      await trx('users').where({ id: req.user.id }).update({ balance: 1000000.0 });
+      // 7. Reset balance to chosen amount (up to 10 Crore)
+      await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
     });
-    res.json({ success: true, message: 'Account successfully reset to ₹10,00,000.' });
+    res.json({ 
+      success: true, 
+      balance: newBalance,
+      message: `Account successfully reset to ₹${newBalance.toLocaleString('en-IN')}.` 
+    });
   } catch (err) {
     console.error('Reset Account Error:', err);
     res.status(500).json({ error: 'Failed to reset account' });
