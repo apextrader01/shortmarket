@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "668704051976",
+    "project_id": "shortmarket-19",
+    "storage_bucket": "shortmarket-19.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668704051976:android:a2c54b127e32c406d992bd",
+        "android_client_info": {
+          "package_name": "com.shortmarket.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQmUFckLvSRHdLSycSc86J5ww-Vz_ICOs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668704051976:android:a2c54b127e32c406d992bd",
+        "android_client_info": {
+          "package_name": "com.shortmarket.staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQmUFckLvSRHdLSycSc86J5ww-Vz_ICOs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
