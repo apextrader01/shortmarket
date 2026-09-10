@@ -843,11 +843,22 @@ export const useStore = create(persist((set, get) => ({
         const holdSymbols = get().holdings.map(h => h.symbol);
         const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
         if (allSymbolsToSubscribe.length > 0) {
-          get().fetchBatchPrices(allSymbolsToSubscribe);
-          allSymbolsToSubscribe.forEach(sym => socket.emit('subscribe', sym));
+          if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
+          const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));
+          
+          if (newSymbols.length > 0) {
+            newSymbols.forEach(sym => {
+              window._subscribedUserSymbols.add(sym);
+              socket.emit('subscribe', sym);
+            });
+            const missingPriceSyms = newSymbols.filter(sym => !get().prices[sym]?.ltp);
+            if (missingPriceSyms.length > 0) {
+              get().fetchBatchPrices(missingPriceSyms);
+            }
+          }
         }
         
-        // Also fetch restricted stocks on load
+        // Fetch restricted stocks (cached for 15m to stop 30s polling churn)
         get().fetchRestrictedStocks();
         // No initial search; let MutualFundsView handle empty state
       } catch (_) {
@@ -860,10 +871,14 @@ export const useStore = create(persist((set, get) => ({
   
   restrictedStocks: [],
   fetchRestrictedStocks: async () => {
+      const now = Date.now();
+      if (get()._lastRestrictedFetch && (now - get()._lastRestrictedFetch < 15 * 60 * 1000) && get().restrictedStocks.length > 0) {
+          return;
+      }
       try {
           const res = await fetch(`${API}/api/restricted-stocks`, { credentials: 'include' });
           const data = await res.json();
-          if (Array.isArray(data)) set({ restrictedStocks: data });
+          if (Array.isArray(data)) set({ restrictedStocks: data, _lastRestrictedFetch: now });
       } catch (_) {}
   },
 

@@ -25,53 +25,53 @@ export default function PositionsView() {
 
   const { positions, holdings, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, orders: state.orders })));
   
-  const mergedHoldingsMap = {};
-  if (viewMode === 'HOLDINGS') {
-    (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });
-  }
-  
-  let sourceData = [];
-  if (viewMode === 'HOLDINGS') {
-    sourceData = Object.values(mergedHoldingsMap).filter(h => h.quantity > 0);
-  } else if (viewMode === 'OPEN') {
-    sourceData = (positions || []).filter(p => Number(p.quantity) !== 0);
-  } else if (viewMode === 'CLOSED') {
-    // 1. Include explicit closed positions updated/closed today from database
-    const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
-    const dbClosedKeys = new Set(dbClosed.map(p => `${p.symbol}-${p.product_type || 'INT'}`));
-    
-    // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed
-    const closedOrdersMap = {};
-    (orders || []).forEach(o => {
-      const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const isClosingSide = o.side === 'SELL' || (o.realized_pnl !== null && Number(o.realized_pnl) !== 0);
-      const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
-      const key = `${o.symbol}-${o.product_type || 'INT'}`;
+  const sourceData = useMemo(() => {
+    if (viewMode === 'HOLDINGS') {
+      const mergedHoldingsMap = {};
+      (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });
+      return Object.values(mergedHoldingsMap).filter(h => h.quantity > 0);
+    } else if (viewMode === 'OPEN') {
+      return (positions || []).filter(p => Number(p.quantity) !== 0);
+    } else if (viewMode === 'CLOSED') {
+      // 1. Include explicit closed positions updated/closed today from database
+      const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
+      const dbClosedKeys = new Set(dbClosed.map(p => `${p.symbol}-${p.product_type || 'INT'}`));
+      
+      // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed
+      const closedOrdersMap = {};
+      (orders || []).forEach(o => {
+        const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+        const isClosingSide = o.side === 'SELL' || (o.realized_pnl !== null && Number(o.realized_pnl) !== 0);
+        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+        const key = `${o.symbol}-${o.product_type || 'INT'}`;
 
-      // Only add from orders if this symbol+product wasn't already in dbClosed
-      if (isExecuted && isClosingSide && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
-        if (!closedOrdersMap[key]) {
-          closedOrdersMap[key] = {
-            id: `closed-ord-${o.id}`,
-            symbol: o.symbol,
-            product_type: o.product_type || 'INT',
-            quantity: 0,
-            closed_quantity: 0,
-            average_price: Number(o.average_price || o.price || 0),
-            exit_price: Number(o.average_price || o.price || 0),
-            realized_pnl: 0,
-            created_at: o.created_at,
-            updated_at: o.updated_at || o.created_at
-          };
+        // Only add from orders if this symbol+product wasn't already in dbClosed
+        if (isExecuted && isClosingSide && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
+          if (!closedOrdersMap[key]) {
+            closedOrdersMap[key] = {
+              id: `closed-ord-${o.id}`,
+              symbol: o.symbol,
+              product_type: o.product_type || 'INT',
+              quantity: 0,
+              closed_quantity: 0,
+              average_price: Number(o.average_price || o.price || 0),
+              exit_price: Number(o.average_price || o.price || 0),
+              realized_pnl: 0,
+              created_at: o.created_at,
+              updated_at: o.updated_at || o.created_at
+            };
+          }
+          closedOrdersMap[key].closed_quantity += Number(o.quantity || 0);
+          closedOrdersMap[key].realized_pnl += Number(o.realized_pnl);
+          closedOrdersMap[key].exit_price = Number(o.average_price || o.price || closedOrdersMap[key].exit_price);
         }
-        closedOrdersMap[key].closed_quantity += Number(o.quantity || 0);
-        closedOrdersMap[key].realized_pnl += Number(o.realized_pnl);
-        closedOrdersMap[key].exit_price = Number(o.average_price || o.price || closedOrdersMap[key].exit_price);
-      }
-    });
+      });
 
-    sourceData = [...dbClosed, ...Object.values(closedOrdersMap)];
-  }
+      return [...dbClosed, ...Object.values(closedOrdersMap)];
+    }
+    return [];
+  }, [viewMode, positions, holdings, orders]);
+
   const [partialExitPos, setPartialExitPos] = useState(null);
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
@@ -92,31 +92,32 @@ export default function PositionsView() {
   useEffect(() => {
     const symbols = (sourceData || []).map(p => p.symbol).filter(isMutualFund);
     const unique = [...new Set(symbols)];
-    if (unique.length > 0) {
-      fetch(`${API}/api/mf/names`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: unique })
-      })
-      .then(r => r.ok ? r.json() : {})
-      .then(data => {
-        setMfNames(prev => ({ ...prev, ...data }));
-        unique.forEach(symbol => {
-          if (!data[symbol]) {
-            const cleanId = String(symbol).replace('-MF', '');
-            fetch(`https://api.mfapi.in/mf/${cleanId}`)
-              .then(r => r.json())
-              .then(mfData => {
-                if (mfData && mfData.meta && mfData.meta.scheme_name) {
-                  setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
-                }
-              }).catch(() => {});
-          }
-        });
-      })
-      .catch(() => {});
-    }
-  }, [sourceData]);
+    const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
+    if (needed.length === 0) return;
+
+    fetch(`${API}/api/mf/names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: needed })
+    })
+    .then(r => r.ok ? r.json() : {})
+    .then(data => {
+      setMfNames(prev => ({ ...prev, ...data }));
+      needed.forEach(symbol => {
+        if (!data[symbol]) {
+          const cleanId = String(symbol).replace('-MF', '');
+          fetch(`https://api.mfapi.in/mf/${cleanId}`)
+            .then(r => r.json())
+            .then(mfData => {
+              if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+              }
+            }).catch(() => {});
+        }
+      });
+    })
+    .catch(() => {});
+  }, [sourceData, mfNames]);
 
   // ⚡ Performance optimization: closed positions have fixed realized PnL and do not re-render on ticks.
   // Open and holding positions subscribe exclusively to their own held symbols, ignoring unrelated ticks.

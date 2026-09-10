@@ -34,7 +34,7 @@ class MTMRiskManager {
     scheduleNextEvaluation() {
         if (!this.isRunning) return;
         const isMarketActive = this.marketChecker ? this.marketChecker() : isAnyMarketOpen();
-        const nextDelay = 60000; // 1 minute (60,000 ms)
+        const nextDelay = isMarketActive ? 60000 : 600000; // 1 min during market hours, 10 min sleep off-hours
         this.evalTimer = setTimeout(async () => {
             try {
                 if (isMarketActive) {

@@ -379,8 +379,27 @@ app.get('/api/health', (req, res) => {
 });
 
 // ─── Prices (all cached LTPs) ─────────────────────────────────────────────
+let _pricesEtag = null;
+let _lastPricesJson = null;
+let _lastPricesHashTime = 0;
+
 app.get('/api/prices', (req, res) => {
-  res.json(priceCache);
+  res.setHeader('Cache-Control', 'public, max-age=2, stale-while-revalidate=5');
+  
+  const now = Date.now();
+  if (!_lastPricesJson || (now - _lastPricesHashTime > 2000)) {
+    _lastPricesJson = JSON.stringify(priceCache);
+    const crypto = require('crypto');
+    _pricesEtag = `"${crypto.createHash('md5').update(_lastPricesJson).digest('hex')}"`;
+    _lastPricesHashTime = now;
+  }
+
+  res.setHeader('ETag', _pricesEtag);
+  if (req.headers['if-none-match'] === _pricesEtag) {
+    return res.status(304).end();
+  }
+
+  res.type('application/json').send(_lastPricesJson);
 });
 
 app.get('/api/prices/batch', async (req, res) => {
@@ -988,7 +1007,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       db('users').where({ id: userId }).first(),
       db('positions').where({ user_id: userId }),
       db('holdings').where({ user_id: userId }).whereNot({ quantity: 0 }).orderBy('id', 'desc'),
-      db('orders').where({ user_id: userId }).orderBy('created_at', 'desc').limit(5000),
+      db('orders').where({ user_id: userId }).orderBy('created_at', 'desc').limit(100),
       db('sips').where({ user_id: userId })
     ]);
 

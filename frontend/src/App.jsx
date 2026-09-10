@@ -358,20 +358,32 @@ function App() {
     loadStocks();
     refreshPrices();
 
-    // ⚡ Smart Price Polling: Only poll REST as fallback when WebSocket is NOT connected
+    // ⚡ Smart Price Polling: Only poll REST as fallback when WebSocket is truly disconnected
     const priceInterval = setInterval(() => {
       if (document.hidden) return; // Pause when tab is minimized/hidden
-      const isWsLive = useStore.getState().isConnected && window._lastWsTick && (Date.now() - window._lastWsTick < 5000);
-      if (!isWsLive) {
+      const isConnected = useStore.getState().isConnected;
+      // If WebSocket is connected and healthy, do not spam REST prices (saves ~14 lakh requests)
+      if (!isConnected) {
         refreshPrices();
       }
-    }, 5000);
+    }, 10000);
 
-    // ⚡ Smart User Data Polling: 30s when tab active, paused when hidden
+    // ⚡ Smart User Data Polling: 30s during active market hours, 2m when markets are closed
+    let lastUserPoll = Date.now();
     const userInterval = setInterval(() => {
       if (document.hidden) return;
-      if (user) fetchUserData();
-    }, 30000);
+      if (!user) return;
+
+      const now = new Date();
+      const istHours = (now.getUTCHours() + 5.5) % 24;
+      const isMarketTime = istHours >= 9 && istHours <= 23.5;
+      const intervalMs = isMarketTime ? 30000 : 120000;
+
+      if (Date.now() - lastUserPoll >= intervalMs) {
+        lastUserPoll = Date.now();
+        fetchUserData();
+      }
+    }, 15000);
 
     // ⚡ Instant Resync when user tabs back into the app
     const handleVisibilityChange = () => {

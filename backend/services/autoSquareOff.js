@@ -74,7 +74,7 @@ function getSymbolToExpiryMap() {
         const futRaw = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
         const optRaw = fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8');
         _symbolToExpiryMap = buildExpiryMapFromRaw(futRaw, optRaw);
-        _lastMapLoadTime = now;
+        _lastMapLoadTime = Date.now();
     } catch (e) {
         console.error("Error building symbolToExpiryMap fallback:", e.message);
         _symbolToExpiryMap = {};

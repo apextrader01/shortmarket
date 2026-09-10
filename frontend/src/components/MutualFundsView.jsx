@@ -57,22 +57,24 @@ export default function MutualFundsView() {
       ...(positions || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol)
     ];
     const unique = [...new Set(symbols)];
-    if (unique.length > 0) {
-      fetch(`${API}/api/mf/names`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: unique })
-      })
-      .then(r => {
-          if (!r.ok) throw new Error('Backend failed');
-          return r.json();
-      })
-      .then(data => {
-          setMfNames(prev => ({ ...prev, ...data }));
-          
-          // For any missing names, fallback to direct mfapi fetch
-          unique.forEach(symbol => {
-             if (!data[symbol]) {
+    const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
+    if (needed.length === 0) return;
+
+    fetch(`${API}/api/mf/names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: needed })
+    })
+    .then(r => {
+        if (!r.ok) throw new Error('Backend failed');
+        return r.json();
+    })
+    .then(data => {
+        setMfNames(prev => ({ ...prev, ...data }));
+        
+        // For any missing names, fallback to direct mfapi fetch
+        needed.forEach(symbol => {
+           if (!data[symbol]) {
                  const cleanId = String(symbol).replace('-MF', '');
                  fetch(`https://api.mfapi.in/mf/${cleanId}`)
                    .then(r => r.json())
@@ -98,7 +100,6 @@ export default function MutualFundsView() {
                }).catch(() => {});
           });
       });
-    }
   }, [sips, holdings, positions]);
 
 
