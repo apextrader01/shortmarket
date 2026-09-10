@@ -23,34 +23,40 @@ webpush.setVapidDetails(
 );
 
 // 📱 Firebase Admin SDK for Native Android / iOS Push Notifications (FCM)
-let firebaseAdmin = null;
+let fcmMessaging = null;
 try {
   const admin = require('firebase-admin');
+  const { getMessaging } = require('firebase-admin/messaging');
   const serviceAccountPath = path.join(__dirname, '../config/firebase-service-account.json');
+  
+  const getCert = (sa) => {
+    if (admin.cert) return admin.cert(sa);
+    if (admin.credential && admin.credential.cert) return admin.credential.cert(sa);
+    return null;
+  };
+
+  let credential = null;
   if (fs.existsSync(serviceAccountPath)) {
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    firebaseAdmin = admin;
-    console.log('[PUSH] Firebase Admin initialized with service account config.');
+    credential = getCert(serviceAccount);
+    if (credential) {
+      console.log('[PUSH] Loaded Firebase service account config file.');
+    }
   } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
       const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-      firebaseAdmin = admin;
-      console.log('[PUSH] Firebase Admin initialized with env variable.');
+      credential = getCert(serviceAccount);
     } catch(e) {
       console.warn('[PUSH] Failed parsing FIREBASE_SERVICE_ACCOUNT env:', e.message);
     }
   } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)) {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault()
-    });
-    firebaseAdmin = admin;
-    console.log('[PUSH] Firebase Admin initialized with GOOGLE_APPLICATION_CREDENTIALS.');
+    credential = admin.applicationDefault ? admin.applicationDefault() : admin.credential?.applicationDefault();
+  }
+
+  if (credential) {
+    const app = admin.initializeApp({ credential });
+    fcmMessaging = getMessaging(app);
+    console.log('[PUSH] Firebase Admin FCM initialized successfully.');
   }
 } catch (err) {
   console.warn('[PUSH] firebase-admin setup note:', err.message);
@@ -107,7 +113,7 @@ async function sendPushNotification(userId, payload) {
   }
 
   // 2. Dispatch FCM Push (Native Mobile App)
-  if (firebaseAdmin) {
+  if (fcmMessaging) {
     try {
       const fcmRecords = await db('fcm_device_tokens').where({ user_id: userId });
       if (fcmRecords && fcmRecords.length > 0) {
@@ -131,7 +137,7 @@ async function sendPushNotification(userId, payload) {
             tokens
           };
 
-          const response = await firebaseAdmin.messaging().sendEachForMulticast(message);
+          const response = await fcmMessaging.sendEachForMulticast(message);
 
           // Purge stale or invalid tokens automatically
           if (response.failureCount > 0) {
@@ -160,7 +166,7 @@ async function sendPushNotification(userId, payload) {
 }
 
 function isFcmConfigured() {
-  return !!firebaseAdmin;
+  return !!fcmMessaging;
 }
 
 module.exports = {

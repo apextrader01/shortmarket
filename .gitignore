@@ -10,3 +10,5 @@ backend/logs/
 frontend/dist/
 dist/
 *.bak
+*service-account.json
+backend/config/
