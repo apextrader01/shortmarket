@@ -94,11 +94,33 @@ const MCX_LIST = ['CRUDEOIL', 'NATURALGAS', 'GOLD', 'SILVER', 'COPPER', 'ZINC', 
 const POPULAR_STOCKS_LIST = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'SBIN', 'ICICIBANK', 'TATAMOTORS', 'BAJFINANCE', 'BHARTIARTL', 'ITC', 'KOTAKBANK', 'LT', 'AXISBANK'];
 
 const STRATEGY_PRESETS = [
-  { id: 'BULL_CALL_SPREAD', label: '🐂 Bull Call', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
-  { id: 'BEAR_PUT_SPREAD', label: '🐻 Bear Put', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
-  { id: 'STRADDLE', label: '⚡ Straddle', color: '#2563eb', bgActive: '#2563eb', bgInactive: 'rgba(37,99,235,0.12)', borderInactive: 'rgba(37,99,235,0.3)', textInactive: '#2563eb' },
-  { id: 'STRANGLE', label: '🎯 Strangle', color: '#d97706', bgActive: '#d97706', bgInactive: 'rgba(217,119,6,0.12)', borderInactive: 'rgba(217,119,6,0.3)', textInactive: '#d97706' },
-  { id: 'IRON_CONDOR', label: '🦅 Iron Condor', color: '#9333ea', bgActive: '#9333ea', bgInactive: 'rgba(147,51,234,0.12)', borderInactive: 'rgba(147,51,234,0.3)', textInactive: '#9333ea' }
+  // BULLISH (5)
+  { id: 'BULL_CALL_SPREAD', category: 'BULLISH', label: '🐂 Bull Call', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+  { id: 'BULL_PUT_SPREAD', category: 'BULLISH', label: '🛡️ Bull Put', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+  { id: 'CALL_RATIO_SPREAD', category: 'BULLISH', label: '📈 Call Ratio', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+  { id: 'LONG_CALL', category: 'BULLISH', label: '🚀 Long Call', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+  { id: 'CALL_BUTTERFLY', category: 'BULLISH', label: '🦋 Call Fly', color: '#16a34a', bgActive: '#16a34a', bgInactive: 'rgba(22,163,74,0.12)', borderInactive: 'rgba(22,163,74,0.3)', textInactive: '#16a34a' },
+
+  // BEARISH (5)
+  { id: 'BEAR_PUT_SPREAD', category: 'BEARISH', label: '🐻 Bear Put', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+  { id: 'BEAR_CALL_SPREAD', category: 'BEARISH', label: '🛡️ Bear Call', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+  { id: 'PUT_RATIO_SPREAD', category: 'BEARISH', label: '📉 Put Ratio', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+  { id: 'LONG_PUT', category: 'BEARISH', label: '🔻 Long Put', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+  { id: 'PUT_BUTTERFLY', category: 'BEARISH', label: '🦋 Put Fly', color: '#dc2626', bgActive: '#dc2626', bgInactive: 'rgba(220,38,38,0.12)', borderInactive: 'rgba(220,38,38,0.3)', textInactive: '#dc2626' },
+
+  // NEUTRAL (5)
+  { id: 'STRADDLE', category: 'NEUTRAL', label: '⚡ Straddle', color: '#2563eb', bgActive: '#2563eb', bgInactive: 'rgba(37,99,235,0.12)', borderInactive: 'rgba(37,99,235,0.3)', textInactive: '#2563eb' },
+  { id: 'STRANGLE', category: 'NEUTRAL', label: '🎯 Strangle', color: '#d97706', bgActive: '#d97706', bgInactive: 'rgba(217,119,6,0.12)', borderInactive: 'rgba(217,119,6,0.3)', textInactive: '#d97706' },
+  { id: 'IRON_CONDOR', category: 'NEUTRAL', label: '🦅 Iron Condor', color: '#9333ea', bgActive: '#9333ea', bgInactive: 'rgba(147,51,234,0.12)', borderInactive: 'rgba(147,51,234,0.3)', textInactive: '#9333ea' },
+  { id: 'IRON_BUTTERFLY', category: 'NEUTRAL', label: '🦋 Iron Fly', color: '#6366f1', bgActive: '#6366f1', bgInactive: 'rgba(99,102,241,0.12)', borderInactive: 'rgba(99,102,241,0.3)', textInactive: '#6366f1' },
+  { id: 'LONG_STRADDLE', category: 'NEUTRAL', label: '💥 Long Straddle', color: '#06b6d4', bgActive: '#06b6d4', bgInactive: 'rgba(6,182,212,0.12)', borderInactive: 'rgba(6,182,212,0.3)', textInactive: '#06b6d4' },
+
+  // OTHERS (5)
+  { id: 'LONG_STRANGLE', category: 'OTHERS', label: '🎯 Long Strangle', color: '#f59e0b', bgActive: '#f59e0b', bgInactive: 'rgba(245,158,11,0.12)', borderInactive: 'rgba(245,158,11,0.3)', textInactive: '#f59e0b' },
+  { id: 'JADE_LIZARD', category: 'OTHERS', label: '🦎 Jade Lizard', color: '#10b981', bgActive: '#10b981', bgInactive: 'rgba(16,185,129,0.12)', borderInactive: 'rgba(16,185,129,0.3)', textInactive: '#10b981' },
+  { id: 'INVERSE_IRON_CONDOR', category: 'OTHERS', label: '🔄 Inv Condor', color: '#8b5cf6', bgActive: '#8b5cf6', bgInactive: 'rgba(139,92,246,0.12)', borderInactive: 'rgba(139,92,246,0.3)', textInactive: '#8b5cf6' },
+  { id: 'BULL_CALL_LADDER', category: 'OTHERS', label: '🪜 Call Ladder', color: '#84cc16', bgActive: '#84cc16', bgInactive: 'rgba(132,204,22,0.12)', borderInactive: 'rgba(132,204,22,0.3)', textInactive: '#84cc16' },
+  { id: 'BEAR_PUT_LADDER', category: 'OTHERS', label: '🪜 Put Ladder', color: '#f43f5e', bgActive: '#f43f5e', bgInactive: 'rgba(244,63,94,0.12)', borderInactive: 'rgba(244,63,94,0.3)', textInactive: '#f43f5e' }
 ];
 
 export default function BasketModal() {
@@ -114,6 +136,7 @@ export default function BasketModal() {
   
   // Strategy & Underlying selection
   const [selectedUnderlying, setSelectedUnderlying] = useState('NIFTY');
+  const [strategyCategory, setStrategyCategory] = useState('BULLISH'); // 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'OTHERS'
   const [selectedExpiry, setSelectedExpiry] = useState('');
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [availableExpiries, setAvailableExpiries] = useState([]);
@@ -884,11 +907,51 @@ export default function BasketModal() {
         const leg2 = getContract(atmIndex + 2, 'CE');
         if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'BULL_PUT_SPREAD') {
+        const leg1 = getContract(atmIndex, 'PE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'CALL_RATIO_SPREAD') {
+        const leg1 = getContract(atmIndex, 'CE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier * 2, orderType: 'MARKET', price: '' });
+      } else if (type === 'LONG_CALL') {
+        const leg1 = getContract(atmIndex, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'CALL_BUTTERFLY') {
+        const leg1 = getContract(atmIndex, 'CE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        const leg3 = getContract(atmIndex + 4, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier * 2, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
       } else if (type === 'BEAR_PUT_SPREAD') {
         const leg1 = getContract(atmIndex, 'PE');
         const leg2 = getContract(atmIndex - 2, 'PE');
         if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'BEAR_CALL_SPREAD') {
+        const leg1 = getContract(atmIndex, 'CE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'PUT_RATIO_SPREAD') {
+        const leg1 = getContract(atmIndex, 'PE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier * 2, orderType: 'MARKET', price: '' });
+      } else if (type === 'LONG_PUT') {
+        const leg1 = getContract(atmIndex, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'PUT_BUTTERFLY') {
+        const leg1 = getContract(atmIndex, 'PE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
+        const leg3 = getContract(atmIndex - 4, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier * 2, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
       } else if (type === 'STRADDLE') {
         const leg1 = getContract(atmIndex, 'CE');
         const leg2 = getContract(atmIndex, 'PE');
@@ -908,6 +971,55 @@ export default function BasketModal() {
         if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg3) newItems.push({ ...leg3, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
         if (leg4) newItems.push({ ...leg4, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'IRON_BUTTERFLY') {
+        const leg1 = getContract(atmIndex + 2, 'CE');
+        const leg2 = getContract(atmIndex, 'CE');
+        const leg3 = getContract(atmIndex, 'PE');
+        const leg4 = getContract(atmIndex - 2, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg4) newItems.push({ ...leg4, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'LONG_STRADDLE') {
+        const leg1 = getContract(atmIndex, 'CE');
+        const leg2 = getContract(atmIndex, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'LONG_STRANGLE') {
+        const leg1 = getContract(atmIndex + 2, 'CE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'JADE_LIZARD') {
+        const leg1 = getContract(atmIndex - 2, 'PE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        const leg3 = getContract(atmIndex + 4, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'INVERSE_IRON_CONDOR') {
+        const leg1 = getContract(atmIndex + 4, 'CE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        const leg3 = getContract(atmIndex - 2, 'PE');
+        const leg4 = getContract(atmIndex - 4, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg4) newItems.push({ ...leg4, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'BULL_CALL_LADDER') {
+        const leg1 = getContract(atmIndex, 'CE');
+        const leg2 = getContract(atmIndex + 2, 'CE');
+        const leg3 = getContract(atmIndex + 4, 'CE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+      } else if (type === 'BEAR_PUT_LADDER') {
+        const leg1 = getContract(atmIndex, 'PE');
+        const leg2 = getContract(atmIndex - 2, 'PE');
+        const leg3 = getContract(atmIndex - 4, 'PE');
+        if (leg1) newItems.push({ ...leg1, side: 'BUY', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg2) newItems.push({ ...leg2, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
+        if (leg3) newItems.push({ ...leg3, side: 'SELL', quantity: globalMultiplier, orderType: 'MARKET', price: '' });
       }
     }
 
@@ -1197,48 +1309,84 @@ export default function BasketModal() {
 
         </div>
 
-        {/* Expiry Selector & 1-Click Strategy Presets Bar */}
+        {/* Expiry Selector & Strategy Category & Presets Bar */}
         <div style={{ 
           padding: '8px 20px', background: 'var(--bg-card)', 
           borderBottom: '1px solid var(--border-color)', 
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-          gap: '12px', flexWrap: 'wrap' 
+          display: 'flex', flexDirection: 'column',
+          gap: '8px' 
         }}>
-          {/* Expiry Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11.5px', color: 'var(--color-blue)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-              <Calendar size={13} /> Expiry:
-            </span>
-            <select
-              value={selectedExpiry}
-              onChange={(e) => handleGlobalExpiryChange(e.target.value)}
-              style={{
-                background: 'var(--bg-panel)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11.5px',
-                fontWeight: '700',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              {availableExpiries.map((exp, idx) => (
-                <option key={exp} value={exp}>
-                  {formatExpiryDisplay(exp)} {idx === 0 ? '(Nearest)' : ''}
-                </option>
-              ))}
-            </select>
-            {loadingChain && (
-              <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Loading expiries...</span>
-            )}
+          {/* Top Row: Expiry Selector + Category Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Expiry Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11.5px', color: 'var(--color-blue)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                <Calendar size={13} /> Expiry:
+              </span>
+              <select
+                value={selectedExpiry}
+                onChange={(e) => handleGlobalExpiryChange(e.target.value)}
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: '700',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {availableExpiries.map((exp, idx) => (
+                  <option key={exp} value={exp}>
+                    {formatExpiryDisplay(exp)} {idx === 0 ? '(Nearest)' : ''}
+                  </option>
+                ))}
+              </select>
+              {loadingChain && (
+                <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>Loading expiries...</span>
+              )}
+            </div>
+
+            {/* Category Pills: [ Bullish ] [ Bearish ] [ Neutral ] [ Others ] */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {[
+                { id: 'BULLISH', label: 'Bullish' },
+                { id: 'BEARISH', label: 'Bearish' },
+                { id: 'NEUTRAL', label: 'Neutral' },
+                { id: 'OTHERS', label: 'Others' }
+              ].map(cat => {
+                const isCatActive = strategyCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setStrategyCategory(cat.id)}
+                    style={{
+                      padding: '4px 14px',
+                      borderRadius: '9999px',
+                      background: isCatActive ? '#0066FF' : 'var(--bg-panel)',
+                      color: isCatActive ? '#ffffff' : 'var(--text-secondary)',
+                      border: isCatActive ? '1px solid #0066FF' : '1px solid var(--border-color)',
+                      fontSize: '11.5px',
+                      fontWeight: isCatActive ? '700' : '500',
+                      cursor: 'pointer',
+                      boxShadow: isCatActive ? '0 2px 8px rgba(0, 102, 255, 0.35)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* 1-Click Strategy Presets */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap' }}>PRESETS:</span>
-            {STRATEGY_PRESETS.map(preset => {
+          {/* Bottom Row: 5 Strategies for active category */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', overflowX: 'auto', paddingTop: '2px' }}>
+            <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '700', whiteSpace: 'nowrap', marginRight: '2px' }}>PRESETS:</span>
+            {STRATEGY_PRESETS.filter(p => p.category === strategyCategory).map(preset => {
               const isActive = selectedPreset === preset.id && basketItems.length > 0;
               return (
                 <button
