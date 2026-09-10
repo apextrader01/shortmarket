@@ -3938,6 +3938,30 @@ app.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: vapidPublicKey });
 });
 
+app.get('/api/push/status', authenticateToken, async (req, res) => {
+  try {
+    let hasWebPush = false;
+    let hasFcm = false;
+    try {
+      const webSub = await db('push_subscriptions').where({ user_id: req.user.id }).first();
+      hasWebPush = !!webSub;
+    } catch (e) {}
+    try {
+      const fcmSub = await db('fcm_device_tokens').where({ user_id: req.user.id }).first();
+      hasFcm = !!fcmSub;
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      enabled: hasWebPush || hasFcm,
+      hasWebPush,
+      hasFcm
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
   try {
     const { endpoint, keys } = req.body;

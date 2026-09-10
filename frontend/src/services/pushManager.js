@@ -33,7 +33,7 @@ export async function registerServiceWorker() {
 /**
  * Returns true if push notifications are enabled on this device/browser
  */
-export async function getPushSubscriptionStatus() {
+export async function getPushSubscriptionStatus(token) {
   if (typeof window === 'undefined') return false;
 
   // 1. Native Mobile App (Android APK / iOS)
@@ -48,17 +48,73 @@ export async function getPushSubscriptionStatus() {
   }
 
   // 2. Web Browser (Chrome, Firefox, Edge, Safari)
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
-  if (Notification.permission !== 'granted') return false;
-  
-  try {
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) return false;
-    const sub = await reg.pushManager.getSubscription();
-    return !!sub;
-  } catch (e) {
+  if (!('Notification' in window)) return false;
+
+  // If user blocked notifications in browser, definitely false
+  if (Notification.permission === 'denied') {
+    localStorage.removeItem('web_push_enabled');
     return false;
   }
+
+  // If user hasn't granted permission yet
+  if (Notification.permission !== 'granted') {
+    return false;
+  }
+
+  const localPref = localStorage.getItem('web_push_enabled') === 'true';
+
+  // Check active Service Worker Push Subscription
+  try {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => null);
+      }
+
+      // Wait with fallback timeout for SW ready
+      const readyReg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
+      const activeReg = readyReg || reg;
+
+      if (activeReg && activeReg.pushManager) {
+        const sub = await activeReg.pushManager.getSubscription();
+        if (sub) {
+          localStorage.setItem('web_push_enabled', 'true');
+          return true;
+        }
+
+        // If localPref was true but subscription was lost, auto re-subscribe silently
+        if (localPref && token) {
+          try {
+            await subscribeUserToPush(token);
+            return true;
+          } catch (reSubErr) {
+            console.warn('[PUSH] Auto re-subscribe failed:', reSubErr);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[PUSH] Status check error:', e);
+  }
+
+  // Backend status check fallback if token provided
+  if (token) {
+    try {
+      const res = await fetch(`${API}/api/push/status`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data && data.success && (data.hasWebPush || data.enabled)) {
+        localStorage.setItem('web_push_enabled', 'true');
+        return true;
+      }
+    } catch (e) {}
+  }
+
+  return localPref;
 }
 
 /**
@@ -221,6 +277,7 @@ export async function subscribeUserToPush(token) {
     throw new Error(errData.error || 'Failed to save push subscription on server.');
   }
 
+  localStorage.setItem('web_push_enabled', 'true');
   return true;
 }
 
@@ -251,6 +308,7 @@ export async function unsubscribeUserFromPush(token) {
   }
 
   // 2. Web Browser Unsubscribe
+  localStorage.removeItem('web_push_enabled');
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
 
   try {

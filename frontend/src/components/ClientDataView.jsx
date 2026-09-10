@@ -125,12 +125,38 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       setRiskMsg('');
     }
   };
-  const [isPushEnabled, setIsPushEnabled] = useState(false);
-  const [pushStatusMsg, setPushStatusMsg] = useState('');
+  const [isPushEnabled, setIsPushEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hasNativeToken = !!localStorage.getItem('fcm_device_token');
+      const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
+      const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';
+      return (hasWebPref && isGranted) || hasNativeToken;
+    }
+    return false;
+  });
+  const [pushStatusMsg, setPushStatusMsg] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hasNativeToken = !!localStorage.getItem('fcm_device_token');
+      const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
+      const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';
+      if ((hasWebPref && isGranted) || hasNativeToken) {
+        return 'Push Notifications Active! 🔔';
+      }
+    }
+    return '';
+  });
   
   useEffect(() => {
-    getPushSubscriptionStatus().then(setIsPushEnabled);
-  }, []);
+    const token = localStorage.getItem('token') || (user && user.token);
+    getPushSubscriptionStatus(token).then((enabled) => {
+      setIsPushEnabled(enabled);
+      if (enabled) {
+        setPushStatusMsg('Push Notifications Active! 🔔');
+      } else {
+        setPushStatusMsg('');
+      }
+    });
+  }, [user]);
 
   const handleTogglePush = async () => {
     const token = localStorage.getItem('token') || (user && user.token);
