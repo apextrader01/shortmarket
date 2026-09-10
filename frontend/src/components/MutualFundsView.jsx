@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
@@ -130,13 +130,15 @@ export default function MutualFundsView() {
   const mainTabs = ['Explore', 'Dashboard', 'SIPs', 'Watchlist'];
   const tabs = ['All', 'Equity', 'Debt', 'Hybrid'];
 
-  const filteredFunds = mutualFunds.filter(fund => {
-    return activeTab === 'All' || (fund.category && fund.category.toLowerCase().includes(activeTab.toLowerCase()));
-  });
+  const filteredFunds = useMemo(() => {
+    return mutualFunds.filter(fund => {
+      return activeTab === 'All' || (fund.category && fund.category.toLowerCase().includes(activeTab.toLowerCase()));
+    });
+  }, [mutualFunds, activeTab]);
 
-  const sortedFunds = [...filteredFunds].sort((a, b) => {
-      if (!sortConfig.key) return 0;
-      
+  const sortedFunds = useMemo(() => {
+    if (!sortConfig.key) return filteredFunds;
+    return [...filteredFunds].sort((a, b) => {
       const valA = a[sortConfig.key] || -9999;
       const valB = b[sortConfig.key] || -9999;
       
@@ -147,10 +149,13 @@ export default function MutualFundsView() {
           return sortConfig.direction === 'asc' ? 1 : -1;
       }
       return 0;
-  });
+    });
+  }, [filteredFunds, sortConfig]);
 
   const totalPages = Math.ceil(sortedFunds.length / ITEMS_PER_PAGE);
-  const paginatedFunds = sortedFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const paginatedFunds = useMemo(() => {
+    return sortedFunds.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  }, [sortedFunds, page]);
 
   const handleSort = (key) => {
       let direction = 'desc';

@@ -50,7 +50,7 @@ const LedgerStatement = () => {
     const fetchLedger = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/api/ledger`, {
+        const res = await fetch(`${API}/api/ledger?limit=250`, {
           headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
         });
         const data = await res.json();

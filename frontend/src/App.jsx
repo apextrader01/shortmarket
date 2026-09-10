@@ -96,14 +96,27 @@ const TopIndexTicker = React.memo(() => {
 // ⚡ Isolated Background Alert Monitor: Runs checks only when active alerts exist
 const ActiveAlertChecker = React.memo(() => {
   const alerts = useStore(state => state.alerts);
-  const prices = useStore(state => state.prices);
   const updateAlert = useStore(state => state.updateAlert);
+
+  const activeAlertSymbols = useMemo(() => {
+    if (!alerts || alerts.length === 0) return [];
+    return [...new Set(alerts.filter(a => !a.triggered).map(a => a.symbol))];
+  }, [alerts]);
+
+  const alertPrices = useStore(useShallow(state => {
+    if (activeAlertSymbols.length === 0) return {};
+    const map = {};
+    for (const sym of activeAlertSymbols) {
+      if (state.prices[sym]) map[sym] = state.prices[sym];
+    }
+    return map;
+  }));
 
   useEffect(() => {
     if (!alerts || alerts.length === 0) return;
     const activeAlerts = alerts.filter(a => !a.triggered);
     activeAlerts.forEach(alert => {
-      const priceData = prices[alert.symbol];
+      const priceData = alertPrices[alert.symbol];
       if (!priceData) return;
       
       const ltp = priceData.ltp;
@@ -125,7 +138,7 @@ const ActiveAlertChecker = React.memo(() => {
         }
       }
     });
-  }, [prices, alerts, updateAlert]);
+  }, [alertPrices, alerts, updateAlert]);
 
   return null;
 });

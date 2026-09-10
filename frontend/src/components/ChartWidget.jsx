@@ -187,6 +187,15 @@ export default function ChartWidget() {
         try { chartRef.current.remove(); } catch (_) {}
         chartRef.current = null;
       }
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      liveLineRef.current = null;
+      smaSeriesRef.current = null;
+      emaSeriesRef.current = null;
+      rsiSeriesRef.current = null;
+      macdSeriesRef.current = null;
+      macdSignalSeriesRef.current = null;
+      macdHistSeriesRef.current = null;
     };
   }, [selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD]);
 
