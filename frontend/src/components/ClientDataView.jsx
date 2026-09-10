@@ -127,6 +127,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   };
   const [isPushEnabled, setIsPushEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
+      if (localStorage.getItem('web_push_enabled') === 'false') return false;
       const hasNativeToken = !!localStorage.getItem('fcm_device_token');
       const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
       const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';
@@ -136,6 +137,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   });
   const [pushStatusMsg, setPushStatusMsg] = useState(() => {
     if (typeof window !== 'undefined') {
+      if (localStorage.getItem('web_push_enabled') === 'false') return '';
       const hasNativeToken = !!localStorage.getItem('fcm_device_token');
       const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
       const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';

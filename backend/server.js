@@ -4326,10 +4326,9 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
     if (token) {
       await db('fcm_device_tokens').where({ token }).delete();
     }
-    if (!endpoint && !token) {
-      await db('push_subscriptions').where({ user_id: req.user.id }).delete();
-      await db('fcm_device_tokens').where({ user_id: req.user.id }).delete();
-    }
+    // Also defensively clear all subscriptions for this user to guarantee status check returns false
+    await db('push_subscriptions').where({ user_id: req.user.id }).delete();
+    await db('fcm_device_tokens').where({ user_id: req.user.id }).delete();
     res.json({ success: true, message: 'Unsubscribed from push notifications' });
   } catch (err) {
     console.error('Failed to unsubscribe push:', err);

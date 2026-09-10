@@ -52,7 +52,12 @@ export async function getPushSubscriptionStatus(token) {
 
   // If user blocked notifications in browser, definitely false
   if (Notification.permission === 'denied') {
-    localStorage.removeItem('web_push_enabled');
+    localStorage.setItem('web_push_enabled', 'false');
+    return false;
+  }
+
+  // If user explicitly disabled push in app settings, honor preference immediately
+  if (localStorage.getItem('web_push_enabled') === 'false') {
     return false;
   }
 
@@ -308,26 +313,32 @@ export async function unsubscribeUserFromPush(token) {
   }
 
   // 2. Web Browser Unsubscribe
-  localStorage.removeItem('web_push_enabled');
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  localStorage.setItem('web_push_enabled', 'false');
 
   try {
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (reg) {
-      const subscription = await reg.pushManager.getSubscription();
-      if (subscription) {
-        const subJson = subscription.toJSON();
-        await subscription.unsubscribe().catch(() => {});
-        await fetch(`${API}/api/push/unsubscribe`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({ endpoint: subJson.endpoint })
-        }).catch(() => {});
+    let endpoint = null;
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        const subscription = await reg.pushManager.getSubscription();
+        if (subscription) {
+          const subJson = subscription.toJSON();
+          endpoint = subJson.endpoint;
+          await subscription.unsubscribe().catch(() => {});
+        }
       }
     }
+
+    // Always inform backend to remove push subscriptions for this user
+    await fetch(`${API}/api/push/unsubscribe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ endpoint })
+    }).catch(() => {});
+
     return true;
   } catch (err) {
     console.warn('Unsubscribe error:', err);
