@@ -1,6 +1,6 @@
 process.on('unhandledRejection', (reason, promise) => { console.error('Unhandled Rejection at:', promise, 'reason:', reason); });
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 process.env.TZ = 'Asia/Kolkata';
 
 // Ultimate Crash Reporter

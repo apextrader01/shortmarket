@@ -1,7 +1,7 @@
 const fyersModel = require("fyers-api-v3").fyersModel;
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 let global_io = null;
 let sharedPriceCache = null;

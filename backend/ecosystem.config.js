@@ -11,6 +11,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 5000,
+        DOTENV_CONFIG_QUIET: 'true',
       },
     }
   ],
