@@ -122,7 +122,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
           <div className="watchlist-price-container" style={{ textAlign: 'right', flexShrink: 0 }}>
             {data && data.ltp !== undefined ? (
               <>
-                <div key={data.last_update_time || data.ltp} className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
+                <div className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
                   {data.ltp.toFixed(2)}
                   {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
                 </div>
@@ -374,12 +374,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
       )}
 
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {stocks.length === 0 ? (
-          <div style={{ padding: '30px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⏳</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>Connecting...</div>
-          </div>
-        ) : !isSearchMode && displayStocks.length === 0 ? (
+        {!isSearchMode && displayStocks.length === 0 ? (
           <div style={{ padding: '50px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <div style={{ width: '64px', height: '64px', background: 'rgba(255,255,255,0.03)', borderRadius: '50%', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <Search size={28} color="var(--color-blue)" opacity={0.8} />

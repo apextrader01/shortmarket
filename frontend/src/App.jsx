@@ -1,21 +1,22 @@
 import { registerServiceWorker } from './services/pushManager';
 import React, { useEffect, useState, useMemo, Suspense, lazy } from 'react';
 import MarketWatch from './components/MarketWatch';
-import ChartWidget from './components/ChartWidget';
-import PositionsView from './components/PositionsView';
-import OrdersView from './components/OrdersView';
-import PortfolioView from './components/PortfolioView';
-import ClientDataView from './components/ClientDataView';
-import OrderModal from './components/OrderModal';
-import EditOrderModal from './components/EditOrderModal';
-import DepositModal from './components/DepositModal';
-import AlertModal from './components/AlertModal';
-import BasketModal from './components/BasketModal';
 import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
-import BiometricLockModal from './components/BiometricLockModal';
+import { getInstantLotsize } from './utils/lotsizeHelper';
 
 // ⚡ Lazy Loaded Sub-Views & Modals (Reduces initial JS bundle by 85% for instant page load)
+const ChartWidget = lazy(() => import('./components/ChartWidget'));
+const PositionsView = lazy(() => import('./components/PositionsView'));
+const OrdersView = lazy(() => import('./components/OrdersView'));
+const PortfolioView = lazy(() => import('./components/PortfolioView'));
+const ClientDataView = lazy(() => import('./components/ClientDataView'));
+const OrderModal = lazy(() => import('./components/OrderModal'));
+const EditOrderModal = lazy(() => import('./components/EditOrderModal'));
+const DepositModal = lazy(() => import('./components/DepositModal'));
+const AlertModal = lazy(() => import('./components/AlertModal'));
+const BasketModal = lazy(() => import('./components/BasketModal'));
+const BiometricLockModal = lazy(() => import('./components/BiometricLockModal'));
 const OptionChainView = lazy(() => import('./components/OptionChainView'));
 const MutualFundsView = lazy(() => import('./components/MutualFundsView'));
 const AboutUsView = lazy(() => import('./components/AboutUsView'));
@@ -154,7 +155,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, loadStocks, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, stocks, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, loadStocks: state.loadStocks, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, stocks: state.stocks, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
@@ -194,7 +195,7 @@ function App() {
     return false;
   });
 
-  // Configurable Inactivity & Background Auto-Lock Listener
+  // Configurable Inactivity & Background Auto-Lock Listener (Throttled to 5s to eliminate 144Hz mouse churn)
   useEffect(() => {
     if (!user || !isUserPinEnabled(user.id)) return;
 
@@ -202,7 +203,10 @@ function App() {
     let bgTime = null;
 
     const updateActivity = () => {
-      lastActivity = Date.now();
+      const now = Date.now();
+      if (now - lastActivity > 5000) {
+        lastActivity = now;
+      }
     };
 
     const checkInactivity = () => {
@@ -363,12 +367,11 @@ function App() {
     fetchBatchPrices(TOP_INDICES);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise socket, load stocks, and start polling
+  // Initialise socket and start polling
   useEffect(() => {
     clearOldAlerts();
     initSocket();
     if (user) fetchUserData();
-    loadStocks();
     refreshPrices();
 
     // ⚡ Smart Price Polling: Only poll REST as fallback when WebSocket is truly disconnected
@@ -423,25 +426,21 @@ function App() {
       if (e.shiftKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         if (!selectedSymbol) return;
-        const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
-        const lotsize = stockInfo.lotsize || 1;
-        
+        const lotsize = getInstantLotsize(selectedSymbol);
         useStore.getState().openOrderModal(selectedSymbol, 'BUY', lotsize);
       }
       
       if (e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         if (!selectedSymbol) return;
-        const stockInfo = stocks.find(s => s.uniqueSymbol === selectedSymbol) || {};
-        const lotsize = stockInfo.lotsize || 1;
-        
+        const lotsize = getInstantLotsize(selectedSymbol);
         useStore.getState().openOrderModal(selectedSymbol, 'SELL', lotsize);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSymbol, stocks]);
+  }, [selectedSymbol]);
 
   // ── Guard: show login screen when not authenticated ──────────────────────────
   
@@ -599,7 +598,9 @@ function App() {
               {(activeTab === 'Markets' || activeTab === 'Chart') && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: 0, padding: window.innerWidth <= 1200 ? '0' : '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0 }}>
-                    <ChartWidget />
+                    <Suspense fallback={<TabLoader />}>
+                      <ChartWidget />
+                    </Suspense>
                   </div>
                 </div>
               )}
@@ -612,9 +613,21 @@ function App() {
                   </ErrorBoundary>
                 </div>
               )}
-              {activeTab === 'Portfolio' && <PortfolioView />}
-              {activeTab === 'Orders' && <OrdersView />}
-              {activeTab === 'Positions' && <PositionsView />}
+              {activeTab === 'Portfolio' && (
+                <Suspense fallback={<TabLoader />}>
+                  <PortfolioView />
+                </Suspense>
+              )}
+              {activeTab === 'Orders' && (
+                <Suspense fallback={<TabLoader />}>
+                  <OrdersView />
+                </Suspense>
+              )}
+              {activeTab === 'Positions' && (
+                <Suspense fallback={<TabLoader />}>
+                  <PositionsView />
+                </Suspense>
+              )}
 
               {activeTab === 'Analytics' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', padding: '12px', minHeight: 0, overflowY: 'auto' }}>
@@ -644,7 +657,9 @@ function App() {
               )}
               {activeTab === 'ClientData' && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
-                  <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
+                  <Suspense fallback={<TabLoader />}>
+                    <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />
+                  </Suspense>
                 </div>
               )}
               {activeTab === 'AboutUs' && (
@@ -689,19 +704,19 @@ function App() {
         </>
       )}
 
-      {orderModal?.isOpen && <OrderModal />}
-      {editOrderModal?.isOpen && <EditOrderModal />}
-      {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
       <Suspense fallback={null}>
+        {orderModal?.isOpen && <OrderModal />}
+        {editOrderModal?.isOpen && <EditOrderModal />}
+        {showDepositModal && <DepositModal onClose={() => setShowDepositModal(false)} />}
         {marketDepthModal?.isOpen && <MarketDepthModal />}
         {domLadderModal?.isOpen && <DOMLadderModal />}
         {chartModalSymbol && <ChartModal />}
+        {alertModalSymbol && <AlertModal />}
+        {basketModalOpen && <BasketModal />}
+        {user && isLocked && isUserPinEnabled(user.id) && (
+          <BiometricLockModal onUnlock={() => setIsLocked(false)} />
+        )}
       </Suspense>
-      {alertModalSymbol && <AlertModal />}
-      {basketModalOpen && <BasketModal />}
-      {user && isLocked && isUserPinEnabled(user.id) && (
-        <BiometricLockModal onUnlock={() => setIsLocked(false)} />
-      )}
       
       {/* Mobile Menu Overlay */}
       <div className={`mobile-menu-overlay ${showMobileMenu ? 'open' : ''}`}>

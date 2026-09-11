@@ -745,10 +745,22 @@ export const useStore = create(persist((set, get) => ({
     if (!force && window._lastWsTick && (now - window._lastWsTick < 5000)) return;
 
     try {
-      const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
-      const snapshot = await res.json();
-      if (snapshot && Object.keys(snapshot).length > 0) {
-        set((state) => ({ prices: applySnapshot(snapshot, state), _lastPriceFetchTime: now }));
+      const { watchlists, activeWatchlistId, positions, holdings, selectedSymbol } = get();
+      const activeWl = (watchlists || []).find(w => String(w.id) === String(activeWatchlistId)) || watchlists?.[0];
+      const symbolsSet = new Set([
+        'NSE:NIFTY50-INDEX',
+        'NSE:NIFTYBANK-INDEX',
+        'BSE:SENSEX-INDEX',
+        ...(activeWl?.symbols || []),
+        ...(positions || []).map(p => p.symbol),
+        ...(holdings || []).map(h => h.symbol),
+        ...(selectedSymbol ? [selectedSymbol] : []),
+        ...temporaryOptionSubscriptions
+      ]);
+      const symbols = [...symbolsSet].filter(Boolean);
+      if (symbols.length > 0) {
+        await get().fetchBatchPrices(symbols, force);
+        set({ _lastPriceFetchTime: now });
       }
     } catch (_) {}
   },
