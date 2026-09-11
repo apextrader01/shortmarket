@@ -15,9 +15,9 @@ const dbConfig = {
   connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
   pool: { 
     min: 2, 
-    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 10,
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 25,
     idleTimeoutMillis: 30000,
-    createTimeoutMillis: 3000,
+    createTimeoutMillis: 5000,
     acquireTimeoutMillis: 30000,
     propagateCreateError: false
   }
