@@ -14,6 +14,15 @@ let isFlushing = false;
 
 async function flushTelemetry() {
     if (isFlushing || !generalClient || !generalClient.isReady) return;
+
+    // ⚡ Zero-traffic idle sleep: Skip multi pipeline if no metrics were recorded
+    if (
+        Object.keys(pendingApiStats).length === 0 &&
+        Object.keys(pendingUserStats).length === 0 &&
+        Object.keys(pendingMbStats).length === 0
+    ) {
+        return;
+    }
     isFlushing = true;
 
     const apiSnapshot = pendingApiStats;
