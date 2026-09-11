@@ -86,18 +86,19 @@ export default function TradingJournalView({ onBack }) {
     // 1. Closed positions (represent completed round-trip trades)
     (positions || []).forEach(p => {
       const pnl = Number(p.realized_pnl || 0);
-      const isClosed = Number(p.quantity) === 0 || p.closed_quantity > 0;
+      const isClosed = Number(p.quantity) === 0 && (Number(p.closed_quantity) > 0 || p.updated_at || pnl !== 0);
       const key = `pos-${p.id || p.symbol}`;
       if (isClosed && !seen.has(key)) {
         seen.add(key);
         closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}`);
+        const entrySide = p.side || (Number(p.closed_quantity) < 0 ? 'SELL' : 'BUY');
         list.push({
           id: key,
           rawId: p.id,
           symbol: p.symbol,
           product_type: p.product_type || 'INT',
-          side: p.side || (Number(p.quantity) < 0 ? 'SELL' : 'BUY'),
-          qty: Math.abs(p.closed_quantity || p.quantity || 1),
+          side: entrySide,
+          qty: Math.abs(p.closed_quantity || 1),
           avg: Number(p.average_price || 0),
           exit_price: Number(p.exit_price || p.average_price || 0),
           pnl: pnl,
@@ -107,23 +108,26 @@ export default function TradingJournalView({ onBack }) {
       }
     });
 
-    // 2. Executed Orders (only add if not a duplicate exit order of a closed position above)
+    // 2. Executed Orders: only add exit orders with realized P&L if not already captured in closed positions
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-      const pnl = Number(o.realized_pnl || 0);
+      const pnl = (o.realized_pnl !== null && o.realized_pnl !== undefined) ? Number(o.realized_pnl) : null;
+      if (!isExecuted || pnl === null || isNaN(pnl) || pnl === 0) return;
+
+      const sig = `${o.symbol}_${Math.round(pnl * 100)}`;
+      if (closedPosSignatures.has(sig)) return;
+
       const key = `ord-${o.id}`;
-      // Skip if this exit order's PnL is already captured by a closed position
-      if (pnl !== 0 && closedPosSignatures.has(`${o.symbol}_${Math.round(pnl * 100)}`)) {
-        return;
-      }
-      if (isExecuted && !seen.has(key)) {
+      if (!seen.has(key)) {
         seen.add(key);
+        closedPosSignatures.add(sig);
+        const originalEntrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
         list.push({
           id: key,
           rawId: o.id,
           symbol: o.symbol,
           product_type: o.product_type || 'INT',
-          side: o.side,
+          side: originalEntrySide,
           qty: Math.abs(o.quantity || 1),
           avg: Number(o.price || o.average_price || 0),
           exit_price: Number(o.average_price || o.price || 0),

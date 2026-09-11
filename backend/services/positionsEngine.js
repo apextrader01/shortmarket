@@ -345,15 +345,14 @@ class PositionsEngine {
                     .whereIn('product_type', ['DEL', 'CNC'])
                     .where('quantity', '>', 0);
                     
-                if (onlyBeforeToday) {
-                    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const parts = formatter.formatToParts(new Date());
-                    const year = parts.find(p => p.type === 'year').value;
-                    const month = parts.find(p => p.type === 'month').value;
-                    const day = parts.find(p => p.type === 'day').value;
-                    const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-                    query = query.where('created_at', '<', startOfToday);
-                }
+                // T+1 Migration ALWAYS migrates only positions opened before today (T+1 settlement rule)
+                const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+                const parts = formatter.formatToParts(new Date());
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+                query = query.where('created_at', '<', startOfToday);
 
                 const deliveryPositions = await query;
 
@@ -392,23 +391,20 @@ class PositionsEngine {
                     }
                 }
 
-                // 2. Wipe the positions table to clear UI history
-                // Wipe the DEL positions we successfully migrated
+                // 2. Mark migrated delivery positions as settled (quantity = 0) to preserve audit trails without data deletion
                 const migratedIds = deliveryPositions.map(p => p.id);
                 if (migratedIds.length > 0) {
-                    await trx('positions').whereIn('id', migratedIds).del();
+                    await trx('positions')
+                        .whereIn('id', migratedIds)
+                        .update({ 
+                            closed_quantity: trx.raw('quantity'), 
+                            quantity: 0, 
+                            updated_at: new Date() 
+                        });
                 }
                 
-                // Wipe ANY remaining closed/intraday positions from yesterday to clear UI
-                const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-                const parts = formatter.formatToParts(new Date());
-                const year = parts.find(p => p.type === 'year').value;
-                const month = parts.find(p => p.type === 'month').value;
-                const day = parts.find(p => p.type === 'day').value;
-                const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-                await trx('positions').where('created_at', '<', startOfToday).where({ quantity: 0 }).del();
-                
-                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions and wiped old history.`);
+                // ZERO TRADE DATA DELETION: Closed positions (quantity = 0) are strictly preserved for historical P&L & audit logs.
+                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions to holdings.`);
             });
         } catch (error) {
             console.error(`[HOLDINGS MIGRATION ERROR]:`, error);

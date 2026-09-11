@@ -51,6 +51,34 @@ export default function DOMLadderModal() {
   const bids = rawBids;
   const asks = rawAsks;
 
+  const bidsMap = useMemo(() => {
+    const map = new Map();
+    bids.forEach(b => {
+      const p = parseFloat(b.price);
+      if (!isNaN(p)) map.set(p.toFixed(2), b);
+    });
+    return map;
+  }, [bids]);
+
+  const asksMap = useMemo(() => {
+    const map = new Map();
+    asks.forEach(a => {
+      const p = parseFloat(a.price);
+      if (!isNaN(p)) map.set(p.toFixed(2), a);
+    });
+    return map;
+  }, [asks]);
+
+  useEffect(() => {
+    if (domLadderModal.isOpen && scrollRef.current && centerPrice > 0 && !hasScrolled) {
+      const container = scrollRef.current;
+      const rowHeight = 32;
+      const centerIndex = 200;
+      container.scrollTop = (centerIndex * rowHeight) - (container.clientHeight / 2);
+      setHasScrolled(true);
+    }
+  }, [domLadderModal.isOpen, centerPrice, hasScrolled]);
+
   // Determine tick size based on exchange/symbol
   let tickSize = 0.05;
   if (symbol.includes('-MCX') || basicData.exchange === 'MCX') {
@@ -92,8 +120,7 @@ export default function DOMLadderModal() {
       placeOrder(payload);
     } else {
       closeDomLadderModal();
-      // Need to pre-fill the order modal with this limit price.
-      openOrderModal(symbol, side, lotsize);
+      openOrderModal(symbol, side, lotsize, 'INT', false, 0, parseFloat(price));
     }
   };
 
@@ -132,8 +159,8 @@ export default function DOMLadderModal() {
            ) : (
              ladderRows.map((price, i) => {
                const isLTP = price.toFixed(2) === (ltp || 0).toFixed(2);
-               const bid = bids.find(b => parseFloat(b.price).toFixed(2) === price.toFixed(2));
-               const ask = asks.find(a => parseFloat(a.price).toFixed(2) === price.toFixed(2));
+               const bid = bidsMap.get(price.toFixed(2));
+               const ask = asksMap.get(price.toFixed(2));
                
                return (
                  <div key={i} style={{ 

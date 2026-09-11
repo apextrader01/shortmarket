@@ -99,7 +99,7 @@ export default function PortfolioView() {
   });
 
   (positions || []).forEach(p => {
-    if (p.product_type === 'DEL' && Number(p.quantity) > 0) {
+    if ((p.product_type === 'DEL' || p.product_type === 'CNC') && Number(p.quantity) > 0) {
       const sym = p.symbol;
       if (!allMergedHoldingsMap[sym]) {
         allMergedHoldingsMap[sym] = { ...p, quantity: Number(p.quantity) || 0, average_price: Number(p.average_price) || 0, isT0: true };

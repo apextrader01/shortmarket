@@ -850,14 +850,17 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
   const filtered = filterRecordsByPeriod(ledger, dateRange, customStart, customEnd);
   
   let currentBalance = parseFloat(user.balance || 0);
+  if (isNaN(currentBalance)) currentBalance = 0;
   const ledgerWithBalance = (filtered || []).map(entry => {
+    const amt = Number(entry.amount);
+    const validAmt = !isNaN(amt) ? amt : 0;
     const balanceAfter = currentBalance;
-    currentBalance -= Number(entry.amount);
-    return { ...entry, running_balance: balanceAfter };
+    currentBalance -= validAmt;
+    return { ...entry, running_balance: isNaN(balanceAfter) ? 0 : balanceAfter };
   });
 
-  const totalCredits = filtered.filter(l => Number(l.amount) > 0).reduce((acc, l) => acc + Number(l.amount), 0);
-  const totalDebits = filtered.filter(l => Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount)), 0);
+  const totalCredits = filtered.filter(l => Number(l.amount) > 0).reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+  const totalDebits = filtered.filter(l => Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount) || 0), 0);
   const closingBalance = parseFloat(user.balance || 0);
 
   const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;

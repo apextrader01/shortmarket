@@ -76,8 +76,13 @@ export default function OrderModal() {
       }
       
       // Fetch initial price imperatively to avoid re-running on every live tick
-      const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
-      setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
+      if (orderModal.initialPrice && Number(orderModal.initialPrice) > 0) {
+        setPrice(Number(orderModal.initialPrice).toFixed(2));
+        setOrderType('LIMIT');
+      } else {
+        const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
+        setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
+      }
       
       // Background sync lotsize if still 1 and looks like a derivative (contains numbers)
       if (effectiveLotsize === 1 && /\d/.test(orderModal.symbol)) {
@@ -609,9 +614,23 @@ export default function OrderModal() {
                 />
               </fieldset>
               <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: isMobile ? '11px' : '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
-                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: '#2563eb' }} /> 
+                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => { setTab(e.target.checked ? 'Stop Loss' : 'Regular'); if (!e.target.checked) setTrailingJump(''); }} style={{ accentColor: '#2563eb' }} /> 
                 Trigger {side.toLowerCase()}
               </label>
+              {tab === 'Stop Loss' && (
+                <div style={{ marginTop: '8px' }}>
+                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)' }}>
+                    <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: isMobile ? '9.5px' : '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trailing Jump (Pts)</legend>
+                    <input 
+                      type="text" 
+                      placeholder="Optional (e.g. 1.0)"
+                      value={trailingJump} 
+                      onChange={e => setTrailingJump(e.target.value)}
+                      style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '5px 8px' : '6px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '12px' : '13px', fontWeight: '600', outline: 'none' }} 
+                    />
+                  </fieldset>
+                </div>
+              )}
             </div>
           </div>
 

@@ -41,12 +41,19 @@ export default function PositionsView() {
       const closedOrdersMap = {};
       (orders || []).forEach(o => {
         const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-        const isClosingSide = o.side === 'SELL' || (o.realized_pnl !== null && Number(o.realized_pnl) !== 0);
-        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && Number(o.realized_pnl) !== 0;
+        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
         const key = `${o.symbol}-${o.product_type || 'INT'}`;
 
-        // Only add from orders if this symbol+product wasn't already in dbClosed
-        if (isExecuted && isClosingSide && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
+        // Include closed trades from orders if this symbol+product wasn't already in dbClosed
+        if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
+          const orderQty = Number(o.quantity || 1);
+          const orderPnl = Number(o.realized_pnl || 0);
+          const exitPrice = Number(o.average_price || o.price || 0);
+          const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
+          const entryPrice = orderQty > 0 
+            ? (entrySide === 'BUY' ? (exitPrice - (orderPnl / orderQty)) : (exitPrice + (orderPnl / orderQty)))
+            : exitPrice;
+
           if (!closedOrdersMap[key]) {
             closedOrdersMap[key] = {
               id: `closed-ord-${o.id}`,
@@ -54,8 +61,9 @@ export default function PositionsView() {
               product_type: o.product_type || 'INT',
               quantity: 0,
               closed_quantity: 0,
-              average_price: Number(o.average_price || o.price || 0),
-              exit_price: Number(o.average_price || o.price || 0),
+              side: entrySide,
+              average_price: Math.max(0, entryPrice),
+              exit_price: exitPrice,
               realized_pnl: 0,
               created_at: o.created_at,
               updated_at: o.updated_at || o.created_at
@@ -63,7 +71,7 @@ export default function PositionsView() {
           }
           closedOrdersMap[key].closed_quantity += Number(o.quantity || 0);
           closedOrdersMap[key].realized_pnl += Number(o.realized_pnl);
-          closedOrdersMap[key].exit_price = Number(o.average_price || o.price || closedOrdersMap[key].exit_price);
+          closedOrdersMap[key].exit_price = exitPrice;
         }
       });
 
@@ -616,11 +624,14 @@ export default function PositionsView() {
                 {flatPositions.map((pos, idx) => {
                   const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
-                  const pnlPercent = pos.invested > 0 ? (pos.pnl / pos.invested) * 100 : 0;
                   const displayPnl = viewMode === 'CLOSED' ? realizedPnl : pos.pnl;
                   const isDisplayProfit = displayPnl >= 0;
-                  const sideText = pos.qty > 0 ? 'BUY' : (pos.qty < 0 ? 'SELL' : '-');
-                  const isBuy = pos.qty > 0 || (viewMode === 'CLOSED' && pos.closed_quantity > 0);
+                  const investedBase = pos.invested > 0 
+                    ? pos.invested 
+                    : ((parseFloat(pos.closed_quantity) || 1) * (pos.avg || parseFloat(pos.average_price) || 1));
+                  const pnlPercent = investedBase > 0 ? (displayPnl / investedBase) * 100 : 0;
+                  const sideText = pos.qty > 0 ? 'BUY' : (pos.qty < 0 ? 'SELL' : (pos.side || '-'));
+                  const isBuy = pos.qty > 0 || (viewMode === 'CLOSED' && pos.side !== 'SELL');
 
                   return (
                     <div 

@@ -77,13 +77,24 @@ export default function EditOrderModal() {
   const isBuy = order.side === 'BUY';
 
   const handleUpdateOrder = async () => {
+    const numQty = Number(quantity);
+    if (!numQty || numQty <= 0 || isNaN(numQty)) {
+      alert('Please enter a valid quantity greater than 0.');
+      return;
+    }
+
     const finalPrice = isPendingTrigger && isMarket ? 0 : parseFloat(price);
     const sl = slPrice ? parseFloat(slPrice) : null;
     const tgt = tgtPrice ? parseFloat(tgtPrice) : null;
     const marketFlag = isPendingTrigger ? isMarket : false;
     const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
 
-    const res = await updateOrder(order.id, quantity, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
+    if (!marketFlag && !isPendingTrigger && (isNaN(finalPrice) || finalPrice <= 0)) {
+      alert('Please enter a valid limit price greater than 0.');
+      return;
+    }
+
+    const res = await updateOrder(order.id, numQty, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
 
     if (res && res.success) {
       closeEditOrderModal();

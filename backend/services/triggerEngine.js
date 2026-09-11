@@ -306,6 +306,24 @@ class TriggerEngine {
                 return; 
             }
 
+            // SL-L Gap Protection: For Stop-Loss Limit orders, verify limit price constraint
+            if (order.type === 'SL-L' || (order.type === 'SL' && order.price && Number(order.price) > 0)) {
+                const limitPrice = Number(order.price);
+                if (order.side === 'BUY' && execPrice > limitPrice) {
+                    // Market gapped above limit price: keep as PENDING limit order at limit price
+                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', updated_at: new Date() });
+                    order.status = 'PENDING';
+                    this.addOrderToMemory(order);
+                    return;
+                } else if (order.side === 'SELL' && execPrice < limitPrice) {
+                    // Market gapped below limit price: keep as PENDING limit order at limit price
+                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', updated_at: new Date() });
+                    order.status = 'PENDING';
+                    this.addOrderToMemory(order);
+                    return;
+                }
+            }
+
             // 1. Mark Executed & Deduct Taxes
             const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, order.user_id, order.symbol, order.product_type, order.side, Number(order.quantity), execPrice);
             
@@ -382,6 +400,11 @@ class TriggerEngine {
                 
                 // If there's still a remaining quantity, insert an OPEN position
                 if (remainingQty !== 0) {
+                    // SAFEGUARD: For Cash Equity Delivery (DEL/CNC), negative quantities (naked shorts) are strictly prohibited
+                    if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0) {
+                        console.warn(`[SAFEGUARD] Blocked negative DEL position for user ${order.user_id}, symbol ${order.symbol}, qty: ${remainingQty}`);
+                        return; // Do NOT insert negative DEL position!
+                    }
                     const finalMargin = customMargin !== undefined ? Number(customMargin.toFixed(2)) : Number(order.margin || 0);
                     await trx('positions').insert({
                         user_id: order.user_id, symbol: order.symbol, quantity: remainingQty,
@@ -488,7 +511,9 @@ class TriggerEngine {
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
                         const remainingQty = order.side === 'BUY' ? (absQty - absPosQty) : -(absQty - absPosQty);
-                        const newPosMargin = Number(order.margin || 0);
+                        const { calculateRequiredMargin } = require('./marginEngine');
+                        const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Math.abs(remainingQty), execPrice);
+                        const newPosMargin = calcMargin > 0 ? calcMargin : Number(order.margin || 0);
                         await handleRemainingPos(trx, remainingQty, execPrice, newPosMargin);
                     }
                 } else {
