@@ -202,8 +202,9 @@ async function initFyers(io, pc, isMaster = true) {
                     // with ticks they aren't subscribed to, which causes severe UI lag.
                     for (const sym of Object.keys(batchUpdate)) {
                         const room = global_io.sockets?.adapter?.rooms?.get(sym);
-                        // ⚡ Skip emitting if no client is actively subscribed to this symbol
-                        if (room && room.size > 0) {
+                        const hasSubscribers = (clientSubscriptions && clientSubscriptions.has(sym)) || (room && room.size > 0);
+                        // ⚡ Skip emitting if no client is actively subscribed to this symbol across any cluster node
+                        if (hasSubscribers) {
                             const p = batchUpdate[sym];
                             // Emit compact 11-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
                             // Slashes live tick egress bandwidth by >65% across all connected clients

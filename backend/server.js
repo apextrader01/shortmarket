@@ -564,7 +564,12 @@ const authLimiter = rateLimit({
 const orderLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 120, // limit each IP to 120 orders per minute
-  message: { error: 'Order rate limit exceeded (max 120/min)' }
+  message: { error: 'Order rate limit exceeded (max 120/min)' },
+  skip: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+    return isLoopback || Boolean(req.body?.is_system_close);
+  }
 });
 
 app.post('/api/auth/profile', authenticateToken, async (req, res) => {

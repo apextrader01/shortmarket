@@ -196,13 +196,19 @@ class TriggerEngine {
                     }).catch(err => console.error('TSL DB update error:', err.message));
 
                     if (this.io) {
-                        this.io.emit('order_update', {
+                        const targetUserRoom = tOrder.user_id ? tOrder.user_id.toString() : null;
+                        const updatePayload = {
                             id: orderId,
                             trigger_price: newTriggerPrice,
                             sl_price: newTriggerPrice,
                             status: tOrder.status,
                             is_trailing: true
-                        });
+                        };
+                        if (targetUserRoom) {
+                            this.io.to(targetUserRoom).emit('order_update', updatePayload);
+                        } else {
+                            this.io.emit('order_update', updatePayload);
+                        }
                     }
                 }
             }

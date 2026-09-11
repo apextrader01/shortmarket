@@ -596,6 +596,7 @@ export const useStore = create(persist((set, get) => ({
       window._hasWsVisibilityHandler = true;
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
+          get().pingSubscriptions();
           if (Object.keys(pendingSnapshots).length > 0) {
             if (snapshotThrottleTimer) {
               clearTimeout(snapshotThrottleTimer);
@@ -733,22 +734,21 @@ export const useStore = create(persist((set, get) => ({
       // FIX: Ping immediately to re-join rooms for already-loaded symbols
       get().pingSubscriptions();
       
-      // FIX: Also ping again at multiple intervals after reconnect (e.g., after PM2 restart from 
-      // token refresh) to ensure subscriptions are re-established before the 60s GC fires.
-      // Without these, a slow frontend reconnect means GC silently kills all subscriptions.
-      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 2000);
-      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 5000);
-      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 10000);
-      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 20000);
-      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 30000);
+      // A single 3s safety re-verify on initial connect
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 3000);
       
-      // Start a 10-second heartbeat to keep subscriptions alive and garbage collect old ones
+      // Background-aware heartbeat: 15s when active; throttled to 45s when tab is hidden/minimized
+      // (Fyers server GC window is 60s, so 45s preserves keepalive while cutting idle socket requests by 78%)
       if (!get().subscriptionPingInterval) {
+          let lastPingTime = Date.now();
           const interval = setInterval(() => {
-              if (get().isConnected) {
-                  get().pingSubscriptions();
-              }
-          }, 10000);
+              if (!get().isConnected) return;
+              const isHidden = typeof document !== 'undefined' && document.hidden;
+              const elapsed = Date.now() - lastPingTime;
+              if (isHidden && elapsed < 45000) return;
+              lastPingTime = Date.now();
+              get().pingSubscriptions();
+          }, 15000);
           set({ subscriptionPingInterval: interval });
       }
     };

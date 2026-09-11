@@ -1274,6 +1274,8 @@ input:checked + .slider:before {
   transition: background 0.2s ease, border-left 0.2s ease;
   border-left: 2px solid transparent;
   font-variant-numeric: tabular-nums;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 44px;
 }
 
 .watchlist-item:hover {
