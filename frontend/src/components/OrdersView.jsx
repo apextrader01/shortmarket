@@ -40,6 +40,9 @@ export default function OrdersView() {
       if (res.ok) {
         useStore.getState().fetchUserData();
         setTagModalOrder(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || 'Failed to save tag. Please try again.');
       }
     } catch (e) {
       alert('Error saving tag: ' + e.message);

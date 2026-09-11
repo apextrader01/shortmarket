@@ -465,8 +465,18 @@ export const useStore = create(persist((set, get) => ({
     }
   },
   unsubscribeFromOptionBatch: (dataArray) => {
-    if(Array.isArray(dataArray)) {
-      dataArray.forEach(data => temporaryOptionSubscriptions.delete(data.uniqueSymbol || data.symbol || data.token));
+    if (Array.isArray(dataArray)) {
+      const symbolsToLeave = [];
+      dataArray.forEach(data => {
+        const sym = data.uniqueSymbol || data.symbol || data.token;
+        if (sym) {
+          temporaryOptionSubscriptions.delete(sym);
+          symbolsToLeave.push(sym);
+        }
+      });
+      if (socket && socket.connected && symbolsToLeave.length > 0) {
+        socket.emit('unsubscribe', symbolsToLeave);
+      }
       get().pingSubscriptions();
     }
   },

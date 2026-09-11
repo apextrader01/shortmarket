@@ -5327,8 +5327,15 @@ io.on('connection', (socket) => {
 
 
   socket.on('unsubscribe', (data) => {
-    let symbol = typeof data === 'string' ? data : data.symbol;
-    socket.leave(symbol);
+    if (Array.isArray(data)) {
+      data.forEach(item => {
+        const sym = typeof item === 'string' ? item : item?.symbol;
+        if (sym) socket.leave(sym);
+      });
+    } else if (data) {
+      const sym = typeof data === 'string' ? data : data.symbol;
+      if (sym) socket.leave(sym);
+    }
   });
 
     socket.on('subscribe_depth', (symbol) => {

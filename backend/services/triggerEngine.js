@@ -149,7 +149,10 @@ class TriggerEngine {
 
                 if (tOrder.side === 'SELL') {
                     // Long position SL: trails upward as LTP increases
-                    const highWater = Number(tOrder.high_water_mark || ltp);
+                    if (!tOrder.high_water_mark || Number(tOrder.high_water_mark) <= 0) {
+                        tOrder.high_water_mark = Number(ltp);
+                    }
+                    const highWater = Number(tOrder.high_water_mark);
                     if (ltp > highWater) {
                         const gain = ltp - highWater;
                         if (gain >= step) {
@@ -164,7 +167,10 @@ class TriggerEngine {
                     }
                 } else if (tOrder.side === 'BUY') {
                     // Short position SL: trails downward as LTP decreases
-                    const lowWater = Number(tOrder.low_water_mark || ltp);
+                    if (!tOrder.low_water_mark || Number(tOrder.low_water_mark) <= 0) {
+                        tOrder.low_water_mark = Number(ltp);
+                    }
+                    const lowWater = Number(tOrder.low_water_mark);
                     if (ltp < lowWater) {
                         const drop = lowWater - ltp;
                         if (drop >= step) {
