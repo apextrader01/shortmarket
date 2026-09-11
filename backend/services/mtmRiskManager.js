@@ -217,6 +217,16 @@ class MTMRiskManager {
             // Invalidate cached positions
             this.cachedPositions = null;
 
+            // ⚡ Real-Time Socket Sync: Instantly clear closed positions and update balance on the user's screen (<10ms)
+            if (triggerEngine && triggerEngine.io) {
+                triggerEngine.io.to(userId.toString()).emit('sync_user_data');
+                triggerEngine.io.to(userId.toString()).emit('trade_alert', {
+                    event: 'SL_HIT',
+                    symbol: 'PORTFOLIO',
+                    message: reason
+                });
+            }
+
             // Send push notification / alert
             try {
                 await sendPushNotification(userId, {

@@ -59,6 +59,7 @@ function initCronJobs(priceCache, triggerEngine) {
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
         console.log(`[CRON] Phase 2 (${assetType}): Sweeping pending Intraday/CO/BO entry orders...`);
+        const affectedUserIds = new Set();
         try {
             await db.transaction(async (trx) => {
                 const pendingOrders = await trx('orders').whereIn('status', ['PENDING']);
@@ -83,6 +84,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         .update({ status: 'CANCELLED', updated_at: new Date() });
 
                     if (updated > 0) {
+                        affectedUserIds.add(order.user_id);
                         if (parseFloat(order.margin) > 0) {
                             await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
                         }
@@ -109,6 +111,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         .update({ status: 'CANCELLED', updated_at: new Date() });
 
                     if (updated > 0) {
+                        affectedUserIds.add(trigger.user_id);
                         if (parseFloat(trigger.margin) > 0) {
                             await LedgerService.releaseMargin(trx, trigger.user_id, trigger.margin, `End of Day Sweep Cancelled: ${trigger.symbol}`);
                         }
@@ -117,6 +120,13 @@ function initCronJobs(priceCache, triggerEngine) {
                     }
                 }
             });
+
+            // ⚡ Real-Time Socket Sync: Instantly refresh orders and balances on affected client screens
+            if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                for (const uid of affectedUserIds) {
+                    triggerEngine.io.to(uid.toString()).emit('sync_user_data');
+                }
+            }
         } catch (err) {
             console.error('Phase 2 Sweep Error:', err);
         }
@@ -128,6 +138,7 @@ function initCronJobs(priceCache, triggerEngine) {
     // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
         console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
+        const affectedUserIds = new Set();
         try {
             await db.transaction(async (trx) => {
                 // Get ALL intraday-type positions (INT, BO, CO) that are still open
@@ -140,14 +151,32 @@ function initCronJobs(priceCache, triggerEngine) {
                     if (assetType === 'EQ' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
 
-                    const ltp = priceCache[pos.symbol]?.ltp;
+                    let ltp = priceCache[pos.symbol]?.ltp;
                     if (!ltp || ltp <= 0) {
-                        console.warn(`[CRON] Phase 3: No live LTP for ${pos.symbol}, skipping square-off to avoid artificial ₹0 PnL.`);
+                        try {
+                            const { fetchBatchLTPs } = require('./fyers');
+                            if (fetchBatchLTPs) {
+                                const quotes = await fetchBatchLTPs([pos.symbol]);
+                                if (quotes && quotes[pos.symbol]?.ltp > 0) {
+                                    ltp = quotes[pos.symbol].ltp;
+                                    priceCache[pos.symbol] = quotes[pos.symbol];
+                                }
+                            }
+                        } catch(e) {}
+                    }
+                    if (!ltp || ltp <= 0) {
+                        // Safe breakeven fallback so intraday positions are NEVER abandoned overnight
+                        ltp = Number(pos.average_price) || 0;
+                    }
+
+                    if (ltp <= 0) {
+                        console.warn(`[CRON] Phase 3: No valid exit price for ${pos.symbol}, skipping.`);
                         continue;
                     }
 
                     // Close position with RMS penalty
                     await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
+                    affectedUserIds.add(pos.user_id);
                     console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
                     
                     // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
@@ -183,6 +212,18 @@ function initCronJobs(priceCache, triggerEngine) {
                     }
                 }
             });
+
+            // ⚡ Real-Time Socket Sync: Instantly refresh positions, orders, and balance on affected user screens
+            if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                for (const uid of affectedUserIds) {
+                    triggerEngine.io.to(uid.toString()).emit('sync_user_data');
+                    triggerEngine.io.to(uid.toString()).emit('trade_alert', {
+                        event: 'EXECUTED',
+                        symbol: 'PORTFOLIO',
+                        message: 'Intraday EOD auto square-off executed'
+                    });
+                }
+            }
         } catch (err) {
             console.error('Phase 3 Square-Off Error:', err);
         }
