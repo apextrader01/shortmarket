@@ -11,18 +11,23 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        let chart;
-        let lineSeries;
+        let isMounted = true;
+        let chart = null;
+        let lineSeries = null;
 
         const initChart = async () => {
             setLoading(true);
             try {
                 const data = await fetchFundHistory(schemeCode);
+                if (!isMounted) return;
+
                 if (!data || data.length === 0) {
                     setError('No historical data available');
                     setLoading(false);
                     return;
                 }
+
+                if (!chartContainerRef.current) return;
 
                 // Create chart
                 chart = createChart(chartContainerRef.current, {
@@ -61,6 +66,7 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
 
                 setLoading(false);
             } catch (err) {
+                if (!isMounted) return;
                 setError(err.message);
                 setLoading(false);
             }
@@ -76,8 +82,12 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
         window.addEventListener('resize', handleResize);
 
         return () => {
+            isMounted = false;
             window.removeEventListener('resize', handleResize);
-            if (chart) chart.remove();
+            if (chart) {
+                try { chart.remove(); } catch (_) {}
+                chart = null;
+            }
         };
     }, [schemeCode, fetchFundHistory, color]);
 
@@ -100,5 +110,3 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
         </div>
     );
 }
-
-

@@ -6470,10 +6470,23 @@ app.post('/api/admin/unban', authenticateToken, async (req, res) => {
 // 1. Trades API
 app.get('/api/journal/trades', authenticateToken, async (req, res) => {
   try {
-    const trades = await db('journal_trades')
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
+    const limit = isExport ? null : (parseInt(req.query.limit) || 250);
+    const offset = parseInt(req.query.offset) || 0;
+
+    let query = db('journal_trades')
       .where({ user_id: req.user.id })
       .orderBy('trade_date', 'desc')
       .orderBy('created_at', 'desc');
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+    if (offset > 0) {
+      query = query.offset(offset);
+    }
+
+    const trades = await query;
     res.json({ success: true, trades });
   } catch (err) {
     console.error('Fetch Journal Trades Error:', err);
