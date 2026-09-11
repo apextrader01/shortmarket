@@ -33,21 +33,32 @@ export default function PositionsView() {
     } else if (viewMode === 'OPEN') {
       return (positions || []).filter(p => Number(p.quantity) !== 0);
     } else if (viewMode === 'CLOSED') {
+      const normalizeSym = (sym) => (sym ? String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '').trim() : '');
+
       // 1. Include explicit closed positions updated/closed today from database
       const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
-      const dbClosedKeys = new Set(dbClosed.map(p => `${p.symbol}-${p.product_type || 'INT'}`));
+      const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`));
       
-      // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed
+      // Track all actively OPEN position keys so open positions are NEVER duplicated into the CLOSED tab
+      const openPositionsKeys = new Set(
+        (positions || [])
+          .filter(p => Number(p.quantity) !== 0)
+          .map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`)
+      );
+
+      // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed AND NOT currently open
       const closedOrdersMap = {};
       (orders || []).forEach(o => {
         const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined;
-        const key = `${o.symbol}-${o.product_type || 'INT'}`;
+        const orderPnl = Number(o.realized_pnl || 0);
+        // Only consider exit orders that realized non-zero P&L (entry orders have 0 P&L and are not closed trades)
+        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0;
+        const normSym = normalizeSym(o.symbol);
+        const key = `${normSym}-${o.product_type || 'INT'}`;
 
-        // Include closed trades from orders if this symbol+product wasn't already in dbClosed
-        if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key)) {
+        // Include closed trades from orders ONLY if this symbol+product is NOT open and NOT in dbClosed
+        if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
           const orderQty = Number(o.quantity || 1);
-          const orderPnl = Number(o.realized_pnl || 0);
           const exitPrice = Number(o.average_price || o.price || 0);
           const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
           const entryPrice = orderQty > 0 
