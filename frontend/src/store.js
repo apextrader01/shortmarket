@@ -524,11 +524,18 @@ export const useStore = create(persist((set, get) => ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const candles = await res.json();
       if (!Array.isArray(candles)) throw new Error('Invalid candle data');
-      set((state) => ({
-        candleData:       { ...state.candleData, [symbol]: candles },
-        isLoadingCandles: false,
-        candleError:      null,
-      }));
+      set((state) => {
+        const nextCandleData = { ...state.candleData, [symbol]: candles };
+        const keys = Object.keys(nextCandleData);
+        if (keys.length > 5) {
+          delete nextCandleData[keys[0]];
+        }
+        return {
+          candleData:       nextCandleData,
+          isLoadingCandles: false,
+          candleError:      null,
+        };
+      });
     } catch (err) {
       set({ isLoadingCandles: false, candleError: err.message });
     }
@@ -572,16 +579,21 @@ export const useStore = create(persist((set, get) => ({
       }
     });
 
-    // Polling fallback: Force sync all subscribed symbols from REST API every 15s
+    // Polling fallback: Force sync only active/held symbols from REST API every 15s
     // ONLY if the WebSocket is disconnected, to prevent flickering between REST and WS prices
     if (!window._forceSyncInterval) {
       window._forceSyncInterval = setInterval(() => {
         if (!get().isConnected) {
-          const { stocks, positions, holdings } = get();
+          const { watchlists, activeWatchlistId, positions, holdings, selectedSymbol } = get();
+          const activeWl = (watchlists || []).find(w => String(w.id) === String(activeWatchlistId)) || watchlists?.[0];
           const allSymbols = new Set([
-            ...stocks.map(s => s.symbol),
+            'NSE:NIFTY50-INDEX',
+            'NSE:NIFTYBANK-INDEX',
+            'BSE:SENSEX-INDEX',
+            ...(activeWl?.symbols || []),
             ...(positions || []).map(p => p.symbol),
             ...(holdings || []).map(h => h.symbol),
+            ...(selectedSymbol ? [selectedSymbol] : []),
             ...temporaryOptionSubscriptions
           ]);
           const arr = [...allSymbols].filter(Boolean);

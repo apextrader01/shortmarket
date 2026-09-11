@@ -106,7 +106,6 @@ export default function LeaderboardView() {
           flexDirection: 'column',
           gap: '16px',
           boxShadow: 'var(--card-shadow, 0 10px 36px rgba(0, 0, 0, 0.08))',
-          backdropFilter: 'blur(14px)',
           position: 'relative',
           overflow: 'hidden'
         }}>

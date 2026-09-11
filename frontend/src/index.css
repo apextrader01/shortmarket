@@ -1386,8 +1386,6 @@ input:checked + .slider:before {
 /* Glassmorphism Watchlist enhancements */
 .sidebar {
   background: var(--bg-secondary) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   border-right: 1px solid var(--border-color) !important;
 }
 .premium-btn-mini {

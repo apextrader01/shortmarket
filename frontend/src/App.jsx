@@ -517,7 +517,7 @@ function App() {
                     position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
                     background: 'rgba(234, 179, 8, 0.9)', color: '#000', padding: '12px 24px',
                     borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', zIndex: 9999,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                     animation: 'fadeInOut 1.5s forwards'
                   }}>
                     {hotkeyToast}

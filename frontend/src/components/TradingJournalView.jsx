@@ -1072,8 +1072,7 @@ export default function TradingJournalView({ onBack }) {
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(0, 0, 0, 0.85)',
           zIndex: 99999,
           display: 'flex',
           alignItems: 'center',

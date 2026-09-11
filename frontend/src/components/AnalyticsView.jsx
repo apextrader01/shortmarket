@@ -177,8 +177,6 @@ export default function AnalyticsView() {
       return (
         <div style={{
           background: 'var(--bg-panel)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid var(--border-color)',
           padding: '14px 18px',
           borderRadius: '12px',
@@ -357,8 +355,6 @@ export default function AnalyticsView() {
       {/* Modern Cumulative Equity Curve Section */}
       <div className="glass-panel" style={{
         background: 'var(--bg-panel)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
         padding: isMobile ? '16px' : '22px',
         borderRadius: '16px',
         border: '1px solid var(--border-color)',

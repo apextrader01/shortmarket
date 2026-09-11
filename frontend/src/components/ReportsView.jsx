@@ -1363,7 +1363,6 @@ const DownloadReports = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          backdropFilter: 'blur(8px)',
           animation: 'fadeIn 0.2s ease-in-out'
         }}>
           <span>{toastMessage}</span>

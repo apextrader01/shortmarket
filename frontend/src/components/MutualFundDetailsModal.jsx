@@ -214,7 +214,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
         <div className="modal-backdrop" style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            background: 'rgba(0,0,0,0.88)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
             <div className="mf-modal-container" style={{

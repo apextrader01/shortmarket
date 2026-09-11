@@ -303,8 +303,6 @@ export default function PortfolioView() {
         padding: isMobile ? '0 16px' : '0 28px', 
         borderBottom: '1px solid var(--border-color)', 
         background: 'var(--bg-panel)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px' }}>
@@ -584,7 +582,6 @@ export default function PortfolioView() {
                         background: 'rgba(11, 17, 33, 0.95)', 
                         border: '1px solid rgba(255, 255, 255, 0.15)', 
                         borderRadius: '10px',
-                        backdropFilter: 'blur(12px)',
                         fontSize: '12px',
                         boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
                       }}

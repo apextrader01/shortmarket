@@ -1158,7 +1158,7 @@ export default function BasketModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)',
+      background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
@@ -1905,8 +1905,7 @@ export default function BasketModal() {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              zIndex: 2000, 
-              backdropFilter: 'blur(3px)' 
+              zIndex: 2000
             }}
           >
             <div style={{ background: 'var(--bg-panel)', borderRadius: '10px', width: '420px', maxWidth: '92vw', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.8)', border: '1px solid var(--border-color)', animation: 'fadeIn 0.15s ease' }}>

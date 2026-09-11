@@ -50,8 +50,7 @@ export default function MarketDepthModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.6)',
-      backdropFilter: orderModal?.isOpen ? 'none' : 'blur(2px)',
+      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
       pointerEvents: orderModal?.isOpen ? 'none' : 'auto'
     }}>

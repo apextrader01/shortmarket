@@ -41,7 +41,7 @@ export default function AlertModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
+      backgroundColor: 'rgba(15, 23, 42, 0.90)',
       zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center',
       padding: '20px'
     }}>

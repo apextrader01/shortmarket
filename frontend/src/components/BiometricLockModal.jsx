@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Lock, Fingerprint, Delete, Shield, LogOut, KeyRound } from 'lucide-react';
@@ -101,9 +101,7 @@ export default function BiometricLockModal({ onUnlock }) {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(5, 10, 20, 0.95)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      background: 'rgba(5, 10, 20, 0.98)',
       zIndex: 999999,
       display: 'flex',
       alignItems: 'center',

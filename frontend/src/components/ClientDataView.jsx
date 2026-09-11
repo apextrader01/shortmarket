@@ -1028,7 +1028,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {/* Hotkeys Modal */}
       {showHotkeysModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
           <div className="glass-panel" style={{ width: '400px', padding: '20px', position: 'relative' }}>
@@ -1060,7 +1060,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       {/* Real Money Withdrawal Modal */}
       {showWithdrawModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px'
         }}>
           <div className="glass-panel" style={{ 

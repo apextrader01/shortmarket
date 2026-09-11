@@ -198,26 +198,42 @@ export default function MarketWatch({ className = '', onStockSelect }) {
     };
   }, [searchQuery, isSearchMode]);
 
-  // Watchlist Mode
-  const watchlistStocks = !isSearchMode ? (activeWatchlist?.symbols || []).map(sym => {
-    const found = stocks.find(s => s.uniqueSymbol === sym || s.unique_symbol === sym || s.symbol === sym);
-    if (found) return {
-      ...found,
-      uniqueSymbol: found.uniqueSymbol || found.unique_symbol || found.symbol
-    };
-    // For Options/Futures that are not in the stocks list
-    const colonIdx = sym.indexOf(':');
-    let symbol, exchange;
-    if (colonIdx > 0) {
-      exchange = sym.substring(0, colonIdx);
-      symbol = sym.substring(colonIdx + 1);
-    } else {
-      symbol = sym;
-      exchange = 'NSE';
-    }
-    const lotsize = getInstantLotsize(sym);
-    return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, lotsize: lotsize, token: '' };
-  }).filter(Boolean) : [];
+  // Fast O(1) indexed stock lookup map
+  const stockMap = React.useMemo(() => {
+    const map = new Map();
+    (stocks || []).forEach(s => {
+      const sym = s.uniqueSymbol || s.unique_symbol || s.symbol;
+      if (sym) {
+        map.set(sym, s);
+        if (s.symbol && s.symbol !== sym) map.set(s.symbol, s);
+      }
+    });
+    return map;
+  }, [stocks]);
+
+  // Watchlist Mode with memoization
+  const watchlistStocks = React.useMemo(() => {
+    if (isSearchMode) return [];
+    return (activeWatchlist?.symbols || []).map(sym => {
+      const found = stockMap.get(sym);
+      if (found) return {
+        ...found,
+        uniqueSymbol: found.uniqueSymbol || found.unique_symbol || found.symbol
+      };
+      // For Options/Futures that are not in the stocks list
+      const colonIdx = sym.indexOf(':');
+      let symbol, exchange;
+      if (colonIdx > 0) {
+        exchange = sym.substring(0, colonIdx);
+        symbol = sym.substring(colonIdx + 1);
+      } else {
+        symbol = sym;
+        exchange = 'NSE';
+      }
+      const lotsize = getInstantLotsize(sym);
+      return { uniqueSymbol: sym, symbol: symbol, name: symbol, exchange: exchange, lotsize: lotsize, token: '' };
+    }).filter(Boolean);
+  }, [isSearchMode, activeWatchlist?.symbols, stockMap]);
   const displayStocks = isSearchMode ? searchResults : watchlistStocks;
 
   React.useEffect(() => {

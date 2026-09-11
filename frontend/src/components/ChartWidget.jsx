@@ -440,7 +440,7 @@ export default function ChartWidget() {
         {isLoadingCandles && (
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'rgba(10,15,28,0.72)', backdropFilter: 'blur(3px)',
+            background: 'rgba(10,15,28,0.85)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: '8px', zIndex: 10,
           }}>
