@@ -15,6 +15,8 @@ let lastTickTime = Date.now();
 let isMasterNode = false;
 
 let dirtySymbols = new Set(); // Track symbols that changed in the last 300ms
+let clientViewerLastSeen = new Map(); // Track timestamp when an active client last pinged/viewed a symbol
+let symbolLastSeen = new Map(); // Global GC timestamp map for Fyers SDK keepalive
 
 // The global map of ALL subscriptions we care about (used by PM2 master);
 
@@ -153,6 +155,16 @@ function loadTokenFromDisk() {
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 
+function isAnyTradingSessionOpen() {
+    const istTimeParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(new Date());
+    const istH = parseInt(istTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const istM = parseInt(istTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const istDay = istTimeParts.find(p => p.type === 'weekday')?.value;
+    if (istDay === 'Sat' || istDay === 'Sun') return false;
+    const currentMins = istH * 60 + istM;
+    return currentMins >= 540 && currentMins <= 1410; // 09:00 AM to 23:30 PM IST (Equities + MCX)
+}
+
 async function initFyers(io, pc, isMaster = true) {
     global_io = io;
     sharedPriceCache = pc;
@@ -172,68 +184,75 @@ async function initFyers(io, pc, isMaster = true) {
     // This is far more efficient than 1 message per symbol (N messages) for multi-user scenarios.
     if (isMasterNode) {
         setInterval(() => {
-            if (dirtySymbols.size > 0 && global_io) {
-                // Build one batch object with ALL updated prices — slimmed to essential fields
-                // to slash network egress bandwidth and Redis loopback traffic by >80%
-                const batchUpdate = {};
-                dirtySymbols.forEach(uniqueSymbol => {
-                    const priceObj = sharedPriceCache[uniqueSymbol];
-                    if (priceObj) {
-                        batchUpdate[uniqueSymbol] = {
-                            symbol: priceObj.symbol,
-                            timestamp: priceObj.timestamp,
-                            ltp: priceObj.ltp,
-                            open: priceObj.open,
-                            high: priceObj.high,
-                            low: priceObj.low,
-                            close: priceObj.close,
-                            volume: priceObj.volume,
-                            change: priceObj.change,
-                            pct: priceObj.pct,
-                            totBuyQuan: priceObj.totBuyQuan,
-                            totSellQuan: priceObj.totSellQuan
-                        };
-                    }
-                });
+            if (dirtySymbols.size === 0 || !global_io) return;
+
+            // ⚡ Off-Market Deep Sleep: If it is night or weekend and all trading sessions are closed, skip broadcast
+            if (!isAnyTradingSessionOpen()) {
                 dirtySymbols.clear();
+                return;
+            }
 
-                if (Object.keys(batchUpdate).length > 0) {
-                    // Send targeted updates to specific symbol rooms to prevent DDOSing the frontend
-                    // with ticks they aren't subscribed to, which causes severe UI lag.
-                    for (const sym of Object.keys(batchUpdate)) {
-                        const room = global_io.sockets?.adapter?.rooms?.get(sym);
-                        const hasSubscribers = (clientSubscriptions && clientSubscriptions.has(sym)) || (room && room.size > 0);
-                        // ⚡ Skip emitting if no client is actively subscribed to this symbol across any cluster node
-                        if (hasSubscribers) {
-                            const p = batchUpdate[sym];
-                            // Emit compact 11-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
-                            // Slashes live tick egress bandwidth by >65% across all connected clients
-                            global_io.to(sym).emit('price_snapshot', {
-                                [sym]: [
-                                    p.ltp,
-                                    p.change,
-                                    p.pct,
-                                    p.timestamp,
-                                    p.open,
-                                    p.high,
-                                    p.low,
-                                    p.close,
-                                    p.volume,
-                                    p.totBuyQuan,
-                                    p.totSellQuan
-                                ]
-                            });
-                        }
-                    }
-
-                    // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)
-                    try {
-                        const { pubClient } = require('./redisClient');
-                        if (pubClient) {
-                            pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate)).catch(e => {});
-                        }
-                    } catch(e) {}
+            // Build one batch object with ALL updated prices — slimmed to essential fields
+            // to slash network egress bandwidth and Redis loopback traffic by >80%
+            const batchUpdate = {};
+            dirtySymbols.forEach(uniqueSymbol => {
+                const priceObj = sharedPriceCache[uniqueSymbol];
+                if (priceObj) {
+                    batchUpdate[uniqueSymbol] = {
+                        symbol: priceObj.symbol,
+                        timestamp: priceObj.timestamp,
+                        ltp: priceObj.ltp,
+                        open: priceObj.open,
+                        high: priceObj.high,
+                        low: priceObj.low,
+                        close: priceObj.close,
+                        volume: priceObj.volume,
+                        change: priceObj.change,
+                        pct: priceObj.pct,
+                        totBuyQuan: priceObj.totBuyQuan,
+                        totSellQuan: priceObj.totSellQuan
+                    };
                 }
+            });
+            dirtySymbols.clear();
+
+            if (Object.keys(batchUpdate).length > 0) {
+                // Send targeted updates to specific symbol rooms ONLY if an active user is viewing it
+                const now = Date.now();
+                for (const sym of Object.keys(batchUpdate)) {
+                    const room = global_io.sockets?.adapter?.rooms?.get(sym);
+                    const lastPingTime = clientViewerLastSeen.get(sym) || 0;
+                    // Active viewer if pinged within last 60s or connected locally
+                    const hasActiveViewers = (now - lastPingTime <= 60000) || (room && room.size > 0);
+                    if (hasActiveViewers) {
+                        const p = batchUpdate[sym];
+                        // Emit compact 11-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
+                        // Slashes live tick egress bandwidth by >65% across all connected clients
+                        global_io.to(sym).emit('price_snapshot', {
+                            [sym]: [
+                                p.ltp,
+                                p.change,
+                                p.pct,
+                                p.timestamp,
+                                p.open,
+                                p.high,
+                                p.low,
+                                p.close,
+                                p.volume,
+                                p.totBuyQuan,
+                                p.totSellQuan
+                            ]
+                        });
+                    }
+                }
+
+                // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)
+                try {
+                    const { pubClient } = require('./redisClient');
+                    if (pubClient) {
+                        pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate)).catch(e => {});
+                    }
+                } catch(e) {}
             }
         }, 1000); // 1000ms (1 update per sec) to drastically save Egress Bandwidth costs for 100k users
     }
@@ -466,6 +485,7 @@ function addSubscriptionBatch(symbols) {
         // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
         // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
         symbolLastSeen.set(s, now);
+        clientViewerLastSeen.set(s, now);
         
         const alreadySubscribed = clientSubscriptions.has(s);
         clientSubscriptions.add(s);
@@ -489,7 +509,6 @@ function addSubscriptionBatch(symbols) {
     }
 }
 
-let symbolLastSeen = new Map();
 let gcInterval = null;
 
 function handlePingSubscriptions(symbols) {
@@ -502,6 +521,7 @@ function handlePingSubscriptions(symbols) {
         if (!s || typeof s !== 'string' || s.endsWith('-MF')) return;
         
         symbolLastSeen.set(s, now);
+        clientViewerLastSeen.set(s, now);
         
         if (!clientSubscriptions.has(s)) {
             clientSubscriptions.add(s);
