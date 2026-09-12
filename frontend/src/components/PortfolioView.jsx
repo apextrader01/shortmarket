@@ -141,7 +141,13 @@ export default function PortfolioView() {
 
   const calculatePnL = (pos, isHolding = false) => {
     if (!pos) return;
-    const priceData = portfolioPrices[pos.symbol] || {};
+    const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const priceData = portfolioPrices[pos.symbol] 
+      || portfolioPrices[cleanSym] 
+      || portfolioPrices[`NSE:${cleanSym}`] 
+      || portfolioPrices[`BSE:${cleanSym}`] 
+      || portfolioPrices[`MCX:${cleanSym}`] 
+      || {};
     const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
     const qty = Math.abs(Number(pos.quantity) || 0);
     

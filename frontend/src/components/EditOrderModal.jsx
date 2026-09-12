@@ -94,6 +94,11 @@ export default function EditOrderModal() {
       return;
     }
 
+    if (!marketFlag && isPendingTrigger && (isNaN(finalTriggerPrice) || !finalTriggerPrice || finalTriggerPrice <= 0)) {
+      alert('Please enter a valid trigger price greater than 0.');
+      return;
+    }
+
     const res = await updateOrder(order.id, numQty, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
 
     if (res && res.success) {

@@ -221,7 +221,9 @@ class TriggerEngine {
         }
 
         // ⚡ Blazing fast O(1) in-memory check: skip Redis if NO triggers exist for this symbol!
-        if (!this.activeTriggerSymbols.has(symbol)) return;
+        const cleanSym = symbol && symbol.includes(':') ? symbol.split(':')[1] : symbol;
+        const targetSym = this.activeTriggerSymbols.has(symbol) ? symbol : (this.activeTriggerSymbols.has(cleanSym) ? cleanSym : null);
+        if (!targetSym) return;
         const { generalClient } = require('./redisClient');
         if (!generalClient || !generalClient.isReady) return;
 
@@ -261,10 +263,10 @@ class TriggerEngine {
 
         try {
             const keys = [
-                `trigger:${symbol}:BUY:LIMIT`,
-                `trigger:${symbol}:SELL:LIMIT`,
-                `trigger:${symbol}:GTE`,
-                `trigger:${symbol}:LTE`
+                `trigger:${targetSym}:BUY:LIMIT`,
+                `trigger:${targetSym}:SELL:LIMIT`,
+                `trigger:${targetSym}:GTE`,
+                `trigger:${targetSym}:LTE`
             ];
             
             // eval(script, options) in node-redis v4
@@ -275,12 +277,12 @@ class TriggerEngine {
 
             if (triggeredOrderIds && triggeredOrderIds.length > 0) {
                 // Check if symbol still has remaining triggers in Redis
-                const remaining = (await generalClient.zCard(`trigger:${symbol}:BUY:LIMIT`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${symbol}:SELL:LIMIT`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${symbol}:GTE`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${symbol}:LTE`).catch(()=>0));
+                const remaining = (await generalClient.zCard(`trigger:${targetSym}:BUY:LIMIT`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${targetSym}:SELL:LIMIT`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${targetSym}:GTE`).catch(()=>0)) +
+                                  (await generalClient.zCard(`trigger:${targetSym}:LTE`).catch(()=>0));
                 if (remaining === 0) {
-                    this.activeTriggerSymbols.delete(symbol);
+                    this.activeTriggerSymbols.delete(targetSym);
                 }
 
                 for (const orderId of triggeredOrderIds) {

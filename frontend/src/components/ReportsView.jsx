@@ -149,10 +149,10 @@ const LedgerStatement = () => {
       bg = 'rgba(249, 115, 22, 0.15)';
       color = '#fb923c';
       label = 'Withdrawal';
-    } else if (t === 'HOLDING_RELEASE') {
+    } else if (t === 'HOLDING_RELEASE' || t === 'HOLDINGS_SELL') {
       bg = 'rgba(59, 130, 246, 0.15)';
       color = '#60a5fa';
-      label = 'Holding Release';
+      label = t === 'HOLDINGS_SELL' ? 'Holding Sell' : 'Holding Release';
     } else if (t === 'RMS_PENALTY') {
       bg = 'rgba(239, 68, 68, 0.2)';
       color = '#ef4444';

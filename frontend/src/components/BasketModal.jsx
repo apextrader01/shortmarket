@@ -645,6 +645,14 @@ export default function BasketModal() {
 
   const handleExecute = async () => {
     if (basketItems.length === 0) return;
+
+    for (const item of enhancedItems) {
+      if (item.orderType === 'LIMIT' && (!item.price || parseFloat(item.price) <= 0 || isNaN(parseFloat(item.price)))) {
+        alert(`Please enter a valid limit price greater than 0 for ${item.symbol}.`);
+        return;
+      }
+    }
+
     if (isMarketBlocked) {
       alert(blockedMarketReason || 'Market is currently closed for one or more items in the basket.');
       return;

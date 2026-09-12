@@ -233,7 +233,7 @@ export default function TradingJournalView({ onBack }) {
       if (!trade.rawDate) return;
       const d = new Date(trade.rawDate);
       if (isNaN(d.getTime())) return;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
       if (!map[key]) {
         map[key] = { pnl: 0, tradesCount: 0, wins: 0, losses: 0, trades: [] };
       }

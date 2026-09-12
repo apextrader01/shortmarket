@@ -423,6 +423,10 @@ function startLiveWebSocket() {
                     // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
                     if (triggerEngine) {
                         triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
+                        if (uniqueSymbol.includes(':')) {
+                            const raw = uniqueSymbol.split(':')[1];
+                            triggerEngine.evaluateTick(raw, ltp).catch(() => {});
+                        }
                     }
                 });
             }
