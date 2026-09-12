@@ -42,8 +42,15 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
     // Uniquely identify Fund Symbol by ID/schemeCode to prevent AMC prefix collisions
     const fundSymbol = `${fund.id || fund.schemeCode}-MF`;
-    const userHolding = holdings.find(h => h.symbol === fundSymbol);
-    const actualSymbolToUse = fundSymbol;
+    const userHolding = holdings.find(h => 
+        h.symbol === fundSymbol || 
+        h.symbol === fund.symbol || 
+        h.symbol === String(fund.id) || 
+        h.symbol === `${fund.id}-MF` || 
+        (fund.schemeCode && h.symbol === `${fund.schemeCode}-MF`) ||
+        (fund.name && h.symbol === `${fund.name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}-MF`)
+    );
+    const actualSymbolToUse = userHolding?.symbol || fundSymbol;
 
     useEffect(() => {
         let mounted = true;

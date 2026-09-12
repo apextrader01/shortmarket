@@ -45,7 +45,7 @@ function calculateRequiredMargin(symbol, product_type, side, quantity, price, as
     
     // 1. Equity Margin Rules
     if (!isOptions && !isFutures) {
-        if (product_type === 'DEL' || product_type === 'DELIVERY') {
+        if (product_type === 'DEL' || product_type === 'DELIVERY' || product_type === 'CNC') {
             return contractValue; // 1x
         }
         if (['INT', 'INTRADAY', 'CO', 'BO'].includes(product_type)) {
@@ -98,14 +98,14 @@ function getLotSize(symbol) {
     // 1. Lookup lot size from instruments master
     const deriv = lookupDerivativeBySymbol(symbol) || lookupDerivativeBySymbol(cleanSym);
     if (deriv && deriv.lotsize) {
-        return Number(deriv.lotsize);
+        return Math.max(1, Number(deriv.lotsize) || 1);
     }
 
     // 2. Lookup in lotsizeMap.json
-    if (lotsizeMap[cleanSym]) return lotsizeMap[cleanSym];
+    if (lotsizeMap[cleanSym]) return Math.max(1, Number(lotsizeMap[cleanSym]) || 1);
     const sortedKeys = Object.keys(lotsizeMap).sort((a, b) => b.length - a.length);
     for (const key of sortedKeys) {
-        if (cleanSym.startsWith(key)) return lotsizeMap[key];
+        if (cleanSym.startsWith(key)) return Math.max(1, Number(lotsizeMap[key]) || 1);
     }
 
     // 3. Fallback estimates for indices

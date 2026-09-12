@@ -272,8 +272,10 @@ export default function PositionsView() {
       if (pos.product_type === 'CO') productLabel = 'Cover Order';
       if (viewMode === 'HOLDINGS') productLabel = 'Delivery';
       
+      const unencumberedQty = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 0 : Math.abs(posQty);
+
       flatList.push({ 
-        ...pos, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
+        ...pos, unencumberedQty, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
         segment, exchange, productLabel
       });
       globalMTM += pnl;

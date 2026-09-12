@@ -104,6 +104,9 @@ class SIPEngine {
       if (!sip) throw new Error('SIP not found');
       if (sip.status !== 'ACTIVE') throw new Error('SIP is not ACTIVE');
 
+      // Advisory transaction lock per-user to prevent balance race conditions
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [sip.user_id]);
+
       // Atomic Idempotency Guard: Ensure this installment has not already been processed today
       const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       const endOfToday = new Date(`${istDateStr}T23:59:59.999+05:30`);
@@ -159,7 +162,13 @@ class SIPEngine {
       });
 
       // 4. Update or Insert Holding
-      const existingHolding = await trx('holdings').where({ user_id: user.id, symbol: sip.symbol }).first();
+      const cleanSym = String(sip.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const existingHolding = await trx('holdings')
+        .where({ user_id: user.id })
+        .where(builder => {
+          builder.where({ symbol: sip.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` });
+        })
+        .first();
       if (existingHolding) {
         const prevQty = parseFloat(existingHolding.quantity) || 0;
         const prevAvg = parseFloat(existingHolding.average_price) || nav;

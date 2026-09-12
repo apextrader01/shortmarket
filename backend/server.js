@@ -1790,6 +1790,9 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
     const targetUserId = req.params.id;
     let pendingOrders = [];
     await db.transaction(async (trx) => {
+      // Serialize reset per-user to prevent concurrent executions
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [targetUserId]);
+
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: targetUserId })
@@ -1895,6 +1898,9 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
     const targetUserId = req.params.id;
     let updatedBal = newBal;
     await db.transaction(async (trx) => {
+      // Serialize balance adjustments per-user
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [targetUserId]);
+
       const targetUser = await trx('users').where({ id: targetUserId }).first();
       if (!targetUser) {
         throw Object.assign(new Error('User not found'), { statusCode: 404 });
@@ -3565,7 +3571,19 @@ let lastOrderError = null;
 
 app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   lastOrderError = null;
-  const { symbol, type, side, quantity, price, sl_price, tgt_price, trigger_price, trail_amount, margin, product_type } = req.body;
+  const symbol = req.body.symbol;
+  const type = req.body.type || req.body.orderType;
+  const side = req.body.side;
+  const quantity = req.body.quantity;
+  const price = req.body.price;
+  const sl_price = req.body.sl_price ?? req.body.slPrice;
+  const tgt_price = req.body.tgt_price ?? req.body.tgtPrice;
+  const trigger_price = req.body.trigger_price ?? req.body.triggerPrice;
+  const trail_amount = req.body.trail_amount ?? req.body.trailAmount;
+  const margin = req.body.margin;
+  const product_type = req.body.product_type || req.body.productType || 'INT';
+  const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL') ? 'DEL' : product_type;
+
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -3827,7 +3845,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
               
               // 2. Fetch open Positions for today
               const existingPos = await trx('positions')
-                  .where({ user_id: req.user.id, product_type: 'DEL' })
+                  .where({ user_id: req.user.id })
+                  .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
                   .where(builder => {
                     builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                   })
@@ -3837,7 +3856,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
               
               // 3. Fetch Pending Sell Orders for this symbol
               const pendingOrders = await trx('orders')
-                  .where({ user_id: req.user.id, side: 'SELL', product_type: 'DEL' })
+                  .where({ user_id: req.user.id, side: 'SELL' })
+                  .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
                   .where(builder => {
                     builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                   })
@@ -4768,19 +4788,30 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
     const isDerivativeSymbol = isDerivativeContract(item.symbol);
     if (isDerivativeSymbol) {
-      const now = new Date();
-      const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-      const dayStr = String(istNow.getUTCDate()).padStart(2, '0');
-      const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-      const monthStr = monthNames[istNow.getUTCMonth()];
-      const yearStr = String(istNow.getUTCFullYear()).slice(-2);
-      const todayExpiryToken = `${dayStr}${monthStr}${yearStr}`;
+      const { parseExpiryDate } = require('./services/autoSquareOff');
+      const expDate = parseExpiryDate(item.symbol);
+      let isExpiringToday = false;
       
-      const isExpiringToday = item.symbol.includes(todayExpiryToken);
+      const now = new Date();
+      const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
+      const curYear = parseInt(istParts.find(p => p.type === 'year')?.value || '0', 10);
+      const curMonth = parseInt(istParts.find(p => p.type === 'month')?.value || '0', 10);
+      const curDay = parseInt(istParts.find(p => p.type === 'day')?.value || '0', 10);
+      const h = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+      const min = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+
+      if (expDate) {
+        isExpiringToday = (expDate.getFullYear() === curYear && (expDate.getMonth() + 1) === curMonth && expDate.getDate() === curDay);
+      } else {
+        const dayStr = String(curDay).padStart(2, '0');
+        const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+        const monthStr = monthNames[curMonth - 1];
+        const yearStr = String(curYear).slice(-2);
+        isExpiringToday = item.symbol.includes(`${yearStr}${monthStr}`) || item.symbol.includes(`${dayStr}${monthStr}${yearStr}`);
+      }
+
       if (isExpiringToday) {
-        const h = istNow.getUTCHours();
-        const min = istNow.getUTCMinutes();
-        const isMCXSymbol = item.symbol.endsWith('-MCX');
+        const isMCXSymbol = item.symbol.endsWith('-MCX') || isCommodityContract(item.symbol);
         // Equity/NFO/BFO: block after 03:25 PM; MCX: block after 07:00 PM
         const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 25));
         const mcxExpiryClosed   =  isMCXSymbol && (h >= 19);
@@ -4795,6 +4826,9 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
 
   try {
     await db.transaction(async (trx) => {
+      // Advisory transaction lock per-user to eliminate concurrency double-spending
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+
       // 1. Verify total margin
       const requiredMargin = parseFloat(total_margin) || 0;
       const user = await trx('users').where({ id: req.user.id }).first();
@@ -4803,31 +4837,51 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         throw new Error(`Insufficient Funds.`);
       }
 
-      // 1.5 Validate SELL DEL orders against holdings (No Naked Shorting for Equities)
+      // 1.5 Validate SELL DEL/CNC/DELIVERY orders against holdings (No Naked Shorting for Equities)
       const sellDelQuantities = {};
       for (const item of items) {
           const isDerivative = isDerivativeContract(item.symbol);
-          if (item.side === 'SELL' && (item.product_type || 'DEL') === 'DEL' && !isDerivative) {
-              sellDelQuantities[item.symbol] = (sellDelQuantities[item.symbol] || 0) + Number(item.quantity);
+          const pType = String(item.product_type || 'DEL').toUpperCase();
+          const isDel = ['DEL', 'CNC', 'DELIVERY'].includes(pType);
+          if (item.side === 'SELL' && isDel && !isDerivative) {
+              const cleanSym = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
+              sellDelQuantities[cleanSym] = (sellDelQuantities[cleanSym] || 0) + Number(item.quantity);
           }
       }
-      for (const symbol in sellDelQuantities) {
-          const qtyRequested = sellDelQuantities[symbol];
+      for (const cleanSym in sellDelQuantities) {
+          const qtyRequested = sellDelQuantities[cleanSym];
           
-          const holding = await trx('holdings').where({ user_id: req.user.id, symbol }).first();
+          const holding = await trx('holdings')
+              .where({ user_id: req.user.id })
+              .where(builder => {
+                builder.where({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .first();
           const holdingQty = holding ? Number(holding.quantity) : 0;
           
-          const existingPos = await trx('positions').where({ user_id: req.user.id, symbol, product_type: 'DEL' }).whereNot({ quantity: 0 }).first();
+          const existingPos = await trx('positions')
+              .where({ user_id: req.user.id })
+              .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+              .where(builder => {
+                builder.where({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .where('quantity', '>', 0)
+              .first();
           const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
           
           const pendingOrders = await trx('orders')
-              .where({ user_id: req.user.id, symbol, side: 'SELL', product_type: 'DEL', status: 'PENDING' });
+              .where({ user_id: req.user.id, side: 'SELL' })
+              .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+              .where(builder => {
+                builder.where({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
           const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
           
           const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
           
           if (qtyRequested > totalAvailable) {
-              throw new Error(`Insufficient holdings for ${symbol}. You only have ${totalAvailable} shares available to sell.`);
+              throw new Error(`Insufficient holdings for ${cleanSym}. You only have ${totalAvailable} shares available to sell.`);
           }
       }
 
@@ -5221,7 +5275,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           const oldMargin = parseFloat(order.margin || 0);
           let newMargin = oldMargin;
           const isDerivative = isDerivativeContract(order.symbol);
-          const isDelSell = order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC') && !isDerivative;
+          const isDelSell = order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') && !isDerivative;
 
           if (isDelSell) {
             newMargin = 0;
@@ -5232,12 +5286,34 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
               const holding = await trx('holdings')
                 .where({ user_id: req.user.id })
                 .where(builder => {
-                  builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` });
+                  builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                 })
                 .first();
               const holdingQty = holding ? Number(holding.quantity) : 0;
-              if (newQty > holdingQty) {
-                throw Object.assign(new Error(`Insufficient holdings. You only have ${holdingQty} shares available.`), { statusCode: 400 });
+
+              const existingPos = await trx('positions')
+                .where({ user_id: req.user.id })
+                .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+                .where(builder => {
+                  builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                })
+                .where('quantity', '>', 0)
+                .first();
+              const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
+
+              const pendingOrders = await trx('orders')
+                .where({ user_id: req.user.id, side: 'SELL' })
+                .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+                .where(builder => {
+                  builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                })
+                .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                .whereNot({ id: order.id });
+              const otherPendingQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+
+              const totalAvailable = parseFloat((holdingQty + posQty - otherPendingQty).toFixed(4));
+              if (newQty > totalAvailable) {
+                throw Object.assign(new Error(`Insufficient holdings. You only have ${totalAvailable} shares available.`), { statusCode: 400 });
               }
             }
           } else if (oldMargin === 0 && Number(quantity) === Number(order.quantity)) {
@@ -6163,13 +6239,19 @@ app.get('/api/leaderboard', async (req, res) => {
       }
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
 
     const topTraders = await db('positions')
       .join('users', 'positions.user_id', 'users.id')
       .where('users.is_admin', false)
-      .where('positions.created_at', '>=', todayStart)
+      .where(builder => {
+        builder.where('positions.created_at', '>=', todayStart).orWhere('positions.updated_at', '>=', todayStart);
+      })
       .groupBy('users.id', 'users.username', 'users.profile_picture_url')
       .select(
         'users.id as user_id',

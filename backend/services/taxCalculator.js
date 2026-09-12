@@ -74,6 +74,11 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
 
     const lot = explicitLotsize || getInstantLotsize(symbol);
 
+    // 1.5 Cash Equity & ETF Guard (e.g. NIFTYBEES, BANKBEES, GOLDBEES, cash shares)
+    if (lot === 1 && !isDerivativeContract(symbol) && !upper.includes('FUT') && !upper.includes('CE') && !upper.includes('PE')) {
+        return 100000;
+    }
+
     // 2. Major Indices Check
     if (upper.startsWith('BANKNIFTY') || upper.includes('BANKNIFTY')) {
         return lot > 1 ? (Math.floor(900 / lot) * lot <= 600 ? Math.floor(600 / lot) * lot : 600) : 600;

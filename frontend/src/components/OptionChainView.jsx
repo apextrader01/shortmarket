@@ -676,7 +676,9 @@ const OptionChainViewInternal = () => {
                     symbol: leg.symbol,
                     side: leg.side,
                     quantity: (Number(leg.quantity) || 1) * effectiveLotsize,
+                    type: 'MARKET',
                     orderType: 'MARKET',
+                    product_type: 'INT',
                     price: ''
                   });
                 });

@@ -1260,7 +1260,12 @@ export const useStore = create(persist((set, get) => ({
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
     try {
-      const { symbol, quantity, lotsize } = orderPayload;
+      const normalizedPayload = {
+        ...orderPayload,
+        type: orderPayload.type || orderPayload.orderType || 'MARKET',
+        product_type: orderPayload.product_type || orderPayload.productType || 'INT'
+      };
+      const { symbol, quantity, lotsize } = normalizedPayload;
       const slices = calculateOrderSlices(symbol, quantity, lotsize);
 
       const token = localStorage.getItem('token');
@@ -1272,7 +1277,7 @@ export const useStore = create(persist((set, get) => ({
         const sliceGroupId = `slice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const slicePromises = slices.map((sliceQty, index) => {
           const childPayload = {
-            ...orderPayload,
+            ...normalizedPayload,
             quantity: sliceQty,
             slice_group_id: sliceGroupId,
             slice_index: index + 1,
@@ -1313,7 +1318,7 @@ export const useStore = create(persist((set, get) => ({
         credentials: 'include', 
         method: 'POST',
         headers,
-        body: JSON.stringify(orderPayload),
+        body: JSON.stringify(normalizedPayload),
       });
       const data = await res.json();
       if (data.success) {
