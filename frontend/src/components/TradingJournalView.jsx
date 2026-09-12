@@ -112,7 +112,7 @@ export default function TradingJournalView({ onBack }) {
     (orders || []).forEach(o => {
       const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
       const pnl = (o.realized_pnl !== null && o.realized_pnl !== undefined) ? Number(o.realized_pnl) : null;
-      if (!isExecuted || pnl === null || isNaN(pnl) || pnl === 0) return;
+      if (!isExecuted || pnl === null || isNaN(pnl)) return;
 
       const sig = `${o.symbol}_${Math.round(pnl * 100)}`;
       if (closedPosSignatures.has(sig)) return;

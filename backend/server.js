@@ -2629,6 +2629,9 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
 
     let pendingOrders = [];
     await db.transaction(async (trx) => {
+      // Prevent race conditions with concurrent orders/ticks during reset
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: req.user.id })
@@ -2885,7 +2888,13 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
             margin: combinedMargin,
             updated_at: new Date()
           });
-          await trx('positions').where({ id: positionId }).del();
+          // ZERO HISTORICAL TRADE DELETION: Mark merged position as absorbed with 0 quantity
+          await trx('positions').where({ id: positionId }).update({
+            quantity: 0,
+            closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [Math.abs(qtyB)]),
+            margin: 0,
+            updated_at: new Date()
+          });
         } else {
           // Netting opposing positions
           const closedQty = Math.min(Math.abs(qtyA), Math.abs(qtyB));
@@ -2927,7 +2936,14 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
               realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
               updated_at: new Date()
             });
-            await trx('positions').where({ id: positionId }).del();
+            // ZERO HISTORICAL TRADE DELETION: Mark closed position with 0 quantity
+            await trx('positions').where({ id: positionId }).update({
+              quantity: 0,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [Math.abs(qtyB)]),
+              exit_price: priceA,
+              margin: 0,
+              updated_at: new Date()
+            });
           } else if (Math.abs(qtyA) > Math.abs(qtyB)) {
             // Existing position partially closed, incoming completely absorbed
             const marginReleaseFromA = marginA * (closedQty / Math.abs(qtyA));
@@ -2961,7 +2977,14 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
               realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
               updated_at: new Date()
             });
-            await trx('positions').where({ id: positionId }).del();
+            // ZERO HISTORICAL TRADE DELETION: Mark absorbed position with 0 quantity
+            await trx('positions').where({ id: positionId }).update({
+              quantity: 0,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [Math.abs(qtyB)]),
+              exit_price: priceA,
+              margin: 0,
+              updated_at: new Date()
+            });
           } else {
             // Existing position completely absorbed, incoming partially remaining
             const marginReleaseFromB = marginB * (closedQty / Math.abs(qtyB));
@@ -2995,7 +3018,13 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
               realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
               updated_at: new Date()
             });
-            await trx('positions').where({ id: positionId }).del();
+            // ZERO HISTORICAL TRADE DELETION: Mark absorbed position with 0 quantity
+            await trx('positions').where({ id: positionId }).update({
+              quantity: 0,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [Math.abs(qtyB)]),
+              margin: 0,
+              updated_at: new Date()
+            });
           }
         }
       }
@@ -3594,14 +3623,24 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Determine if this order is strictly closing/reducing an existing open position or holding
-  const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || !product_type) ? 'DEL' : product_type;
+  const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
+  const isDeliveryProduct = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL' || !product_type);
   const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
   let isClosingOrder = false;
 
   if (side === 'SELL') {
     // Check if user has open long position in this symbol
     const existingLongPos = await db('positions')
-      .where({ user_id: req.user.id, product_type: effectiveProductType })
+      .where({ user_id: req.user.id })
+      .where(builder => {
+        if (isIntradayProduct) {
+          builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+        } else if (isDeliveryProduct) {
+          builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+        } else {
+          builder.where({ product_type });
+        }
+      })
       .where(builder => {
         builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
       })
@@ -3610,14 +3649,14 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
     if (existingLongPos && Number(existingLongPos.quantity) >= Number(quantity)) {
       isClosingOrder = true;
-    } else if (effectiveProductType === 'DEL') {
+    } else if (isDeliveryProduct) {
       // Check holdings
       const holding = await db('holdings')
         .where({ user_id: req.user.id })
         .where(builder => {
           builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
         })
-        .where('quantity', '>=', Number(quantity))
+        .where('quantity', '>=', Number(quantity) - 0.0001)
         .first();
       if (holding) {
         isClosingOrder = true;
@@ -3626,7 +3665,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   } else if (side === 'BUY') {
     // Check if user has open short position in this symbol
     const existingShortPos = await db('positions')
-      .where({ user_id: req.user.id, product_type: effectiveProductType })
+      .where({ user_id: req.user.id })
+      .where(builder => {
+        if (isIntradayProduct) {
+          builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+        } else if (isDeliveryProduct) {
+          builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+        } else {
+          builder.where({ product_type });
+        }
+      })
       .where(builder => {
         builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
       })
@@ -3694,7 +3742,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Block new orders when market is closed (square-off / closing orders are always permitted)
-  if (!isClosingOrder) {
+  const isMF = String(symbol).endsWith('-MF') || String(symbol).includes('MUTUALFUND');
+  if (!isClosingOrder && !isMF) {
     const isCommodity = isCommodityContract(symbol);
     const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
     

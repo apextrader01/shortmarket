@@ -161,7 +161,7 @@ class MTMRiskManager {
                 }
 
                 // ── CHECK 2: ⚡ RMS 95% Account Capital Loss Liquidation (Intraday) ──
-                const intradayPositions = positions.filter(p => p.product_type !== 'DEL');
+                const intradayPositions = positions.filter(p => !['DEL', 'CNC', 'DELIVERY'].includes(p.product_type));
                 if (intradayPositions.length > 0 && totalCapital > 0) {
                     if (netIntradayMtm < 0 && Math.abs(netIntradayMtm) >= (totalCapital * 0.95)) {
                         const auditReason = `RMS 95% Margin Call Liquidation (Net Intraday Loss: ₹${Math.abs(netIntradayMtm).toFixed(2)} reached 95% of ₹${totalCapital.toFixed(2)} capital)`;
@@ -206,8 +206,13 @@ class MTMRiskManager {
                     const freshPos = await trx('positions').where({ id: pos.id }).first();
                     if (!freshPos || Number(freshPos.quantity) === 0) continue;
 
-                    const ltp = this.priceCache[freshPos.symbol]?.ltp || Number(freshPos.average_price) || 0;
-                    if (ltp <= 0) continue;
+                    let ltp = this.priceCache[freshPos.symbol]?.ltp;
+                    if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
+                        ltp = Number(freshPos.average_price) || 0;
+                    } else {
+                        ltp = Math.max(0, Number(ltp));
+                    }
+                    if (ltp < 0) continue;
 
                     await LedgerService.closePosition(trx, userId, freshPos.id, ltp, isRMSPenalty, auditTag);
                     console.log(`[AUTO-EXIT EXECUTED] Closed ${freshPos.symbol} for user ${userId} at ₹${ltp} (${reason})`);

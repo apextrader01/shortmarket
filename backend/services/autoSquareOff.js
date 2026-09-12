@@ -224,14 +224,11 @@ async function runAutoSquareOff(exchangeFilter) {
             const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
 
             for (const pos of batch) {
-                let ltp = priceCache[pos.symbol]?.ltp;
-                if (!ltp || ltp <= 0) {
-                    ltp = Number(pos.average_price) || 0;
-                }
-                if (ltp <= 0) {
-                    console.warn(`[Auto-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
-                    continue;
-                }
+                const cachedLtp = priceCache[pos.symbol]?.ltp;
+                // For expiring derivatives, use live market LTP. If expired with no tick, settle at 0 (never refund purchase price).
+                const ltp = (cachedLtp !== undefined && cachedLtp !== null && !isNaN(Number(cachedLtp)))
+                    ? Math.max(0, Number(cachedLtp))
+                    : 0;
 
                 try {
                     await squareOffPositionInProcess(pos, ltp, 'Expiry Auto Square-Off (RMS)');
@@ -283,11 +280,13 @@ async function runIntradaySquareOff(exchangeFilter) {
 
             for (const pos of batch) {
                 let ltp = priceCache[pos.symbol]?.ltp;
-                if (!ltp || ltp <= 0) {
+                if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
                     ltp = Number(pos.average_price) || 0;
+                } else {
+                    ltp = Math.max(0, Number(ltp));
                 }
-                if (ltp <= 0) {
-                    console.warn(`[Auto-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
+                if (ltp < 0) {
+                    console.warn(`[Auto-Close] Invalid price for ${pos.symbol}, skipping.`);
                     continue;
                 }
 
@@ -416,11 +415,13 @@ async function runMasterSquareOff() {
 
             for (const pos of batch) {
                 let ltp = priceCache[pos.symbol]?.ltp;
-                if (!ltp || ltp <= 0) {
+                if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
                     ltp = Number(pos.average_price) || 0;
+                } else {
+                    ltp = Math.max(0, Number(ltp));
                 }
-                if (ltp <= 0) {
-                    console.warn(`[Master-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
+                if (ltp < 0) {
+                    console.warn(`[Master-Close] Invalid price for ${pos.symbol}, skipping.`);
                     continue;
                 }
 

@@ -12,6 +12,12 @@ const isCommoditySymbol = (symbol) => {
     return COMMODITIES.some(c => clean.startsWith(c));
 };
 
+const isDerivativeSymbol = (symbol) => {
+    if (!symbol || typeof symbol !== 'string') return false;
+    const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || symbol.includes('-MCX');
+};
+
 const ensureLivePrices = async (symbols) => {
     const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
     const priceCache = getPriceFromCache();
@@ -384,6 +390,9 @@ class PositionsEngine {
                 const deliveryPositions = await query;
 
                 for (const pos of deliveryPositions) {
+                    // Exclude derivative contracts from migrating into equity stock holdings
+                    if (isDerivativeSymbol(pos.symbol)) continue;
+
                     const isCommodity = isCommoditySymbol(pos.symbol);
                     const assetClass = isCommodity ? 'COMMODITY' : 'STOCK';
 
@@ -409,7 +418,7 @@ class PositionsEngine {
 
                         const newTotalQty = existingQty + posQty;
                         const totalCost = (existingQty * existingAvgPrice) + (posQty * posAvgPrice);
-                        const newAvgPrice = newTotalQty === 0 ? 0 : totalCost / newTotalQty;
+                        const newAvgPrice = newTotalQty === 0 ? 0 : parseFloat((totalCost / newTotalQty).toFixed(2));
 
                         await trx('holdings')
                             .where({ id: existingHolding.id })
@@ -427,19 +436,20 @@ class PositionsEngine {
                 }
 
                 // 2. Mark migrated delivery positions as settled (quantity = 0) to preserve audit trails without data deletion
-                const migratedIds = deliveryPositions.map(p => p.id);
+                const migratedIds = deliveryPositions.filter(p => !isDerivativeSymbol(p.symbol)).map(p => p.id);
                 if (migratedIds.length > 0) {
                     await trx('positions')
                         .whereIn('id', migratedIds)
                         .update({ 
                             closed_quantity: trx.raw('quantity'), 
                             quantity: 0, 
+                            margin: 0,
                             updated_at: new Date() 
                         });
                 }
                 
                 // ZERO TRADE DATA DELETION: Closed positions (quantity = 0) are strictly preserved for historical P&L & audit logs.
-                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${deliveryPositions.length} DEL positions to holdings.`);
+                console.log(`[HOLDINGS MIGRATION] Successfully migrated ${migratedIds.length} DEL positions to holdings.`);
             });
         } catch (error) {
             console.error(`[HOLDINGS MIGRATION ERROR]:`, error);

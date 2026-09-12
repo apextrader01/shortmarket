@@ -77,7 +77,7 @@ class LedgerService {
         const productType = position.product_type;
         const side = quantity > 0 ? 'SELL' : 'BUY'; // To close long, you sell. To close short, you buy.
         const absQty = Math.abs(quantity);
-        const validExitPrice = (exitPrice && !isNaN(Number(exitPrice)) && Number(exitPrice) > 0) 
+        const validExitPrice = (exitPrice !== undefined && exitPrice !== null && !isNaN(Number(exitPrice)) && Number(exitPrice) >= 0) 
             ? Number(exitPrice) 
             : entryPrice;
 
@@ -121,12 +121,14 @@ class LedgerService {
         const user = await trx('users').where({ id: userId }).first();
         await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + netRelease });
 
-        await trx('ledger').insert({
-            user_id: userId,
-            amount: marginBlocked,
-            type: 'MARGIN_RELEASE',
-            description: `Margin released for closing ${symbol}`
-        });
+        if (marginBlocked > 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: marginBlocked,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released for closing ${symbol}`
+            });
+        }
 
         if (realizedPnl !== 0) {
             await trx('ledger').insert({

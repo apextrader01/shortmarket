@@ -83,10 +83,12 @@ export default function PortfolioView() {
 
   (holdings || []).forEach(h => {
     const sym = h.symbol;
-    if (!allMergedHoldingsMap[sym]) {
-      allMergedHoldingsMap[sym] = { ...h, quantity: Number(h.quantity) || 0, average_price: Number(h.average_price) || 0 };
+    const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const key = cleanSym || sym;
+    if (!allMergedHoldingsMap[key]) {
+      allMergedHoldingsMap[key] = { ...h, quantity: Number(h.quantity) || 0, average_price: Number(h.average_price) || 0 };
     } else {
-      const existing = allMergedHoldingsMap[sym];
+      const existing = allMergedHoldingsMap[key];
       const prevQty = Number(existing.quantity) || 0;
       const prevPrice = Number(existing.average_price) || 0;
       const addQty = Number(h.quantity) || 0;
@@ -99,12 +101,14 @@ export default function PortfolioView() {
   });
 
   (positions || []).forEach(p => {
-    if ((p.product_type === 'DEL' || p.product_type === 'CNC') && Number(p.quantity) > 0) {
+    if ((p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY') && Number(p.quantity) > 0) {
       const sym = p.symbol;
-      if (!allMergedHoldingsMap[sym]) {
-        allMergedHoldingsMap[sym] = { ...p, quantity: Number(p.quantity) || 0, average_price: Number(p.average_price) || 0, isT0: true };
+      const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const key = cleanSym || sym;
+      if (!allMergedHoldingsMap[key]) {
+        allMergedHoldingsMap[key] = { ...p, quantity: Number(p.quantity) || 0, average_price: Number(p.average_price) || 0, isT0: true };
       } else {
-        const existing = allMergedHoldingsMap[sym];
+        const existing = allMergedHoldingsMap[key];
         const prevQty = Number(existing.quantity) || 0;
         const prevPrice = Number(existing.average_price) || 0;
         const addQty = Number(p.quantity) || 0;
