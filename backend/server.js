@@ -1838,12 +1838,39 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const { balance } = req.body;
-    if (balance === undefined) return res.status(400).json({ error: 'Balance required' });
+    const newBal = Number(balance);
+    if (balance === undefined || isNaN(newBal) || newBal < 0) {
+      return res.status(400).json({ error: 'Valid non-negative balance required' });
+    }
 
-    await db('users').where({ id: req.params.id }).update({ balance: Number(balance) });
-    res.json({ success: true, balance: Number(balance) });
+    const targetUserId = req.params.id;
+    let updatedBal = newBal;
+    await db.transaction(async (trx) => {
+      const targetUser = await trx('users').where({ id: targetUserId }).first();
+      if (!targetUser) {
+        throw Object.assign(new Error('User not found'), { statusCode: 404 });
+      }
+
+      const prevBal = Number(targetUser.balance) || 0;
+      const delta = parseFloat((newBal - prevBal).toFixed(2));
+
+      await trx('users').where({ id: targetUserId }).update({ balance: newBal });
+
+      if (delta !== 0) {
+        await trx('ledger').insert({
+          user_id: targetUserId,
+          amount: delta,
+          type: delta > 0 ? 'DEPOSIT' : 'WITHDRAWAL',
+          description: `Admin balance adjustment by ${caller.username} (₹${prevBal.toLocaleString('en-IN')} ➔ ₹${newBal.toLocaleString('en-IN')})`
+        });
+      }
+      updatedBal = newBal;
+    });
+
+    res.json({ success: true, balance: updatedBal });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = err.statusCode || 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -3735,11 +3762,38 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
   }
 
   try {
+    const finalMargin = Number(amount);
+    if (isNaN(finalMargin) || finalMargin <= 0) {
+      return res.status(400).json({ error: 'Invalid SIP amount' });
+    }
+
+    // 1. Resolve Execution Price / NAV
+    let execPrice = Number(price);
+    if (!execPrice || execPrice <= 0) {
+      execPrice = await SIPEngine.getLatestNav(symbol, priceCache);
+    }
+    if (!execPrice || execPrice <= 0) {
+      const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+      execPrice = priceCache[symbol]?.ltp || priceCache[cleanSym]?.ltp || priceCache[`NSE:${cleanSym}`]?.ltp || 0;
+    }
+    if (!execPrice || execPrice <= 0) {
+      return res.status(400).json({ error: `Unable to determine live NAV or market price for ${symbol}. Please specify a valid price or try again.` });
+    }
+
+    const qty = parseFloat((finalMargin / execPrice).toFixed(4));
+    if (qty <= 0) {
+      return res.status(400).json({ error: 'Calculated quantity is zero. Please increase SIP amount.' });
+    }
+
+    const nextExecutionDate = SIPEngine.getNextExecutionDate(new Date(), frequency);
+    const isMf = Boolean(symbol.endsWith('-MF') || symbol.includes('MUTUALFUND'));
+    const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
+    const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+
     await db.transaction(async (trx) => {
       const user = await trx('users').where({ id: req.user.id }).first();
-      const finalMargin = Number(amount);
       if (Number(user.balance) < finalMargin) {
-         throw new Error('Insufficient Funds for SIP installment.');
+         throw Object.assign(new Error(`Insufficient funds for SIP installment. Required: ₹${finalMargin.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`), { statusCode: 400 });
       }
       
       const newBalance = Number(user.balance) - finalMargin;
@@ -3749,12 +3803,8 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
           user_id: req.user.id,
           amount: -finalMargin,
           type: 'MARGIN_BLOCK',
-          description: `SIP installment blocked for ${symbol}`
+          description: `SIP Installment (${frequency || 'MONTHLY'}): Bought ${qty} units of ${symbol} @ ₹${execPrice.toFixed(2)}`
       });
-
-      
-      const nextExecutionDate = SIPEngine.getNextExecutionDate(new Date(), frequency);
-
 
       await trx('sips').insert({
         user_id: req.user.id,
@@ -3765,26 +3815,60 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
         status: 'ACTIVE'
       });
 
-      const execPrice = price || priceCache[symbol]?.ltp || 1;
-      const qty = parseFloat((finalMargin / execPrice).toFixed(4));
+      // Insert Executed Order Record
+      await trx('orders').insert({
+        user_id: req.user.id,
+        symbol,
+        type: 'MARKET',
+        side: 'BUY',
+        quantity: qty,
+        price: execPrice,
+        status: 'EXECUTED',
+        product_type: 'DEL',
+        margin: finalMargin,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
 
-      const [id] = await trx('orders').insert({
-        user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-        status: 'PENDING', product_type: 'DEL', margin: finalMargin
-      }).returning('id');
-      const orderId = typeof id === 'object' ? id.id : id;
+      // Update or Insert Holding Directly
+      const existingHolding = await trx('holdings')
+        .where({ user_id: req.user.id })
+        .where(builder => {
+          builder.where({ symbol: symbol })
+                 .orWhere({ symbol: cleanSym })
+                 .orWhere({ symbol: `NSE:${cleanSym}` })
+                 .orWhere({ symbol: `BSE:${cleanSym}` });
+        })
+        .first();
 
-      const triggerEngine = require('./services/triggerEngine');
-      triggerEngine.executeOrder({
-        id: orderId, user_id: req.user.id, symbol, type: 'MARKET', side: 'BUY', quantity: qty, price: execPrice,
-        status: 'PENDING', product_type: 'DEL', margin: finalMargin
-      }, execPrice).catch(e => console.error('Immediate execution error:', e));
-
+      if (existingHolding) {
+        const prevQty = parseFloat(existingHolding.quantity) || 0;
+        const prevAvg = parseFloat(existingHolding.average_price) || execPrice;
+        const totalQty = prevQty + qty;
+        const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (qty * execPrice)) / totalQty : execPrice;
+        await trx('holdings').where({ id: existingHolding.id }).update({
+          quantity: parseFloat(totalQty.toFixed(4)),
+          average_price: parseFloat(newAvg.toFixed(2)),
+          asset_class: assetClass,
+          updated_at: new Date()
+        });
+      } else {
+        await trx('holdings').insert({
+          user_id: req.user.id,
+          symbol,
+          quantity: qty,
+          average_price: parseFloat(execPrice.toFixed(2)),
+          asset_class: assetClass,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      }
     });
 
-    res.json({ success: true, message: 'SIP created successfully' });
+    res.json({ success: true, message: `SIP created and 1st installment executed successfully (${qty} units @ ₹${execPrice.toFixed(2)})` });
   } catch (error) {
-    res.status(500).json({ error: error.message, success: false });
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({ error: error.message, success: false });
   }
 });
 

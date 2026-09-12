@@ -24,8 +24,10 @@ class SIPEngine {
    * Fetch the latest NAV for a mutual fund from official mfapi or priceCache
    */
   static async getLatestNav(symbol, priceCache = {}) {
+    const isMf = Boolean((symbol || '').includes('-MF') || (symbol || '').includes('MUTUALFUND'));
     const cleanCode = (symbol || '').replace(/[^0-9]/g, '');
-    if (cleanCode && cleanCode.length >= 4) {
+
+    if (cleanCode && cleanCode.length >= 4 && (isMf || /^\d+$/.test(symbol))) {
       try {
         const data = await fetchJson(`https://api.mfapi.in/mf/${cleanCode}`);
         if (data && data.data && data.data[0] && data.data[0].nav) {
@@ -37,11 +39,28 @@ class SIPEngine {
       }
     }
     
-    // Check priceCache if equity/ETF
-    if (priceCache && priceCache[symbol]?.ltp > 0) {
-      return priceCache[symbol].ltp;
+    // Check priceCache if equity/ETF/stock
+    const cleanSym = (symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    if (priceCache) {
+      if (priceCache[symbol]?.ltp > 0) return priceCache[symbol].ltp;
+      if (priceCache[cleanSym]?.ltp > 0) return priceCache[cleanSym].ltp;
+      if (priceCache[`NSE:${cleanSym}`]?.ltp > 0) return priceCache[`NSE:${cleanSym}`].ltp;
+      if (priceCache[`BSE:${cleanSym}`]?.ltp > 0) return priceCache[`BSE:${cleanSym}`].ltp;
     }
-    return null; // Don't use fake fallback price; return null to retry when live NAV is fetched
+
+    // Try live Fyers quote fallback if available
+    try {
+      const { fetchBatchLTPs } = require('./fyers');
+      if (fetchBatchLTPs) {
+        const quotes = await fetchBatchLTPs([symbol]);
+        if (quotes && quotes[symbol]?.ltp > 0) {
+          priceCache[symbol] = quotes[symbol];
+          return quotes[symbol].ltp;
+        }
+      }
+    } catch (e) {}
+
+    return null; // Return null if live quote/NAV is temporarily unavailable to retry later
   }
 
   /**
@@ -109,6 +128,9 @@ class SIPEngine {
       }
       const units = parseFloat((amount / nav).toFixed(4));
 
+      const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
+      const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
+
       // 1. Deduct user balance
       const newBalance = parseFloat(user.balance) - amount;
       await trx('users').where({ id: user.id }).update({ balance: newBalance });
@@ -118,7 +140,7 @@ class SIPEngine {
         user_id: user.id,
         amount: -amount,
         type: 'MARGIN_BLOCK',
-        description: `SIP Installment (${sip.frequency}): Bought ${units} units of ${sip.symbol} @ NAV ₹${nav.toFixed(2)}`
+        description: `SIP Installment (${sip.frequency}): Bought ${units} units of ${sip.symbol} @ ₹${nav.toFixed(2)}`
       });
 
       // 3. Create executed order entry
@@ -147,7 +169,7 @@ class SIPEngine {
         await trx('holdings').where({ id: existingHolding.id }).update({
           quantity: parseFloat(totalQty.toFixed(4)),
           average_price: parseFloat(newAvg.toFixed(2)),
-          asset_class: 'MUTUAL_FUND',
+          asset_class: assetClass,
           updated_at: new Date()
         });
       } else {
@@ -156,7 +178,7 @@ class SIPEngine {
           symbol: sip.symbol,
           quantity: units,
           average_price: parseFloat(nav.toFixed(2)),
-          asset_class: 'MUTUAL_FUND',
+          asset_class: assetClass,
           created_at: new Date(),
           updated_at: new Date()
         });
@@ -202,11 +224,6 @@ class SIPEngine {
 
       for (const sip of dueSips) {
         try {
-          // Exclusively process Mutual Fund SIPs here (Equity SIPs are executed as whole-share delivery orders in cronJobs.js)
-          const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
-          if (!isMf) {
-            continue;
-          }
           const result = await SIPEngine.executeSingleSip(sip.id, priceCache);
           if (result && result.success) {
             successCount++;

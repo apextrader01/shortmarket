@@ -1747,9 +1747,10 @@ export const useStore = create(persist((set, get) => ({
   })(),
   
   toggleMfWatchlist: (symbol) => {
-    let current = get().mfWatchlist;
-    if (current.includes(symbol)) {
-      current = current.filter(s => s !== symbol);
+    let current = get().mfWatchlist || [];
+    const symStr = String(symbol);
+    if (current.some(s => String(s) === symStr)) {
+      current = current.filter(s => String(s) !== symStr);
     } else {
       current = [...current, symbol];
     }

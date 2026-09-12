@@ -247,11 +247,14 @@ const OptionChainViewInternal = () => {
 
     const tokensToSub = [];
 
-    if (initialSpotPrice !== null) {
-      const allStrikes = Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b);
-      if (allStrikes.length > 0) {
+    const allStrikes = optionsData[expiry] ? Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b) : [];
+    const effectiveSpotPrice = initialSpotPrice !== null 
+      ? initialSpotPrice 
+      : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
+
+    if (effectiveSpotPrice !== null && allStrikes.length > 0) {
         let atmStrike = allStrikes.reduce((prev, curr) => 
-          Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+          Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
         );
         
         const atmIndex = allStrikes.indexOf(atmStrike);
@@ -286,7 +289,6 @@ const OptionChainViewInternal = () => {
             useStore.getState().fetchBatchPrices(uniqueSymbolsToFetch);
           }
         }
-      }
     }
 
     setHasScrolled(false); // Reset scroll on expiry change
@@ -304,12 +306,15 @@ const OptionChainViewInternal = () => {
   }, [expiry, optionsData, symbol, futureData, initialSpotPrice, indexKey, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const chain = optionsData[expiry] || {};
+  const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  const effectiveSpotPrice = initialSpotPrice !== null 
+    ? initialSpotPrice 
+    : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
   
   let strikes = [];
-  if (initialSpotPrice !== null && Object.keys(chain).length > 0) {
-    const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  if (effectiveSpotPrice !== null && allStrikes.length > 0) {
     let atmStrike = allStrikes.reduce((prev, curr) => 
-      Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+      Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
     const startIndex = Math.max(0, atmIndex - 15);
@@ -692,8 +697,8 @@ const OptionChainViewInternal = () => {
           </div>
         ) : expiries.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>No option chain data available for {symbol}</div>
-        ) : initialSpotPrice === null ? (
-          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Waiting for market data...</div>
+        ) : strikes.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Waiting for option chain data...</div>
         ) : (
         <table className="option-chain-table">
           <thead>

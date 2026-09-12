@@ -585,10 +585,10 @@ export default function MutualFundsView() {
         ) : mainTab === 'Watchlist' ? (
           <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
             {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Watchlist</h3>}
-            {mutualFunds.filter(f => mfWatchlist.includes(f.id)).length > 0 ? (
+            {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).length > 0 ? (
                 isMobile ? (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {mutualFunds.filter(f => mfWatchlist.includes(f.id)).map(fund => (
+                        {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).map(fund => (
                             <div key={fund.id} className="mf-card" onClick={() => setSelectedFund(fund)}>
                                 <div className="mf-card-header">
                                     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
@@ -639,7 +639,7 @@ export default function MutualFundsView() {
                             </tr>
                         </thead>
                         <tbody>
-                            {mutualFunds.filter(f => mfWatchlist.includes(f.id)).map(fund => (
+                            {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).map(fund => (
                                 <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                                     <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
                                     <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category}</td>

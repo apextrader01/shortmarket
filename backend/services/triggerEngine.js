@@ -433,6 +433,37 @@ class TriggerEngine {
                         console.warn(`[SAFEGUARD] Blocked negative DEL cash equity position for user ${order.user_id}, symbol ${order.symbol}, qty: ${remainingQty}`);
                         return; // Do NOT insert negative DEL position for cash equities!
                     }
+
+                    // MUTUAL FUNDS DELIVERY: Mutual fund purchases must directly enter Holdings as delivery assets (never open positions)
+                    if (remainingQty > 0 && (order.symbol.endsWith('-MF') || order.symbol.includes('MUTUALFUND'))) {
+                        const existingHolding = await trx('holdings')
+                            .where({ user_id: order.user_id, symbol: order.symbol })
+                            .first();
+                        if (existingHolding) {
+                            const prevQty = parseFloat(existingHolding.quantity) || 0;
+                            const prevAvg = parseFloat(existingHolding.average_price) || execPrice;
+                            const totalQty = prevQty + remainingQty;
+                            const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (remainingQty * execPrice)) / totalQty : execPrice;
+                            await trx('holdings').where({ id: existingHolding.id }).update({
+                                quantity: parseFloat(totalQty.toFixed(4)),
+                                average_price: parseFloat(newAvg.toFixed(2)),
+                                asset_class: 'MUTUAL_FUND',
+                                updated_at: new Date()
+                            });
+                        } else {
+                            await trx('holdings').insert({
+                                user_id: order.user_id,
+                                symbol: order.symbol,
+                                quantity: parseFloat(remainingQty.toFixed(4)),
+                                average_price: parseFloat(execPrice.toFixed(2)),
+                                asset_class: 'MUTUAL_FUND',
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                        }
+                        return;
+                    }
+
                     const finalMargin = customMargin !== undefined ? Number(customMargin.toFixed(2)) : Number(order.margin || 0);
                     await trx('positions').insert({
                         user_id: order.user_id, symbol: order.symbol, quantity: remainingQty,
