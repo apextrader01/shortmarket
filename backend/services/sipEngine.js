@@ -178,6 +178,13 @@ class SIPEngine {
    * Batch process all due active SIPs across all users
    */
   static async processDueSips(priceCache = {}) {
+    const lockKey = 'cron_sip_engine';
+    const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+    if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+      console.log('[SIPEngine] SIP execution already running on another cluster worker. Skipping.');
+      return;
+    }
+
     console.log('[SIPEngine] 🔄 Checking for due SIP installments...');
     try {
       // Ensure date comparison uses Asia/Kolkata timezone
@@ -217,6 +224,8 @@ class SIPEngine {
     } catch (e) {
       console.error('[SIPEngine] Global process error:', e);
       return { error: e.message };
+    } finally {
+      await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
     }
   }
 

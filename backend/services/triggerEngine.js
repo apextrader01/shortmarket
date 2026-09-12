@@ -547,6 +547,31 @@ class TriggerEngine {
                         const { calculateRequiredMargin } = require('./marginEngine');
                         const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Math.abs(remainingQty), execPrice);
                         const newPosMargin = calcMargin > 0 ? calcMargin : Number(order.margin || 0);
+
+                        // Balance margin difference: blocked on order vs required on new position
+                        const orderMarginBlocked = Number(order.margin || 0);
+                        const marginDelta = newPosMargin - orderMarginBlocked;
+                        if (marginDelta > 0) {
+                            // More margin required than was blocked on order
+                            await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                            await trx('ledger').insert({
+                                user_id: order.user_id,
+                                amount: -marginDelta,
+                                type: 'MARGIN_BLOCK',
+                                description: `Margin blocked for reversed position ${remainingQty} ${order.symbol}`
+                            });
+                        } else if (marginDelta < 0) {
+                            // Excess margin was blocked on order, refund the difference
+                            const excessRefund = Math.abs(marginDelta);
+                            await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                            await trx('ledger').insert({
+                                user_id: order.user_id,
+                                amount: excessRefund,
+                                type: 'MARGIN_RELEASE',
+                                description: `Excess margin refunded for reversed position ${remainingQty} ${order.symbol}`
+                            });
+                        }
+
                         await handleRemainingPos(trx, remainingQty, execPrice, newPosMargin);
                     }
                 } else {

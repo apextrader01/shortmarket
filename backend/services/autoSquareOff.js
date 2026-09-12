@@ -6,6 +6,15 @@ const path = require('path');
 const LedgerService = require('./ledgerService');
 const triggerEngine = require('./triggerEngine');
 
+const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+const isCommoditySymbol = (symbol) => {
+    if (!symbol || typeof symbol !== 'string') return false;
+    if (symbol.includes('MCX') || symbol.includes('NCDEX')) return true;
+    const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return COMMODITIES.some(c => clean.startsWith(c));
+};
+
 const MONTH_MAP = {
     'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
     'JUL': 6, 'AUG': 7, 'SEP': 8, 'OCT': 9, 'NOV': 10, 'DEC': 11
@@ -195,9 +204,9 @@ async function runAutoSquareOff(exchangeFilter) {
         console.log(`Found ${openPositions.length} open positions total. Checking for expiries...`);
 
         const positionsToClose = openPositions.filter(pos => {
-            const isMcx = pos.symbol.includes('MCX');
-            if (exchangeFilter === 'MCX' && !isMcx) return false;
-            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) return false;
+            const isCom = isCommoditySymbol(pos.symbol);
+            if (exchangeFilter === 'MCX' && !isCom) return false;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isCom) return false;
             
             const expiryDateObj = parseExpiryDate(pos.symbol);
             if (!expiryDateObj) return false; 
@@ -257,9 +266,9 @@ async function runIntradaySquareOff(exchangeFilter) {
         console.log(`Found ${openPositions.length} open INTRADAY/BO/CO positions total.`);
 
         const positionsToClose = openPositions.filter(pos => {
-            const isMcx = pos.symbol.includes('MCX');
-            if (exchangeFilter === 'MCX' && !isMcx) return false;
-            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) return false;
+            const isCom = isCommoditySymbol(pos.symbol);
+            if (exchangeFilter === 'MCX' && !isCom) return false;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isCom) return false;
             return true;
         });
 

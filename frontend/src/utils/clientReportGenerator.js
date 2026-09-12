@@ -413,7 +413,13 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
   });
 
   const scripList = Object.values(scripMap);
-  const totalTurnover = scripList.reduce((acc, s) => acc + (s.buyVal + s.sellVal), 0);
+  // Regulatory turnover under Section 44AB:
+  // For Delivery trades: Turnover = Sell Value
+  // For Intraday & F&O trades: Turnover = Absolute Realized P&L (|Profit| + |Loss|)
+  const totalTurnover = scripList.reduce((acc, s) => {
+    const isDelivery = s.segment === 'Equity Delivery';
+    return acc + (isDelivery ? s.sellVal : Math.abs(s.realizedPnl));
+  }, 0);
   const totalGrossPnl = scripList.reduce((acc, s) => acc + s.realizedPnl, 0);
   const totalCharges = scripList.reduce((acc, s) => acc + s.charges, 0);
   const totalNetTaxable = totalGrossPnl - totalCharges;
