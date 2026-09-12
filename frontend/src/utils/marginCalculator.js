@@ -172,8 +172,8 @@ export function calculateOrderMargin({
     leverageText = '1x'; // Matches Fyers official (1x) for derivative margins
   } else {
     // 4. Cash Equity (Stocks)
-    if (productType === 'INT') {
-      // 5x leverage (20% margin) for Intraday MIS
+    if (['INT', 'INTRADAY', 'BO', 'CO', 'MIS'].includes(productType)) {
+      // 5x leverage (20% margin) for Intraday MIS, BO & CO
       marginRate = 0.20;
       requiredMargin = totalValue * 0.20;
       leverageText = '5x';

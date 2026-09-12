@@ -311,6 +311,13 @@ async function runIntradaySquareOff(exchangeFilter) {
 }
 
 async function runWatchlistCleanup() {
+    const lockKey = 'cron_watchlist_cleanup';
+    const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+    if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+        console.log('[Watchlist Cleanup] Already running on another cluster worker. Skipping.');
+        return;
+    }
+
     console.log(`\n=========================================`);
     console.log(`🧹 Midnight Watchlist Cleanup Initiated`);
     console.log(`=========================================\n`);
@@ -367,6 +374,8 @@ async function runWatchlistCleanup() {
         console.log(`✅ Watchlist Cleanup Complete. Removed ${totalRemoved} expired contracts.\n`);
     } catch (err) {
         console.error('❌ Watchlist Cleanup Error:', err);
+    } finally {
+        await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
     }
 }
 

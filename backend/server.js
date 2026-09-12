@@ -3310,6 +3310,15 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'GTT orders are not supported.' });
   }
 
+  // Validate Limit and Stop-Loss prices
+  if (type === 'LIMIT' && (!price || parseFloat(price) <= 0 || isNaN(parseFloat(price)))) {
+    return res.status(400).json({ error: 'Limit orders require a valid price greater than 0.' });
+  }
+
+  if ((type === 'SL-L' || type === 'SL-M') && (!trigger_price || parseFloat(trigger_price) <= 0 || isNaN(parseFloat(trigger_price)))) {
+    return res.status(400).json({ error: 'Stop Loss orders require a valid trigger price greater than 0.' });
+  }
+
   // Validate Quantity is a multiple of Lot Size for Options/Futures
   if (isDerivativeContract(symbol)) {
     const { getLotSizes } = require('./services/instrumentsCache');
@@ -3478,7 +3487,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     if (isExpiringToday) {
       const h = istNow.getUTCHours();
       const min = istNow.getUTCMinutes();
-      const isMCXSymbol = symbol.endsWith('-MCX');
+      const isMCXSymbol = symbol.endsWith('-MCX') || isCommodityContract(symbol);
       // Equity/NFO/BFO: block after 03:25 PM; MCX: block after 07:00 PM
       const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 25));
       const mcxExpiryClosed   =  isMCXSymbol && (h >= 19);

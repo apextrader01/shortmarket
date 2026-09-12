@@ -1288,12 +1288,16 @@ export const useStore = create(persist((set, get) => ({
         get().fetchUserData().catch(() => {});
         if (successful.length > 0) {
           playOrderExecutedSound();
+          const totalPlacedQty = successful.reduce((sum, _, idx) => sum + (Number(slices[idx]) || 0), 0);
+          const msg = successful.length === slices.length
+            ? `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
+            : `Placed ${successful.length} of ${slices.length} sliced orders (${totalPlacedQty} of ${quantity} qty placed)`;
           return {
             success: true,
             status: successful[0].status || 'EXECUTED',
             isSliced: true,
             slicesCount: slices.length,
-            message: `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
+            message: msg
           };
         } else {
           const firstErr = results[0]?.error || 'Order placement failed';

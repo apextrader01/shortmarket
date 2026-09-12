@@ -252,6 +252,13 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // --- 1:00 AM Expired Watchlist Cleanup ---
     cron.schedule('0 1 * * *', async () => {
+        const lockKey = 'cron_watchlist_cleanup';
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log('[CRON] 1:00 AM Watchlist cleanup already running on another cluster worker. Skipping.');
+            return;
+        }
+
         console.log('[CRON] 1:00 AM: Cleaning expired symbols from all user watchlists...');
         try {
             const db = require('../database/db');
@@ -293,6 +300,8 @@ function initCronJobs(priceCache, triggerEngine) {
             } catch (sessErr) {}
         } catch (err) {
             console.error('[CRON] Watchlist cleanup error:', err);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
         }
     }, TZ);
 }

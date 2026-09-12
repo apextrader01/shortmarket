@@ -162,13 +162,13 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         sebiCharge = turnover * 0.000001;
     } else {
         // Equity Stocks
-        if (productType === 'DEL') {
+        if (productType === 'DEL' || productType === 'CNC' || productType === 'DELIVERY') {
             brokerage = 0; // Free equity delivery
             stt = turnover * 0.001; // 0.1% on buy & sell
             if (side === 'BUY') stampDuty = turnover * 0.00015;
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
-            // Intraday Equity
+            // Intraday Equity (INT, BO, CO, MIS)
             brokerage = Math.min(turnover * 0.0003, 20 * slicesCount); // 0.03% or ₹20 max per slice
             if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
             if (side === 'BUY') stampDuty = turnover * 0.00003;
@@ -179,9 +179,9 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
 
     // 5. Stamp Duty - Charged ONLY on Buy
     if (side === 'BUY') {
-        if (isEquity && productType === 'DEL') {
+        if (isEquity && (productType === 'DEL' || productType === 'CNC' || productType === 'DELIVERY')) {
             stampDuty = turnover * 0.00015;
-        } else if (isEquity && productType === 'INT') {
+        } else if (isEquity && ['INT', 'INTRADAY', 'BO', 'CO', 'MIS'].includes(productType)) {
             stampDuty = turnover * 0.00003;
         } else if (isFuture) {
             stampDuty = turnover * 0.00002;

@@ -189,7 +189,7 @@ function calculateOrderMargin({
     requiredMargin = totalValue * marginRate;
     leverageText = '1x';
   } else {
-    if (productType === 'INT') {
+    if (['INT', 'INTRADAY', 'BO', 'CO', 'MIS'].includes(productType)) {
       marginRate = 0.20;
       requiredMargin = totalValue * 0.20;
       leverageText = '5x';
