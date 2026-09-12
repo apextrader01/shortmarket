@@ -181,13 +181,27 @@ export default function PositionsView() {
          const prevQty = agg.quantity;
          agg.realized_pnl = (parseFloat(agg.realized_pnl) || 0) + (parseFloat(pos.realized_pnl) || 0);
          agg.closed_quantity = (parseFloat(agg.closed_quantity) || 0) + (parseFloat(pos.closed_quantity) || 0);
-         
          if (isOpen) {
-           const currentTotal = Math.abs(Number(agg.quantity)) * parseFloat(agg.average_price || 0);
-           const newTotal = Math.abs(posQty) * parseFloat(pos.average_price || 0);
-           agg.quantity = Number(agg.quantity) + posQty;
-           agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : agg.average_price;
-         } else {
+            const prevNum = Number(agg.quantity);
+            const isAdding = (prevNum >= 0 && posQty >= 0) || (prevNum <= 0 && posQty <= 0);
+            if (isAdding) {
+              const currentTotal = Math.abs(prevNum) * parseFloat(agg.average_price || 0);
+              const newTotal = Math.abs(posQty) * parseFloat(pos.average_price || 0);
+              agg.quantity = prevNum + posQty;
+              agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : agg.average_price;
+            } else {
+              // Offsetting / Reducing position (e.g. partial exit or reversal)
+              const netQty = prevNum + posQty;
+              if (Math.abs(prevNum) >= Math.abs(posQty)) {
+                // Reduced position keeps original purchase price
+                agg.quantity = netQty;
+              } else {
+                // Reversal: position flipped side, new average price applies to remaining net
+                agg.quantity = netQty;
+                agg.average_price = parseFloat(pos.average_price || 0);
+              }
+            }
+          } else {
            if (parseFloat(pos.average_price) > 0 && parseFloat(agg.average_price) === 0) {
              agg.average_price = pos.average_price;
            }

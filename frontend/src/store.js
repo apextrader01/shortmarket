@@ -481,7 +481,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
   pingSubscriptions: () => {
-    const { watchlists, activeWatchlistId, positions } = get();
+    const { watchlists, activeWatchlistId, positions, selectedSymbol } = get();
     const activeWl = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
     
     const symbols = new Set();
@@ -496,6 +496,10 @@ export const useStore = create(persist((set, get) => ({
     const holdings = get().holdings;
     if (holdings && holdings.length > 0) {
       holdings.forEach(h => symbols.add(h.symbol));
+    }
+
+    if (selectedSymbol) {
+      symbols.add(selectedSymbol);
     }
     
     // Add temporary options
@@ -1288,7 +1292,7 @@ export const useStore = create(persist((set, get) => ({
         get().fetchUserData().catch(() => {});
         if (successful.length > 0) {
           playOrderExecutedSound();
-          const totalPlacedQty = successful.reduce((sum, _, idx) => sum + (Number(slices[idx]) || 0), 0);
+          const totalPlacedQty = results.reduce((sum, r, idx) => (r && r.success ? sum + (Number(slices[idx]) || 0) : sum), 0);
           const msg = successful.length === slices.length
             ? `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
             : `Placed ${successful.length} of ${slices.length} sliced orders (${totalPlacedQty} of ${quantity} qty placed)`;
@@ -1301,8 +1305,7 @@ export const useStore = create(persist((set, get) => ({
           };
         } else {
           const firstErr = results[0]?.error || 'Order placement failed';
-          set({ authError: firstErr });
-          return null;
+          return { success: false, error: firstErr };
         }
       }
 
@@ -1320,12 +1323,10 @@ export const useStore = create(persist((set, get) => ({
         return data;
       }
       console.error('[placeOrder FAILED]', data);
-      set({ authError: data.error || 'Order failed' });
-      return null;
+      return { success: false, error: data.error || 'Order failed' };
     } catch (err) { 
       console.error('[placeOrder ERROR]', err);
-      set({ authError: err.message || 'Network error occurred while placing order.' });
-      return null;
+      return { success: false, error: err.message || 'Network error occurred while placing order.' };
     }
   },
 

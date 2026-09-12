@@ -71,8 +71,8 @@ export function calculateIV(type, marketPrice, S, K, T, r) {
   if (marketPrice <= 0 || T <= 0 || S <= 0 || K <= 0) return 0;
   
   // Basic bounds checking for intrinsic value
-  if (type === 'CE' && marketPrice < (S - K) * Math.exp(-r*T)) return 0;
-  if (type === 'PE' && marketPrice < (K - S) * Math.exp(-r*T)) return 0;
+  const intrinsic = type === 'CE' ? Math.max(0, S - K) : Math.max(0, K - S);
+  if (marketPrice < intrinsic) return 0;
 
   let low = 0.0001;
   let high = 5.0;

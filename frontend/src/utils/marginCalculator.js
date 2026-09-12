@@ -148,11 +148,24 @@ export function calculateOrderMargin({
       
       let strikeVal = optionStrike;
       if (!strikeVal || strikeVal <= 0) {
-        const strikeMatch = cleanSym.match(/(\d+)(CE|PE)$/i);
-        if (strikeMatch) {
-          let s = strikeMatch[1];
-          if (s.length > 5) s = s.slice(-5);
-          strikeVal = parseFloat(s);
+        // Format 1: Monthly (e.g. NIFTY24SEP25000CE or RELIANCE24OCT1400PE)
+        const monthlyMatch = cleanSym.match(/^([A-Z]+)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
+        if (monthlyMatch) {
+          strikeVal = parseFloat(monthlyMatch[4]);
+        } else {
+          // Format 2: Weekly (e.g. NIFTY2491225000CE or SENSEX24D1569100CE)
+          const weeklyMatch = cleanSym.match(/^([A-Z]+)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+          if (weeklyMatch) {
+            strikeVal = parseFloat(weeklyMatch[5]);
+          } else {
+            // Format 3: General fallback
+            const genMatch = cleanSym.match(/(\d+)(CE|PE)$/i);
+            if (genMatch) {
+              let s = genMatch[1];
+              if (s.length > 5) s = s.slice(-5);
+              strikeVal = parseFloat(s);
+            }
+          }
         }
       }
 

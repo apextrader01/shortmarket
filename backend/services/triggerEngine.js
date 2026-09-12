@@ -632,7 +632,8 @@ class TriggerEngine {
             // 4. OCO (One Cancels Other) Logic for BO
             if (order.parent_order_id) {
                 const siblings = await trx('orders')
-                    .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
+                    .where({ parent_order_id: order.parent_order_id })
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
                     .whereNot({ id: order.id });
                 
                 for (const sibling of siblings) {

@@ -274,7 +274,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
         unsubscribeBatch(tokensToSub);
       };
     }
-  }, [isSearchMode, searchResults.map(s => s.uniqueSymbol).join(','), activeWatchlist.symbols.join(',')]);
+  }, [isSearchMode, searchResults.map(s => s.uniqueSymbol).join(','), activeWatchlist?.symbols?.join(',') || '']);
 
   return (
     <div className={`sidebar glass-panel ${className}`}>

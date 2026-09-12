@@ -188,7 +188,7 @@ export default function PortfolioView() {
   };
 
   allMergedHoldings.forEach(h => calculatePnL(h, true));
-  (positions || []).filter(p => p.product_type !== 'DEL').forEach(p => calculatePnL(p, false));
+  (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC').forEach(p => calculatePnL(p, false));
 
   const isToday = (dateString) => {
     if (!dateString) return false;

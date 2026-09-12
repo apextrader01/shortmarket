@@ -397,7 +397,7 @@ export default function OrderModal() {
           alert("⏳ Order Placed (Pending)");
         }
       } else {
-        const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
+        const errorMsg = (result && result.error) || useStore.getState().authError || "Failed to place order. Please try again.";
         alert(errorMsg);
       }
     } catch (err) {

@@ -120,7 +120,8 @@ const ActiveAlertChecker = React.memo(() => {
       const priceData = alertPrices[alert.symbol];
       if (!priceData) return;
       
-      const ltp = priceData.ltp;
+      const ltp = parseFloat(priceData.ltp || 0);
+      if (!ltp || ltp <= 0) return;
       let triggered = false;
       
       if (alert.condition === 'ABOVE' && ltp >= alert.targetPrice) {

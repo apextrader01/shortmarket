@@ -87,20 +87,24 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
 
   // Build Table HTML
   const headerHtml = columns
-    .map(c => `<th style="text-align: ${c.align || 'left'};">${escapeHTML(c.header)}</th>`)
+    .map(c => {
+      const safeAlign = (c.align === 'right' || c.align === 'center') ? c.align : 'left';
+      return `<th style="text-align: ${safeAlign};">${escapeHTML(c.header)}</th>`;
+    })
     .join('');
 
   const rowsHtml = data
     .map((item, idx) => {
       const cells = columns
         .map(c => {
+          const safeAlign = (c.align === 'right' || c.align === 'center') ? c.align : 'left';
           let val = '';
           if (c.format) {
             val = c.format(item[c.key], item, idx);
           } else if (c.key) {
             val = item[c.key] !== null && item[c.key] !== undefined ? item[c.key] : '';
           }
-          return `<td style="text-align: ${c.align || 'left'};">${escapeHTML(val)}</td>`;
+          return `<td style="text-align: ${safeAlign};">${escapeHTML(val)}</td>`;
         })
         .join('');
       return `<tr>${cells}</tr>`;

@@ -83,62 +83,81 @@ async function spawnBracketOrders(trx, order) {
   const hasSL = order.sl_price !== null && order.sl_price !== undefined && Number(order.sl_price) > 0;
   const hasTgt = order.tgt_price !== null && order.tgt_price !== undefined && Number(order.tgt_price) > 0;
   
-  if (!hasSL && !hasTgt) return; // Not a bracket order
+  if (!hasSL && !hasTgt) return []; // Not a bracket order
   
   // The side of the child orders is OPPOSITE to the parent order's side
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
   const triggerEngine = require('./triggerEngine');
   
-  const tasks = [];
+  let slOrder = null;
+  let tgtOrder = null;
 
   if (hasSL) {
-    tasks.push((async () => {
-      const slOrder = {
-        user_id: order.user_id,
-        symbol: order.symbol,
-        type: 'SL-M', // Stop Loss Market
-        side: childSide,
-        quantity: order.quantity,
-        price: null,
-        status: 'PENDING_TRIGGER',
-        trigger_price: order.sl_price,
-        trail_amount: order.trail_amount || null,
-        product_type: order.product_type,
-        trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
-        parent_order_id: order.id,
-        margin: 0
-      };
-      const [slId] = await trx('orders').insert(slOrder).returning('id');
-      slOrder.id = typeof slId === 'object' ? slId.id : slId;
-      await triggerEngine.addOrderToMemory(slOrder);
-      return slOrder;
-    })());
+    slOrder = {
+      user_id: order.user_id,
+      symbol: order.symbol,
+      type: 'SL-M', // Stop Loss Market
+      side: childSide,
+      quantity: order.quantity,
+      price: null,
+      status: 'PENDING_TRIGGER',
+      trigger_price: order.sl_price,
+      trail_amount: order.trail_amount || null,
+      product_type: order.product_type,
+      trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
+      parent_order_id: order.id,
+      margin: 0
+    };
+    const [slId] = await trx('orders').insert(slOrder).returning('id');
+    slOrder.id = typeof slId === 'object' ? slId.id : slId;
   }
 
   if (hasTgt) {
-    tasks.push((async () => {
-      const tgtOrder = {
-        user_id: order.user_id,
-        symbol: order.symbol,
-        type: 'LIMIT',
-        side: childSide,
-        quantity: order.quantity,
-        price: order.tgt_price,
-        status: 'PENDING_TRIGGER',
-        trigger_price: order.tgt_price,
-        product_type: order.product_type,
-        trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
-        parent_order_id: order.id,
-        margin: 0
-      };
-      const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
-      tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
-      await triggerEngine.addOrderToMemory(tgtOrder);
-      return tgtOrder;
-    })());
+    tgtOrder = {
+      user_id: order.user_id,
+      symbol: order.symbol,
+      type: 'LIMIT',
+      side: childSide,
+      quantity: order.quantity,
+      price: order.tgt_price,
+      status: 'PENDING_TRIGGER',
+      trigger_price: order.tgt_price,
+      product_type: order.product_type,
+      trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
+      parent_order_id: order.id,
+      margin: 0
+    };
+    const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
+    tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
   }
 
-  await Promise.all(tasks);
+  // Mutually link the Stop-Loss and Target orders for OCO tracking
+  if (slOrder && tgtOrder) {
+    slOrder.linked_order_id = tgtOrder.id;
+    tgtOrder.linked_order_id = slOrder.id;
+    await trx('orders').where({ id: slOrder.id }).update({ linked_order_id: tgtOrder.id });
+    await trx('orders').where({ id: tgtOrder.id }).update({ linked_order_id: slOrder.id });
+  }
+
+  const spawned = [];
+  if (slOrder) spawned.push(slOrder);
+  if (tgtOrder) spawned.push(tgtOrder);
+
+  // Hook into transaction completion to add orders to in-memory trigger engine
+  // This guarantees that if the transaction rolls back, ghost orders are NOT added to memory
+  if (trx && typeof trx.executionPromise?.then === 'function') {
+    trx.executionPromise.then(async () => {
+      for (const ord of spawned) {
+        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+      }
+    }).catch(() => {});
+  } else {
+    for (const ord of spawned) {
+      await triggerEngine.addOrderToMemory(ord).catch(() => {});
+    }
+  }
+
+  return spawned;
 }
 
 async function executeOrder(order, execPrice) {

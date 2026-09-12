@@ -223,7 +223,7 @@ function StockDetails({ symbol, price, candles }) {
           <div style={{ marginTop: '16px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Shareholding Pattern</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {holders[0].shareHoldings.map((h) => (
+              {holders[0]?.shareHoldings && holders[0].shareHoldings.map((h) => (
                 <div key={h.key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                     <span style={{ color: 'var(--text-primary)' }}>{h.key}</span>
@@ -395,30 +395,30 @@ function StockDetails({ symbol, price, candles }) {
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Bollinger Bands (20, 2)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
-            {bb && renderInd('Upper Band (Overbought)', bb.upper?.toFixed(2), ltp > bb.upper ? 'BEARISH' : 'NEUTRAL')}
-            {bb && renderInd('Middle Band (SMA 20)', bb.middle?.toFixed(2), ltp > bb.middle ? 'BULLISH' : 'BEARISH')}
-            {bb && renderInd('Lower Band (Oversold)', bb.lower?.toFixed(2), ltp < bb.lower ? 'BULLISH' : 'NEUTRAL')}
+            {bb && renderInd('Upper Band (Overbought)', bb.upper?.toFixed(2), ltp > 0 ? (ltp > bb.upper ? 'BEARISH' : 'NEUTRAL') : 'NEUTRAL')}
+            {bb && renderInd('Middle Band (SMA 20)', bb.middle?.toFixed(2), ltp > 0 ? (ltp > bb.middle ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {bb && renderInd('Lower Band (Oversold)', bb.lower?.toFixed(2), ltp > 0 ? (ltp < bb.lower ? 'BULLISH' : 'NEUTRAL') : 'NEUTRAL')}
           </div>
         </div>
 
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Exponential Moving Averages (EMA)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
-            {ema10 && renderInd('EMA 10', '₹' + ema10?.toFixed(2), ltp > ema10 ? 'BULLISH' : 'BEARISH')}
-            {ema20 && renderInd('EMA 20', '₹' + ema20?.toFixed(2), ltp > ema20 ? 'BULLISH' : 'BEARISH')}
-            {ema50 && renderInd('EMA 50', '₹' + ema50?.toFixed(2), ltp > ema50 ? 'BULLISH' : 'BEARISH')}
-            {ema200 && renderInd('EMA 200', '₹' + ema200?.toFixed(2), ltp > ema200 ? 'BULLISH' : 'BEARISH')}
+            {ema10 && renderInd('EMA 10', '₹' + ema10?.toFixed(2), ltp > 0 ? (ltp > ema10 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {ema20 && renderInd('EMA 20', '₹' + ema20?.toFixed(2), ltp > 0 ? (ltp > ema20 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {ema50 && renderInd('EMA 50', '₹' + ema50?.toFixed(2), ltp > 0 ? (ltp > ema50 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {ema200 && renderInd('EMA 200', '₹' + ema200?.toFixed(2), ltp > 0 ? (ltp > ema200 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
           </div>
         </div>
 
         <div>
           <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Simple Moving Averages (SMA)</h4>
           <div className="glass-panel" style={{ padding: '16px' }}>
-            {sma10 && renderInd('SMA 10', '₹' + sma10?.toFixed(2), ltp > sma10 ? 'BULLISH' : 'BEARISH')}
-            {sma20 && renderInd('SMA 20', '₹' + sma20?.toFixed(2), ltp > sma20 ? 'BULLISH' : 'BEARISH')}
-            {sma50 && renderInd('SMA 50', '₹' + sma50?.toFixed(2), ltp > sma50 ? 'BULLISH' : 'BEARISH')}
-            {sma100 && renderInd('SMA 100', '₹' + sma100?.toFixed(2), ltp > sma100 ? 'BULLISH' : 'BEARISH')}
-            {sma200 && renderInd('SMA 200', '₹' + sma200?.toFixed(2), ltp > sma200 ? 'BULLISH' : 'BEARISH')}
+            {sma10 && renderInd('SMA 10', '₹' + sma10?.toFixed(2), ltp > 0 ? (ltp > sma10 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {sma20 && renderInd('SMA 20', '₹' + sma20?.toFixed(2), ltp > 0 ? (ltp > sma20 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {sma50 && renderInd('SMA 50', '₹' + sma50?.toFixed(2), ltp > 0 ? (ltp > sma50 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {sma100 && renderInd('SMA 100', '₹' + sma100?.toFixed(2), ltp > 0 ? (ltp > sma100 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
+            {sma200 && renderInd('SMA 200', '₹' + sma200?.toFixed(2), ltp > 0 ? (ltp > sma200 ? 'BULLISH' : 'BEARISH') : 'NEUTRAL')}
           </div>
         </div>
       </div>

@@ -1151,6 +1151,16 @@ app.post('/api/payment/create-subscription', authenticateToken, async (req, res)
 app.post('/api/payment/verify', authenticateToken, async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_subscription_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
+    
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret || secret === 'secret_placeholder') {
+      return res.status(503).json({ error: 'Payment gateway configuration is incomplete or in maintenance. Please contact support.' });
+    }
+
+    if (!razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing required payment verification parameters' });
+    }
+
     // For subscriptions, Razorpay generates signature using payment_id + '|' + subscription_id
     // For normal orders, it uses order_id + '|' + payment_id
     let body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -1159,49 +1169,51 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
     }
     
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder')
+      .createHmac('sha256', secret)
       .update(body.toString())
       .digest('hex');
       
     const isAuthentic = expectedSignature === razorpay_signature;
     if (isAuthentic) {
       const expires = new Date();
-      if (plan === 'monthly') {
+      const selectedPlan = plan === 'yearly' ? 'yearly' : 'monthly';
+      if (selectedPlan === 'monthly') {
         expires.setMonth(expires.getMonth() + 1);
       } else {
         expires.setFullYear(expires.getFullYear() + 1);
       }
       
-      await db('users').where({ id: req.user.id }).update({
-        subscription_tier: 'PRO',
-        subscription_expires: expires
+      await db.transaction(async (trx) => {
+        await trx('users').where({ id: req.user.id }).update({
+          subscription_tier: 'PRO',
+          subscription_expires: expires
         });
 
-        // --- Referral Reward Logic ---
+        // --- Referral Reward Logic (Atomic) ---
         try {
-          const pendingRef = await db('referrals')
+          const pendingRef = await trx('referrals')
             .where({ referred_user_id: req.user.id, status: 'pending' })
             .first();
 
           if (pendingRef) {
-            const rewardAmount = plan === 'monthly' ? 9.9 : 49.9;
+            const rewardAmount = selectedPlan === 'monthly' ? 9.9 : 49.9;
             
             // Mark as completed
-            await db('referrals')
+            await trx('referrals')
               .where({ id: pendingRef.id })
               .update({ status: 'completed', reward_amount: rewardAmount });
             
             // Credit referrer
-            await db('users')
+            await trx('users')
               .where({ id: pendingRef.referrer_id })
               .increment('balance', rewardAmount);
           }
         } catch (e) {
           console.error('Failed to process referral reward', e);
         }
-        // -----------------------------
+      });
 
-        res.json({ success: true, message: 'Upgraded to PRO successfully!' });
+      res.json({ success: true, message: 'Upgraded to PRO successfully!' });
     } else {
       res.status(400).json({ error: 'Invalid Payment Signature' });
     }
@@ -3545,8 +3557,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Validate Quantity is a multiple of Lot Size for Options/Futures
   if (isDerivativeContract(symbol)) {
     const { getLotSizes } = require('./services/instrumentsCache');
-    const lotSizes = getLotSizes([symbol]);
-    const lotsize = lotSizes[symbol] || 1;
+    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const lotSizes = getLotSizes([symbol, cleanSym]);
+    const lotsize = lotSizes[symbol] || lotSizes[cleanSym] || 1;
     if (Number(quantity) % lotsize !== 0) {
       return res.status(400).json({ error: `Quantity must be a multiple of lot size (${lotsize}).` });
     }
@@ -5008,7 +5021,11 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
     if (autoExitOrderToExecute) {
       triggerEngine.removeOrderFromMemory(autoExitOrderToExecute.id, autoExitOrderToExecute.symbol);
-      triggerEngine.executeOrder(autoExitOrderToExecute, autoExitLtp).catch(err => console.error('Auto-exit execution error on BO cancel:', err));
+      try {
+        await triggerEngine.executeOrder(autoExitOrderToExecute, autoExitLtp);
+      } catch (err) {
+        console.error('Auto-exit execution error on BO cancel:', err);
+      }
     }
 
     try {
@@ -5025,8 +5042,12 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
 
 // ─── ADMIN CLEANUP ENDPOINT ───
-app.get('/api/admin/cleanup', async (req, res) => {
+app.get('/api/admin/cleanup', authenticateToken, async (req, res) => {
   try {
+     const caller = await db('users').where({ id: req.user.id }).first();
+     if (!caller || !caller.is_admin) {
+       return res.status(403).json({ error: 'Access denied. Administrator privileges required.' });
+     }
      console.log("Running manual API cleanup for expired contracts...");
      const patterns = ['%24JUL%', '%SENSEX2672377700%', '%NATURALGAS24JUL%'];
      let results = {};
