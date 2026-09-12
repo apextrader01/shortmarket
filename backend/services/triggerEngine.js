@@ -344,8 +344,16 @@ class TriggerEngine {
             order.taxes = totalTaxes;
 
             // 2. Position Logic
+            const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
             const existingPos = await trx('positions')
-                .where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type })
+                .where({ user_id: order.user_id, product_type: order.product_type })
+                .where(builder => {
+                    builder.where({ symbol: order.symbol })
+                           .orWhere({ symbol: cleanSym })
+                           .orWhere({ symbol: `NSE:${cleanSym}` })
+                           .orWhere({ symbol: `BSE:${cleanSym}` })
+                           .orWhere({ symbol: `MCX:${cleanSym}` });
+                })
                 .whereNot({ quantity: 0 }).first();
             
             const qtyChange = order.side === 'BUY' ? Number(order.quantity) : -Number(order.quantity);
@@ -355,7 +363,16 @@ class TriggerEngine {
                 const isDeriv = isDerivativeSymbol(order.symbol);
 
                 if (order.product_type === 'DEL' && remainingQty < 0 && !isDeriv) {
-                    const holding = await trx('holdings').where({ user_id: order.user_id, symbol: order.symbol }).first();
+                    const holding = await trx('holdings')
+                        .where({ user_id: order.user_id })
+                        .where(builder => {
+                            builder.where({ symbol: order.symbol })
+                                   .orWhere({ symbol: cleanSym })
+                                   .orWhere({ symbol: `NSE:${cleanSym}` })
+                                   .orWhere({ symbol: `BSE:${cleanSym}` })
+                                   .orWhere({ symbol: `MCX:${cleanSym}` });
+                        })
+                        .first();
                     if (holding && holding.quantity > 0) {
                         const offsetQty = Math.min(Math.abs(remainingQty), holding.quantity);
                         
@@ -467,7 +484,14 @@ class TriggerEngine {
                         });
                         // Cancel dangling pending and trigger orders for this specific product type
                         const danglingOrders = await trx('orders')
-                            .where({ user_id: order.user_id, symbol: order.symbol, product_type: order.product_type })
+                            .where({ user_id: order.user_id, product_type: order.product_type })
+                            .where(builder => {
+                                builder.where({ symbol: order.symbol })
+                                       .orWhere({ symbol: cleanSym })
+                                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                                       .orWhere({ symbol: `MCX:${cleanSym}` });
+                            })
                             .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
                             
                         for (const dangler of danglingOrders) {

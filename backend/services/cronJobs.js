@@ -58,6 +58,12 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 2: Order Sweep (15:19 Eq / 22:59 Com) ──────────────────────────
     const phase2Sweep = async (assetType) => {
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [`cron_phase2_${assetType}`]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log(`[CRON] Phase 2 (${assetType}) already running on another cluster worker. Skipping.`);
+            return;
+        }
+
         console.log(`[CRON] Phase 2 (${assetType}): Sweeping pending Intraday/CO/BO entry orders...`);
         const affectedUserIds = new Set();
         try {
@@ -129,6 +135,8 @@ function initCronJobs(priceCache, triggerEngine) {
             }
         } catch (err) {
             console.error('Phase 2 Sweep Error:', err);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [`cron_phase2_${assetType}`]).catch(() => {});
         }
     };
 
@@ -137,6 +145,12 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [`cron_phase3_${assetType}`]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log(`[CRON] Phase 3 (${assetType}) already running on another cluster worker. Skipping.`);
+            return;
+        }
+
         console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
         const affectedUserIds = new Set();
         try {
@@ -226,6 +240,8 @@ function initCronJobs(priceCache, triggerEngine) {
             }
         } catch (err) {
             console.error('Phase 3 Square-Off Error:', err);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [`cron_phase3_${assetType}`]).catch(() => {});
         }
     };
 

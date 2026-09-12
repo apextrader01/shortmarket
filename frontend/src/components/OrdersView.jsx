@@ -302,7 +302,16 @@ export default function OrdersView() {
                                 EDIT
                               </button>
                             )}
-                            <button onClick={() => { if (window.confirm('Cancel trigger?')) { if (trigger.isBackendOrder) useStore.getState().cancelOrder(trigger.id); else removePendingTrigger(trigger.id); } }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                            <button onClick={() => {
+                              const isBOProtection = trigger.parent_order_id || trigger.product_type === 'BO' || trigger.productType === 'BO';
+                              const confirmMsg = isBOProtection
+                                ? 'Cancelling this Bracket Order protection leg will immediately exit your open position at market price. Are you sure you want to proceed?'
+                                : 'Cancel trigger?';
+                              if (window.confirm(confirmMsg)) {
+                                if (trigger.isBackendOrder) useStore.getState().cancelOrder(trigger.id);
+                                else removePendingTrigger(trigger.id);
+                              }
+                            }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
                               CANCEL
                             </button>
                           </div>
@@ -357,7 +366,7 @@ export default function OrdersView() {
                             {(order.symbol || '').split('-')[0]}
                           </div>
                           <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                            ₹{priceVal.toFixed(2)}
+                            {priceVal > 0 ? `₹${priceVal.toFixed(2)}` : (order.type === 'MARKET' ? 'MKT' : '—')}
                           </div>
                         </div>
 
@@ -480,7 +489,11 @@ export default function OrdersView() {
                              )}
                              <button 
                                onClick={() => {
-                                 if (window.confirm('Cancel this pending trigger?')) {
+                                 const isBOProtection = trigger.parent_order_id || trigger.product_type === 'BO' || trigger.productType === 'BO';
+                                 const confirmMsg = isBOProtection 
+                                   ? 'Cancelling this Bracket Order protection leg will immediately exit your open position at market price. Are you sure you want to proceed?' 
+                                   : 'Cancel this pending trigger?';
+                                 if (window.confirm(confirmMsg)) {
                                    if (trigger.isBackendOrder) {
                                      useStore.getState().cancelOrder(trigger.id);
                                    } else {
