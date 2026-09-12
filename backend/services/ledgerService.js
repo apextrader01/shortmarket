@@ -69,25 +69,28 @@ class LedgerService {
      */
     static async closePosition(trx, userId, positionId, exitPrice, isForcedRMSExit = false, customRemark = '') {
         const position = await trx('positions').where({ id: positionId }).first();
-        if (!position || position.quantity === 0) return;
+        if (!position || Number(position.quantity) === 0) return;
 
-        const quantity = position.quantity;
-        const entryPrice = position.average_price;
+        const quantity = Number(position.quantity);
+        const entryPrice = parseFloat(position.average_price) || 0;
         const symbol = position.symbol;
         const productType = position.product_type;
         const side = quantity > 0 ? 'SELL' : 'BUY'; // To close long, you sell. To close short, you buy.
         const absQty = Math.abs(quantity);
+        const validExitPrice = (exitPrice && !isNaN(Number(exitPrice)) && Number(exitPrice) > 0) 
+            ? Number(exitPrice) 
+            : entryPrice;
 
         // 1. Calculate P&L
         let realizedPnl = 0;
         if (quantity > 0) {
-            realizedPnl = (exitPrice - entryPrice) * absQty;
+            realizedPnl = (validExitPrice - entryPrice) * absQty;
         } else {
-            realizedPnl = (entryPrice - exitPrice) * absQty;
+            realizedPnl = (entryPrice - validExitPrice) * absQty;
         }
 
         // 2. Calculate Exit Taxes
-        const taxesObj = calculateTaxes(symbol, productType, side, absQty, exitPrice);
+        const taxesObj = calculateTaxes(symbol, productType, side, absQty, validExitPrice);
         const exitTaxes = taxesObj.totalTaxes;
 
         // 3. RMS Penalty
@@ -100,7 +103,7 @@ class LedgerService {
             type: 'MARKET',
             side: side,
             quantity: absQty,
-            price: exitPrice,
+            price: validExitPrice,
             status: 'EXECUTED',
             product_type: productType,
             margin: 0,
@@ -156,7 +159,7 @@ class LedgerService {
         await trx('positions').where({ id: positionId }).update({
             quantity: 0,
             closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [absQty]),
-            exit_price: exitPrice,
+            exit_price: validExitPrice,
             margin: 0,
             realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
             updated_at: new Date()

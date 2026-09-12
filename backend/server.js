@@ -1316,11 +1316,14 @@ app.post('/api/user/password', authenticateToken, async (req, res) => {
 app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
-    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount < 100 || parsedAmount > 100000000) {
+      return res.status(400).json({ error: 'Invalid amount. Minimum deposit is ₹100 and maximum is ₹10 Crore.' });
+    }
     
     await db('deposit_requests').insert({
       user_id: req.user.id,
-      amount: Number(amount),
+      amount: parsedAmount,
       status: 'PENDING'
     });
     
@@ -1770,17 +1773,51 @@ app.put('/api/admin/user/:id', authenticateToken, async (req, res) => {
 app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
   try {
     const caller = await db('users').where({ id: req.user.id }).first();
-    if (!caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const targetUserId = req.params.id;
+    let pendingOrders = [];
     await db.transaction(async (trx) => {
+      // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
+      pendingOrders = await trx('orders')
+        .where({ user_id: targetUserId })
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+      // 1. Nullify self-referencing FK links to prevent FK constraint crashes
+      await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
       await trx('orders').where({ user_id: targetUserId }).del();
       await trx('positions').where({ user_id: targetUserId }).del();
+
+      const hasHoldings = await trx.schema.hasTable('holdings');
+      if (hasHoldings) {
+        await trx('holdings').where({ user_id: targetUserId }).del();
+      }
+      const hasSips = await trx.schema.hasTable('sips');
+      if (hasSips) {
+        await trx('sips').where({ user_id: targetUserId }).del();
+      }
       await trx('ledger').where({ user_id: targetUserId }).del();
       await trx('users').where({ id: targetUserId }).update({ balance: 1000000.0 });
+      await trx('ledger').insert({
+        user_id: targetUserId,
+        amount: 1000000.0,
+        type: 'DEPOSIT',
+        description: 'Admin account reset opening balance'
+      });
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    for (const ord of pendingOrders) {
+      triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+    }
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
+    } catch(e) {}
+
     res.json({ success: true, message: 'User account reset to ₹10,00,000.' });
   } catch (err) {
+    console.error('Admin reset error:', err);
     res.status(500).json({ error: 'Failed to reset user' });
   }
 });
@@ -1943,10 +1980,16 @@ app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) 
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     await db.transaction(async trx => {
+      // Atomic conditional update guarantees only one transaction can approve a PENDING deposit
+      const updatedCount = await trx('deposit_requests')
+        .where({ id: req.params.id, status: 'PENDING' })
+        .update({ status: 'APPROVED' });
+
+      if (updatedCount === 0) {
+        throw new Error('Deposit request has already been processed or does not exist');
+      }
+
       const deposit = await trx('deposit_requests').where({ id: req.params.id }).first();
-      if (!deposit || deposit.status !== 'PENDING') throw new Error('Invalid deposit request');
-      
-      await trx('deposit_requests').where({ id: deposit.id }).update({ status: 'APPROVED' });
       await trx('users').where({ id: deposit.user_id }).increment('balance', deposit.amount);
       
       await trx('ledger').insert({
@@ -1968,10 +2011,14 @@ app.post('/api/admin/deposits/:id/reject', authenticateToken, async (req, res) =
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
-    const deposit = await db('deposit_requests').where({ id: req.params.id }).first();
-    if (!deposit || deposit.status !== 'PENDING') return res.status(400).json({ error: 'Invalid deposit request' });
+    const updatedCount = await db('deposit_requests')
+      .where({ id: req.params.id, status: 'PENDING' })
+      .update({ status: 'REJECTED' });
+
+    if (updatedCount === 0) {
+      return res.status(400).json({ error: 'Deposit request already processed or not found' });
+    }
     
-    await db('deposit_requests').where({ id: deposit.id }).update({ status: 'REJECTED' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2568,7 +2615,13 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       newBalance = Math.min(Math.max(requestedAmount, MIN_AMOUNT), MAX_AMOUNT);
     }
 
+    let pendingOrders = [];
     await db.transaction(async (trx) => {
+      // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
+      pendingOrders = await trx('orders')
+        .where({ user_id: req.user.id })
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
       // 1. Nullify self-referencing FK links first so the batch delete doesn't
       //    trip the orders.linked_order_id / parent_order_id constraints.
       await trx('orders').where({ user_id: req.user.id }).update({ linked_order_id: null, parent_order_id: null });
@@ -2590,7 +2643,23 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       await trx('ledger').where({ user_id: req.user.id }).del();
       // 7. Reset balance to chosen amount (up to 10 Crore)
       await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
+      // 8. Add initial deposit record so ledger matches balance
+      await trx('ledger').insert({
+        user_id: req.user.id,
+        amount: newBalance,
+        type: 'DEPOSIT',
+        description: 'Account reset opening balance'
+      });
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    for (const ord of pendingOrders) {
+      triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+    }
+    try {
+      const { pubClient } = require('./services/redisClient');
+      if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
+    } catch(e) {}
     res.json({ 
       success: true, 
       balance: newBalance,
@@ -2711,9 +2780,13 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
   if (!positionId || !newProductType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+  if (!['INT', 'DEL'].includes(newProductType)) {
+    return res.status(400).json({ error: 'Invalid product type. Must be INT or DEL.' });
+  }
   
   try {
     await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const position = await trx('positions').where({ id: positionId, user_id: req.user.id }).first();
       if (!position) throw Object.assign(new Error('Position not found'), { statusCode: 404 });
       if (position.product_type === newProductType) {
@@ -2777,19 +2850,142 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         .first();
 
       if (existingPos) {
-        const newQty = Number(existingPos.quantity) + Number(position.quantity);
-        const currentCost = Math.abs(Number(existingPos.quantity)) * parseFloat(existingPos.average_price);
-        const addedCost = Math.abs(Number(position.quantity)) * parseFloat(position.average_price);
-        const newAvg = Math.abs(newQty) > 0 ? (currentCost + addedCost) / Math.abs(newQty) : existingPos.average_price;
-        const combinedMargin = parseFloat(existingPos.margin || 0) + newMargin;
+        const qtyA = Number(existingPos.quantity);
+        const qtyB = Number(position.quantity);
+        const priceA = parseFloat(existingPos.average_price) || 0;
+        const priceB = parseFloat(position.average_price) || 0;
+        const marginA = parseFloat(existingPos.margin || 0);
+        const marginB = newMargin;
 
-        await trx('positions').where({ id: existingPos.id }).update({ 
-          quantity: newQty, 
-          average_price: newAvg,
-          margin: combinedMargin,
-          updated_at: new Date()
-        });
-        await trx('positions').where({ id: positionId }).del();
+        const sameSign = (qtyA > 0 && qtyB > 0) || (qtyA < 0 && qtyB < 0);
+
+        if (sameSign) {
+          // Volume-weighted average price when adding to the same side
+          const newQty = qtyA + qtyB;
+          const currentCost = Math.abs(qtyA) * priceA;
+          const addedCost = Math.abs(qtyB) * priceB;
+          const newAvg = Math.abs(newQty) > 0 ? (currentCost + addedCost) / Math.abs(newQty) : priceA;
+          const combinedMargin = marginA + marginB;
+
+          await trx('positions').where({ id: existingPos.id }).update({ 
+            quantity: newQty, 
+            average_price: newAvg,
+            margin: combinedMargin,
+            updated_at: new Date()
+          });
+          await trx('positions').where({ id: positionId }).del();
+        } else {
+          // Netting opposing positions
+          const closedQty = Math.min(Math.abs(qtyA), Math.abs(qtyB));
+          const netQty = qtyA + qtyB;
+          
+          // PnL calculation: If qtyA > 0, qtyA was BUY and qtyB was SELL
+          const realizedPnl = qtyA > 0 
+            ? (priceB - priceA) * closedQty 
+            : (priceA - priceB) * closedQty;
+
+          if (netQty === 0) {
+            // Both completely closed
+            const totalMarginRelease = marginA + marginB;
+            const netRelease = totalMarginRelease + realizedPnl;
+            await trx('users').where({ id: req.user.id }).increment('balance', netRelease);
+
+            if (totalMarginRelease > 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: totalMarginRelease,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released from netted conversion for ${position.symbol}`
+              });
+            }
+            if (realizedPnl !== 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L from netted conversion for ${position.symbol}`
+              });
+            }
+
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: 0,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [closedQty]),
+              exit_price: priceB,
+              margin: 0,
+              realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+              updated_at: new Date()
+            });
+            await trx('positions').where({ id: positionId }).del();
+          } else if (Math.abs(qtyA) > Math.abs(qtyB)) {
+            // Existing position partially closed, incoming completely absorbed
+            const marginReleaseFromA = marginA * (closedQty / Math.abs(qtyA));
+            const remainingMarginA = marginA - marginReleaseFromA;
+            const totalMarginRelease = marginB + marginReleaseFromA;
+            const netRelease = totalMarginRelease + realizedPnl;
+            await trx('users').where({ id: req.user.id }).increment('balance', netRelease);
+
+            if (totalMarginRelease > 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: totalMarginRelease,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released from partial netting conversion for ${position.symbol}`
+              });
+            }
+            if (realizedPnl !== 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L from partial netting conversion for ${position.symbol}`
+              });
+            }
+
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: netQty,
+              average_price: priceA,
+              margin: remainingMarginA,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [closedQty]),
+              realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+              updated_at: new Date()
+            });
+            await trx('positions').where({ id: positionId }).del();
+          } else {
+            // Existing position completely absorbed, incoming partially remaining
+            const marginReleaseFromB = marginB * (closedQty / Math.abs(qtyB));
+            const remainingMarginB = marginB - marginReleaseFromB;
+            const totalMarginRelease = marginA + marginReleaseFromB;
+            const netRelease = totalMarginRelease + realizedPnl;
+            await trx('users').where({ id: req.user.id }).increment('balance', netRelease);
+
+            if (totalMarginRelease > 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: totalMarginRelease,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released from partial netting conversion for ${position.symbol}`
+              });
+            }
+            if (realizedPnl !== 0) {
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized P&L from partial netting conversion for ${position.symbol}`
+              });
+            }
+
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: netQty,
+              average_price: priceB,
+              margin: remainingMarginB,
+              closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [closedQty]),
+              realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+              updated_at: new Date()
+            });
+            await trx('positions').where({ id: positionId }).del();
+          }
+        }
       }
     });
 
@@ -4382,10 +4578,20 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
         await trx('ledger').insert({
           user_id: req.user.id,
           amount: totalValue,
-          type: 'HOLDINGS_SELL',
+          type: 'MARGIN_RELEASE',
           description: `Exited Holdings: SELL ${qty} ${holding.symbol} @ ₹${ltp.toFixed(2)}`,
           created_at: new Date()
         });
+
+        if (realizedPnl !== 0) {
+          await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: realizedPnl,
+            type: 'REALIZED_PNL',
+            description: `Realized P&L for exited holding ${holding.symbol}`,
+            created_at: new Date()
+          });
+        }
 
         exitOrders.push({ symbol: holding.symbol, quantity: qty, price: ltp });
       }
@@ -4866,6 +5072,37 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Missing quantity, price, or trigger price' });
       }
 
+      if (quantity !== undefined && quantity !== null) {
+        const parsedQty = Number(quantity);
+        if (isNaN(parsedQty) || parsedQty <= 0 || !isFinite(parsedQty)) {
+          return res.status(400).json({ error: 'Quantity must be a positive number' });
+        }
+      }
+      if (price !== undefined && price !== null && price !== '') {
+        const parsedP = parseFloat(price);
+        if (isNaN(parsedP) || parsedP <= 0 || !isFinite(parsedP)) {
+          return res.status(400).json({ error: 'Price must be a positive number greater than 0' });
+        }
+      }
+      if (trigger_price !== undefined && trigger_price !== null && trigger_price !== '') {
+        const parsedTP = parseFloat(trigger_price);
+        if (isNaN(parsedTP) || parsedTP <= 0 || !isFinite(parsedTP)) {
+          return res.status(400).json({ error: 'Trigger price must be a positive number greater than 0' });
+        }
+      }
+      if (sl_price !== undefined && sl_price !== null && sl_price !== '') {
+        const parsedSL = parseFloat(sl_price);
+        if (isNaN(parsedSL) || parsedSL <= 0 || !isFinite(parsedSL)) {
+          return res.status(400).json({ error: 'Stop loss price must be a positive number greater than 0' });
+        }
+      }
+      if (tgt_price !== undefined && tgt_price !== null && tgt_price !== '') {
+        const parsedTgt = parseFloat(tgt_price);
+        if (isNaN(parsedTgt) || parsedTgt <= 0 || !isFinite(parsedTgt)) {
+          return res.status(400).json({ error: 'Target price must be a positive number greater than 0' });
+        }
+      }
+
       try {
         let marketOrderToExecute = null;
         let ltpForMarket = 0;
@@ -5029,7 +5266,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         if (marketOrderToExecute) {
             const triggerEngine = require('./services/triggerEngine');
             triggerEngine.removeOrderFromMemory(marketOrderToExecute.id, marketOrderToExecute.symbol);
-            triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
+            await triggerEngine.executeOrder(marketOrderToExecute, ltpForMarket).catch(err => console.error(err));
             return res.json({ success: true, executed: true });
         }
 

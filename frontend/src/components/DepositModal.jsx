@@ -14,8 +14,9 @@ export default function DepositModal({ onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!amount || Number(amount) <= 0) {
-      setError('Please enter a valid amount');
+    const parsedAmount = parseFloat(amount);
+    if (!amount || isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount < 100 || parsedAmount > 100000000) {
+      setError('Please enter a valid amount between ₹100 and ₹10 Crore.');
       return;
     }
     setLoading(true);

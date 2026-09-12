@@ -51,13 +51,15 @@ export default function PositionsView() {
       (orders || []).forEach(o => {
         const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
         const orderPnl = Number(o.realized_pnl || 0);
-        // Only consider exit orders that realized non-zero P&L (entry orders have 0 P&L and are not closed trades)
-        const hasRealizedPnl = o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0;
+        // Consider exit orders that realized P&L, are tagged as exits, or have closed quantity
+        const isExitOrder = (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off') || o.remarks.includes('Auto-Square-Off'))) 
+          || (o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0)
+          || (o.closed_quantity && Number(o.closed_quantity) > 0);
         const normSym = normalizeSym(o.symbol);
         const key = `${normSym}-${o.product_type || 'INT'}`;
 
         // Include closed trades from orders ONLY if this symbol+product is NOT open and NOT in dbClosed
-        if (isExecuted && hasRealizedPnl && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
+        if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
           const orderQty = Number(o.quantity || 1);
           const exitPrice = Number(o.average_price || o.price || 0);
           const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
@@ -406,10 +408,14 @@ export default function PositionsView() {
               onClick={async () => {
                 if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
                 try {
+                  const token = useStore.getState().token || localStorage.getItem('token');
                   const res = await fetch(`${API}/api/holdings/exit-all`, {
                     credentials: 'include',
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 
+                      'Content-Type': 'application/json',
+                      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    }
                   });
                   const data = await res.json();
                   if (res.ok) {

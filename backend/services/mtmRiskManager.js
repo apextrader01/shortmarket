@@ -183,6 +183,9 @@ class MTMRiskManager {
             let cancelledOrders = [];
 
             await db.transaction(async (trx) => {
+                // Acquire exclusive advisory lock for user to prevent race conditions with concurrent orders/ticks
+                await trx.raw('SELECT pg_advisory_xact_lock(?)', [userId]);
+
                 // 1. Cancel all pending entry and trigger orders for the user and refund margin
                 const pendingOrders = await trx('orders')
                     .where({ user_id: userId })
@@ -200,11 +203,14 @@ class MTMRiskManager {
                 // 2. Liquidate / Auto-exit all positions with full audit detail
                 const auditTag = isRMSPenalty ? `Auto-Square-Off (RMS: ${reason})` : `Risk Guardian Auto-Exit (${reason})`;
                 for (const pos of positions) {
-                    const ltp = this.priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                    const freshPos = await trx('positions').where({ id: pos.id }).first();
+                    if (!freshPos || Number(freshPos.quantity) === 0) continue;
+
+                    const ltp = this.priceCache[freshPos.symbol]?.ltp || Number(freshPos.average_price) || 0;
                     if (ltp <= 0) continue;
 
-                    await LedgerService.closePosition(trx, userId, pos.id, ltp, isRMSPenalty, auditTag);
-                    console.log(`[AUTO-EXIT EXECUTED] Closed ${pos.symbol} for user ${userId} at ₹${ltp} (${reason})`);
+                    await LedgerService.closePosition(trx, userId, freshPos.id, ltp, isRMSPenalty, auditTag);
+                    console.log(`[AUTO-EXIT EXECUTED] Closed ${freshPos.symbol} for user ${userId} at ₹${ltp} (${reason})`);
                 }
             });
 
@@ -213,6 +219,10 @@ class MTMRiskManager {
             for (const ord of cancelledOrders) {
                 triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
             }
+            try {
+                const { pubClient } = require('./redisClient');
+                if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
+            } catch(e) {}
 
             // Invalidate cached positions
             this.cachedPositions = null;

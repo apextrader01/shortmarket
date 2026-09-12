@@ -102,13 +102,13 @@ export default function OrderModal() {
   }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
 
   const balanceNum = Number(user?.balance) || 0;
-  const totalQuantity = (parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1);
   const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
-  const slicesCount = getOrderSlicesCount(symbol, totalQuantity, orderModal.lotsize);
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   const isMutualFund = cleanSym.endsWith('-MF') || /^\d{5,6}$/.test(cleanSym) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym);
+  const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : ((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
+  const slicesCount = getOrderSlicesCount(symbol, totalQuantity, orderModal.lotsize);
   
   // Fetch Estimated Charges
   useEffect(() => {
@@ -138,9 +138,9 @@ export default function OrderModal() {
     
     const timer = setTimeout(fetchEst, 400); // Debounce
     return () => clearTimeout(timer);
-  }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
+  }, [symbol, totalQuantity, orderType, price, livePrice, productType, side]);
 
-  const marginCalc = calculateOrderMargin({
+  const marginCalc = calculateMarginRequirement({
     symbol,
     side,
     quantity: totalQuantity,
@@ -161,11 +161,27 @@ export default function OrderModal() {
   const availableHoldingQty = (matchingHolding ? Number(matchingHolding.quantity || 0) : 0) + (matchingDelPos ? Number(matchingDelPos.quantity || 0) : 0);
   const isDelSellFromHoldings = side === 'SELL' && (productType === 'DEL' || productType === 'CNC') && !isDerivativeContract(symbol) && availableHoldingQty >= totalQuantity;
 
+  // Check if this order is closing/reducing an existing open position
+  const matchingOpenPos = (positions || []).find(p => {
+    const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const symMatch = pClean === cleanSym || p.symbol === symbol;
+    if (!symMatch) return false;
+    const pQty = Number(p.quantity || 0);
+    if (pQty === 0) return false;
+    if (p.product_type !== productType && !(productType === 'DEL' && p.product_type === 'CNC')) return false;
+    if (side === 'BUY' && pQty < 0) return true;
+    if (side === 'SELL' && pQty > 0) return true;
+    return false;
+  });
+  const isOpposingPositionExit = !!matchingOpenPos;
+
   const isFuture = marginCalc.isFuture;
-  const isTrueExit = (orderModal.isExit && side === orderModal.type) || isDelSellFromHoldings;
+  const isTrueExit = (orderModal.isExit && side === orderModal.type) || isDelSellFromHoldings || isOpposingPositionExit;
   const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
   const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
-  const leverageText = isTrueExit ? (isDelSellFromHoldings ? 'Holding Exit' : 'Exit') : marginCalc.leverageText;
+  const leverageText = isTrueExit 
+    ? (isDelSellFromHoldings ? 'Holding Exit' : (isOpposingPositionExit ? 'Position Square-Off' : 'Exit')) 
+    : marginCalc.leverageText;
 
   const isRestricted = restrictedStocks.includes(symbol);
   
@@ -313,12 +329,12 @@ export default function OrderModal() {
       const parsedSL = slPrice ? parseFloat(slPrice) : 0;
       const parsedTgt = tgtPrice ? parseFloat(tgtPrice) : 0;
       
-      if (isCO && !parsedSL) {
-        alert("Please specify a Stop Loss price for your Cover Order (CO).");
+      if (isCO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL))) {
+        alert("Please specify a valid positive Stop Loss price for your Cover Order (CO).");
         return;
       }
-      if (isBO && (!parsedSL || !parsedTgt)) {
-        alert("Please specify both Stop Loss and Target prices for your Bracket Order (BO).");
+      if (isBO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL) || !parsedTgt || parsedTgt <= 0 || isNaN(parsedTgt))) {
+        alert("Please specify valid positive Stop Loss and Target prices for your Bracket Order (BO).");
         return;
       }
       
@@ -346,7 +362,7 @@ export default function OrderModal() {
     const parsedTrail = parseFloat(trailingJump);
     let finalType = orderType;
     if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
-    if (tab === 'Trailing SL' || (parsedTrail > 0 && (tab === 'Stop Loss' || tab === 'Trailing SL'))) {
+    if (tab === 'Trailing SL' || parsedTrail > 0) {
       finalType = 'TRAILING_STOP';
     }
 

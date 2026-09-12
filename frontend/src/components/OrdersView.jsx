@@ -98,8 +98,18 @@ export default function OrdersView() {
 
 
   if (statusFilter !== 'ALL') {
-    displayOrders = displayOrders.filter(order => order.status === statusFilter);
-    displayTriggers = displayTriggers.filter(trigger => trigger.status === statusFilter);
+    displayOrders = displayOrders.filter(order => {
+      if (statusFilter === 'EXECUTED') {
+        return order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE';
+      }
+      return order.status === statusFilter;
+    });
+    displayTriggers = displayTriggers.filter(trigger => {
+      if (statusFilter === 'EXECUTED') {
+        return trigger.status === 'EXECUTED' || trigger.status === 'COMPLETED' || trigger.status === 'COMPLETE';
+      }
+      return trigger.status === statusFilter;
+    });
   }
 
   if (searchQuery) {
@@ -250,6 +260,28 @@ export default function OrdersView() {
                   }}
                 >
                   CANCEL ALL OPEN ORDERS ({displayOrders.length})
+                </button>
+              )}
+              {activeTab === 'Pending Triggers' && displayTriggers.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (window.confirm(`Are you sure you want to cancel all ${displayTriggers.length} pending triggers?`)) {
+                      const cancelPromises = displayTriggers.map(trigger => {
+                        if (trigger.isBackendOrder) return useStore.getState().cancelOrder(trigger.id);
+                        return removePendingTrigger(trigger.id);
+                      });
+                      await Promise.allSettled(cancelPromises);
+                      await useStore.getState().fetchUserData().catch(() => {});
+                      alert(`Cancelled ${displayTriggers.length} trigger(s).`);
+                    }
+                  }}
+                  style={{
+                    background: 'var(--color-red-light)', color: '#fff', border: 'none',
+                    padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  CANCEL ALL PENDING TRIGGERS ({displayTriggers.length})
                 </button>
               )}
             </div>
