@@ -35,6 +35,12 @@ export default function DOMLadderModal() {
 
   const ltp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? parseFloat(marketDepthData.ltp) : parseFloat(basicData.ltp);
 
+  // Reset centerPrice and scroll state when symbol changes or modal closes/opens
+  useEffect(() => {
+    setCenterPrice(0);
+    setHasScrolled(false);
+  }, [symbol, domLadderModal.isOpen]);
+
   // Set the initial center price when we first get a reference price
   useEffect(() => {
     if (domLadderModal.isOpen && refPrice > 0 && centerPrice === 0) {

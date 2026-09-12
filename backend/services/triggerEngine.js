@@ -364,7 +364,7 @@ class TriggerEngine {
             const handleRemainingPos = async (trx, remainingQty, execPrice, customMargin = undefined) => {
                 const isDeriv = isDerivativeSymbol(order.symbol);
 
-                if (order.product_type === 'DEL' && remainingQty < 0 && !isDeriv) {
+                if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0 && !isDeriv) {
                     const holding = await trx('holdings')
                         .where({ user_id: order.user_id })
                         .where(builder => {
@@ -375,11 +375,13 @@ class TriggerEngine {
                                    .orWhere({ symbol: `MCX:${cleanSym}` });
                         })
                         .first();
-                    if (holding && holding.quantity > 0) {
-                        const offsetQty = Math.min(Math.abs(remainingQty), holding.quantity);
+                    if (holding && Number(holding.quantity) > 0) {
+                        const hQty = Number(holding.quantity);
+                        const hAvg = Number(holding.average_price);
+                        const offsetQty = Math.min(Math.abs(remainingQty), hQty);
                         
                         // Deduct from holding or remove row if sold out
-                        const newHoldingQty = holding.quantity - offsetQty;
+                        const newHoldingQty = hQty - offsetQty;
                         if (newHoldingQty <= 0) {
                             await trx('holdings').where({ id: holding.id }).del();
                         } else {
@@ -387,17 +389,17 @@ class TriggerEngine {
                         }
                         
                         // Create a CLOSED position record for today
-                        const realizedPnl = (execPrice - holding.average_price) * offsetQty;
-                        const principalAmount = holding.average_price * offsetQty;
+                        const realizedPnl = (execPrice - hAvg) * offsetQty;
+                        const principalAmount = hAvg * offsetQty;
                         await trx('positions').insert({
                             user_id: order.user_id,
                             symbol: order.symbol,
                             quantity: 0,
                             closed_quantity: offsetQty,
-                            average_price: holding.average_price,
+                            average_price: hAvg,
                             exit_price: execPrice,
                             realized_pnl: realizedPnl,
-                            product_type: 'DEL',
+                            product_type: order.product_type || 'DEL',
                             updated_at: new Date()
                         });
                         

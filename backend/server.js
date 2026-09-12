@@ -3711,18 +3711,30 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // After these times, no manual intervention is allowed as the system forces settlement.
   const isDerivativeSymbol = isDerivativeContract(symbol);
   if (isDerivativeSymbol) {
-    const now = new Date();
-    const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-    const dayStr = String(istNow.getUTCDate()).padStart(2, '0');
-    const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-    const monthStr = monthNames[istNow.getUTCMonth()];
-    const yearStr = String(istNow.getUTCFullYear()).slice(-2);
-    const todayExpiryToken = `${dayStr}${monthStr}${yearStr}`; // e.g. "10AUG26"
+    const { parseExpiryDate } = require('./services/autoSquareOff');
+    const expDate = parseExpiryDate(symbol);
+    let isExpiringToday = false;
     
-    const isExpiringToday = symbol.includes(todayExpiryToken);
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
+    const curYear = parseInt(istParts.find(p => p.type === 'year')?.value || '0', 10);
+    const curMonth = parseInt(istParts.find(p => p.type === 'month')?.value || '0', 10);
+    const curDay = parseInt(istParts.find(p => p.type === 'day')?.value || '0', 10);
+    const h = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const min = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+
+    if (expDate) {
+      isExpiringToday = (expDate.getFullYear() === curYear && (expDate.getMonth() + 1) === curMonth && expDate.getDate() === curDay);
+    } else {
+      // Fallback token matching if master map missing
+      const dayStr = String(curDay).padStart(2, '0');
+      const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const monthStr = monthNames[curMonth - 1];
+      const yearStr = String(curYear).slice(-2);
+      isExpiringToday = symbol.includes(`${yearStr}${monthStr}`) || symbol.includes(`${dayStr}${monthStr}${yearStr}`);
+    }
+
     if (isExpiringToday) {
-      const h = istNow.getUTCHours();
-      const min = istNow.getUTCMinutes();
       const isMCXSymbol = symbol.endsWith('-MCX') || isCommodityContract(symbol);
       // Equity/NFO/BFO: block after 03:25 PM; MCX: block after 07:00 PM
       const equityExpiryClosed = !isMCXSymbol && (h > 15 || (h === 15 && min >= 25));
@@ -4000,6 +4012,7 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
     const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
 
     await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const user = await trx('users').where({ id: req.user.id }).first();
       if (Number(user.balance) < finalMargin) {
          throw Object.assign(new Error(`Insufficient funds for SIP installment. Required: ₹${finalMargin.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`), { statusCode: 400 });
@@ -4113,7 +4126,8 @@ app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
 // ⚡ Admin: Process all due SIPs
 app.post('/api/admin/sips/process-all', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const result = await SIPEngine.processDueSips(priceCache);
     res.json({ success: true, message: `Processed ${result.total} due SIPs: ${result.success} succeeded, ${result.failed} failed/skipped.`, result });
   } catch (error) {
@@ -4468,7 +4482,8 @@ app.post('/api/telegram/test', authenticateToken, async (req, res) => {
 // 🛡️ Admin Telegram Traffic & Peak Protection Endpoints
 app.get('/api/admin/telegram/config', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const config = getTelegramSystemConfig();
     const connectedUsersCount = await db('users').whereNotNull('telegram_chat_id').where('telegram_alerts_enabled', true).count('* as count').first();
     res.json({ success: true, config, connectedUsers: Number(connectedUsersCount?.count || 0) });
@@ -4479,7 +4494,8 @@ app.get('/api/admin/telegram/config', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/telegram/config', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const updated = updateTelegramSystemConfig(req.body);
     res.json({ success: true, message: 'Telegram system configuration updated!', config: updated });
   } catch (err) {
@@ -4489,7 +4505,8 @@ app.post('/api/admin/telegram/config', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/telegram/broadcast', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'Message content is required' });
 
@@ -6072,6 +6089,7 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
 
     await db('reward_withdrawals').where({ id: req.params.id }).update({
       status,
+      admin_notes: remarks || null,
       remarks: remarks || null,
       utr: utr || null,
       updated_at: new Date()

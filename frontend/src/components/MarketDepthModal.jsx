@@ -154,10 +154,12 @@ export default function MarketDepthModal() {
               <span style={{ color: 'var(--text-secondary)' }}>Change</span>
               <span style={{ textAlign: 'right', fontWeight: '500', color: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) > (marketDepthData?.symbol === symbol ? marketDepthData.close : basicData.close) ? 'var(--color-blue)' : 'var(--color-red)' }}>
                 {(() => {
-                  const currentLtp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp;
-                  const currentClose = marketDepthData?.symbol === symbol && marketDepthData.close ? marketDepthData.close : basicData.close;
-                  if (currentLtp && currentClose) {
-                    return `${(currentLtp - currentClose).toFixed(2)} (${(((currentLtp - currentClose)/currentClose)*100).toFixed(2)}%)`;
+                  const currentLtp = Number(marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp);
+                  const currentClose = Number(marketDepthData?.symbol === symbol && marketDepthData.close ? marketDepthData.close : basicData.close);
+                  if (currentLtp > 0 && currentClose > 0) {
+                    const diff = currentLtp - currentClose;
+                    const pct = (diff / currentClose) * 100;
+                    return `${diff.toFixed(2)} (${pct.toFixed(2)}%)`;
                   }
                   return '-';
                 })()}

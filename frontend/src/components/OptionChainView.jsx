@@ -2,6 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
 import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock, ChevronLeft } from 'lucide-react';
@@ -442,6 +443,7 @@ const OptionChainViewInternal = () => {
         optionType: type,
         side,
         quantity: 1,
+        lotsize: getInstantLotsize(legData.symbol),
         price: legData.ltp,
         iv: legData.iv || 0.2
       };
@@ -669,10 +671,11 @@ const OptionChainViewInternal = () => {
               onExecute={() => {
                 if (strategyLegs.length === 0) return;
                 strategyLegs.forEach(leg => {
+                  const effectiveLotsize = leg.lotsize || getInstantLotsize(leg.symbol) || 1;
                   placeOrder({
                     symbol: leg.symbol,
                     side: leg.side,
-                    quantity: leg.quantity,
+                    quantity: (Number(leg.quantity) || 1) * effectiveLotsize,
                     orderType: 'MARKET',
                     price: ''
                   });

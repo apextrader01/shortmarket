@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { calculateGreeks } from '../utils/blackScholes';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 // Normal CDF approximation for POP
 function N(x) {
@@ -73,12 +74,18 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     const maxPrice = Math.ceil(Math.max(maxStrike, effectiveSpot) + rangeBuffer);
     const step = (maxPrice - minPrice) / 100;
     
+    const getLegQty = (leg) => {
+      const lotCount = Number(leg.quantity) || 1;
+      const lotSize = Number(leg.lotsize) || (leg.symbol ? getInstantLotsize(leg.symbol) : 1);
+      return lotCount * lotSize;
+    };
+
     let netPrem = 0;
     let tDelta = 0, tTheta = 0, tGamma = 0, tVega = 0;
 
     legs.forEach(leg => {
       const price = leg.price || 0;
-      const qty = leg.quantity || 1;
+      const qty = getLegQty(leg);
       const val = price * qty;
       const sign = leg.side === 'BUY' ? 1 : -1;
       netPrem += leg.side === 'BUY' ? -val : val;
@@ -97,7 +104,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       legs.forEach(leg => {
         const strike = leg.strike || 0;
         const price = leg.price || 0;
-        const qty = leg.quantity || 1;
+        const qty = getLegQty(leg);
         let intrinsic = leg.optionType === 'CE' ? Math.max(0, priceAtExpiry - strike) : Math.max(0, strike - priceAtExpiry);
         totalPnl += (leg.side === 'BUY') ? (intrinsic - price) * qty : (price - intrinsic) * qty;
       });
@@ -109,7 +116,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       legs.forEach(leg => {
         const strike = leg.strike || 0;
         const price = leg.price || 0;
-        const qty = leg.quantity || 1;
+        const qty = getLegQty(leg);
         const iv = leg.iv > 0 ? leg.iv : 0.2;
         
         let targetVal = 0;
@@ -135,6 +142,11 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       if (pnlExpiry > pMax) pMax = pnlExpiry;
       if (pnlExpiry < pMin) pMin = pnlExpiry;
     }
+
+    // Explicitly evaluate boundary at price = 0 (underlying cannot drop below zero)
+    const pnlAtZero = calculateExpiryPayoff(0);
+    if (pnlAtZero > pMax) pMax = pnlAtZero;
+    if (pnlAtZero < pMin) pMin = pnlAtZero;
 
     // Find Expiry breakevens
     const be = [];
@@ -197,10 +209,8 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     if (rightSlope > 0) isMaxProfitInfinity = true;
     if (rightSlope < 0) isMaxLossInfinity = true;
 
-    // Check left tail (price drops to 0, though technically bounded by 0, practically treated as unbounded if slope is steep)
-    const leftSlope = calculateExpiryPayoff(minPrice - 1000) - calculateExpiryPayoff(minPrice);
-    if (leftSlope > 0) isMaxProfitInfinity = true;
-    if (leftSlope < 0) isMaxLossInfinity = true;
+    // Note: Stock/Index prices cannot drop below zero.
+    // Left tail payoff is strictly bounded at price = 0, which is already evaluated above.
 
     return {
       data: dataPoints,

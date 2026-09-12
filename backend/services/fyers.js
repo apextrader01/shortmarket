@@ -56,6 +56,7 @@ const fyersToNameMap = new Map(Object.entries(nameToFyers).map(([k, v]) => [v, k
 // ── Pre-require triggerEngine at module level so it's not re-required in every tick ──
 let triggerEngine = null;
 try { triggerEngine = require('./triggerEngine'); } catch(e) {}
+let gcInterval = null;
 
 
 // Convert our platform's unique symbols to Fyers Symbols (guaranteeing valid exchange prefix)
@@ -512,8 +513,6 @@ function addSubscriptionBatch(symbols) {
         gcInterval = setInterval(garbageCollectSubscriptions, 30000);
     }
 }
-
-let gcInterval = null;
 
 function handlePingSubscriptions(symbols) {
     if (!Array.isArray(symbols)) return;

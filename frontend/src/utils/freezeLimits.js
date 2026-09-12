@@ -45,7 +45,13 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
 
   const lot = explicitLotsize || getInstantLotsize(symbol);
 
-  // 2. Major Indices Check
+  // 2. Cash Equities & ETFs (lot === 1 and not derivative contract)
+  // Ensures cash ETFs like NIFTYBEES, BANKBEES, JUNIORBEES are not misclassified as index derivatives
+  if (lot === 1 && !isDerivativeContract(symbol) && !upper.includes('FUT') && !upper.includes('CE') && !upper.includes('PE')) {
+    return 100000;
+  }
+
+  // 3. Major Indices Check
   if (upper.startsWith('BANKNIFTY') || upper.includes('BANKNIFTY')) {
     return lot > 1 ? (Math.floor(900 / lot) * lot <= 600 ? Math.floor(600 / lot) * lot : 600) : 600;
   }

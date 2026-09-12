@@ -858,6 +858,9 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
   let currentBalance = parseFloat(user.balance || 0);
   if (isNaN(currentBalance)) currentBalance = 0;
   const ledgerWithBalance = (filtered || []).map(entry => {
+    if (entry.running_balance !== undefined && entry.running_balance !== null && !isNaN(Number(entry.running_balance))) {
+      return { ...entry, running_balance: Number(entry.running_balance) };
+    }
     const amt = Number(entry.amount);
     const validAmt = !isNaN(amt) ? amt : 0;
     const balanceAfter = currentBalance;

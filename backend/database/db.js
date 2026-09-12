@@ -585,6 +585,8 @@ async function ensureCriticalColumns() {
       )
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_reward_withdrawals_user_id ON reward_withdrawals(user_id)');
+    await db.raw('ALTER TABLE reward_withdrawals ADD COLUMN IF NOT EXISTS remarks TEXT');
+    await db.raw('ALTER TABLE reward_withdrawals ADD COLUMN IF NOT EXISTS utr VARCHAR(100)');
 
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
