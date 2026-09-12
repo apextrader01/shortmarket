@@ -3,6 +3,8 @@ const db = require('../database/db').default || require('../database/db');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const LedgerService = require('./ledgerService');
+const triggerEngine = require('./triggerEngine');
 
 const MONTH_MAP = {
     'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
@@ -113,9 +115,74 @@ function formatDate(date) {
     return `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
 }
 
+const ensureLivePrices = async (symbols) => {
+    try {
+        const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
+        const priceCache = getPriceFromCache ? getPriceFromCache() : {};
+        const missing = [...new Set(symbols)].filter(sym => !priceCache[sym]?.ltp);
+        
+        if (missing.length > 0 && fetchBatchLTPs) {
+            console.log(`[AutoSquareOff] Fetching live prices for ${missing.length} offline symbols via REST...`);
+            const fetchedQuotes = await fetchBatchLTPs(missing).catch(() => null);
+            if (fetchedQuotes && typeof fetchedQuotes === 'object') {
+                for (const [sym, data] of Object.entries(fetchedQuotes)) {
+                    if (data && data.ltp) {
+                        priceCache[sym] = { ltp: data.ltp };
+                    }
+                }
+            }
+        }
+        return priceCache;
+    } catch (e) {
+        console.error('[AutoSquareOff] ensureLivePrices error:', e.message);
+        return {};
+    }
+};
+
+async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-Off (RMS)') {
+    const affectedUser = pos.user_id;
+    await db.transaction(async (trx) => {
+        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true, customRemark);
+
+        // Cancel all PENDING_TRIGGER brackets for this user+symbol
+        const triggers = await trx('orders')
+            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' });
+        for (const t of triggers) {
+            const updated = await trx('orders')
+                .where({ id: t.id, status: 'PENDING_TRIGGER' })
+                .update({ status: 'CANCELLED', updated_at: new Date() });
+            if (updated > 0) {
+                if (parseFloat(t.margin) > 0) {
+                    await LedgerService.releaseMargin(trx, pos.user_id, t.margin, `Square-Off Cancelled: ${t.symbol}`);
+                }
+                triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+            }
+        }
+
+        // Also cancel any remaining PENDING entry orders for this user+symbol
+        const pendingOrders = await trx('orders')
+            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' });
+        for (const o of pendingOrders) {
+            const updated = await trx('orders')
+                .where({ id: o.id, status: 'PENDING' })
+                .update({ status: 'CANCELLED', updated_at: new Date() });
+            if (updated > 0) {
+                if (parseFloat(o.margin) > 0) {
+                    await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Square-Off Cancelled: ${o.symbol}`);
+                }
+                triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+            }
+        }
+    });
+
+    if (triggerEngine && triggerEngine.io && affectedUser) {
+        triggerEngine.io.to(affectedUser.toString()).emit('sync_user_data');
+    }
+}
+
 async function runAutoSquareOff(exchangeFilter) {
     console.log(`\n=========================================`);
-    console.log(`?? Auto Square-Off Initiated for ${exchangeFilter}`);
+    console.log(`🚨 Auto Square-Off Initiated for ${exchangeFilter}`);
     console.log(`=========================================\n`);
 
     const now = new Date();
@@ -126,9 +193,6 @@ async function runAutoSquareOff(exchangeFilter) {
         const openPositions = await db('positions').whereNot({ quantity: 0 });
         
         console.log(`Found ${openPositions.length} open positions total. Checking for expiries...`);
-        
-        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
-        const port = process.env.PORT || 5000;
 
         const positionsToClose = openPositions.filter(pos => {
             const isMcx = pos.symbol.includes('MCX');
@@ -142,61 +206,47 @@ async function runAutoSquareOff(exchangeFilter) {
         });
 
         console.log(`Filtered down to ${positionsToClose.length} expiring positions for ${exchangeFilter}.`);
-        console.log('Starting 50-order-per-second Throttle Queue...');
 
         let closedCount = 0;
         const BATCH_SIZE = 50;
 
         for (let i = 0; i < positionsToClose.length; i += BATCH_SIZE) {
             const batch = positionsToClose.slice(i, i + BATCH_SIZE);
-            
-            await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(Number(pos.quantity));
-                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
 
-                const orderPayload = {
-                    symbol: pos.symbol,
-                    type: 'MARKET',
-                    side: side,
-                    quantity: remainingQty,
-                    product_type: pos.product_type,
-                    is_system_close: true
-                };
+            for (const pos of batch) {
+                let ltp = priceCache[pos.symbol]?.ltp;
+                if (!ltp || ltp <= 0) {
+                    ltp = Number(pos.average_price) || 0;
+                }
+                if (ltp <= 0) {
+                    console.warn(`[Auto-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
+                    continue;
+                }
 
                 try {
-                    const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
-                    const res = await fetch(`http://localhost:${port}/api/order`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${userToken}`
-                        },
-                        body: JSON.stringify(orderPayload)
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        closedCount++;
-                        console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol}`);
-                    }
+                    await squareOffPositionInProcess(pos, ltp, 'Expiry Auto Square-Off (RMS)');
+                    closedCount++;
+                    console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
                 } catch(e) {
-                    console.error(`[Error] Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
                 }
-            }));
+            }
 
             if (i + BATCH_SIZE < positionsToClose.length) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
         
-        console.log(`? Auto Square-Off Complete. Closed ${closedCount} positions.\n`);
+        console.log(`✅ Auto Square-Off Complete. Closed ${closedCount} positions.\n`);
     } catch (err) {
-        console.error('? Auto Square-Off Error:', err);
+        console.error('❌ Auto Square-Off Error:', err);
     }
 }
 
 async function runIntradaySquareOff(exchangeFilter) {
     console.log(`\n=========================================`);
-    console.log(`?? INTRADAY Square-Off Initiated for ${exchangeFilter}`);
+    console.log(`🚨 INTRADAY Square-Off Initiated for ${exchangeFilter}`);
     console.log(`=========================================\n`);
 
     try {
@@ -205,9 +255,6 @@ async function runIntradaySquareOff(exchangeFilter) {
             .whereIn('product_type', ['INT', 'BO', 'CO']);
         
         console.log(`Found ${openPositions.length} open INTRADAY/BO/CO positions total.`);
-        
-        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
-        const port = process.env.PORT || 5000;
 
         const positionsToClose = openPositions.filter(pos => {
             const isMcx = pos.symbol.includes('MCX');
@@ -217,54 +264,40 @@ async function runIntradaySquareOff(exchangeFilter) {
         });
 
         console.log(`Filtered down to ${positionsToClose.length} intraday positions for ${exchangeFilter}.`);
-        console.log('Starting 50-order-per-second Throttle Queue...');
 
         let closedCount = 0;
         const BATCH_SIZE = 50;
 
         for (let i = 0; i < positionsToClose.length; i += BATCH_SIZE) {
             const batch = positionsToClose.slice(i, i + BATCH_SIZE);
-            
-            await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(Number(pos.quantity));
-                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
 
-                const orderPayload = {
-                    symbol: pos.symbol,
-                    type: 'MARKET',
-                    side: side,
-                    quantity: remainingQty,
-                    product_type: pos.product_type,
-                    is_system_close: true
-                };
+            for (const pos of batch) {
+                let ltp = priceCache[pos.symbol]?.ltp;
+                if (!ltp || ltp <= 0) {
+                    ltp = Number(pos.average_price) || 0;
+                }
+                if (ltp <= 0) {
+                    console.warn(`[Auto-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
+                    continue;
+                }
 
                 try {
-                    const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
-                    const res = await fetch(`http://localhost:${port}/api/order`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${userToken}`
-                        },
-                        body: JSON.stringify(orderPayload)
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        closedCount++;
-                        console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol}`);
-                    }
+                    await squareOffPositionInProcess(pos, ltp, 'Intraday Auto Square-Off (RMS)');
+                    closedCount++;
+                    console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
                 } catch(e) {
-                    console.error(`[Error] Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
                 }
-            }));
+            }
 
             if (i + BATCH_SIZE < positionsToClose.length) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
-        console.log(`? Intraday Square-Off Complete. Closed ${closedCount} positions.\n`);
+        console.log(`✅ Intraday Square-Off Complete. Closed ${closedCount} positions.\n`);
     } catch (err) {
-        console.error('? Intraday Square-Off Error:', err);
+        console.error('❌ Intraday Square-Off Error:', err);
     }
 }
 
@@ -348,65 +381,49 @@ function startSquareOffJobs() {
 
 async function runMasterSquareOff() {
     console.log(`\n=========================================`);
-    console.log(`?? MASTER SQUARE-OFF INITIATED (ALL POSITIONS)`);
+    console.log(`🚨 MASTER SQUARE-OFF INITIATED (ALL POSITIONS)`);
     console.log(`=========================================\n`);
 
     try {
         const openPositions = await db('positions').whereNot({ quantity: 0 });
         
         console.log(`Found ${openPositions.length} open positions total.`);
-        
-        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
-        const port = process.env.PORT || 5000;
 
         let closedCount = 0;
         const BATCH_SIZE = 50;
 
         for (let i = 0; i < openPositions.length; i += BATCH_SIZE) {
             const batch = openPositions.slice(i, i + BATCH_SIZE);
-            
-            await Promise.all(batch.map(async (pos) => {
-                const remainingQty = Math.abs(Number(pos.quantity));
-                const side = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
 
-                const orderPayload = {
-                    symbol: pos.symbol,
-                    type: 'MARKET',
-                    side: side,
-                    quantity: remainingQty,
-                    product_type: pos.product_type,
-                    is_system_close: true
-                };
+            for (const pos of batch) {
+                let ltp = priceCache[pos.symbol]?.ltp;
+                if (!ltp || ltp <= 0) {
+                    ltp = Number(pos.average_price) || 0;
+                }
+                if (ltp <= 0) {
+                    console.warn(`[Master-Close] No valid LTP or average price for ${pos.symbol}, skipping.`);
+                    continue;
+                }
 
                 try {
-                    const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
-                    const res = await fetch(`http://localhost:${port}/api/order`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${userToken}`
-                        },
-                        body: JSON.stringify(orderPayload)
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        closedCount++;
-                        console.log(`[Master-Close] User ${pos.user_id} on ${pos.symbol}`);
-                    }
-                } catch(e) {
-                    console.error(`[Error] Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                    await squareOffPositionInProcess(pos, ltp, 'Admin Master Square-Off (RMS)');
+                    closedCount++;
+                    console.log(`[Master-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
+                } catch (e) {
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
                 }
-            }));
+            }
 
             if (i + BATCH_SIZE < openPositions.length) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
         
-        console.log(`? Master Square-Off Complete. Closed ${closedCount} positions.\n`);
+        console.log(`✅ Master Square-Off Complete. Closed ${closedCount} positions.\n`);
         return { success: true, count: closedCount };
     } catch (err) {
-        console.error('? Master Square-Off Error:', err);
+        console.error('❌ Master Square-Off Error:', err);
         throw err;
     }
 }

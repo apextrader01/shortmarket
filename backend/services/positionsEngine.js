@@ -43,18 +43,11 @@ class PositionsEngine {
         this.initCronJobs();
         // Run catchup migration on startup (in case the server was down at 8:00 AM)
         setTimeout(() => {
-            if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
-                this.runHoldingsMigration(true);
-            }
+            this.runHoldingsMigration(true);
         }, 15000);
     }
 
     initCronJobs() {
-        // In PM2 cluster mode, only Worker 0 (Master) should run automated cron schedules
-        if (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0') {
-            console.log('[PositionsEngine] Cluster worker instance detected. Skipping duplicate cron scheduling.');
-            return;
-        }
 
         // HOLDINGS MIGRATION (T+1)
         // Phase 0: The 8:00 AM Wipe - 08:00 AM IST
@@ -92,6 +85,13 @@ class PositionsEngine {
     }
 
     async sweepPendingOrders(market) {
+        const lockKey = `cron_sweep_orders_${market}`;
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log(`[EOD SWEEP] ${market} sweep already running on another cluster worker. Skipping.`);
+            return;
+        }
+
         console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
         try {
             // Step A: Cancel PENDING entry orders for INT/BO/CO
@@ -143,10 +143,19 @@ class PositionsEngine {
             }
         } catch (error) {
             console.error(`[EOD SWEEP ERROR] ${market}:`, error);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
         }
     }
 
     async forceSquareOff(market) {
+        const lockKey = `cron_force_squareoff_${market}`;
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log(`[EOD SQUARE-OFF] ${market} forceSquareOff already running on another cluster worker. Skipping.`);
+            return;
+        }
+
         console.log(`[EOD SQUARE-OFF] Running Final Safety Net Square-Off for ${market}...`);
         try {
             await db.transaction(async (trx) => {
@@ -198,10 +207,19 @@ class PositionsEngine {
             });
         } catch (error) {
             console.error(`[EOD SQUARE-OFF ERROR] ${market}:`, error);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
         }
     }
 
     async settleExpiries(isCommodity) {
+        const lockKey = isCommodity ? 'cron_settle_expiries_mcx' : 'cron_settle_expiries_eq';
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log(`[EXPIRY SETTLE] Expiry settlement (${isCommodity ? 'MCX' : 'EQ'}) already running on another cluster worker. Skipping.`);
+            return;
+        }
+
         console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}).`);
         try {
             const todayStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' }).split(',')[0].replace(/\//g, '-');
@@ -333,10 +351,19 @@ class PositionsEngine {
             }
         } catch (error) {
             console.error(`[EXPIRY SETTLEMENT ERROR]:`, error);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
         }
     }
 
     async runHoldingsMigration(onlyBeforeToday = false) {
+        const lockKey = 'cron_holdings_migration';
+        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
+        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
+            console.log('[HOLDINGS MIGRATION] Already running on another cluster worker. Skipping.');
+            return;
+        }
+
         console.log(`[HOLDINGS MIGRATION] Starting T+1 Holdings Migration (Startup Catchup: ${onlyBeforeToday})...`);
         try {
             await db.transaction(async (trx) => {
@@ -360,9 +387,17 @@ class PositionsEngine {
                     const isCommodity = isCommoditySymbol(pos.symbol);
                     const assetClass = isCommodity ? 'COMMODITY' : 'STOCK';
 
-                    // Check if holding already exists
+                    // Check if holding already exists (prefix-tolerant)
+                    const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
                     const existingHolding = await trx('holdings')
-                        .where({ user_id: pos.user_id, symbol: pos.symbol })
+                        .where({ user_id: pos.user_id })
+                        .where(builder => {
+                            builder.where({ symbol: pos.symbol })
+                                   .orWhere({ symbol: cleanSym })
+                                   .orWhere({ symbol: `NSE:${cleanSym}` })
+                                   .orWhere({ symbol: `BSE:${cleanSym}` })
+                                   .orWhere({ symbol: `MCX:${cleanSym}` });
+                        })
                         .first();
 
                     if (existingHolding) {
@@ -408,6 +443,8 @@ class PositionsEngine {
             });
         } catch (error) {
             console.error(`[HOLDINGS MIGRATION ERROR]:`, error);
+        } finally {
+            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
         }
     }
 }
