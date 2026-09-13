@@ -526,7 +526,7 @@ class TriggerEngine {
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
                         });
-                        // Cancel dangling pending and trigger orders for this specific product type
+                        // Cancel dangling linked pending and trigger orders (SL/Target child legs or linked brackets)
                         const danglingOrders = await trx('orders')
                             .where({ user_id: order.user_id, product_type: order.product_type })
                             .where(builder => {
@@ -535,6 +535,11 @@ class TriggerEngine {
                                        .orWhere({ symbol: `NSE:${cleanSym}` })
                                        .orWhere({ symbol: `BSE:${cleanSym}` })
                                        .orWhere({ symbol: `MCX:${cleanSym}` });
+                            })
+                            .where(builder => {
+                                builder.where('status', 'PENDING_TRIGGER')
+                                       .orWhereNotNull('parent_order_id')
+                                       .orWhereIn('product_type', ['BO', 'CO']);
                             })
                             .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
                             
@@ -588,32 +593,66 @@ class TriggerEngine {
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
                         const remainingQty = order.side === 'BUY' ? (absQty - absPosQty) : -(absQty - absPosQty);
-                        const { calculateRequiredMargin } = require('./marginEngine');
-                        const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Math.abs(remainingQty), execPrice);
-                        const newPosMargin = calcMargin > 0 ? calcMargin : Number(order.margin || 0);
+                        
+                        // Check if reversing with delivery sell shares from existing holdings
+                        let isHoldingSell = false;
+                        if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+                            const cleanSym = order.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+                            const holding = await trx('holdings')
+                                .where({ user_id: order.user_id })
+                                .where(builder => {
+                                    builder.where({ symbol: order.symbol })
+                                           .orWhere({ symbol: cleanSym })
+                                           .orWhere({ symbol: `NSE:${cleanSym}` })
+                                           .orWhere({ symbol: `BSE:${cleanSym}` });
+                                })
+                                .first();
+                            if (holding && Number(holding.quantity) >= Math.abs(remainingQty)) {
+                                isHoldingSell = true;
+                            }
+                        }
 
-                        // Balance margin difference: blocked on order vs required on new position
-                        const orderMarginBlocked = Number(order.margin || 0);
-                        const marginDelta = newPosMargin - orderMarginBlocked;
-                        if (marginDelta > 0) {
-                            // More margin required than was blocked on order
-                            await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
-                            await trx('ledger').insert({
-                                user_id: order.user_id,
-                                amount: -marginDelta,
-                                type: 'MARGIN_BLOCK',
-                                description: `Margin blocked for reversed position ${remainingQty} ${order.symbol}`
-                            });
-                        } else if (marginDelta < 0) {
-                            // Excess margin was blocked on order, refund the difference
-                            const excessRefund = Math.abs(marginDelta);
-                            await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
-                            await trx('ledger').insert({
-                                user_id: order.user_id,
-                                amount: excessRefund,
-                                type: 'MARGIN_RELEASE',
-                                description: `Excess margin refunded for reversed position ${remainingQty} ${order.symbol}`
-                            });
+                        let newPosMargin = 0;
+                        if (!isHoldingSell) {
+                            const { calculateRequiredMargin } = require('./marginEngine');
+                            const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Math.abs(remainingQty), execPrice);
+                            newPosMargin = calcMargin > 0 ? calcMargin : Number(order.margin || 0);
+
+                            // Balance margin difference: blocked on order vs required on new position
+                            const orderMarginBlocked = Number(order.margin || 0);
+                            const marginDelta = newPosMargin - orderMarginBlocked;
+                            if (marginDelta > 0) {
+                                // More margin required than was blocked on order
+                                await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                                await trx('ledger').insert({
+                                    user_id: order.user_id,
+                                    amount: -marginDelta,
+                                    type: 'MARGIN_BLOCK',
+                                    description: `Margin blocked for reversed position ${remainingQty} ${order.symbol}`
+                                });
+                            } else if (marginDelta < 0) {
+                                // Excess margin was blocked on order, refund the difference
+                                const excessRefund = Math.abs(marginDelta);
+                                await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                                await trx('ledger').insert({
+                                    user_id: order.user_id,
+                                    amount: excessRefund,
+                                    type: 'MARGIN_RELEASE',
+                                    description: `Excess margin refunded for reversed position ${remainingQty} ${order.symbol}`
+                                });
+                            }
+                        } else {
+                            // If order had blocked any margin, refund it since it's backed by holdings
+                            const orderMarginBlocked = Number(order.margin || 0);
+                            if (orderMarginBlocked > 0) {
+                                await trx('users').where({ id: order.user_id }).increment('balance', orderMarginBlocked);
+                                await trx('ledger').insert({
+                                    user_id: order.user_id,
+                                    amount: orderMarginBlocked,
+                                    type: 'MARGIN_RELEASE',
+                                    description: `Margin refunded for holdings-backed delivery sell reversal: ${order.symbol}`
+                                });
+                            }
                         }
 
                         await handleRemainingPos(trx, remainingQty, execPrice, newPosMargin);
@@ -629,6 +668,7 @@ class TriggerEngine {
                         quantity: newQty,
                         average_price: newAvgPrice,
                         margin: parseFloat(existingPos.margin) + Number(order.margin || 0),
+                        exit_price: null,
                         updated_at: new Date()
                     });
                 }

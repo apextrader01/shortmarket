@@ -430,15 +430,19 @@ export default function BasketModal() {
       if (matchQty > 0) {
         const strikeDiff = Math.abs(sell.optionStrike - buy.optionStrike);
         const buyPrice = buy.orderType === 'MARKET' ? buy.livePrice : parseFloat(buy.price || 0);
+        const sellPrice = sell.orderType === 'MARKET' ? sell.livePrice : parseFloat(sell.price || 0);
 
         // For Debit Spreads (Bull Call Spread: Buy CE strike <= Sell CE strike; Bear Put Spread: Buy PE strike >= Sell PE strike),
-        // maximum risk is limited to the net premium paid. The full buy premium has already been charged in totalBuyMargin.
-        // For Credit Spreads, maximum risk is strike differential capped minus buy premium.
+        // maximum risk is limited to the net premium paid. The short premium collected is credited against totalBuyMargin.
+        // For Credit Spreads, maximum risk is (strike differential - net premium credit) * matchQty.
         const isDebitSpread = (buy.typeStr === 'CE' && buy.optionStrike <= sell.optionStrike) ||
                               (buy.typeStr === 'PE' && buy.optionStrike >= sell.optionStrike);
 
         if (!isDebitSpread) {
-          hedgedMargin += Math.max(0, (strikeDiff - buyPrice) * matchQty);
+          const netCredit = Math.max(0, sellPrice - buyPrice);
+          hedgedMargin += Math.max(0, (strikeDiff - netCredit) * matchQty);
+        } else {
+          totalBuyMargin = Math.max(0, totalBuyMargin - (sellPrice * matchQty));
         }
         buy.remainingQty -= matchQty;
         sell.remainingQty -= matchQty;

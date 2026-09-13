@@ -5102,29 +5102,37 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           status: ord.status, sl_price: ord.sl_price || null, tgt_price: ord.tgt_price || null, trigger_price: null, trail_amount: null, product_type: ord.product_type, margin: ord.margin
        });
        
+       let execStatus = ord.status;
+       let legError = null;
+
        if (ord.isMarket) {
-          
           const isMutualFund = ord.symbol.endsWith('-MF') || /^\d+$/.test(ord.symbol);
           if (isMutualFund) {
              try {
                  const triggerEngineLocal = require('./services/triggerEngine');
                  triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
-                 triggerEngineLocal.executeOrder(ord, ord.execPrice).catch(e => console.error(e));
-             } catch(e) {}
+                 await triggerEngineLocal.executeOrder(ord, ord.execPrice);
+                 execStatus = 'EXECUTED';
+             } catch(e) {
+                 legError = e.message;
+                 console.error('Basket MF execution error:', e);
+             }
           } else {
              const realLtp = priceCache[ord.symbol]?.ltp || 0;
              if (realLtp > 0) {
                 try {
                   await triggerEngine.evaluateTick(ord.symbol, realLtp);
+                  const freshOrder = await db('orders').where({ id: ord.id }).select('status').first();
+                  if (freshOrder) execStatus = freshOrder.status;
                 } catch (err) {
+                  legError = err.message;
                   console.error('Immediate evaluation error for basket item:', err);
                 }
              }
           }
-
        }
        
-       finalResponseOrders.push({ id: ord.id, symbol: ord.symbol, status: ord.status });
+       finalResponseOrders.push({ id: ord.id, symbol: ord.symbol, status: execStatus, error: legError });
     }
     
     setTimeout(() => {
@@ -5134,7 +5142,8 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         } catch(e) {}
     }, 500);
 
-    res.json({ success: true, orders: finalResponseOrders });
+    const hasErrors = finalResponseOrders.some(o => o.error);
+    res.json({ success: !hasErrors, orders: finalResponseOrders });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

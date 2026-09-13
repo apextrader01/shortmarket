@@ -62,8 +62,8 @@ class PositionsEngine {
         }, { timezone: 'Asia/Kolkata' });
 
         // EQUITIES
-        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:25 PM IST
-        cron.schedule('25 15 * * *', () => {
+        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:30 PM IST (Market Close)
+        cron.schedule('30 15 * * *', () => {
             this.settleExpiries(false); // false = Not Commodity
         }, { timezone: 'Asia/Kolkata' });
 
@@ -86,20 +86,26 @@ class PositionsEngine {
             console.log('[CRON] 12:05 AM Final Cleanup for Commodities triggered.');
             this.sweepPendingOrders('COMMODITY');
             this.forceSquareOff('COMMODITY');
-            this.settleExpiries(true);
+            this.settleExpiries(true, true); // true = Commodity, true = includeYesterday
         }, { timezone: 'Asia/Kolkata' });
     }
 
     async sweepPendingOrders(market) {
         const lockKey = `cron_sweep_orders_${market}`;
-        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-            console.log(`[EOD SWEEP] ${market} sweep already running on another cluster worker. Skipping.`);
-            return;
-        }
-
-        console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
+        let connection = null;
+        let isLocked = false;
         try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log(`[EOD SWEEP] ${market} sweep already running on another cluster worker. Skipping.`);
+                    return;
+                }
+            }
+
+            console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
             // Step A: Cancel PENDING entry orders for INT/BO/CO
             const pendingEntryOrders = await db('orders')
                 .where('status', 'PENDING')
@@ -150,20 +156,34 @@ class PositionsEngine {
         } catch (error) {
             console.error(`[EOD SWEEP ERROR] ${market}:`, error);
         } finally {
-            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+            if (connection) {
+                try {
+                    if (isLocked) {
+                        await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                    }
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
         }
     }
 
     async forceSquareOff(market) {
         const lockKey = `cron_force_squareoff_${market}`;
-        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-            console.log(`[EOD SQUARE-OFF] ${market} forceSquareOff already running on another cluster worker. Skipping.`);
-            return;
-        }
-
-        console.log(`[EOD SQUARE-OFF] Running Final Safety Net Square-Off for ${market}...`);
+        let connection = null;
+        let isLocked = false;
         try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log(`[EOD SQUARE-OFF] ${market} forceSquareOff already running on another cluster worker. Skipping.`);
+                    return;
+                }
+            }
+
+            console.log(`[EOD SQUARE-OFF] Running Final Safety Net Square-Off for ${market}...`);
             await db.transaction(async (trx) => {
                 // 1. Force Market Exit for Open Positions
                 const positions = await trx('positions')
@@ -214,59 +234,85 @@ class PositionsEngine {
         } catch (error) {
             console.error(`[EOD SQUARE-OFF ERROR] ${market}:`, error);
         } finally {
-            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+            if (connection) {
+                try {
+                    if (isLocked) {
+                        await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                    }
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
         }
     }
 
-    async settleExpiries(isCommodity) {
+    async settleExpiries(isCommodity = false, includeYesterday = false) {
         const lockKey = isCommodity ? 'cron_settle_expiries_mcx' : 'cron_settle_expiries_eq';
-        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-            console.log(`[EXPIRY SETTLE] Expiry settlement (${isCommodity ? 'MCX' : 'EQ'}) already running on another cluster worker. Skipping.`);
-            return;
-        }
-
-        console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}).`);
+        let connection = null;
+        let isLocked = false;
         try {
-            const todayStr = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata' }).split(',')[0].replace(/\//g, '-');
-            const [d, m, y] = todayStr.split('-');
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log(`[EXPIRY SETTLE] Expiry settlement (${isCommodity ? 'MCX' : 'EQ'}) already running on another cluster worker. Skipping.`);
+                    return;
+                }
+            }
+
+            console.log(`[CRON] Condition 10: Expiry Day Settlement triggered (Commodity: ${isCommodity}, includeYesterday: ${includeYesterday}).`);
+            
             const monthMap = { '01':'JAN', '02':'FEB', '03':'MAR', '04':'APR', '05':'MAY', '06':'JUN', '07':'JUL', '08':'AUG', '09':'SEP', '10':'OCT', '11':'NOV', '12':'DEC' };
             const monthCharMap = { '01': '1', '02': '2', '03': '3', '04': '4', '05': '5', '06': '6', '07': '7', '08': '8', '09': '9', '10': 'O', '11': 'N', '12': 'D' };
-            
-            const expiryToken1 = `${d}${monthMap[m]}${y.slice(-2)}`; // e.g. 13AUG26 (Standard)
-            const expiryToken2 = `${y.slice(-2)}${monthCharMap[m]}${d}`; // e.g. 26813 (Fyers Weekly)
 
             const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
             const parts = formatter.formatToParts(new Date());
             const yearPart = parts.find(p => p.type === 'year').value;
             const monthPart = parts.find(p => p.type === 'month').value;
             const dayPart = parts.find(p => p.type === 'day').value;
-            const startOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`).getTime();
+            
+            let startOfWindow = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`).getTime();
             const endOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T23:59:59.999+05:30`).getTime();
             
+            const expiryTokens = [];
+            expiryTokens.push(`${dayPart}${monthMap[monthPart]}${yearPart.slice(-2)}`);
+            expiryTokens.push(`${yearPart.slice(-2)}${monthCharMap[monthPart]}${dayPart}`);
+
+            if (includeYesterday) {
+                const yesterdayDate = new Date(startOfWindow - (12 * 60 * 60 * 1000));
+                const yParts = formatter.formatToParts(yesterdayDate);
+                const yYear = yParts.find(p => p.type === 'year').value;
+                const yMonth = yParts.find(p => p.type === 'month').value;
+                const yDay = yParts.find(p => p.type === 'day').value;
+                startOfWindow = new Date(`${yYear}-${yMonth}-${yDay}T00:00:00+05:30`).getTime();
+                expiryTokens.push(`${yDay}${monthMap[yMonth]}${yYear.slice(-2)}`);
+                expiryTokens.push(`${yYear.slice(-2)}${monthCharMap[yMonth]}${yDay}`);
+            }
+
             const expiringInstruments = await db('instruments')
-                .where('expiry_timestamp', '>=', startOfToday)
+                .where('expiry_timestamp', '>=', startOfWindow)
                 .where('expiry_timestamp', '<=', endOfToday)
                 .select('unique_symbol');
             const expiringUniqueSymbols = expiringInstruments.map(i => i.unique_symbol);
 
             // Find all expiring assets in Holdings OR Positions
             let posQuery = db('positions').whereNot({ quantity: 0 }).where(function() {
-                this.where('symbol', 'like', `%${expiryToken1}%`)
-                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
-                    .orWhereIn('symbol', expiringUniqueSymbols);
+                const b = this;
+                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
+                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
             });
             let holdQuery = db('holdings').whereNot({ quantity: 0 }).where(function() {
-                this.where('symbol', 'like', `%${expiryToken1}%`)
-                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
-                    .orWhereIn('symbol', expiringUniqueSymbols);
+                const b = this;
+                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
+                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
             });
             
             // Cancel ALL pending open orders for expiring symbols globally (even if user has no position)
             let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).where(function() {
-                this.where('symbol', 'like', `%${expiryToken1}%`)
-                    .orWhere('symbol', 'like', `%${expiryToken2}%`)
-                    .orWhereIn('symbol', expiringUniqueSymbols);
+                const b = this;
+                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
+                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
             });
             
             if (isCommodity) {
@@ -279,14 +325,21 @@ class PositionsEngine {
                 orderQuery = orderQuery.whereNot('symbol', 'like', '%MCX%');
             }
 
-            // Filter to ensure contracts actually expire TODAY (prevents matching strike numbers like 26805 as expiry tokens)
+            // Filter to ensure contracts actually expire in window (strips exchange prefix before matching)
             const isActuallyExpiringToday = (sym) => {
-                if (expiringUniqueSymbols.includes(sym)) return true;
-                const expDate = parseExpiryDate(sym);
+                if (!sym) return false;
+                const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+                if (expiringUniqueSymbols.includes(sym) || expiringUniqueSymbols.includes(cleanSym)) return true;
+                const expDate = parseExpiryDate(sym) || parseExpiryDate(cleanSym);
                 if (expDate) {
                     const now = new Date();
                     const istNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-                    return formatDate(expDate) === formatDate(istNow);
+                    if (formatDate(expDate) === formatDate(istNow)) return true;
+                    if (includeYesterday) {
+                        const yestDate = new Date(istNow);
+                        yestDate.setDate(yestDate.getDate() - 1);
+                        if (formatDate(expDate) === formatDate(yestDate)) return true;
+                    }
                 }
                 return false;
             };
@@ -300,15 +353,17 @@ class PositionsEngine {
                 await db.transaction(async (trx) => {
                     if (stale.margin > 0) {
                         const user = await trx('users').where({ id: stale.user_id }).first();
-                        await trx('users').where({ id: stale.user_id }).update({
-                            balance: Number(user.balance) + Number(stale.margin)
-                        });
-                        await trx('ledger').insert({
-                            user_id: stale.user_id,
-                            amount: Number(stale.margin),
-                            type: 'MARGIN_RELEASE',
-                            description: `Margin refunded: expiry settlement cancelled open order for ${stale.symbol}`
-                        });
+                        if (user) {
+                            await trx('users').where({ id: stale.user_id }).update({
+                                balance: Number(user.balance) + Number(stale.margin)
+                            });
+                            await trx('ledger').insert({
+                                user_id: stale.user_id,
+                                amount: Number(stale.margin),
+                                type: 'MARGIN_RELEASE',
+                                description: `Margin refunded: expiry settlement cancelled open order for ${stale.symbol}`
+                            });
+                        }
                     }
                     await trx('orders').where({ id: stale.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                     triggerEngine.removeOrderFromMemory(stale.id, stale.symbol);
@@ -317,18 +372,91 @@ class PositionsEngine {
             }
 
             const allSymbols = [...expiringPositions.map(p => p.symbol), ...expiringHoldings.map(h => h.symbol)];
-            const priceCache = await ensureLivePrices(allSymbols);
+            
+            // Extract underlying symbols to ensure their spot closing prices are in cache for intrinsic value settlement
+            const spotSymbolsToFetch = [];
+            for (const sym of allSymbols) {
+                const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+                const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
+                if (m && m[1]) {
+                    const u = m[1];
+                    spotSymbolsToFetch.push(u, `NSE:${u}`, `NSE:${u}-INDEX`, `NSE:${u}-EQ`, `BSE:${u}`);
+                }
+            }
+            const priceCache = await ensureLivePrices([...allSymbols, ...spotSymbolsToFetch]);
             
             // Helper to submit settlement order
             const submitSettlementOrder = async (item, isHolding) => {
-                // At 3:25 PM, use live market LTP from cache. If expired with no tick, settle at 0 (never refund purchase price)
-                const cachedLtp = priceCache[item.symbol]?.ltp;
-                const ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
+                const sym = item.symbol;
+                const cleanSym = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
                 const side = item.quantity > 0 ? 'SELL' : 'BUY';
                 const orderQty = Math.abs(item.quantity);
                 const prodType = isHolding ? 'DEL' : item.product_type;
 
-                // BUG FIX 5: Store actual LTP in price field (not 0) so order history shows correct price
+                let ltp = 0;
+                const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+
+                if (isOpt) {
+                    // Option cash settlement at intrinsic value
+                    let optType = null;
+                    let strike = 0;
+                    let underlying = null;
+
+                    const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
+                    if (monthlyMatch) {
+                        underlying = monthlyMatch[1];
+                        strike = parseFloat(monthlyMatch[4]);
+                        optType = monthlyMatch[5].toUpperCase();
+                    } else {
+                        const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+                        if (weeklyMatch) {
+                            underlying = weeklyMatch[1];
+                            strike = parseFloat(weeklyMatch[5]);
+                            optType = weeklyMatch[6].toUpperCase();
+                        } else {
+                            const genMatch = cleanSym.match(/([A-Z0-9]+).*?(\d{3,6})(CE|PE)$/i);
+                            if (genMatch) {
+                                underlying = genMatch[1];
+                                strike = parseFloat(genMatch[2]);
+                                optType = genMatch[3].toUpperCase();
+                            }
+                        }
+                    }
+
+                    let spotPrice = 0;
+                    if (underlying) {
+                        const candidates = [
+                            underlying,
+                            `NSE:${underlying}`,
+                            `NSE:${underlying}-INDEX`,
+                            `NSE:${underlying}-EQ`,
+                            `BSE:${underlying}`
+                        ];
+                        for (const cand of candidates) {
+                            if (priceCache[cand]?.ltp > 0) {
+                                spotPrice = Number(priceCache[cand].ltp);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (spotPrice > 0 && strike > 0 && optType) {
+                        if (optType === 'CE') {
+                            ltp = Math.max(0, spotPrice - strike);
+                        } else {
+                            ltp = Math.max(0, strike - spotPrice);
+                        }
+                    } else {
+                        const cachedLtp = priceCache[item.symbol]?.ltp;
+                        ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
+                    }
+                } else {
+                    const cachedLtp = priceCache[item.symbol]?.ltp;
+                    ltp = (cachedLtp !== undefined && cachedLtp !== null) ? Number(cachedLtp) : 0;
+                }
+
+                ltp = Math.max(0, parseFloat(Number(ltp).toFixed(2)));
+
                 const [orderId] = await db('orders').insert({
                     user_id: item.user_id,
                     symbol: item.symbol,
@@ -338,13 +466,13 @@ class PositionsEngine {
                     price: ltp,
                     status: 'PENDING',
                     product_type: prodType,
-                    is_rms: true,
+                    is_rms: false, // Natural contract expiry: zero penalty
                     created_at: new Date(),
                     updated_at: new Date()
                 }).returning('id');
 
                 const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
-                orderRow.is_rms = true;
+                orderRow.is_rms = false;
                 await triggerEngine.executeOrder(orderRow, ltp);
                 console.log(`[EXPIRY SETTLED] ${item.symbol} (${side} ${orderQty} @ ${ltp}) for User ${item.user_id}`);
             };
@@ -358,20 +486,34 @@ class PositionsEngine {
         } catch (error) {
             console.error(`[EXPIRY SETTLEMENT ERROR]:`, error);
         } finally {
-            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+            if (connection) {
+                try {
+                    if (isLocked) {
+                        await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                    }
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
         }
     }
 
     async runHoldingsMigration(onlyBeforeToday = false) {
         const lockKey = 'cron_holdings_migration';
-        const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-        if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-            console.log('[HOLDINGS MIGRATION] Already running on another cluster worker. Skipping.');
-            return;
-        }
-
-        console.log(`[HOLDINGS MIGRATION] Starting T+1 Holdings Migration (Startup Catchup: ${onlyBeforeToday})...`);
+        let connection = null;
+        let isLocked = false;
         try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log('[HOLDINGS MIGRATION] Already running on another cluster worker. Skipping.');
+                    return;
+                }
+            }
+
+            console.log(`[HOLDINGS MIGRATION] Starting T+1 Holdings Migration (Startup Catchup: ${onlyBeforeToday})...`);
             await db.transaction(async (trx) => {
                 // 1. Fetch all Delivery positions with Qty > 0
                 let query = trx('positions')
@@ -441,7 +583,7 @@ class PositionsEngine {
                     await trx('positions')
                         .whereIn('id', migratedIds)
                         .update({ 
-                            closed_quantity: trx.raw('quantity'), 
+                            closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + quantity'), 
                             quantity: 0, 
                             margin: 0,
                             updated_at: new Date() 
@@ -454,7 +596,15 @@ class PositionsEngine {
         } catch (error) {
             console.error(`[HOLDINGS MIGRATION ERROR]:`, error);
         } finally {
-            await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+            if (connection) {
+                try {
+                    if (isLocked) {
+                        await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                    }
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
         }
     }
 }

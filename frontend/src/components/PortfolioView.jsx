@@ -192,7 +192,7 @@ export default function PortfolioView() {
   };
 
   allMergedHoldings.forEach(h => calculatePnL(h, true));
-  (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC').forEach(p => calculatePnL(p, false));
+  (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC' && p.product_type !== 'DELIVERY').forEach(p => calculatePnL(p, false));
 
   const isToday = (dateString) => {
     if (!dateString) return false;
@@ -237,14 +237,20 @@ export default function PortfolioView() {
     let list = deliveryPositions.map(pos => {
       const priceData = portfolioPrices[pos.symbol] || {};
       const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
+      const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
+      const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
       const qty = Math.abs(pos.quantity);
       const invested = parseFloat(pos.average_price) * qty;
       const current = ltp * qty;
       const pnl = current - invested;
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+      const dayChangeVal = chg * qty;
       return {
         ...pos,
         ltp,
+        chg,
+        chgp,
+        dayChangeVal,
         qty,
         invested,
         current,
@@ -937,6 +943,9 @@ export default function PortfolioView() {
                             <div>Qty: <strong style={{ color: 'var(--text-primary)' }}>{pos.qty}</strong> • Avg: ₹{parseFloat(pos.average_price).toFixed(2)}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span>LTP: <strong style={{ color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</strong></span>
+                              <span style={{ fontSize: '10px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
+                              </span>
                               <span style={{ 
                                 fontSize: '10px', 
                                 color: '#FF3B30', 
@@ -969,6 +978,7 @@ export default function PortfolioView() {
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Qty</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Live LTP</th>
+                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Current Value</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Total Return (P&L)</th>
@@ -978,7 +988,7 @@ export default function PortfolioView() {
                   <tbody>
                     {processedHoldings.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <td colSpan={9} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <Layers size={36} style={{ opacity: 0.3 }} />
                             <div style={{ fontSize: '14px', fontWeight: '600' }}>No Delivery Holdings Found</div>
@@ -1009,6 +1019,14 @@ export default function PortfolioView() {
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>{pos.qty}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                              <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                                {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
+                              </div>
+                            </td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right' }}>

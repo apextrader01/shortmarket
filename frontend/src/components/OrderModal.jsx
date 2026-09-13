@@ -173,10 +173,12 @@ export default function OrderModal() {
     if (side === 'SELL' && pQty > 0) return true;
     return false;
   });
-  const isOpposingPositionExit = !!matchingOpenPos;
+  const openPosQty = matchingOpenPos ? Math.abs(Number(matchingOpenPos.quantity || 0)) : 0;
+  const isOpposingPositionExit = !!matchingOpenPos && totalQuantity <= openPosQty;
 
   const isFuture = marginCalc.isFuture;
-  const isTrueExit = (orderModal.isExit && side === orderModal.type) || isDelSellFromHoldings || isOpposingPositionExit;
+  const isModalExplicitExit = orderModal.isExit && side === orderModal.type && (orderModal.exitQuantity ? totalQuantity <= Number(orderModal.exitQuantity) : true);
+  const isTrueExit = isModalExplicitExit || isDelSellFromHoldings || isOpposingPositionExit;
   const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
   const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
   const leverageText = isTrueExit 

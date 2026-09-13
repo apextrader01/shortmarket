@@ -40,6 +40,34 @@ export function getISTDateString(dateVal) {
   return `${y}-${m}-${day}`;
 }
 
+export function safeFormatDateTime(val) {
+  if (!val) return '-';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '-';
+  try {
+    return d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  } catch (e) {
+    return '-';
+  }
+}
+
+export function safeFormatTime(val) {
+  if (!val) return '-';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '-';
+  try {
+    return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+  } catch (e) {
+    return '-';
+  }
+}
+
+export function safeToFixed(val, digits = 2) {
+  const num = Number(val);
+  if (!Number.isFinite(num)) return (0).toFixed(digits);
+  return num.toFixed(digits);
+}
+
 /**
  * Robust filter for any list of records based on period preset or custom date range
  */
@@ -723,7 +751,7 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
     grandTotalCharges += ch.totalCharges;
 
     return {
-      date: new Date(o.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      date: safeFormatDateTime(o.created_at),
       orderId: o.id || 'N/A',
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',
@@ -898,13 +926,13 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
     ledgerWithBalance.forEach(l => {
       const amt = Number(l.amount) || 0;
       rows.push([
-        esc(new Date(l.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })),
+        esc(safeFormatDateTime(l.created_at)),
         esc(l.type),
         esc(l.description || l.type),
         esc(amt > 0 ? amt.toFixed(2) : '0.00'),
         esc(amt < 0 ? Math.abs(amt).toFixed(2) : '0.00'),
         esc(amt.toFixed(2)),
-        esc(Number(l.running_balance).toFixed(2))
+        esc(safeToFixed(l.running_balance, 2))
       ]);
     });
 
@@ -924,12 +952,12 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
       const amt = Number(l.amount) || 0;
       return `
         <tr>
-          <td>${new Date(l.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+          <td>${safeFormatDateTime(l.created_at)}</td>
           <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9.5px;">${String(l.type || '').replace('_', ' ')}</span></td>
           <td>${l.description || l.type}</td>
           <td class="text-right text-green">${amt > 0 ? `₹${amt.toFixed(2)}` : '-'}</td>
           <td class="text-right text-red">${amt < 0 ? `₹${Math.abs(amt).toFixed(2)}` : '-'}</td>
-          <td class="text-right" style="font-weight: 700; color: #1e3a8a;">₹${Number(l.running_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right" style="font-weight: 700; color: #1e3a8a;">₹${Number(l.running_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
         </tr>
       `;
     }).join('');
@@ -965,12 +993,12 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
       const amt = Number(l.amount) || 0;
       return `
         <tr>
-          <td>${new Date(l.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+          <td>${safeFormatDateTime(l.created_at)}</td>
           <td><span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 9.5px;">${String(l.type || '').replace('_', ' ')}</span></td>
           <td>${l.description || l.type}</td>
           <td class="text-right text-green">${amt > 0 ? `₹${amt.toFixed(2)}` : '-'}</td>
           <td class="text-right text-red">${amt < 0 ? `₹${Math.abs(amt).toFixed(2)}` : '-'}</td>
-          <td class="text-right" style="font-weight: 700; color: #1e3a8a;">₹${Number(l.running_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right" style="font-weight: 700; color: #1e3a8a;">₹${Number(l.running_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
         </tr>
       `;
     }).join('');
@@ -1034,7 +1062,7 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
 
     return {
       orderNo: o.id || `ORD${1000 + idx}`,
-      tradeTime: new Date(o.created_at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      tradeTime: safeFormatTime(o.created_at),
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',
       qty: Number(o.quantity) || 0,

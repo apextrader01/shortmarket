@@ -304,6 +304,17 @@ export default function PositionsView() {
     let failed = 0;
     let lastError = '';
     const results = await Promise.allSettled(openPositions.map(async (pos) => {
+      // Cancel any resting pending orders or trigger orders for this symbol first
+      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const restingOrders = (store.orders || []).filter(o => {
+        if (o.status !== 'PENDING' && o.status !== 'PENDING_TRIGGER') return false;
+        const oClean = (o.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        return o.symbol === pos.symbol || oClean === cleanSym;
+      });
+      for (const ord of restingOrders) {
+        await store.cancelOrder(ord.id).catch(() => {});
+      }
+
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const payload = {
         symbol: pos.symbol,

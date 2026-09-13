@@ -25,6 +25,17 @@ export default function AlertModal() {
       alert("Please enter a valid target price");
       return;
     }
+
+    if (ltp > 0) {
+      if (condition === 'ABOVE' && val <= ltp) {
+        alert(`Target price for 'ABOVE' alert must be greater than the current market price (₹${ltp.toFixed(2)})`);
+        return;
+      }
+      if (condition === 'BELOW' && val >= ltp) {
+        alert(`Target price for 'BELOW' alert must be less than the current market price (₹${ltp.toFixed(2)})`);
+        return;
+      }
+    }
     
     // Request notification permission if not granted
     if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
