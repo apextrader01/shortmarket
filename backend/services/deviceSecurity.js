@@ -126,7 +126,7 @@ function parseIpLocation(ip) {
  */
 async function syncBannedEntities(dbInstance, redisClient) {
   try {
-    const db = dbInstance || require('../database/db').db;
+    const db = dbInstance || require('../database/db');
     const bans = await db('banned_entities').select('type', 'value');
     localBannedIps.clear();
     localBannedPhones.clear();

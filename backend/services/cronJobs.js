@@ -32,9 +32,29 @@ function initCronJobs(priceCache, triggerEngine) {
         isEquityIntradayBlocked = true;
     }, TZ);
 
-    const isMCXWinterSession = () => {
-        const month = new Date().getMonth(); // 0 = Jan, 1 = Feb, 2 = Mar, 10 = Nov, 11 = Dec
-        return month === 10 || month === 11 || month === 0 || month === 1 || month === 2;
+    /**
+     * Determines whether MCX is operating on Winter Session timings (ends 23:55 IST)
+     * vs Summer Session timings (ends 23:30 IST) dynamically based on US DST.
+     * US DST (Summer) runs from the 2nd Sunday of March to the 1st Sunday of November.
+     * Winter session (Standard Time) is active from 1st Sunday of November to 2nd Sunday of March.
+     */
+    const isMCXWinterSession = (d = new Date()) => {
+        const year = d.getFullYear();
+        // Second Sunday of March
+        const marchFirst = new Date(Date.UTC(year, 2, 1));
+        const marchFirstDay = marchFirst.getUTCDay();
+        const firstSunMarch = marchFirstDay === 0 ? 1 : (7 - marchFirstDay + 1);
+        const secondSunMarch = firstSunMarch + 7;
+        const dstStart = new Date(Date.UTC(year, 2, secondSunMarch, 7, 0, 0));
+
+        // First Sunday of November
+        const novFirst = new Date(Date.UTC(year, 10, 1));
+        const novFirstDay = novFirst.getUTCDay();
+        const firstSunNov = novFirstDay === 0 ? 1 : (7 - novFirstDay + 1);
+        const dstEnd = new Date(Date.UTC(year, 10, firstSunNov, 6, 0, 0));
+
+        const isDstSummer = d >= dstStart && d < dstEnd;
+        return !isDstSummer;
     };
 
     cron.schedule('50 22 * * *', () => {

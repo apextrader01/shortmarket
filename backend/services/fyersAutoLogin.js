@@ -38,6 +38,36 @@ function generateTOTP(secret, epochTime = Date.now()) {
     return (otp % 1000000).toString().padStart(6, '0');
 }
 
+function encryptSecret(plaintext) {
+    if (!plaintext) return '';
+    const secret = process.env.JWT_SECRET || 'shortmarket_totp_encryption_secret_key_2026';
+    const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+    return `enc:${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+function decryptSecret(ciphertext) {
+    if (!ciphertext || !ciphertext.startsWith('enc:')) return ciphertext;
+    try {
+        const secret = process.env.JWT_SECRET || 'shortmarket_totp_encryption_secret_key_2026';
+        const key = crypto.scryptSync(secret, 'shortmarket_totp_salt', 32);
+        const parts = ciphertext.split(':');
+        if (parts.length !== 4) return ciphertext;
+        const [, ivHex, tagHex, encryptedHex] = parts;
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+        decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (e) {
+        return ciphertext;
+    }
+}
+
 async function getFyersCredentials() {
     let fy_id = null;
     let pin = null;
@@ -53,7 +83,7 @@ async function getFyersCredentials() {
         rows.forEach(r => {
             if (r.key === 'fyers_user_id' && r.value) fy_id = r.value.trim();
             if (r.key === 'fyers_pin' && r.value) pin = r.value.trim();
-            if (r.key === 'fyers_totp_key' && r.value) totp_key = r.value.trim();
+            if (r.key === 'fyers_totp_key' && r.value) totp_key = decryptSecret(r.value.trim());
             if (r.key === 'fyers_app_id' && r.value) app_id = r.value.trim();
             if (r.key === 'fyers_secret_id' && r.value) secret_id = r.value.trim();
         });
@@ -193,5 +223,7 @@ async function performFyersAutoLogin(retryCount = 0) {
 module.exports = {
     performFyersAutoLogin,
     getFyersCredentials,
-    generateTOTP
+    generateTOTP,
+    encryptSecret,
+    decryptSecret
 };

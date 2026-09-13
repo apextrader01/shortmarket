@@ -619,6 +619,8 @@ async function ensureCriticalColumns() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_user_id ON sips(user_id)');
+    await db.raw('ALTER TABLE sips ADD COLUMN IF NOT EXISTS failure_count INTEGER DEFAULT 0').catch(()=>null);
+    await db.raw('ALTER TABLE sips ADD COLUMN IF NOT EXISTS anchor_day INTEGER').catch(()=>null);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at DESC)');
     

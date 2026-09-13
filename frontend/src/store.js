@@ -1319,18 +1319,32 @@ export const useStore = create(persist((set, get) => ({
         const successful = results.filter(r => r && r.success);
         
         get().fetchUserData().catch(() => {});
-        if (successful.length > 0) {
+        if (successful.length === slices.length) {
           playOrderExecutedSound();
-          const totalPlacedQty = results.reduce((sum, r, idx) => (r && r.success ? sum + (Number(slices[idx]) || 0) : sum), 0);
-          const msg = successful.length === slices.length
-            ? `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
-            : `Placed ${successful.length} of ${slices.length} sliced orders (${totalPlacedQty} of ${quantity} qty placed)`;
           return {
             success: true,
-            status: successful[0].status || 'EXECUTED',
+            status: successful[0]?.status || 'EXECUTED',
             isSliced: true,
             slicesCount: slices.length,
-            message: msg
+            message: `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
+          };
+        } else if (successful.length > 0) {
+          playOrderExecutedSound();
+          const totalPlacedQty = results.reduce((sum, r, idx) => (r && r.success ? sum + (Number(slices[idx]) || 0) : sum), 0);
+          const failedResults = results.filter(r => !r || !r.success);
+          const firstErr = failedResults[0]?.error || 'Some order slices failed to execute';
+          return {
+            success: false,
+            partialSuccess: true,
+            status: 'PARTIAL',
+            placedCount: successful.length,
+            totalSlices: slices.length,
+            placedQty: totalPlacedQty,
+            totalQty: quantity,
+            isSliced: true,
+            slicesCount: slices.length,
+            error: `Partial fill: ${successful.length}/${slices.length} slices placed (${totalPlacedQty}/${quantity} qty). Failed remainder: ${firstErr}`,
+            message: `Partial fill: Placed ${successful.length} of ${slices.length} slices (${totalPlacedQty}/${quantity} qty). Remaining failed: ${firstErr}`
           };
         } else {
           const firstErr = results[0]?.error || 'Order placement failed';
@@ -1371,6 +1385,65 @@ export const useStore = create(persist((set, get) => ({
     } catch (err) {
       console.error('[setupSip ERROR]', err);
       return null;
+    }
+  },
+
+  // Defect 42: Create SIP action for MutualFundModal and general SIP creation
+  createSip: async (sipPayload) => {
+    try {
+      const symbol = String(sipPayload.scheme_code || sipPayload.symbol || '');
+      const symWithSuffix = symbol.endsWith('-MF') ? symbol : `${symbol}-MF`;
+      const payload = {
+        symbol: symWithSuffix,
+        amount: Number(sipPayload.amount),
+        frequency: sipPayload.frequency || 'MONTHLY',
+        anchor_day: sipPayload.sip_day || sipPayload.anchor_day,
+        name: sipPayload.scheme_name || sipPayload.name
+      };
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/sip`, {
+        credentials: 'include',
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData().catch(() => {});
+        return data;
+      }
+      return { success: false, error: data.error || 'Failed to create SIP' };
+    } catch (err) {
+      console.error('[createSip ERROR]', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  // Defect 41: Lumpsum Mutual Fund Purchase action
+  buyMutualFund: async (schemeCode, amount) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/mutual-funds/buy`, {
+        credentials: 'include',
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ scheme_code: schemeCode, amount: Number(amount) })
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData().catch(() => {});
+        return data;
+      }
+      return { success: false, error: data.error || 'Mutual fund purchase failed' };
+    } catch (err) {
+      console.error('[buyMutualFund ERROR]', err);
+      return { success: false, error: err.message };
     }
   },
 

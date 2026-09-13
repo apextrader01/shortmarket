@@ -33,11 +33,14 @@ function authenticateToken(req, res, next) {
         if (banCache.size > 10000) banCache.clear();
         banCache.set(user.id, cachedBan);
       }
-      if (cachedBan.is_banned) {
+      if (cachedBan && cachedBan.is_banned) {
         return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
       }
     } catch (e) {
-      // Ignore db errors silently to not break auth if DB is temporarily slow
+      const fallbackBan = banCache.get(user.id);
+      if (fallbackBan && fallbackBan.is_banned) {
+        return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      }
     }
 
     const tokenHash = hashToken(token);

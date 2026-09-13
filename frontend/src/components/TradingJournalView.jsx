@@ -61,6 +61,45 @@ export default function TradingJournalView({ onBack }) {
   const [filterResult, setFilterResult] = useState('ALL'); // 'ALL' | 'WIN' | 'LOSS'
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Defect 48: Load and synchronize journal entries with backend on mount
+  useEffect(() => {
+    const syncJournalFromBackend = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${API}/api/journal/trades?limit=500`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.trades)) {
+          setJournalEntries(prev => {
+            const merged = { ...prev };
+            data.trades.forEach(t => {
+              const key = t.trade_id || `trade-${t.id}`;
+              if (key) {
+                merged[key] = {
+                  strategy: t.strategy || '',
+                  emotion: t.emotion || '',
+                  notes: t.notes || '',
+                  rating: t.setup_rating || 5,
+                  updatedAt: t.updated_at || t.created_at,
+                  backendId: t.id
+                };
+              }
+            });
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('Journal backend sync unavailable, using local cache:', err.message);
+      }
+    };
+    syncJournalFromBackend();
+  }, [userId, storageKey]);
+
   const saveJournalEntry = (tradeId, data) => {
     const updated = {
       ...journalEntries,
@@ -74,6 +113,38 @@ export default function TradingJournalView({ onBack }) {
       localStorage.setItem(storageKey, JSON.stringify(updated));
     } catch (e) {
       console.error('Failed to save journal entry to localStorage', e);
+    }
+
+    // Defect 48: Persist journal tags, notes, and emotions to backend database
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const trade = (tradesList || []).find(t => t.id === tradeId || t.rawId === tradeId);
+        fetch(`${API}/api/journal/trades`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            trade_id: String(tradeId),
+            symbol: trade?.symbol || 'TRADE',
+            trade_type: trade?.side || 'BUY',
+            product_type: trade?.product_type || 'INT',
+            entry_price: trade?.avg || 0,
+            exit_price: trade?.exit_price || trade?.avg || 0,
+            quantity: trade?.qty || 1,
+            realized_pnl: trade?.pnl || 0,
+            strategy: data.strategy || '',
+            emotion: data.emotion || '',
+            notes: data.notes || '',
+            setup_rating: data.rating || 5,
+            trade_date: trade?.time ? new Date(trade.time).toISOString() : new Date().toISOString()
+          })
+        }).catch(err => console.warn('Background journal sync error:', err.message));
+      }
+    } catch (err) {
+      console.warn('Failed to dispatch journal sync:', err);
     }
   };
 

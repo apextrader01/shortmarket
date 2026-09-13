@@ -76,8 +76,8 @@ class PositionsEngine {
         }, { timezone: 'Asia/Kolkata' });
 
         // COMMODITIES
-        // Condition 10: Expiry Day Settlement (Commodities) - 07:00 PM (19:00)
-        cron.schedule('0 19 * * *', () => {
+        // Condition 10: Expiry Day Settlement (Commodities) - 11:35 PM (23:35) IST after MCX market close
+        cron.schedule('35 23 * * *', () => {
             this.settleExpiries(true); // true = Commodity
         }, { timezone: 'Asia/Kolkata' });
 
@@ -289,8 +289,11 @@ class PositionsEngine {
             const endOfToday = new Date(`${yearPart}-${monthPart}-${dayPart}T23:59:59.999+05:30`).getTime();
             
             const expiryTokens = [];
-            expiryTokens.push(`${dayPart}${monthMap[monthPart]}${yearPart.slice(-2)}`);
-            expiryTokens.push(`${yearPart.slice(-2)}${monthCharMap[monthPart]}${dayPart}`);
+            expiryTokens.push(`${dayPart}${monthMap[monthPart]}${yearPart.slice(-2)}`); // Weekly: e.g. 31OCT24
+            expiryTokens.push(`${yearPart.slice(-2)}${monthCharMap[monthPart]}${dayPart}`); // Weekly compact: e.g. 24O31
+            if (parseInt(dayPart, 10) >= 21) {
+                expiryTokens.push(`${yearPart.slice(-2)}${monthMap[monthPart]}`); // Monthly: e.g. 24OCT
+            }
 
             if (includeYesterday) {
                 const yesterdayDate = new Date(startOfWindow - (12 * 60 * 60 * 1000));
@@ -301,6 +304,9 @@ class PositionsEngine {
                 startOfWindow = new Date(`${yYear}-${yMonth}-${yDay}T00:00:00+05:30`).getTime();
                 expiryTokens.push(`${yDay}${monthMap[yMonth]}${yYear.slice(-2)}`);
                 expiryTokens.push(`${yYear.slice(-2)}${monthCharMap[yMonth]}${yDay}`);
+                if (parseInt(yDay, 10) >= 21) {
+                    expiryTokens.push(`${yYear.slice(-2)}${monthMap[yMonth]}`);
+                }
             }
 
             const expiringInstruments = await db('instruments')
@@ -440,6 +446,8 @@ class PositionsEngine {
                     if (underlying) {
                         const candidates = [
                             underlying,
+                            `${underlying}-NSE`,
+                            `${underlying}-BSE`,
                             `NSE:${underlying}`,
                             `NSE:${underlying}-INDEX`,
                             `NSE:${underlying}-EQ`,
@@ -470,6 +478,56 @@ class PositionsEngine {
 
                 ltp = Math.max(0, parseFloat(Number(ltp).toFixed(2)));
 
+                // Defect 32: Direct position lapse at ₹0 without creating synthetic orders or fees on worthless OTM options
+                if (isOpt && ltp === 0) {
+                    await db.transaction(async (trx) => {
+                        await trx.raw('SELECT pg_advisory_xact_lock(?)', [item.user_id]);
+                        if (isHolding) {
+                            await trx('holdings').where({ id: item.id }).del();
+                        } else {
+                            const entryPrice = parseFloat(item.average_price) || 0;
+                            const realizedPnl = item.quantity > 0 ? -entryPrice * orderQty : entryPrice * orderQty;
+                            const marginBlocked = parseFloat(item.margin) || 0;
+
+                            await trx('positions').where({ id: item.id }).update({
+                                quantity: 0,
+                                closed_quantity: (parseFloat(item.closed_quantity) || 0) + orderQty,
+                                exit_price: 0,
+                                margin: 0,
+                                realized_pnl: (parseFloat(item.realized_pnl) || 0) + realizedPnl,
+                                updated_at: new Date()
+                            });
+
+                            if (marginBlocked > 0) {
+                                const u = await trx('users').where({ id: item.user_id }).forUpdate().first();
+                                if (u) {
+                                    await trx('users').where({ id: item.user_id }).update({ balance: Math.round((parseFloat(u.balance) + marginBlocked + Number.EPSILON) * 100) / 100 });
+                                    await trx('ledger').insert({
+                                        user_id: item.user_id,
+                                        amount: marginBlocked,
+                                        type: 'MARGIN_RELEASE',
+                                        description: `Margin released on expired worthless contract: ${item.symbol}`
+                                    });
+                                }
+                            }
+                            if (realizedPnl !== 0) {
+                                await trx('ledger').insert({
+                                    user_id: item.user_id,
+                                    amount: realizedPnl,
+                                    type: 'REALIZED_PNL',
+                                    description: `Realized loss on expired worthless contract: ${item.symbol}`
+                                });
+                            }
+                        }
+                    });
+                    console.log(`[EXPIRY LAPSED AT ₹0] ${item.symbol} lapsed without charges for User ${item.user_id}`);
+                    return;
+                }
+
+                // Defect 31: SEBI physical delivery vs cash settlement segregation
+                const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'].includes(underlying?.toUpperCase());
+                const settlementRemark = isIndex ? 'Cash Settlement at Expiry' : 'Physical Delivery Settlement at Expiry (SEBI)';
+
                 const [orderId] = await db('orders').insert({
                     user_id: item.user_id,
                     symbol: item.symbol,
@@ -480,6 +538,7 @@ class PositionsEngine {
                     status: 'PENDING',
                     product_type: prodType,
                     is_rms: false, // Natural contract expiry: zero penalty
+                    remarks: settlementRemark,
                     created_at: new Date(),
                     updated_at: new Date()
                 }).returning('id');

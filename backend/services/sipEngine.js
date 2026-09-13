@@ -64,29 +64,49 @@ class SIPEngine {
   }
 
   /**
-   * Calculate next execution date based on frequency
+   * Calculate next execution date based on frequency with anchor mandate day clamping (Defect 35)
    */
-  static getNextExecutionDate(currentDate, frequency) {
+  static getNextExecutionDate(currentDate, frequency, anchorDay = null) {
     const now = currentDate ? new Date(currentDate) : new Date();
     // Parse current date in Asia/Kolkata timezone to avoid UTC drift
     const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
     const [y, m, d] = istDateStr.split('-').map(Number);
+    const targetAnchor = anchorDay || d;
 
-    // Default to 09:30 AM IST (04:00 AM UTC) on that target date
-    const nextDate = new Date(Date.UTC(y, m - 1, d, 4, 0, 0));
     const freq = (frequency || 'MONTHLY').toUpperCase();
-    
+    let targetYear = y;
+    let targetMonth = m - 1; // 0-indexed month
+
     if (freq === 'DAILY') {
+      const nextDate = new Date(Date.UTC(y, m - 1, d, 4, 0, 0));
       nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+      while (nextDate.getUTCDay() === 0 || nextDate.getUTCDay() === 6) {
+        nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+      }
+      return nextDate;
     } else if (freq === 'WEEKLY') {
+      const nextDate = new Date(Date.UTC(y, m - 1, d, 4, 0, 0));
       nextDate.setUTCDate(nextDate.getUTCDate() + 7);
+      while (nextDate.getUTCDay() === 0 || nextDate.getUTCDay() === 6) {
+        nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+      }
+      return nextDate;
     } else if (freq === 'YEARLY') {
-      nextDate.setUTCFullYear(nextDate.getUTCFullYear() + 1);
+      targetYear += 1;
     } else {
       // Default: MONTHLY
-      nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
+      targetMonth += 1;
+      if (targetMonth > 11) {
+        targetMonth = 0;
+        targetYear += 1;
+      }
     }
 
+    // Clamped mandate day in target month (Defect 35: ensures 29th-31st clamps cleanly without skipping Feb)
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(targetAnchor, daysInTargetMonth);
+
+    const nextDate = new Date(Date.UTC(targetYear, targetMonth, clampedDay, 4, 0, 0));
     // Skip Saturday (6) and Sunday (0) to Monday
     while (nextDate.getUTCDay() === 0 || nextDate.getUTCDay() === 6) {
       nextDate.setUTCDate(nextDate.getUTCDate() + 1);
@@ -118,9 +138,36 @@ class SIPEngine {
       if (!user) throw new Error('User not found');
 
       const amount = parseFloat(sip.amount);
+      const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
+      const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
+
+      // Anchor day for mandate month-end handling (Defect 35)
+      const anchorDay = sip.anchor_day || (sip.next_execution_date ? new Date(sip.next_execution_date).getUTCDate() : new Date().getUTCDate());
+
+      // Defect 36: Insufficient balance retry backoff & pause after 3 failures
       if (parseFloat(user.balance) < amount) {
-        console.warn(`[SIPEngine] User ${user.username} has insufficient balance (₹${user.balance} < ₹${amount}) for SIP #${sip.id}`);
-        return { success: false, reason: 'INSUFFICIENT_FUNDS', required: amount, available: parseFloat(user.balance) };
+        const failureCount = (sip.failure_count || 0) + 1;
+        const shouldPause = failureCount >= 3;
+        const nextDate = SIPEngine.getNextExecutionDate(sip.next_execution_date || new Date(), sip.frequency, anchorDay);
+
+        const updateData = {
+          failure_count: failureCount,
+          next_execution_date: nextDate,
+          updated_at: new Date()
+        };
+        if (shouldPause) {
+          updateData.status = 'PAUSED';
+          console.warn(`[SIPEngine] ⚠️ SIP #${sip.id} paused due to ${failureCount} consecutive balance failures.`);
+        }
+
+        await trx('sips').where({ id: sip.id }).update(updateData);
+        console.warn(`[SIPEngine] User ${user.username} has insufficient balance (₹${user.balance} < ₹${amount}) for SIP #${sip.id}. Failure count: ${failureCount}. Rescheduled to ${nextDate.toISOString()}`);
+        return {
+          success: false,
+          reason: shouldPause ? 'SIP_PAUSED_INSUFFICIENT_FUNDS' : 'INSUFFICIENT_FUNDS',
+          failureCount,
+          nextExecutionDate: nextDate
+        };
       }
 
       // Fetch latest NAV
@@ -129,25 +176,37 @@ class SIPEngine {
         console.warn(`[SIPEngine] Latest NAV unavailable for ${sip.symbol}. Skipping SIP #${sip.id} for retry.`);
         return { success: false, reason: 'NAV_UNAVAILABLE' };
       }
-      const units = parseFloat((amount / nav).toFixed(4));
-      if (units <= 0) {
-        console.warn(`[SIPEngine] Calculated units zero for SIP #${sip.id} (amount: ₹${amount}, NAV: ₹${nav})`);
-        return { success: false, reason: 'ZERO_UNITS_ALLOCATED' };
+
+      // Defect 38: Fractional Share Allocation in Cash Equity SIP
+      let units = 0;
+      let actualDebitAmount = amount;
+      if (isMf) {
+        // Mutual funds allow fractional units (up to 4 decimal places)
+        units = parseFloat((amount / nav).toFixed(4));
+        if (units <= 0) {
+          console.warn(`[SIPEngine] Calculated units zero for SIP #${sip.id} (amount: ₹${amount}, NAV: ₹${nav})`);
+          return { success: false, reason: 'ZERO_UNITS_ALLOCATED' };
+        }
+      } else {
+        // Cash Equities require integer shares on Indian exchanges
+        units = Math.floor(amount / nav);
+        if (units < 1) {
+          console.warn(`[SIPEngine] SIP amount ₹${amount} insufficient to purchase 1 whole share of ${sip.symbol} @ ₹${nav}`);
+          return { success: false, reason: 'INSUFFICIENT_FUNDS_FOR_FULL_SHARE', sharePrice: nav, sipAmount: amount };
+        }
+        actualDebitAmount = parseFloat((units * nav).toFixed(2));
       }
 
-      const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
-      const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
-
-      // 1. Deduct user balance
-      const newBalance = parseFloat(user.balance) - amount;
+      // 1. Deduct user balance for actual purchase amount (paise rounded)
+      const newBalance = Math.round((parseFloat(user.balance) - actualDebitAmount) * 100) / 100;
       await trx('users').where({ id: user.id }).update({ balance: newBalance });
 
-      // 2. Insert into ledger (MARGIN_BLOCK compliant with ledger table check constraint)
+      // 2. Defect 37: Insert into ledger with proper description & MARGIN_BLOCK type compliant with schema constraint
       await trx('ledger').insert({
         user_id: user.id,
-        amount: -amount,
+        amount: -actualDebitAmount,
         type: 'MARGIN_BLOCK',
-        description: `SIP Installment (${sip.frequency}): Bought ${units} units of ${sip.symbol} @ ₹${nav.toFixed(2)}`
+        description: `SIP Installment Purchase (${sip.frequency}): Bought ${units} ${isMf ? 'units' : 'shares'} of ${sip.symbol} @ ₹${nav.toFixed(2)}${actualDebitAmount < amount ? ` (Unused cash ₹${(amount - actualDebitAmount).toFixed(2)} retained in balance)` : ''}`
       });
 
       // 3. Create executed order record for audit & history
@@ -161,7 +220,7 @@ class SIPEngine {
         average_price: nav,
         status: 'COMPLETED',
         product_type: 'DEL',
-        margin: amount,
+        margin: actualDebitAmount,
         remarks: `SIP Installment (${sip.frequency})`,
         created_at: new Date(),
         updated_at: new Date()
@@ -175,8 +234,8 @@ class SIPEngine {
       if (existingHolding) {
         const currentQty = parseFloat(existingHolding.quantity);
         const currentAvg = parseFloat(existingHolding.average_price);
-        const newQty = parseFloat((currentQty + units).toFixed(4));
-        const newAvg = ((currentQty * currentAvg) + amount) / newQty;
+        const newQty = isMf ? parseFloat((currentQty + units).toFixed(4)) : (currentQty + units);
+        const newAvg = ((currentQty * currentAvg) + actualDebitAmount) / newQty;
 
         await trx('holdings').where({ id: existingHolding.id }).update({
           quantity: newQty,
@@ -195,15 +254,17 @@ class SIPEngine {
         });
       }
 
-      // 5. Update next execution date
-      const nextDate = SIPEngine.getNextExecutionDate(new Date(), sip.frequency);
+      // 5. Update next execution date and reset failure_count on success
+      const nextDate = SIPEngine.getNextExecutionDate(sip.next_execution_date || new Date(), sip.frequency, anchorDay);
       await trx('sips').where({ id: sip.id }).update({
         next_execution_date: nextDate,
+        failure_count: 0,
+        anchor_day: anchorDay,
         updated_at: new Date()
       });
 
-      console.log(`[SIPEngine] ✅ Successfully executed SIP #${sip.id} (${sip.symbol}) for ${user.username}: ${units} units @ NAV ₹${nav}`);
-      return { success: true, units, nav, amount, nextExecutionDate: nextDate };
+      console.log(`[SIPEngine] ✅ Successfully executed SIP #${sip.id} (${sip.symbol}) for ${user.username}: ${units} ${isMf ? 'units' : 'shares'} @ ₹${nav} (debited: ₹${actualDebitAmount})`);
+      return { success: true, units, nav, amount: actualDebitAmount, nextExecutionDate: nextDate };
     });
   }
 

@@ -160,10 +160,11 @@ class TriggerEngine {
                     }
                     const highWater = Number(tOrder.high_water_mark);
                     if (ltp > highWater) {
-                        const gain = ltp - highWater;
-                        if (gain >= step) {
-                            const stepsCount = Math.floor(gain / step);
-                            const ratchet = stepsCount * step;
+                        const gainPaise = Math.round((ltp - highWater) * 100);
+                        const stepPaise = Math.max(1, Math.round(step * 100));
+                        if (gainPaise >= stepPaise) {
+                            const stepsCount = Math.floor(gainPaise / stepPaise);
+                            const ratchet = (stepsCount * stepPaise) / 100;
                             tOrder.high_water_mark = Number((highWater + ratchet).toFixed(2));
                             newTriggerPrice = Number((newTriggerPrice + ratchet).toFixed(2));
                             tOrder.trigger_price = newTriggerPrice;
@@ -178,10 +179,11 @@ class TriggerEngine {
                     }
                     const lowWater = Number(tOrder.low_water_mark);
                     if (ltp < lowWater) {
-                        const drop = lowWater - ltp;
-                        if (drop >= step) {
-                            const stepsCount = Math.floor(drop / step);
-                            const ratchet = stepsCount * step;
+                        const dropPaise = Math.round((lowWater - ltp) * 100);
+                        const stepPaise = Math.max(1, Math.round(step * 100));
+                        if (dropPaise >= stepPaise) {
+                            const stepsCount = Math.floor(dropPaise / stepPaise);
+                            const ratchet = (stepsCount * stepPaise) / 100;
                             tOrder.low_water_mark = Number((lowWater - ratchet).toFixed(2));
                             newTriggerPrice = Number((newTriggerPrice - ratchet).toFixed(2));
                             tOrder.trigger_price = newTriggerPrice;
@@ -192,7 +194,12 @@ class TriggerEngine {
                 }
 
                 if (updated) {
-                    this.addOrderToMemory(tOrder).catch(() => {});
+                    const { generalClient } = require('./redisClient');
+                    if (generalClient && generalClient.isReady) {
+                        const isGreaterOrEqual = (tOrder.side === 'BUY');
+                        const zKey = isGreaterOrEqual ? `trigger:${tOrder.symbol}:GTE` : `trigger:${tOrder.symbol}:LTE`;
+                        generalClient.zAdd(zKey, [{ score: newTriggerPrice, value: orderId.toString() }]).catch(() => {});
+                    }
                     db('orders').where({ id: orderId }).update({
                         trigger_price: newTriggerPrice,
                         sl_price: newTriggerPrice,
@@ -507,10 +514,11 @@ class TriggerEngine {
                     } else {
                         realizedPnl = (existingPos.average_price - execPrice) * closeQty;
                     }
+                    realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
                     
                     const proportionClosed = closeQty / absPosQty;
-                    const marginRefund = (existingPos.margin || 0) * proportionClosed;
-                    const newMargin = (existingPos.margin || 0) - marginRefund;
+                    const marginRefund = Math.round(((existingPos.margin || 0) * proportionClosed + Number.EPSILON) * 100) / 100;
+                    const newMargin = Math.max(0, Math.round(((existingPos.margin || 0) - marginRefund + Number.EPSILON) * 100) / 100);
                     
                     const newQty = existingPos.quantity + qtyChange;
                     
@@ -538,8 +546,7 @@ class TriggerEngine {
                             })
                             .where(builder => {
                                 builder.where('status', 'PENDING_TRIGGER')
-                                       .orWhereNotNull('parent_order_id')
-                                       .orWhereIn('product_type', ['BO', 'CO']);
+                                       .orWhereNotNull('parent_order_id');
                             })
                             .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
                             
@@ -549,7 +556,7 @@ class TriggerEngine {
                             if (refundMargin > 0) {
                                 const user = await trx('users').where({ id: order.user_id }).first();
                                 if (user) {
-                                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + refundMargin });
+                                    await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100 });
                                     await trx('ledger').insert({
                                         user_id: order.user_id,
                                         amount: refundMargin,
@@ -569,12 +576,31 @@ class TriggerEngine {
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
                         });
+
+                        // Proportionally reduce child OCO legs if existing position was partially closed
+                        const childOrders = await trx('orders')
+                            .where({ user_id: order.user_id, product_type: order.product_type })
+                            .where(builder => {
+                                builder.where({ symbol: order.symbol })
+                                       .orWhere({ symbol: cleanSym });
+                            })
+                            .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                            .whereNotNull('parent_order_id');
+                        for (const child of childOrders) {
+                            const updatedChildQty = Math.max(0, child.quantity - closeQty);
+                            if (updatedChildQty === 0) {
+                                await trx('orders').where({ id: child.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                                this.removeOrderFromMemory(child.id, child.symbol);
+                            } else {
+                                await trx('orders').where({ id: child.id }).update({ quantity: updatedChildQty, updated_at: new Date() });
+                            }
+                        }
                     }
 
                     // Update Ledger for realized P&L and margin refund
                     const isRMS = order.is_rms || false;
                     const rmsPenalty = isRMS ? 59 : 0;
-                    let balanceChange = realizedPnl + marginRefund - rmsPenalty;
+                    let balanceChange = Math.round((realizedPnl + marginRefund - rmsPenalty + Number.EPSILON) * 100) / 100;
                     
                     if (marginRefund > 0) {
                         await trx('ledger').insert({ user_id: order.user_id, amount: marginRefund, type: 'MARGIN_RELEASE', description: `Margin released for closing ${closeQty} ${order.symbol}` });
@@ -588,7 +614,7 @@ class TriggerEngine {
                     }
                     
                     const user = await trx('users').where({ id: order.user_id }).first();
-                    await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + balanceChange });
+                    await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + balanceChange + Number.EPSILON) * 100) / 100 });
 
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {

@@ -71,6 +71,18 @@ try {
 async function sendPushNotification(userId, payload) {
   if (!userId) return;
 
+  // Defect 46: Sanitize target URL to prevent open redirect and javascript: injection attacks
+  const sanitizeUrl = (rawUrl) => {
+    if (!rawUrl || typeof rawUrl !== 'string') return '/orders';
+    const trimmed = rawUrl.trim();
+    // Must start with a single slash, not protocol-relative //, and not contain protocol schemes
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+      return trimmed;
+    }
+    return '/orders';
+  };
+  const safeUrl = sanitizeUrl(payload.url);
+
   // 1. Dispatch Web Push (Browsers)
   try {
     const subscriptions = await db('push_subscriptions').where({ user_id: userId });
@@ -81,7 +93,7 @@ async function sendPushNotification(userId, payload) {
         icon: payload.icon || '/favicon.ico',
         badge: payload.badge || '/favicon.ico',
         data: {
-          url: payload.url || '/orders',
+          url: safeUrl,
           timestamp: Date.now(),
           ...(payload.data || {})
         }
@@ -121,7 +133,7 @@ async function sendPushNotification(userId, payload) {
         if (tokens.length > 0) {
           const rawData = payload.data || {};
           const stringifiedData = {
-            url: String(payload.url || '/orders'),
+            url: safeUrl,
             timestamp: String(Date.now())
           };
           for (const [key, val] of Object.entries(rawData)) {

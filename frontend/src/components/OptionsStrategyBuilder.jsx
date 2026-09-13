@@ -65,10 +65,16 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
         }
       }
     }
-    exp.setHours(0,0,0,0);
-    
-    let diffDays = Math.max(0, Math.floor((exp - today) / (1000 * 60 * 60 * 24)));
-    if (diffDays === 0 || isNaN(diffDays)) diffDays = 0.01; // Avoid 0 DTE math errors
+    // Target 15:30 IST market close on expiry day for exact intraday DTE precision
+    exp.setHours(15, 30, 0, 0);
+    const now = new Date();
+    const msDiff = exp.getTime() - now.getTime();
+    let diffDays = 0;
+    if (msDiff > 0) {
+      diffDays = msDiff / (1000 * 60 * 60 * 24);
+    } else {
+      diffDays = 0.005; // Past 15:30 IST market close
+    }
     
     const targetDaysLeft = Math.max(0.001, diffDays - targetDteOffset);
     const T = targetDaysLeft / 365.0; // Time in years for Black-Scholes
@@ -247,15 +253,18 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
   }, [legs, spotPrice, expiryDate, targetDteOffset]);
 
   const gradientOffset = useMemo(() => {
-    if (!data || data.length === 0) return 0;
-    const dataMax = Math.max(...data.map(i => i.pnlExpiry));
-    const dataMin = Math.min(...data.map(i => i.pnlExpiry));
+    if (!data || data.length === 0) return 0.5;
+    const validPnl = data.map(i => i.pnlExpiry).filter(p => !isNaN(p) && isFinite(p));
+    if (validPnl.length === 0) return 0.5;
+    const dataMax = Math.max(...validPnl);
+    const dataMin = Math.min(...validPnl);
 
     if (dataMax <= 0) return 0;
     if (dataMin >= 0) return 1;
 
     const range = dataMax - dataMin;
-    return range === 0 ? 0.5 : dataMax / range;
+    if (range <= 0 || !isFinite(range)) return 0.5;
+    return Math.max(0, Math.min(1, dataMax / range));
   }, [data]);
 
   if (!legs || legs.length === 0) {

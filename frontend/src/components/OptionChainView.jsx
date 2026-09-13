@@ -359,7 +359,8 @@ const OptionChainViewInternal = () => {
         strike: parseFloat(opt.strike),
         price: parseFloat(price),
         side: type === 'BUY' ? 'BUY' : 'SELL',
-        quantity: opt.lotsize ? parseInt(opt.lotsize) : 1,
+        quantity: 1,
+        lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
         iv: iv || 0,
         symbol: optKey
       }]);
@@ -515,6 +516,35 @@ const OptionChainViewInternal = () => {
     }
   };
 
+  // Defect 49: Calculate Aggregate Open Interest (OI) and Put-Call Ratio (PCR)
+  const formatOI = (oi) => {
+    if (!oi || isNaN(Number(oi)) || Number(oi) === 0) return '0';
+    const n = Number(oi);
+    if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
+    if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n.toLocaleString('en-IN');
+  };
+
+  const { totalCallOI, totalPutOI, pcrRatio } = useMemo(() => {
+    let callOi = 0;
+    let putOi = 0;
+    (strikes || []).forEach(s => {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      const cKey = c ? (c.symbol.includes('-') ? c.symbol : `${c.symbol}-${c.exch_seg}`) : null;
+      const pKey = p ? (p.symbol.includes('-') ? p.symbol : `${p.symbol}-${p.exch_seg}`) : null;
+      const cData = cKey ? prices[cKey] : null;
+      const pData = pKey ? prices[pKey] : null;
+      const cVal = Number(cData?.oi ?? c?.oi ?? 0);
+      const pVal = Number(pData?.oi ?? p?.oi ?? 0);
+      if (cVal > 0) callOi += cVal;
+      if (pVal > 0) putOi += pVal;
+    });
+    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
+    return { totalCallOI: callOi, totalPutOI: putOi, pcrRatio: pcr };
+  }, [strikes, chain, prices]);
+
   return (
     <div className="option-chain-container glass-panel">
       {/* Header */}
@@ -578,6 +608,19 @@ const OptionChainViewInternal = () => {
               {vixChange > 0 ? '+' : ''}{vixChange.toFixed(2)}
             </span>
           )}
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 5: PCR (Defect 49) */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">PCR (OI)</span>
+          <span className="top-bar-value" style={{ fontWeight: '700', color: Number(pcrRatio) >= 1 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            {pcrRatio}
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>
+            ({formatOI(totalPutOI)}P / {formatOI(totalCallOI)}C)
+          </span>
         </div>
 
         <div className="top-bar-divider"></div>
@@ -708,12 +751,14 @@ const OptionChainViewInternal = () => {
         <table className="option-chain-table">
           <thead>
             <tr>
-              <th className="header-call" colSpan="8">CALL</th>
+              <th className="header-call" colSpan="10">CALL</th>
               <th className="header-strike"></th>
-              <th className="header-put" colSpan="8">PUT</th>
+              <th className="header-put" colSpan="10">PUT</th>
             </tr>
             <tr>
               {/* Calls */}
+              <th className="center">OI</th>
+              <th className="center">OI Chg</th>
               <th className="center">Delta</th>
               <th className="center">Theta</th>
               <th className="center">Vega</th>
@@ -733,6 +778,8 @@ const OptionChainViewInternal = () => {
               <th className="center">Vega</th>
               <th className="center">Theta</th>
               <th className="center">Delta</th>
+              <th className="center">OI Chg</th>
+              <th className="center">OI</th>
             </tr>
           </thead>
           <tbody>

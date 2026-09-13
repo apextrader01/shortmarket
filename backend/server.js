@@ -918,12 +918,14 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     const user = await db('users').where({ email: normalizedEmail }).first();
     if (!user) return res.status(404).json({ error: 'No account found with this email' });
 
-    // Generate 6 digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate 6 digit cryptographically secure OTP
+    const crypto = require('crypto');
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
     const expires = new Date(Date.now() + 15 * 60000); // 15 minutes
 
     await db('users').where({ id: user.id }).update({
-      reset_otp: otp,
+      reset_otp: otpHash,
       reset_otp_expires: expires
     });
 
@@ -1036,7 +1038,11 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
     }
 
-    if (user.reset_otp !== String(otp).trim()) {
+    const crypto = require('crypto');
+    const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+
+    if (!isOtpMatch) {
       attemptRecord.count += 1;
       if (attemptRecord.count >= 5) {
         attemptRecord.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
@@ -1060,6 +1066,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
       reset_otp_expires: null
     });
 
+    // Invalidate all active sessions for this user across all devices upon password reset (Defect 27)
+    await db('user_sessions').where({ user_id: user.id }).del().catch(() => {});
+
     res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
     console.error('Reset Password Error:', error);
@@ -1069,8 +1078,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 // ─── User ─────────────────────────────────────────────────────────────────
 
-app.get('/api/debug-db', async (req, res) => {
+app.get('/api/debug-db', authenticateToken, async (req, res) => {
     try {
+        const caller = await db('users').where({ id: req.user.id }).first();
+        if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
         const columns = await db('users').columnInfo();
         res.json(columns);
     } catch (e) {
@@ -1454,6 +1465,12 @@ const handleUpdateUserDetails = async (req, res) => {
 
     await db('users').where({ id: req.user.id }).update(updates);
     const updatedUser = await db('users').where({ id: req.user.id }).first();
+    if (updatedUser) {
+      delete updatedUser.password_hash;
+      delete updatedUser.reset_otp;
+      delete updatedUser.reset_otp_expires;
+      delete updatedUser.two_factor_secret;
+    }
     res.json({ success: true, message: 'Profile details updated successfully', user: updatedUser });
   } catch (err) {
     console.error('Error updating user details:', err);
@@ -1471,6 +1488,16 @@ app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
     if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount < 100 || parsedAmount > 100000000) {
       return res.status(400).json({ error: 'Invalid amount. Minimum deposit is ₹100 and maximum is ₹10 Crore.' });
     }
+
+    // Defect 44: Cap pending deposit requests to prevent spam / flooding
+    const pendingCount = await db('deposit_requests')
+      .where({ user_id: req.user.id, status: 'PENDING' })
+      .count('id as count')
+      .first();
+
+    if (parseInt(pendingCount?.count || 0) >= 5) {
+      return res.status(400).json({ error: 'You have reached the limit of 5 pending deposit requests. Please wait for an administrator to process them.' });
+    }
     
     await db('deposit_requests').insert({
       user_id: req.user.id,
@@ -1478,9 +1505,73 @@ app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
       status: 'PENDING'
     });
     
-    res.json({ success: true });
+    res.json({ success: true, message: 'Deposit request submitted successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Defect 44: Transactional Trading Wallet Withdrawal Route
+app.post('/api/wallet/withdraw', authenticateToken, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || !isFinite(parsedAmount) || parsedAmount < 100) {
+      return res.status(400).json({ error: 'Invalid amount. Minimum withdrawal is ₹100.' });
+    }
+
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+
+      const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
+      if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+
+      // Verify bank or UPI details are linked
+      if (!user.upi_id && (!user.bank_account_no || !user.bank_ifsc)) {
+        throw Object.assign(new Error('Please update your Bank or UPI details in Settings before requesting a withdrawal.'), { statusCode: 400 });
+      }
+
+      // Check available cash balance
+      const currentBalance = parseFloat(user.balance) || 0;
+      if (currentBalance < parsedAmount) {
+        throw Object.assign(new Error(`Insufficient trading balance. Available: ₹${currentBalance.toLocaleString('en-IN')}, Requested: ₹${parsedAmount.toLocaleString('en-IN')}`), { statusCode: 400 });
+      }
+
+      // Cap active pending withdrawal requests to prevent double spending
+      const pendingCount = await trx('reward_withdrawals')
+        .where({ user_id: req.user.id, status: 'PENDING' })
+        .count('id as count')
+        .first();
+      if (parseInt(pendingCount?.count || 0) >= 3) {
+        throw Object.assign(new Error('You already have 3 pending withdrawal requests. Please wait for them to be processed.'), { statusCode: 400 });
+      }
+
+      // Deduct trading balance immediately (lock funds for withdrawal)
+      const newBalance = Math.round((currentBalance - parsedAmount) * 100) / 100;
+      await trx('users').where({ id: user.id }).update({ balance: newBalance });
+
+      // Record in ledger as WITHDRAWAL (compliant with check constraint)
+      await trx('ledger').insert({
+        user_id: user.id,
+        amount: -parsedAmount,
+        type: 'WITHDRAWAL',
+        description: `Wallet Withdrawal Request (Bank/UPI)`
+      });
+
+      // Insert withdrawal record for admin processing
+      await trx('reward_withdrawals').insert({
+        user_id: user.id,
+        amount: parsedAmount,
+        status: 'PENDING',
+        remarks: 'Trading Wallet Withdrawal',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    });
+
+    res.json({ success: true, message: `Withdrawal request for ₹${parsedAmount.toLocaleString('en-IN')} submitted successfully.` });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
@@ -1984,19 +2075,24 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
 
     const targetUserId = req.params.id;
 
-    // Prevent admin from deleting themselves
+    // Prevent admin from deleting themselves or other admins
     if (String(targetUserId) === String(req.user.id)) {
       return res.status(400).json({ error: 'Cannot delete your own admin account.' });
+    }
+    const targetUser = await db('users').where({ id: targetUserId }).first();
+    if (!targetUser) return res.status(404).json({ error: 'Target user not found.' });
+    if (targetUser.is_admin) {
+      return res.status(400).json({ error: 'Cannot delete an administrator account.' });
     }
 
     await db.transaction(async (trx) => {
       await trx('orders').where({ user_id: targetUserId }).del();
       await trx('positions').where({ user_id: targetUserId }).del();
       await trx('ledger').where({ user_id: targetUserId }).del();
-      await trx('holdings').where({ user_id: targetUserId }).del().catch(() => {});
-      await trx('sips').where({ user_id: targetUserId }).del().catch(() => {});
-      await trx('deposit_requests').where({ user_id: targetUserId }).del().catch(() => {});
-      await trx('user_profiles').where({ user_id: targetUserId }).del().catch(() => {});
+      await trx('holdings').where({ user_id: targetUserId }).del();
+      await trx('sips').where({ user_id: targetUserId }).del();
+      await trx('deposit_requests').where({ user_id: targetUserId }).del();
+      await trx('user_sessions').where({ user_id: targetUserId }).del();
       await trx('users').where({ id: targetUserId }).del();
     });
 
@@ -3599,6 +3695,113 @@ app.get('/api/mf/:schemeCode', async (req, res) => {
     }
 });
 
+// 3. Lumpsum Mutual Fund Purchase Endpoint (Defect 41)
+const handleMutualFundBuy = async (req, res) => {
+  const { scheme_code, schemeCode, amount } = req.body;
+  const targetCode = String(scheme_code || schemeCode || '').replace('-MF', '').trim();
+  const parsedAmount = parseFloat(amount);
+  if (!targetCode || isNaN(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: 'Valid mutual fund scheme code and positive investment amount are required.' });
+  }
+
+  try {
+    const symbol = `${targetCode}-MF`;
+    let nav = await SIPEngine.getLatestNav(symbol, priceCache);
+    if (!nav || nav <= 0) {
+      nav = await SIPEngine.getLatestNav(targetCode, priceCache);
+    }
+    if (!nav || nav <= 0) {
+      if (mfCache[targetCode]?.data?.data?.[0]?.nav) {
+        nav = parseFloat(mfCache[targetCode].data.data[0].nav);
+      }
+    }
+    if (!nav || nav <= 0) {
+      return res.status(400).json({ error: `Current NAV unavailable for fund ${targetCode}. Please try again later.` });
+    }
+
+    const units = parseFloat((parsedAmount / nav).toFixed(4));
+    if (units <= 0) {
+      return res.status(400).json({ error: 'Calculated units are zero. Please increase investment amount.' });
+    }
+
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+      const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
+      if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+
+      if (Number(user.balance) < parsedAmount) {
+        throw Object.assign(new Error(`Insufficient funds. Required: ₹${parsedAmount.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`), { statusCode: 400 });
+      }
+
+      // Deduct balance
+      const newBal = Math.round((Number(user.balance) - parsedAmount) * 100) / 100;
+      await trx('users').where({ id: req.user.id }).update({ balance: newBal });
+
+      // Ledger entry
+      await trx('ledger').insert({
+        user_id: req.user.id,
+        amount: -parsedAmount,
+        type: 'MARGIN_BLOCK',
+        description: `Mutual Fund Purchase: ${units} units of ${symbol} @ NAV ₹${nav.toFixed(2)}`
+      });
+
+      // Order record
+      await trx('orders').insert({
+        user_id: req.user.id,
+        symbol,
+        type: 'MARKET',
+        side: 'BUY',
+        quantity: units,
+        price: nav,
+        average_price: nav,
+        status: 'EXECUTED',
+        product_type: 'DEL',
+        margin: parsedAmount,
+        remarks: 'Lumpsum Mutual Fund Purchase',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+
+      // Holdings
+      const existingHolding = await trx('holdings')
+        .where({ user_id: req.user.id, symbol })
+        .first();
+
+      if (existingHolding) {
+        const curQty = parseFloat(existingHolding.quantity) || 0;
+        const curAvg = parseFloat(existingHolding.average_price) || nav;
+        const newQty = parseFloat((curQty + units).toFixed(4));
+        const newAvg = parseFloat((((curQty * curAvg) + parsedAmount) / newQty).toFixed(4));
+
+        await trx('holdings').where({ id: existingHolding.id }).update({
+          quantity: newQty,
+          average_price: newAvg,
+          asset_class: 'MUTUAL_FUND',
+          updated_at: new Date()
+        });
+      } else {
+        await trx('holdings').insert({
+          user_id: req.user.id,
+          symbol,
+          quantity: units,
+          average_price: nav,
+          asset_class: 'MUTUAL_FUND',
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      }
+    });
+
+    return res.json({ success: true, units, nav, amount: parsedAmount, symbol });
+  } catch (err) {
+    console.error('[MF BUY ERROR]', err);
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Failed to purchase mutual fund' });
+  }
+};
+
+app.post('/api/mutual-funds/buy', authenticateToken, handleMutualFundBuy);
+app.post('/api/mf/buy', authenticateToken, handleMutualFundBuy);
+
 // ─── Restricted Stocks ────────────────────────────────────────────────────
 let restrictedStocksCache = [];
 app.get('/api/restricted-stocks', async (req, res) => {
@@ -3717,6 +3920,46 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 // ─── Place Order ─────────────────────────────────────────────────────────
 const { spawnBracketOrders } = require('./services/orderExecutor');
 
+function calculateExecutionPrice(symbol, side, quantity, basePrice) {
+  const cached = priceCache[symbol];
+  if (!cached || !basePrice || basePrice <= 0) return Number(basePrice || 0);
+  
+  // 1. Level-2 order book depth matching (if depth cache available)
+  const depth = cached.depth;
+  if (depth && (depth.buy || depth.sell || depth.asks || depth.bids)) {
+    const book = side === 'BUY' ? (depth.sell || depth.asks) : (depth.buy || depth.bids);
+    if (Array.isArray(book) && book.length > 0) {
+      let remaining = Number(quantity);
+      let totalCost = 0;
+      for (const level of book) {
+        const levelPrice = Number(level.price);
+        const levelQty = Number(level.quantity || level.orders);
+        if (levelPrice > 0 && levelQty > 0) {
+          const fillQty = Math.min(remaining, levelQty);
+          totalCost += fillQty * levelPrice;
+          remaining -= fillQty;
+          if (remaining <= 0) break;
+        }
+      }
+      if (remaining < Number(quantity)) {
+        const filledQty = Number(quantity) - remaining;
+        const vwap = totalCost / filledQty;
+        return Number(vwap.toFixed(2));
+      }
+    }
+  }
+  
+  // 2. Realistic market impact slippage model for large orders (> ₹5 Lakhs or > 5,000 qty)
+  const orderValue = Number(quantity) * basePrice;
+  if (orderValue > 500000 || Number(quantity) >= 5000) {
+    const impactBps = Math.min(0.005, 0.0005 * Math.log10(Math.max(1, orderValue / 100000))); // 5 to 50 bps max
+    const slippage = basePrice * impactBps;
+    const slippedPrice = side === 'BUY' ? (basePrice + slippage) : (basePrice - slippage);
+    return Number(slippedPrice.toFixed(2));
+  }
+  return Number(basePrice.toFixed(2));
+}
+
 let lastOrderError = null;
 
 app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
@@ -3725,6 +3968,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   const type = req.body.type || req.body.orderType;
   const side = req.body.side;
   const quantity = req.body.quantity;
+  const parsedQty = Number(quantity);
+  if (!quantity || isNaN(parsedQty) || parsedQty <= 0) {
+    return res.status(400).json({ error: 'Order quantity must be a positive number greater than 0.' });
+  }
   const price = req.body.price;
   const sl_price = req.body.sl_price ?? req.body.slPrice;
   const tgt_price = req.body.tgt_price ?? req.body.tgtPrice;
@@ -3764,7 +4011,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   // Validate Bracket Order (BO) and Cover Order (CO) formats
   if (product_type === 'BO' || product_type === 'CO') {
-    const entryPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
+    const ltp = Number(priceCache[symbol]?.ltp) || 0;
+    const entryPrice = parseFloat(price) || ltp || 0;
     
     if (entryPrice <= 0) {
       return res.status(400).json({ error: 'Cannot place Bracket/Cover order when live price is unavailable. Please specify a limit price.' });
@@ -3774,18 +4022,22 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const parsedTgt = tgt_price ? parseFloat(tgt_price) : 0;
     
     if (side === 'BUY') {
-      if (parsedSL && parsedSL >= entryPrice) {
-        return res.status(400).json({ error: `Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      const lowerBoundary = Math.min(entryPrice, ltp > 0 ? ltp : entryPrice);
+      const upperBoundary = Math.max(entryPrice, ltp > 0 ? ltp : entryPrice);
+      if (parsedSL && parsedSL >= lowerBoundary) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a BUY order, Stop Loss price (${parsedSL}) must be lower than the entry/market price (${lowerBoundary.toFixed(2)}).` });
       }
-      if (parsedTgt && parsedTgt <= entryPrice) {
-        return res.status(400).json({ error: `Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      if (parsedTgt && parsedTgt <= upperBoundary) {
+        return res.status(400).json({ error: `Invalid Target: For a BUY order, Target price (${parsedTgt}) must be higher than the entry/market price (${upperBoundary.toFixed(2)}).` });
       }
     } else if (side === 'SELL') {
-      if (parsedSL && parsedSL <= entryPrice) {
-        return res.status(400).json({ error: `Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry price (${entryPrice.toFixed(2)}).` });
+      const upperBoundary = Math.max(entryPrice, ltp > 0 ? ltp : entryPrice);
+      const lowerBoundary = Math.min(entryPrice, ltp > 0 ? ltp : entryPrice);
+      if (parsedSL && parsedSL <= upperBoundary) {
+        return res.status(400).json({ error: `Invalid Stop Loss: For a SELL order, Stop Loss price (${parsedSL}) must be higher than the entry/market price (${upperBoundary.toFixed(2)}).` });
       }
-      if (parsedTgt && parsedTgt >= entryPrice) {
-        return res.status(400).json({ error: `Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry price (${entryPrice.toFixed(2)}).` });
+      if (parsedTgt && parsedTgt >= lowerBoundary) {
+        return res.status(400).json({ error: `Invalid Target: For a SELL order, Target price (${parsedTgt}) must be lower than the entry/market price (${lowerBoundary.toFixed(2)}).` });
       }
     }
   }
@@ -3795,10 +4047,12 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   const isDeliveryProduct = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL' || !product_type);
   const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
   let isClosingOrder = false;
+  let existingLongPos = null;
+  let existingShortPos = null;
 
   if (side === 'SELL') {
     // Check if user has open long position in this symbol
-    const existingLongPos = await db('positions')
+    existingLongPos = await db('positions')
       .where({ user_id: req.user.id })
       .where(builder => {
         if (isIntradayProduct) {
@@ -3832,7 +4086,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   } else if (side === 'BUY') {
     // Check if user has open short position in this symbol
-    const existingShortPos = await db('positions')
+    existingShortPos = await db('positions')
       .where({ user_id: req.user.id })
       .where(builder => {
         if (isIntradayProduct) {
@@ -4040,77 +4294,85 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
               }
               requiresMargin = false; // Selling DEL from holdings requires no margin
-          } else if (isClosingOrder) {
-              requiresMargin = false;
-          } else if (!isDerivative || effectiveProductType !== 'DEL') {
-              const existingPos = await trx('positions')
-                  .where({ user_id: req.user.id, product_type: effectiveProductType })
+          } else {
+              // Re-evaluate closing order inside transaction with advisory lock to prevent TOCTOU naked shorting
+              const txLongPos = await trx('positions')
+                  .where({ user_id: req.user.id })
                   .where(builder => {
-                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+                      if (isIntradayProduct) builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+                      else if (isDeliveryProduct) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                      else builder.where({ product_type });
+                  })
+                  .where(builder => {
+                      builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                   })
                   .where('quantity', '>', 0)
+                  .forUpdate()
                   .first();
-              if (existingPos) {
-                  const excessQty = Math.max(0, Number(quantity) - Number(existingPos.quantity));
-                  if (excessQty === 0) {
-                      requiresMargin = false;
-                  } else {
-                      marginQty = excessQty;
+              
+              if (txLongPos && Number(txLongPos.quantity) >= Number(quantity) - 0.0001) {
+                  requiresMargin = false;
+              } else if (!isDerivative || effectiveProductType !== 'DEL') {
+                  if (txLongPos) {
+                      const excessQty = Math.max(0, Number(quantity) - Number(txLongPos.quantity));
+                      if (excessQty === 0) {
+                          requiresMargin = false;
+                      } else {
+                          marginQty = excessQty;
+                      }
                   }
-              }
-          } else if (isDerivative && effectiveProductType === 'DEL') {
-              const existingPos = await trx('positions')
-                  .where({ user_id: req.user.id, product_type: effectiveProductType })
-                  .where(builder => {
-                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
-                  })
-                  .where('quantity', '>', 0)
-                  .first();
-              if (existingPos) {
-                  const excessQty = Math.max(0, Number(quantity) - Number(existingPos.quantity));
-                  if (excessQty === 0) {
-                      requiresMargin = false;
-                  } else {
-                      marginQty = excessQty;
+              } else if (isDerivative && effectiveProductType === 'DEL') {
+                  if (txLongPos) {
+                      const excessQty = Math.max(0, Number(quantity) - Number(txLongPos.quantity));
+                      if (excessQty === 0) {
+                          requiresMargin = false;
+                      } else {
+                          marginQty = excessQty;
+                      }
                   }
               }
           }
       } else if (side === 'BUY') {
-          if (isClosingOrder) {
+          // Re-evaluate closing short position inside transaction with advisory lock
+          const txShortPos = await trx('positions')
+              .where({ user_id: req.user.id, product_type: effectiveProductType })
+              .where(builder => {
+                builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .where('quantity', '<', 0)
+              .forUpdate()
+              .first();
+
+          if (txShortPos && Math.abs(Number(txShortPos.quantity)) >= Number(quantity) - 0.0001) {
               requiresMargin = false;
-          } else {
-              const existingPos = await trx('positions')
-                  .where({ user_id: req.user.id, product_type: effectiveProductType })
-                  .where(builder => {
-                    builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
-                  })
-                  .where('quantity', '<', 0)
-                  .first();
-              if (existingPos) {
-                  const excessQty = Math.max(0, Number(quantity) - Math.abs(Number(existingPos.quantity)));
-                  if (excessQty === 0) {
-                      requiresMargin = false;
-                  } else {
-                      marginQty = excessQty;
-                  }
+          } else if (txShortPos) {
+              const excessQty = Math.max(0, Number(quantity) - Math.abs(Number(txShortPos.quantity)));
+              if (excessQty === 0) {
+                  requiresMargin = false;
+              } else {
+                  marginQty = excessQty;
               }
           }
       }
 
       let finalMargin = 0;
       if (requiresMargin) {
-          if (execPrice <= 0) {
-              const fallbackPrice = priceCache[symbol]?.close || priceCache[symbol]?.ltp || 0;
-              if (fallbackPrice > 0) {
-                  execPrice = fallbackPrice;
-              } else if (isMarket) {
+          let priceBasis = execPrice;
+          if (!priceBasis || priceBasis <= 0) {
+              priceBasis = parseFloat(resolvedTriggerPrice) || parseFloat(trigger_price) || parseFloat(price) || Number(priceCache[symbol]?.ltp) || Number(priceCache[symbol]?.close) || 0;
+          }
+          if (priceBasis <= 0) {
+              if (isMarket) {
                   throw new Error(`Live market price is currently unavailable for ${symbol}. Please specify a limit price or wait for market data to connect.`);
               } else if (isDerivativeContract(symbol) && side === 'BUY') {
                   throw new Error(`A valid price > 0 is required to calculate margin for ${symbol}.`);
+              } else {
+                  throw new Error(`A valid price or trigger price > 0 is required to calculate margin for ${symbol}.`);
               }
           }
+          execPrice = execPrice > 0 ? execPrice : priceBasis;
           const { calculateRequiredMargin } = require('./services/marginEngine');
-          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, execPrice);
+          finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, priceBasis);
           if (finalMargin <= 0 && isDerivativeContract(symbol) && side === 'BUY') {
               throw new Error(`Unable to determine required margin for ${symbol}. Please specify a valid limit price.`);
           }
@@ -4134,17 +4396,20 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       // Ensure margin passed down to insert is the final margin
       const marginToSave = requiresMargin ? finalMargin : 0;
+      const orderRemarks = req.body.slice_group_id ? `Slice ${req.body.slice_index || 1}/${req.body.slice_total || 1} [${req.body.slice_group_id}]` : (req.body.remarks || '');
 
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave
+        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        remarks: orderRemarks
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
       req.orderToProcess = {
         id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
         status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        remarks: orderRemarks,
         isMarket
       };
     });
@@ -4164,11 +4429,12 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     
     // Instantly execute Market orders & Marketable Limit orders with 0ms delay
     if (ord.isMarket) {
-      const execLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
+      const baseLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
         ? Number(priceCache[ord.symbol].ltp)
         : (parseFloat(ord.price) || parseFloat(req.body.price) || 0);
 
-      if (execLtp > 0) {
+      if (baseLtp > 0) {
+        const execLtp = calculateExecutionPrice(ord.symbol, ord.side, ord.quantity, baseLtp);
         try {
           await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
           await triggerEngine.executeOrder(ord, execLtp);
@@ -4277,13 +4543,16 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
           description: `SIP Installment (${frequency || 'MONTHLY'}): Bought ${qty} units of ${symbol} @ ₹${execPrice.toFixed(2)}`
       });
 
+      const anchorDay = nextExecutionDate ? new Date(nextExecutionDate).getUTCDate() : new Date().getUTCDate();
       await trx('sips').insert({
         user_id: req.user.id,
         symbol,
         amount: finalMargin,
         frequency: frequency || 'MONTHLY',
         next_execution_date: nextExecutionDate,
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        anchor_day: anchorDay,
+        failure_count: 0
       });
 
       // Insert Executed Order Record
@@ -4948,14 +5217,32 @@ app.post('/api/push/test', authenticateToken, async (req, res) => {
   }
 });
 
-// 📖 Get Ledger History 📖
+// 📖 Get Ledger History with Authoritative Running Balance (Defect 47) 📖
 app.get('/api/ledger', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5000;
+    const user = await db('users').where({ id: req.user.id }).first();
     const ledger = await db('ledger')
       .where({ user_id: req.user.id })
       .orderBy('created_at', 'desc')
+      .orderBy('id', 'desc')
       .limit(limit);
+
+    // Compute exact cumulative running balances chronologically forward
+    if (ledger && ledger.length > 0) {
+      const chronological = [...ledger].reverse();
+      const totalNetChange = chronological.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      let running = (parseFloat(user?.balance || 0)) - totalNetChange;
+      const balMap = {};
+      for (const item of chronological) {
+        running += (parseFloat(item.amount) || 0);
+        balMap[item.id] = Math.round((running + Number.EPSILON) * 100) / 100;
+      }
+      for (const item of ledger) {
+        item.running_balance = balMap[item.id];
+      }
+    }
+
     res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -5025,12 +5312,40 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
       // Advisory transaction lock per-user to eliminate concurrency double-spending
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
 
-      // 1. Verify total margin
-      const requiredMargin = parseFloat(total_margin) || 0;
+      // 1. Process each item (Hedge-Aware Sequence: BUY legs first)
+      const sortedItems = [...items].sort((a, b) => {
+        if (a.side === 'BUY' && b.side === 'SELL') return -1;
+        if (a.side === 'SELL' && b.side === 'BUY') return 1;
+        return 0;
+      });
+
+      // Calculate standalone margins for all legs
+      const { calculateRequiredMargin } = require('./services/marginEngine');
+      const itemStandaloneMargins = sortedItems.map(item => {
+        const pType = item.product_type || 'INT';
+        const pPrice = parseFloat(item.price) || priceCache[item.symbol]?.ltp || 1;
+        const pQty = Number(item.quantity) || 0;
+        if (item.margin && parseFloat(item.margin) > 0) {
+          return parseFloat(item.margin);
+        }
+        try {
+          return Math.max(0, calculateRequiredMargin(item.symbol, pType, item.side, pQty, pPrice));
+        } catch (e) {
+          return pQty * pPrice;
+        }
+      });
+      const totalStandalone = itemStandaloneMargins.reduce((sum, m) => sum + m, 0);
+
+      // Verify total margin - Server Authoritative validation (prevent client 0-margin bypass)
+      let requiredMargin = parseFloat(total_margin) || 0;
+      const minHedgingFloor = totalStandalone > 0 ? parseFloat((totalStandalone * 0.25).toFixed(2)) : 0;
+      if (totalStandalone > 0 && (requiredMargin <= 0 || requiredMargin < minHedgingFloor)) {
+        requiredMargin = Math.max(requiredMargin, minHedgingFloor);
+      }
+
       const user = await trx('users').where({ id: req.user.id }).first();
-      
       if (requiredMargin > 0 && parseFloat(user.balance) < requiredMargin) {
-        throw new Error(`Insufficient Funds.`);
+        throw new Error(`Insufficient Funds. Required: ₹${requiredMargin.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`);
       }
 
       // 1.5 Validate SELL DEL/CNC/DELIVERY orders against holdings (No Naked Shorting for Equities)
@@ -5093,30 +5408,6 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
           description: `Combined margin blocked for Basket Order (${items.length} legs)`
         });
       }
-
-      // 3. Process each item (Hedge-Aware Sequence: BUY legs first)
-      const sortedItems = [...items].sort((a, b) => {
-        if (a.side === 'BUY' && b.side === 'SELL') return -1;
-        if (a.side === 'SELL' && b.side === 'BUY') return 1;
-        return 0;
-      });
-
-      // Calculate proportional margin allocation across all basket items
-      const { calculateRequiredMargin } = require('./services/marginEngine');
-      const itemStandaloneMargins = sortedItems.map(item => {
-        const pType = item.product_type || 'INT';
-        const pPrice = parseFloat(item.price) || priceCache[item.symbol]?.ltp || 1;
-        const pQty = Number(item.quantity) || 0;
-        if (item.margin && parseFloat(item.margin) > 0) {
-          return parseFloat(item.margin);
-        }
-        try {
-          return Math.max(0, calculateRequiredMargin(item.symbol, pType, item.side, pQty, pPrice));
-        } catch (e) {
-          return pQty * pPrice;
-        }
-      });
-      const totalStandalone = itemStandaloneMargins.reduce((sum, m) => sum + m, 0);
 
       let distributedMarginSum = 0;
       const itemAllocatedMargins = sortedItems.map((item, idx) => {
@@ -5290,6 +5581,19 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
           for (const sib of cancelledSiblings) {
             await trx('orders').where({ id: sib.id }).update({ status: 'CANCELLED', updated_at: new Date() });
             siblingsToClean.push(sib);
+            const sibMargin = parseFloat(sib.margin) || 0;
+            if (sibMargin > 0) {
+              const u = await trx('users').where({ id: req.user.id }).first();
+              if (u) {
+                await trx('users').where({ id: req.user.id }).update({ balance: Math.round((parseFloat(u.balance) + sibMargin + Number.EPSILON) * 100) / 100 });
+                await trx('ledger').insert({
+                  user_id: req.user.id,
+                  amount: sibMargin,
+                  type: 'MARGIN_RELEASE',
+                  description: `Margin refunded for cancelled sibling order: ${sib.quantity} ${sib.symbol} ${sib.side}`
+                });
+              }
+            }
           }
 
           // Bracket order cancelled: Auto-exit the underlying position at market
@@ -5335,14 +5639,16 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       const refundAmount = parseFloat(order.margin) || 0;
       if (refundAmount > 0) {
           const user = await trx('users').where({ id: req.user.id }).first();
-          await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
-          // BUG FIX: Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
-          await trx('ledger').insert({
-            user_id: req.user.id,
-            amount: refundAmount,
-            type: 'MARGIN_RELEASE',
-            description: `Margin refunded for cancelled order: ${order.quantity} ${order.symbol} ${order.side}`
-          });
+          if (user) {
+              await trx('users').where({ id: req.user.id }).update({ balance: Math.round((parseFloat(user.balance) + refundAmount + Number.EPSILON) * 100) / 100 });
+              // BUG FIX: Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
+              await trx('ledger').insert({
+                user_id: req.user.id,
+                amount: refundAmount,
+                type: 'MARGIN_RELEASE',
+                description: `Margin refunded for cancelled order: ${order.quantity} ${order.symbol} ${order.side}`
+              });
+          }
       }
       
       cancelledOrder = order;
@@ -5596,17 +5902,20 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
              if (parent) {
                  const entryPrice = parseFloat(parent.price);
                  const checkPrice = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
-                 if (order.type === 'SL-M') {
-                     if (order.side === 'SELL' && checkPrice >= entryPrice) {
-                         throw Object.assign(new Error('BO Buy: Stop-Loss must be lower than execution price.'), { statusCode: 400 });
-                     } else if (order.side === 'BUY' && checkPrice <= entryPrice) {
-                         throw Object.assign(new Error('BO Sell: Stop-Loss must be higher than execution price.'), { statusCode: 400 });
+                 const currentLtp = (priceCache[order.symbol]?.ltp && Number(priceCache[order.symbol].ltp) > 0)
+                     ? Number(priceCache[order.symbol].ltp)
+                     : entryPrice;
+                 if (order.type === 'SL-M' || order.type === 'SL-L' || order.type === 'SL') {
+                     if (order.side === 'SELL' && checkPrice >= currentLtp) {
+                         throw Object.assign(new Error(`BO Buy: Stop-Loss (₹${checkPrice}) must be lower than current market price (₹${currentLtp}).`), { statusCode: 400 });
+                     } else if (order.side === 'BUY' && checkPrice <= currentLtp) {
+                         throw Object.assign(new Error(`BO Sell: Stop-Loss (₹${checkPrice}) must be higher than current market price (₹${currentLtp}).`), { statusCode: 400 });
                      }
                  } else if (order.type === 'LIMIT') {
-                     if (order.side === 'SELL' && checkPrice <= entryPrice) {
-                         throw Object.assign(new Error('BO Buy: Target must be higher than execution price.'), { statusCode: 400 });
-                     } else if (order.side === 'BUY' && checkPrice >= entryPrice) {
-                         throw Object.assign(new Error('BO Sell: Target must be lower than execution price.'), { statusCode: 400 });
+                     if (order.side === 'SELL' && checkPrice <= currentLtp) {
+                         throw Object.assign(new Error(`BO Buy: Target (₹${checkPrice}) must be higher than current market price (₹${currentLtp}).`), { statusCode: 400 });
+                     } else if (order.side === 'BUY' && checkPrice >= currentLtp) {
+                         throw Object.assign(new Error(`BO Sell: Target (₹${checkPrice}) must be lower than current market price (₹${currentLtp}).`), { statusCode: 400 });
                      }
                  }
              }
@@ -6240,7 +6549,8 @@ app.post('/api/admin/fyers/credentials', authenticateToken, async (req, res) => 
       await db('system_settings').insert({ key: 'fyers_pin', value: fyers_pin.trim(), updated_at: new Date() }).onConflict('key').merge();
     }
     if (fyers_totp_key) {
-      await db('system_settings').insert({ key: 'fyers_totp_key', value: fyers_totp_key.replace(/\s+/g, ''), updated_at: new Date() }).onConflict('key').merge();
+      const { encryptSecret } = require('./services/fyersAutoLogin');
+      await db('system_settings').insert({ key: 'fyers_totp_key', value: encryptSecret(fyers_totp_key.replace(/\s+/g, '')), updated_at: new Date() }).onConflict('key').merge();
     }
 
     // Immediately attempt auto-login with the new credentials
@@ -6466,20 +6776,48 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
       return res.status(400).json({ error: 'Invalid withdrawal status' });
     }
 
-    const withdrawal = await db('reward_withdrawals').where({ id: req.params.id }).first();
-    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal record not found' });
+    await db.transaction(async (trx) => {
+      const withdrawal = await trx('reward_withdrawals').where({ id: req.params.id }).forUpdate().first();
+      if (!withdrawal) throw Object.assign(new Error('Withdrawal record not found'), { statusCode: 404 });
 
-    await db('reward_withdrawals').where({ id: req.params.id }).update({
-      status,
-      admin_notes: remarks || null,
-      remarks: remarks || null,
-      utr: utr || null,
-      updated_at: new Date()
+      // Advisory lock on the withdrawal target user
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [withdrawal.user_id]);
+
+      // State machine validation: cannot modify once in terminal state (CREDITED or REJECTED)
+      if (withdrawal.status === 'CREDITED' || withdrawal.status === 'REJECTED') {
+        throw Object.assign(new Error(`Withdrawal #${withdrawal.id} is already ${withdrawal.status} and cannot be modified.`), { statusCode: 400 });
+      }
+
+      // If rejecting a trading wallet withdrawal, refund the balance back to user
+      if (status === 'REJECTED') {
+        const isTradingWallet = withdrawal.remarks && withdrawal.remarks.includes('Trading Wallet');
+        if (isTradingWallet) {
+          const refundUser = await trx('users').where({ id: withdrawal.user_id }).forUpdate().first();
+          if (refundUser) {
+            const refundedBalance = Math.round((parseFloat(refundUser.balance) + parseFloat(withdrawal.amount)) * 100) / 100;
+            await trx('users').where({ id: withdrawal.user_id }).update({ balance: refundedBalance });
+            await trx('ledger').insert({
+              user_id: withdrawal.user_id,
+              amount: parseFloat(withdrawal.amount),
+              type: 'DEPOSIT',
+              description: `Refund for Rejected Withdrawal #${withdrawal.id}${remarks ? `: ${remarks}` : ''}`
+            });
+          }
+        }
+      }
+
+      await trx('reward_withdrawals').where({ id: req.params.id }).update({
+        status,
+        admin_notes: remarks || null,
+        remarks: remarks || withdrawal.remarks,
+        utr: utr || null,
+        updated_at: new Date()
+      });
     });
 
     res.json({ success: true, message: `Withdrawal #${req.params.id} marked as ${status}` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 

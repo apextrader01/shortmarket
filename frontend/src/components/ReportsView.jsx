@@ -70,15 +70,31 @@ const LedgerStatement = () => {
     fetchLedger();
   }, [token]);
 
-  // Calculate running balances using user's current balance
+  // Defect 47: Calculate running balances forward chronologically or use server running_balance
   const ledgerWithBalance = useMemo(() => {
-    if (!user || !ledger.length) return ledger;
-    let currentBalance = parseFloat(user.balance || 0);
-    return ledger.map(entry => {
-       const balanceAfter = currentBalance;
-       currentBalance -= Number(entry.amount);
-       return { ...entry, running_balance: balanceAfter };
-    });
+    if (!ledger || !ledger.length) return [];
+
+    // If server provided running_balance, preserve it
+    if (ledger[0] && ledger[0].running_balance !== undefined && ledger[0].running_balance !== null) {
+      return ledger;
+    }
+
+    // Otherwise compute forward chronologically from initial starting balance
+    const chronological = [...ledger].sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id);
+    const totalNetChange = chronological.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const startBalance = (parseFloat(user?.balance || 0)) - totalNetChange;
+
+    let accum = startBalance;
+    const withBalMap = new Map();
+    for (const entry of chronological) {
+      accum += Number(entry.amount || 0);
+      withBalMap.set(entry.id, Math.round((accum + Number.EPSILON) * 100) / 100);
+    }
+
+    return ledger.map(entry => ({
+      ...entry,
+      running_balance: withBalMap.get(entry.id) ?? user?.balance ?? 0
+    }));
   }, [ledger, user]);
 
   // Apply filters

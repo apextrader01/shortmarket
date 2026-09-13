@@ -125,7 +125,7 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
  * @param {number} price - Execution price
  * @returns {object} { brokerage, stt, exchangeCharge, gst, sebiCharge, stampDuty, dpCharge, totalTaxes }
  */
-function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null) {
+function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null, isExercise = false) {
     const turnover = (quantity || 0) * (price || 0);
     
     const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
@@ -150,12 +150,15 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
         if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
     } else if (isOption) {
-        brokerage = 20 * slicesCount; // Flat ₹20 per executed order/slice for Options
-        if (side === 'SELL') {
+        brokerage = isExercise ? 0 : 20 * slicesCount; // Flat ₹20 per executed order/slice for Options; ₹0 on expiry exercise
+        if (isExercise) {
+            // Statutory 0.125% STT on exercised ITM options at expiry (Finance Act Section 98)
+            stt = turnover * 0.00125;
+        } else if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0005 : 0.001); // 0.1% STT on Options sale (revised Oct 2024)
         }
         exchangeCharge = turnover * (isCommodity ? 0.000418 : 0.0003553);
-        if (side === 'BUY') stampDuty = turnover * 0.00003;
+        if (side === 'BUY' && !isExercise) stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
         if (slicesCount > 0) {

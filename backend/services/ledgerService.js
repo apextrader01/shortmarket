@@ -77,7 +77,7 @@ class LedgerService {
         const productType = position.product_type;
         const side = quantity > 0 ? 'SELL' : 'BUY'; // To close long, you sell. To close short, you buy.
         const absQty = Math.abs(quantity);
-        const validExitPrice = (exitPrice !== undefined && exitPrice !== null && !isNaN(Number(exitPrice)) && Number(exitPrice) >= 0) 
+        const validExitPrice = (exitPrice !== undefined && exitPrice !== null && !isNaN(Number(exitPrice)) && Number(exitPrice) > 0) 
             ? Number(exitPrice) 
             : entryPrice;
 
@@ -88,6 +88,7 @@ class LedgerService {
         } else {
             realizedPnl = (entryPrice - validExitPrice) * absQty;
         }
+        realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
 
         // 2. Calculate Exit Taxes
         const taxesObj = calculateTaxes(symbol, productType, side, absQty, validExitPrice);
@@ -115,11 +116,11 @@ class LedgerService {
         // 4. Calculate Total Release Amount
         // Release Amount = (Original Blocked Margin) + (Realized P&L) - (Exit Taxes) - (RMS Penalty)
         const marginBlocked = parseFloat(position.margin) || 0;
-        const netRelease = marginBlocked + realizedPnl - exitTaxes - rmsPenalty;
+        const netRelease = Math.round((marginBlocked + realizedPnl - exitTaxes - rmsPenalty + Number.EPSILON) * 100) / 100;
 
         // 5. Update Ledger & Balance
         const user = await trx('users').where({ id: userId }).forUpdate().first();
-        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + netRelease });
+        await trx('users').where({ id: userId }).update({ balance: Math.round((parseFloat(user.balance) + netRelease + Number.EPSILON) * 100) / 100 });
 
         if (marginBlocked > 0) {
             await trx('ledger').insert({

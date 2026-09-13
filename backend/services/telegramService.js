@@ -376,41 +376,65 @@ async function handleIncomingTelegramUpdate(update) {
   }
 
   if (command === '/exitall') {
-    const positions = await db('positions')
-      .where({ user_id: user.id })
-      .whereNot({ quantity: 0 });
+    const LedgerService = require('./ledgerService');
+    const triggerEngine = require('./triggerEngine');
+    const { ensureLivePrices } = require('./positionsEngine');
+    let closedCount = 0;
 
-    if (positions.length === 0) {
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [user.id]);
+
+      // 1. Cancel pending orders and release their margin
+      const pendingOrders = await trx('orders')
+        .where({ user_id: user.id })
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+      for (const ord of pendingOrders) {
+        await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+        const marginRefund = parseFloat(ord.margin) || 0;
+        if (marginRefund > 0) {
+          const u = await trx('users').where({ id: user.id }).first();
+          if (u) {
+            await trx('users').where({ id: user.id }).update({ balance: Math.round((parseFloat(u.balance) + marginRefund + Number.EPSILON) * 100) / 100 });
+            await trx('ledger').insert({
+              user_id: user.id,
+              amount: marginRefund,
+              type: 'MARGIN_RELEASE',
+              description: `Margin released for cancelled order: ${ord.symbol}`
+            });
+          }
+        }
+        triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+      }
+
+      // 2. Square off positions using live market LTP and LedgerService
+      const positions = await trx('positions')
+        .where({ user_id: user.id })
+        .whereNot({ quantity: 0 })
+        .forUpdate();
+
+      if (positions.length === 0) {
+        return;
+      }
+
+      const pCache = await ensureLivePrices(positions.map(p => p.symbol));
+
+      for (const pos of positions) {
+        const livePrice = (pCache && pCache[pos.symbol]?.ltp && Number(pCache[pos.symbol].ltp) > 0)
+          ? Number(pCache[pos.symbol].ltp)
+          : Number(pos.average_price || 0);
+
+        await LedgerService.closePosition(trx, user.id, pos.id, livePrice, false, 'Emergency Exit via Telegram /exitall');
+        closedCount++;
+      }
+    });
+
+    if (closedCount === 0) {
       await callTelegramApi(chatId, `ℹ️ No open positions to exit.`);
       return { handled: true, command };
     }
 
-    // Cancel pending orders and square off positions
-    await db('orders')
-      .where({ user_id: user.id, status: 'PENDING' })
-      .update({ status: 'CANCELLED', updated_at: new Date() });
-
-    for (const pos of positions) {
-      const exitSide = Number(pos.quantity) > 0 ? 'SELL' : 'BUY';
-      const exitQty = Math.abs(Number(pos.quantity));
-      const execPrice = Number(pos.average_price || 0);
-
-      await db('orders').insert({
-        user_id: user.id,
-        symbol: pos.symbol,
-        type: 'MARKET',
-        side: exitSide,
-        quantity: exitQty,
-        price: execPrice,
-        status: 'EXECUTED',
-        product_type: pos.product_type || 'INT',
-        remarks: 'Emergency Exit via Telegram /exitall'
-      });
-
-      await db('positions').where({ id: pos.id }).update({ quantity: 0, updated_at: new Date() });
-    }
-
-    await callTelegramApi(chatId, `🚨 <b>Emergency Square-Off Complete!</b>\n\nAll ${positions.length} active positions squared off and pending orders cancelled.`);
+    await callTelegramApi(chatId, `🚨 <b>Emergency Square-Off Complete!</b>\n\nAll ${closedCount} active positions squared off at market LTP and pending orders cancelled.`);
     return { handled: true, command };
   }
 
