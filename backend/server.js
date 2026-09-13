@@ -5902,9 +5902,14 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
              if (parent) {
                  const entryPrice = parseFloat(parent.price);
                  const checkPrice = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
+                 const cleanSym = order.symbol && order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
                  const currentLtp = (priceCache[order.symbol]?.ltp && Number(priceCache[order.symbol].ltp) > 0)
                      ? Number(priceCache[order.symbol].ltp)
-                     : entryPrice;
+                     : (priceCache[cleanSym]?.ltp && Number(priceCache[cleanSym].ltp) > 0)
+                         ? Number(priceCache[cleanSym].ltp)
+                         : (priceCache[`NSE:${cleanSym}`]?.ltp && Number(priceCache[`NSE:${cleanSym}`].ltp) > 0)
+                             ? Number(priceCache[`NSE:${cleanSym}`].ltp)
+                             : entryPrice;
                  if (order.type === 'SL-M' || order.type === 'SL-L' || order.type === 'SL') {
                      if (order.side === 'SELL' && checkPrice >= currentLtp) {
                          throw Object.assign(new Error(`BO Buy: Stop-Loss (₹${checkPrice}) must be lower than current market price (₹${currentLtp}).`), { statusCode: 400 });

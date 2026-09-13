@@ -115,7 +115,13 @@ async function spawnBracketOrders(trx, order, childQty) {
 
   // Hook into transaction completion to add orders to in-memory trigger engine
   // This guarantees that if the transaction rolls back, ghost orders are NOT added to memory
-  if (trx && typeof trx.executionPromise?.then === 'function') {
+  if (trx && typeof trx.on === 'function') {
+    trx.on('commit', async () => {
+      for (const ord of spawned) {
+        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+      }
+    });
+  } else if (trx && typeof trx.executionPromise?.then === 'function') {
     trx.executionPromise.then(async () => {
       for (const ord of spawned) {
         await triggerEngine.addOrderToMemory(ord).catch(() => {});
