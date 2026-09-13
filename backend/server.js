@@ -28,6 +28,7 @@ const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
 const SIPEngine = require('./services/sipEngine');
+const { verifyFirebasePhoneToken } = require('./services/firebaseAuth');
 
 const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
@@ -606,8 +607,17 @@ app.post('/api/auth/profile', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { username, email, phone, password, referral_code } = req.body;
+  const { username, email, phone, password, referral_code, firebase_token } = req.body;
   if (!username || !email || !password || !phone) return res.status(400).json({ error: 'Missing fields' });
+
+  // Validate phone OTP token if provided or if Firebase Admin is configured
+  if (firebase_token) {
+    const tokenCheck = await verifyFirebasePhoneToken(firebase_token, phone);
+    if (!tokenCheck.verified) {
+      return res.status(403).json({ error: tokenCheck.reason || 'Invalid or unverified phone authorization token.' });
+    }
+  }
+
   try {
     // Check for existing duplicates
     const existingUser = await db('users')
@@ -909,11 +919,21 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     });
 
     // Send via EmailJS REST API
+    const serviceId = process.env.EMAILJS_SERVICE_ID;
+    const templateId = process.env.EMAILJS_TEMPLATE_ID;
+    const userId = process.env.EMAILJS_USER_ID;
+    const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
+
+    if (!serviceId || !templateId || !userId || !accessToken) {
+      console.error('[AUTH] EmailJS configuration missing in environment variables.');
+      return res.status(503).json({ error: 'Email delivery service is currently unconfigured. Please contact support.' });
+    }
+
     const emailData = {
-      service_id: process.env.EMAILJS_SERVICE_ID || 'service_apextrade',
-      template_id: process.env.EMAILJS_TEMPLATE_ID || 'template_qfe0n8c',
-      user_id: process.env.EMAILJS_USER_ID || '5l4SSMcquuPO_XGId',
-      accessToken: process.env.EMAILJS_ACCESS_TOKEN || 'f0eGuMIvDNCxPoAf5CeZD',
+      service_id: serviceId,
+      template_id: templateId,
+      user_id: userId,
+      accessToken: accessToken,
       template_params: {
         otp: otp,
         otp_code: otp,
@@ -947,6 +967,45 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
 // Rate limiting and attempt tracker for password reset OTP
 const passwordResetAttempts = new Map();
+
+// ─── Verify Reset OTP ───────────────────────────────────────────────────────
+app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
+  const { email, otp } = req.body || {};
+  if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
+  const now = Date.now();
+
+  if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
+    const waitMins = Math.ceil((attemptRecord.lockedUntil - now) / 60000);
+    return res.status(429).json({ error: `Account temporarily locked due to excessive failed attempts. Please try again in ${waitMins} minute(s).` });
+  }
+
+  try {
+    const user = await db('users').where({ email: normalizedEmail }).first();
+    if (!user || !user.reset_otp || !user.reset_otp_expires) {
+      return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
+    }
+
+    if (new Date() > new Date(user.reset_otp_expires)) {
+      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    if (user.reset_otp !== String(otp).trim()) {
+      attemptRecord.count += 1;
+      if (attemptRecord.count >= 5) {
+        attemptRecord.lockedUntil = now + 15 * 60 * 1000;
+      }
+      passwordResetAttempts.set(normalizedEmail, attemptRecord);
+      return res.status(400).json({ error: 'Invalid OTP code.' });
+    }
+
+    res.json({ success: true, message: 'OTP verified successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── Reset Password ─────────────────────────────────────────────────────────
 app.post('/api/auth/reset-password', async (req, res) => {

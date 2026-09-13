@@ -5,9 +5,9 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function LoginView() {
-  const { login, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
+  const { login, preLogin, register, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, preLogin: state.preLogin, register: state.register, forgotPassword: state.forgotPassword, verifyResetOtp: state.verifyResetOtp, resetPassword: state.resetPassword, authError: state.authError })));
   
-  // view: 'login', 'register', 'forgot', 'otp', 'reset'
+  // view: 'login', 'register', 'forgot', 'otp', 'reset', 'login_otp', 'register_otp'
   const [view, setView] = useState(() => {
     if (typeof window !== 'undefined') {
       const p = window.location.pathname.toLowerCase();
@@ -53,14 +53,37 @@ export default function LoginView() {
     setMessage('');
 
     if (view === 'login') {
-      await login(email, password);
+      const res = await preLogin(email, password);
+      if (res && res.success) {
+        try {
+          if (window.recaptchaVerifier) {
+            try { window.recaptchaVerifier.clear(); } catch (_) {}
+            window.recaptchaVerifier = null;
+          }
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible'
+          });
+          const rawPhone = String(res.phone || '').trim();
+          const cleanPhone = rawPhone.replace(/\D/g, '');
+          const formattedPhone = rawPhone.startsWith('+') ? rawPhone : '+91' + cleanPhone;
+          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+          setConfirmationResult(confirmation);
+          setView('login_otp');
+          setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
+        } catch (error) {
+          useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
+        }
+      }
     } 
     else if (view === 'login_otp') {
       try {
+        if (!confirmationResult) {
+          throw new Error('No pending OTP verification session. Please log in again.');
+        }
         await confirmationResult.confirm(phoneOtp);
         await login(email, password);
       } catch (error) {
-        useStore.setState({ authError: 'Invalid OTP code.' });
+        useStore.setState({ authError: 'Invalid 2FA code. Please check and try again.' });
       }
     }
     else if (view === 'register') {
@@ -73,7 +96,10 @@ export default function LoginView() {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
           size: 'invisible'
         });
-        const formattedPhone = '+91' + phone;
+        const cleanPhone = phone.replace(/\D/g, '');
+        const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 
+          ? '+' + cleanPhone 
+          : '+91' + cleanPhone;
         const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
         setConfirmationResult(confirmation);
         setView('register_otp');
@@ -84,38 +110,54 @@ export default function LoginView() {
     }
     else if (view === 'register_otp') {
       try {
-        await confirmationResult.confirm(phoneOtp);
-        await register(username, email, phone, password);
+        if (!confirmationResult) {
+          throw new Error('No pending OTP verification session. Please register again.');
+        }
+        const userCredential = await confirmationResult.confirm(phoneOtp);
+        const firebaseToken = await userCredential?.user?.getIdToken().catch(() => null);
+        await register(username, email, phone, password, firebaseToken);
       } catch (error) {
         useStore.setState({ authError: 'Invalid OTP code.' });
       }
     }
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
-      if (res.success) {
+      if (res && res.success) {
         setMessage('OTP sent to your email! (Valid for 15 minutes)');
         setView('otp');
       } else {
-        useStore.setState({ authError: res.error });
+        useStore.setState({ authError: res?.error || 'Failed to send reset code.' });
       }
     }
     else if (view === 'otp') {
-      // Just move to reset password screen
-      if (otp.length === 6) {
-        setView('reset');
-      } else {
+      if (!otp || otp.length !== 6) {
         useStore.setState({ authError: 'OTP must be 6 digits' });
+        setLoading(false);
+        return;
+      }
+      const res = await verifyResetOtp(email, otp);
+      if (res && res.success) {
+        setView('reset');
+        setMessage('Code verified. Set your new password.');
+      } else {
+        useStore.setState({ authError: res?.error || 'Invalid or expired OTP code' });
       }
     }
     else if (view === 'reset') {
+      if (!email) {
+        setView('forgot');
+        useStore.setState({ authError: 'Session expired. Please enter your email again.' });
+        setLoading(false);
+        return;
+      }
       const res = await resetPassword(email, otp, password);
-      if (res.success) {
+      if (res && res.success) {
         setMessage('Password reset successfully! Please log in.');
         setView('login');
         setPassword('');
         setOtp('');
       } else {
-        useStore.setState({ authError: res.error });
+        useStore.setState({ authError: res?.error || 'Failed to reset password.' });
       }
     }
     setLoading(false);
@@ -287,7 +329,19 @@ export default function LoginView() {
             </div>
           )}
 
-          {(view === 'login' || view === 'login_otp' || view === 'register' || view === 'reset') && (
+          {view === 'login_otp' && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
+              🔒 Authenticating account: <strong>{email}</strong>
+            </div>
+          )}
+
+          {view === 'reset' && email && (
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
+              🔑 Resetting password for: <strong>{email}</strong>
+            </div>
+          )}
+
+          {(view === 'login' || view === 'register' || view === 'reset') && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>{view === 'reset' ? 'New Password' : 'Password'}</label>

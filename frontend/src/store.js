@@ -193,7 +193,7 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  register: async (username, email, phone, password) => {
+  register: async (username, email, phone, password, firebaseToken = null) => {
     try {
       set({ authError: null });
       const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
@@ -202,6 +202,7 @@ export const useStore = create(persist((set, get) => ({
         email,
         phone,
         password,
+        firebase_token: firebaseToken || undefined,
         referral_code: localStorage.getItem('referral_code'),
         client_ip: publicInfo?.ip || undefined,
         client_city: publicInfo?.city || undefined,
@@ -232,6 +233,19 @@ export const useStore = create(persist((set, get) => ({
     try {
       const res = await fetch(`${API}/api/auth/forgot-password`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  verifyResetOtp: async (email, otp) => {
+    try {
+      const res = await fetch(`${API}/api/auth/verify-reset-otp`, { credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
