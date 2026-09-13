@@ -98,19 +98,19 @@ class SIPEngine {
   /**
    * Execute a single SIP installment
    */
-  static async executeSingleSip(sipId, priceCache = {}) {
+  static async executeSingleSip(sipId, priceCache = {}, isManualPayNow = false) {
     return await db.transaction(async (trx) => {
-      const sip = await trx('sips').where({ id: sipId }).first();
+      const sip = await trx('sips').where({ id: sipId }).forUpdate().first();
       if (!sip) throw new Error('SIP not found');
       if (sip.status !== 'ACTIVE') throw new Error('SIP is not ACTIVE');
 
       // Advisory transaction lock per-user to prevent balance race conditions
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [sip.user_id]);
 
-      // Atomic Idempotency Guard: Ensure this installment has not already been processed today
+      // Atomic Idempotency Guard: Ensure this installment has not already been processed today (unless explicit manual Pay Now)
       const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
       const endOfToday = new Date(`${istDateStr}T23:59:59.999+05:30`);
-      if (sip.next_execution_date && new Date(sip.next_execution_date) > endOfToday) {
+      if (!isManualPayNow && sip.next_execution_date && new Date(sip.next_execution_date) > endOfToday) {
         return { success: false, reason: 'ALREADY_PROCESSED_OR_NOT_DUE' };
       }
 
@@ -130,6 +130,10 @@ class SIPEngine {
         return { success: false, reason: 'NAV_UNAVAILABLE' };
       }
       const units = parseFloat((amount / nav).toFixed(4));
+      if (units <= 0) {
+        console.warn(`[SIPEngine] Calculated units zero for SIP #${sip.id} (amount: ₹${amount}, NAV: ₹${nav})`);
+        return { success: false, reason: 'ZERO_UNITS_ALLOCATED' };
+      }
 
       const isMf = Boolean(sip.is_mf || sip.scheme_code || (sip.symbol && (sip.symbol.endsWith('-MF') || sip.symbol.includes('MUTUALFUND'))));
       const assetClass = isMf ? 'MUTUAL_FUND' : 'EQUITY';
@@ -146,7 +150,7 @@ class SIPEngine {
         description: `SIP Installment (${sip.frequency}): Bought ${units} units of ${sip.symbol} @ ₹${nav.toFixed(2)}`
       });
 
-      // 3. Create executed order entry
+      // 3. Create executed order record for audit & history
       await trx('orders').insert({
         user_id: user.id,
         symbol: sip.symbol,
@@ -154,31 +158,29 @@ class SIPEngine {
         side: 'BUY',
         quantity: units,
         price: nav,
-        status: 'EXECUTED',
+        average_price: nav,
+        status: 'COMPLETED',
         product_type: 'DEL',
         margin: amount,
+        remarks: `SIP Installment (${sip.frequency})`,
         created_at: new Date(),
         updated_at: new Date()
       });
 
-      // 4. Update or Insert Holding
-      const cleanSym = String(sip.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+      // 4. Credit or update Holdings
       const existingHolding = await trx('holdings')
-        .where({ user_id: user.id })
-        .where(builder => {
-          builder.where({ symbol: sip.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` });
-        })
+        .where({ user_id: user.id, symbol: sip.symbol })
         .first();
+
       if (existingHolding) {
-        const prevQty = parseFloat(existingHolding.quantity) || 0;
-        const prevAvg = parseFloat(existingHolding.average_price) || nav;
-        const totalQty = prevQty + units;
-        const newAvg = totalQty > 0 ? ((prevQty * prevAvg) + (units * nav)) / totalQty : nav;
+        const currentQty = parseFloat(existingHolding.quantity);
+        const currentAvg = parseFloat(existingHolding.average_price);
+        const newQty = parseFloat((currentQty + units).toFixed(4));
+        const newAvg = ((currentQty * currentAvg) + amount) / newQty;
 
         await trx('holdings').where({ id: existingHolding.id }).update({
-          quantity: parseFloat(totalQty.toFixed(4)),
-          average_price: parseFloat(newAvg.toFixed(2)),
-          asset_class: assetClass,
+          quantity: newQty,
+          average_price: parseFloat(newAvg.toFixed(4)),
           updated_at: new Date()
         });
       } else {
@@ -186,7 +188,7 @@ class SIPEngine {
           user_id: user.id,
           symbol: sip.symbol,
           quantity: units,
-          average_price: parseFloat(nav.toFixed(2)),
+          average_price: nav,
           asset_class: assetClass,
           created_at: new Date(),
           updated_at: new Date()
@@ -210,14 +212,21 @@ class SIPEngine {
    */
   static async processDueSips(priceCache = {}) {
     const lockKey = 'cron_sip_engine';
-    const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-    if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-      console.log('[SIPEngine] SIP execution already running on another cluster worker. Skipping.');
-      return;
-    }
+    let connection = null;
+    let isLocked = false;
 
-    console.log('[SIPEngine] 🔄 Checking for due SIP installments...');
     try {
+      if (db.client && db.client.acquireConnection) {
+        connection = await db.client.acquireConnection();
+        const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+        isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+        if (!isLocked) {
+          console.log('[SIPEngine] SIP execution already running on another cluster worker. Skipping.');
+          return { total: 0, success: 0, failed: 0, skipped: true };
+        }
+      }
+
+      console.log('[SIPEngine] 🔄 Checking for due SIP installments...');
       // Ensure date comparison uses Asia/Kolkata timezone
       const istDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date()); // "YYYY-MM-DD"
       const endOfTodayIst = new Date(new Date(`${istDateStr}T23:59:59.999+05:30`).toISOString());
@@ -251,7 +260,15 @@ class SIPEngine {
       console.error('[SIPEngine] Global process error:', e);
       return { error: e.message };
     } finally {
-      await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+      if (connection) {
+        try {
+          if (isLocked) {
+            await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+          }
+        } finally {
+          await db.client.releaseConnection(connection).catch(() => {});
+        }
+      }
     }
   }
 

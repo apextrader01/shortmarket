@@ -911,10 +911,10 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     // Send via EmailJS REST API
     const emailData = {
-      service_id: 'service_apextrade',
-      template_id: 'template_qfe0n8c',
-      user_id: '5l4SSMcquuPO_XGId',
-      accessToken: 'f0eGuMIvDNCxPoAf5CeZD',
+      service_id: process.env.EMAILJS_SERVICE_ID || 'service_apextrade',
+      template_id: process.env.EMAILJS_TEMPLATE_ID || 'template_qfe0n8c',
+      user_id: process.env.EMAILJS_USER_ID || '5l4SSMcquuPO_XGId',
+      accessToken: process.env.EMAILJS_ACCESS_TOKEN || 'f0eGuMIvDNCxPoAf5CeZD',
       template_params: {
         otp: otp,
         otp_code: otp,
@@ -936,6 +936,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(500).json({ error: `Failed to send email: ${errText}` });
     }
 
+    // Reset failed attempts tracker on new OTP request
+    passwordResetAttempts.delete(email.toLowerCase().trim());
+
     res.json({ success: true, message: 'OTP sent to email' });
   } catch (error) {
     console.error('Forgot Password Error:', error);
@@ -943,22 +946,51 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
+// Rate limiting and attempt tracker for password reset OTP
+const passwordResetAttempts = new Map();
+
 // ─── Reset Password ─────────────────────────────────────────────────────────
 app.post('/api/auth/reset-password', async (req, res) => {
   const { email, otp, newPassword } = req.body;
   if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields required' });
 
+  const normalizedEmail = email.toLowerCase().trim();
+  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
+  const now = Date.now();
+
+  if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
+    const waitMins = Math.ceil((attemptRecord.lockedUntil - now) / 60000);
+    return res.status(429).json({ error: `Account temporarily locked due to excessive failed attempts. Please try again in ${waitMins} minute(s).` });
+  }
+
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await db('users').where({ email: normalizedEmail }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.reset_otp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+    if (!user.reset_otp || !user.reset_otp_expires) {
+      return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
     }
-    
+
     if (new Date() > new Date(user.reset_otp_expires)) {
-      return res.status(400).json({ error: 'OTP has expired' });
+      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
     }
+
+    if (user.reset_otp !== String(otp).trim()) {
+      attemptRecord.count += 1;
+      if (attemptRecord.count >= 5) {
+        attemptRecord.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
+        passwordResetAttempts.set(normalizedEmail, attemptRecord);
+        // Invalidate OTP in DB to protect user
+        await db('users').where({ id: user.id }).update({ reset_otp: null, reset_otp_expires: null });
+        return res.status(429).json({ error: 'Too many incorrect OTP attempts. The OTP has been invalidated for security. Please request a new one after 15 minutes.' });
+      }
+      passwordResetAttempts.set(normalizedEmail, attemptRecord);
+      const remaining = 5 - attemptRecord.count;
+      return res.status(400).json({ error: `Invalid OTP. ${remaining} attempt(s) remaining.` });
+    }
+
+    // Success: clear rate limiter
+    passwordResetAttempts.delete(normalizedEmail);
 
     const password_hash = await bcrypt.hash(newPassword, 10);
     await db('users').where({ id: user.id }).update({
@@ -967,7 +999,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
       reset_otp_expires: null
     });
 
-    res.json({ success: true, message: 'Password has been reset' });
+    res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
     console.error('Reset Password Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -4088,17 +4120,14 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid SIP amount' });
     }
 
-    // 1. Resolve Execution Price / NAV
-    let execPrice = Number(price);
-    if (!execPrice || execPrice <= 0) {
-      execPrice = await SIPEngine.getLatestNav(symbol, priceCache);
-    }
+    // 1. Resolve Execution Price / NAV (Official NAV only - never trust client supplied price for mutual funds)
+    let execPrice = await SIPEngine.getLatestNav(symbol, priceCache);
     if (!execPrice || execPrice <= 0) {
       const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
-      execPrice = priceCache[symbol]?.ltp || priceCache[cleanSym]?.ltp || priceCache[`NSE:${cleanSym}`]?.ltp || 0;
+      execPrice = Number(priceCache[symbol]?.ltp) || Number(priceCache[cleanSym]?.ltp) || Number(priceCache[`NSE:${cleanSym}`]?.ltp) || 0;
     }
     if (!execPrice || execPrice <= 0) {
-      return res.status(400).json({ error: `Unable to determine live NAV or market price for ${symbol}. Please specify a valid price or try again.` });
+      return res.status(400).json({ error: `Unable to determine live NAV or market price for ${symbol}. Please try again.` });
     }
 
     const qty = parseFloat((finalMargin / execPrice).toFixed(4));
@@ -4210,12 +4239,18 @@ app.post('/api/sip/:id/execute-now', authenticateToken, async (req, res) => {
     const sip = await db('sips').where({ id: req.params.id, user_id: req.user.id }).first();
     if (!sip) return res.status(404).json({ error: 'SIP not found' });
     
-    const result = await SIPEngine.executeSingleSip(sip.id, priceCache);
+    const result = await SIPEngine.executeSingleSip(sip.id, priceCache, true);
     if (!result.success) {
       if (result.reason === 'INSUFFICIENT_FUNDS') {
         return res.status(400).json({ error: `Insufficient funds. Needed ₹${result.required}, Available ₹${result.available.toFixed(2)}` });
       }
-      return res.status(500).json({ error: 'Failed to execute SIP installment' });
+      if (result.reason === 'NAV_UNAVAILABLE') {
+        return res.status(400).json({ error: 'Latest NAV is temporarily unavailable. Please try again shortly.' });
+      }
+      if (result.reason === 'ZERO_UNITS_ALLOCATED') {
+        return res.status(400).json({ error: 'Installment amount is too small for current NAV. Please increase amount.' });
+      }
+      return res.status(500).json({ error: result.reason || 'Failed to execute SIP installment' });
     }
     res.json({ success: true, message: `Successfully executed SIP installment! ${result.units} units credited @ NAV ₹${result.nav}`, data: result });
   } catch (error) {
@@ -4229,7 +4264,7 @@ app.post('/api/admin/sips/process-all', authenticateToken, async (req, res) => {
     const caller = await db('users').where({ id: req.user.id }).first();
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const result = await SIPEngine.processDueSips(priceCache);
-    res.json({ success: true, message: `Processed ${result.total} due SIPs: ${result.success} succeeded, ${result.failed} failed/skipped.`, result });
+    res.json({ success: true, message: `Processed ${result?.total || 0} due SIPs: ${result?.success || 0} succeeded, ${result?.failed || 0} failed/skipped.`, result });
   } catch (error) {
     res.status(500).json({ error: error.message, success: false });
   }

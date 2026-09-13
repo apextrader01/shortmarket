@@ -409,7 +409,7 @@ class TriggerEngine {
                         await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + principalAmount + realizedPnl - rmsPenalty });
                         
                         await trx('ledger').insert({
-                            user_id: order.user_id, amount: principalAmount, type: 'HOLDING_RELEASE', description: `Holding value released for ${offsetQty} ${order.symbol}`
+                            user_id: order.user_id, amount: principalAmount, type: 'MARGIN_RELEASE', description: `Holding principal value released for ${offsetQty} ${order.symbol}`
                         });
                         await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
                         if (realizedPnl !== 0) {
