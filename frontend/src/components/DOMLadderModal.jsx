@@ -53,14 +53,12 @@ export default function DOMLadderModal() {
     }
   }, [domLadderModal.isOpen, refPrice, centerPrice]);
 
-  if (!domLadderModal.isOpen || !symbol) return null;
-
   // Use real data from store, fallback to empty array
-  const rawBids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  const rawAsks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  const rawBids = (domLadderModal.isOpen && marketDepthData?.symbol === symbol) ? marketDepthData.bids : [];
+  const rawAsks = (domLadderModal.isOpen && marketDepthData?.symbol === symbol) ? marketDepthData.asks : [];
 
-  const bids = rawBids;
-  const asks = rawAsks;
+  const bids = rawBids || [];
+  const asks = rawAsks || [];
 
   const bidsMap = useMemo(() => {
     const map = new Map();
@@ -89,6 +87,8 @@ export default function DOMLadderModal() {
       setHasScrolled(true);
     }
   }, [domLadderModal.isOpen, centerPrice, hasScrolled]);
+
+  if (!domLadderModal.isOpen || !symbol) return null;
 
   // Determine tick size based on exchange/symbol
   let tickSize = 0.05;
