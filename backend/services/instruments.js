@@ -48,9 +48,9 @@ async function loadInstrumentMaster() {
             "102000000000002": { symbol: "BSE:BANKEX-INDEX", name: "Bankex", exchange: "BSE" },
         };
 
-        globalNfoOptions = nfoOptions;
-        globalNfoFutures = nfoFutures;
-        globalBseSpots = bseSpots;
+        Object.assign(globalNfoOptions, nfoOptions);
+        Object.assign(globalNfoFutures, nfoFutures);
+        Object.assign(globalBseSpots, bseSpots);
 
         let tempStockMaster = { ...indices };
         symbolToToken = {};

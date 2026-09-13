@@ -48,6 +48,11 @@ class MTMRiskManager {
         }, nextDelay);
     }
 
+    invalidateCache() {
+        this.cachedPositions = null;
+        this.lastCacheTime = 0;
+    }
+
     async evaluateMTM() {
         if (this.isChecking) return;
         // Check if market is active (respects Admin manual override OPEN/CLOSED and exchange hours)
@@ -56,14 +61,14 @@ class MTMRiskManager {
         this.isChecking = true;
         try {
             const now = Date.now();
-            // Cache positions for 30 seconds to reduce DB pressure while keeping checks fast
-            if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 30000) {
+            // Cache positions for 5 seconds to reduce DB pressure while staying responsive to order closes
+            if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 5000) {
                 this.cachedPositions = await db('positions')
                     .whereNot({ quantity: 0 });
                 this.lastCacheTime = now;
             }
             
-            const openPositions = this.cachedPositions;
+            const openPositions = (this.cachedPositions || []).filter(pos => Number(pos.quantity) !== 0);
             if (!openPositions || openPositions.length === 0) {
                 this.isChecking = false;
                 return;
@@ -207,12 +212,21 @@ class MTMRiskManager {
                     if (!freshPos || Number(freshPos.quantity) === 0) continue;
 
                     let ltp = this.priceCache[freshPos.symbol]?.ltp;
-                    if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
-                        ltp = Number(freshPos.average_price) || 0;
-                    } else {
-                        ltp = Math.max(0, Number(ltp));
+                    if (ltp === undefined || ltp === null || isNaN(Number(ltp)) || Number(ltp) <= 0) {
+                        ltp = Number(this.priceCache[freshPos.symbol]?.close) || 0;
                     }
-                    if (ltp < 0) continue;
+                    if (!ltp || ltp <= 0) {
+                        const lastOrder = await trx('orders')
+                            .where({ symbol: freshPos.symbol })
+                            .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
+                            .orderBy('id', 'desc')
+                            .first();
+                        ltp = Number(lastOrder?.price || lastOrder?.average_price) || 0;
+                    }
+                    if (ltp <= 0) {
+                        console.warn(`[MTM Risk] Skipping liquidation for ${freshPos.symbol} - no market price available; not falling back to average_price.`);
+                        continue;
+                    }
 
                     await LedgerService.closePosition(trx, userId, freshPos.id, ltp, isRMSPenalty, auditTag);
                     console.log(`[AUTO-EXIT EXECUTED] Closed ${freshPos.symbol} for user ${userId} at ₹${ltp} (${reason})`);

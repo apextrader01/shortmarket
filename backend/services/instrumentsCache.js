@@ -117,8 +117,12 @@ function searchInstruments(query) {
     // Simple filter: every part of the query must be included in the search_string
     const nowMs = Date.now();
     const results = allInstruments.filter(item => {
-        if (item.expiryTimestamp && item.expiryTimestamp < nowMs) return false;
-        if (item.expiry_timestamp && item.expiry_timestamp * 1000 < nowMs) return false;
+        const expMs = item.expiryTimestamp 
+            ? Number(item.expiryTimestamp) 
+            : (item.expiry_timestamp 
+                ? (Number(item.expiry_timestamp) > 1e11 ? Number(item.expiry_timestamp) : Number(item.expiry_timestamp) * 1000) 
+                : null);
+        if (expMs && expMs < nowMs) return false;
         for (const part of queryParts) {
             if (!item.search_string.includes(part)) return false;
         }

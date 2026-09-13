@@ -3947,16 +3947,21 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       let finalMargin = 0;
       if (requiresMargin) {
-          if (isMarket && execPrice <= 0) {
-              const fallbackPrice = priceCache[symbol]?.close || 0;
+          if (execPrice <= 0) {
+              const fallbackPrice = priceCache[symbol]?.close || priceCache[symbol]?.ltp || 0;
               if (fallbackPrice > 0) {
                   execPrice = fallbackPrice;
-              } else {
+              } else if (isMarket) {
                   throw new Error(`Live market price is currently unavailable for ${symbol}. Please specify a limit price or wait for market data to connect.`);
+              } else if (isDerivativeContract(symbol) && side === 'BUY') {
+                  throw new Error(`A valid price > 0 is required to calculate margin for ${symbol}.`);
               }
           }
           const { calculateRequiredMargin } = require('./services/marginEngine');
           finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, execPrice);
+          if (finalMargin <= 0 && isDerivativeContract(symbol) && side === 'BUY') {
+              throw new Error(`Unable to determine required margin for ${symbol}. Please specify a valid limit price.`);
+          }
       }
 
       if (requiresMargin && finalMargin > 0) {
