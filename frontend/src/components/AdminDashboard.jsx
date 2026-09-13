@@ -223,7 +223,12 @@ function SystemStatusTab({ onOpenAutoLoginModal, onTriggerAutoLogin, autoLoginLo
     fetchMarketStatus?.();
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/fyers/status`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/fyers/status`, {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        });
         const data = await res.json();
         setStatus(data);
       } catch (err) {
@@ -2092,8 +2097,9 @@ export default function AdminDashboard() {
         { header: 'Bank Acc No', key: 'bank_account_no' },
         { header: 'IFSC Code', key: 'bank_ifsc' },
         { header: 'Status', key: 'status' },
+        { header: 'UTR / Ref', key: 'utr', format: u => u || '-' },
         { header: 'Requested At', key: 'created_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' },
-        { header: 'Processed At', key: 'processed_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
+        { header: 'Processed At', key: 'updated_at', format: d => d ? new Date(d).toLocaleString('en-IN') : '-' }
       ];
       const subtitle = `Filter: ${withdrawalsDatePreset.toUpperCase()}${debouncedWithdrawalSearch ? ` | Search: "${debouncedWithdrawalSearch}"` : ''}`;
       if (format === 'excel') exportToExcel(exportData, cols, 'withdrawals_export', 'Withdrawals Report');
@@ -4613,8 +4619,9 @@ export default function AdminDashboard() {
                                 }
                               }}>Approve</button>
                               <button className="btn btn-outline" style={{ padding: '2px 6px', fontSize: '10px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }} onClick={async () => {
-                                if(window.confirm('Reject this withdrawal? Amount will return to user.')) {
-                                  await processAdminWithdrawal(w.id, 'REJECTED');
+                                const reason = window.prompt('Reject this withdrawal? Enter reason (Amount will return to user):', '');
+                                if (reason !== null) {
+                                  await processAdminWithdrawal(w.id, 'REJECTED', reason.trim());
                                   loadData();
                                 }
                               }}>Reject</button>
@@ -4622,8 +4629,9 @@ export default function AdminDashboard() {
                           )}
                           {w.status === 'PROCESSING' && (
                             <button className="btn btn-primary" style={{ padding: '2px 6px', fontSize: '10px', background: 'var(--color-green)' }} onClick={async () => {
-                              if(window.confirm('Mark as Credited? This means you have successfully transferred the money.')) {
-                                await processAdminWithdrawal(w.id, 'CREDITED');
+                              const utr = window.prompt('Enter Transaction UTR / Reference ID (optional but recommended):', '');
+                              if (utr !== null) {
+                                await processAdminWithdrawal(w.id, 'CREDITED', 'Payment transferred', utr.trim());
                                 loadData();
                               }
                             }}>Mark Credited</button>

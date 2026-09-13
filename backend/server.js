@@ -1207,15 +1207,22 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
       
     const isAuthentic = expectedSignature === razorpay_signature;
     if (isAuthentic) {
-      const expires = new Date();
-      const selectedPlan = plan === 'yearly' ? 'yearly' : 'monthly';
-      if (selectedPlan === 'monthly') {
-        expires.setMonth(expires.getMonth() + 1);
-      } else {
-        expires.setFullYear(expires.getFullYear() + 1);
-      }
-      
       await db.transaction(async (trx) => {
+        const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
+        if (!user) throw new Error('User not found');
+
+        const now = new Date();
+        const baseDate = (user.subscription_expires && new Date(user.subscription_expires) > now) 
+          ? new Date(user.subscription_expires) 
+          : now;
+        const expires = new Date(baseDate.getTime());
+        const selectedPlan = plan === 'yearly' ? 'yearly' : 'monthly';
+        if (selectedPlan === 'monthly') {
+          expires.setMonth(expires.getMonth() + 1);
+        } else {
+          expires.setFullYear(expires.getFullYear() + 1);
+        }
+
         await trx('users').where({ id: req.user.id }).update({
           subscription_tier: 'PRO',
           subscription_expires: expires
@@ -1225,6 +1232,7 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
         try {
           const pendingRef = await trx('referrals')
             .where({ referred_user_id: req.user.id, status: 'pending' })
+            .forUpdate()
             .first();
 
           if (pendingRef) {
@@ -1239,6 +1247,14 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
             await trx('users')
               .where({ id: pendingRef.referrer_id })
               .increment('balance', rewardAmount);
+
+            // Audit ledger entry for referral credit
+            await trx('ledger').insert({
+              user_id: pendingRef.referrer_id,
+              amount: rewardAmount,
+              type: 'DEPOSIT',
+              description: `Referral reward bonus for user ${user.username || req.user.id} PRO upgrade`
+            });
           }
         } catch (e) {
           console.error('Failed to process referral reward', e);

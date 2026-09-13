@@ -1216,7 +1216,11 @@ export const useStore = create(persist((set, get) => ({
       if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
       if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
       if (isExport) url += `&export=true`;
-      const res = await fetch(url, { credentials: 'include' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       if (res.ok) return { success: true, ...data };
       return { success: false, withdrawals: [], total: 0, totalPages: 1 };
@@ -1226,12 +1230,16 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  processAdminWithdrawal: async (id, status) => {
+  processAdminWithdrawal: async (id, status, remarks = '', utr = '') => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/admin/withdrawals/${id}/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status, remarks, utr }),
         credentials: 'include'
       });
       const data = await res.json();
@@ -1479,10 +1487,11 @@ export const useStore = create(persist((set, get) => ({
 
   // ─── Admin ───────────────────────────────────────────────────────────────
   fetchAdminAnalytics: async () => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/admin/analytics`, { credentials: 'include'
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/analytics`, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       if (res.ok) {
         const data = await res.json();
@@ -1500,7 +1509,11 @@ export const useStore = create(persist((set, get) => ({
       if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
       if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
       if (isExport) url += `&export=true`;
-      const res = await fetch(url, { credentials: 'include' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1514,7 +1527,11 @@ export const useStore = create(persist((set, get) => ({
       if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
       if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
       if (isExport) url += `&export=true`;
-      const res = await fetch(url, { credentials: 'include' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1558,7 +1575,11 @@ export const useStore = create(persist((set, get) => ({
       if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
       if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
       if (isExport) url += `&export=true`;
-      const res = await fetch(url, { credentials: 'include' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -1567,11 +1588,15 @@ export const useStore = create(persist((set, get) => ({
   },
 
   forceCloseUserPosition: async (positionId) => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/admin/force-close`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/force-close`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ positionId })
       });
       const data = await res.json();

@@ -66,6 +66,7 @@ async function callTelegramApi(chatId, messageText, parseMode = 'HTML') {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({
         chat_id: chatId,
         text: messageText,
@@ -222,7 +223,11 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
       }
     }
 
-    // Push into non-blocking queue
+    // Push into bounded non-blocking queue (capped at 1000 items)
+    if (alertQueue.length >= 1000) {
+      alertQueue.shift(); // Drop oldest message to prevent memory growth
+      stats.peakDropsCount++;
+    }
     alertQueue.push({
       chatId: user.telegram_chat_id,
       text: message,
