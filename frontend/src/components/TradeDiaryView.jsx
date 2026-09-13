@@ -7916,23 +7916,10 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 pnlVal = liveDayPnl;
                 isGreen = liveDayPnl > 0;
                 isRed = liveDayPnl < 0;
-              } else if (marketSegment === 'Crypto') {
-                // Crypto trades 7 days/week
-                isGreen = [1, 2, 4, 6, 7, 8, 9, 11, 13, 14, 15, 16, 18, 20, 21, 22, 25, 27, 28, 29].includes(dayNum);
-                isRed = [3, 5, 10, 12, 17, 19, 23, 24, 26].includes(dayNum);
-                pnlVal = isGreen ? (dayNum * 45 + 180) : (isRed ? -(dayNum * 25 + 90) : 0);
               } else {
-                // Equities / Forex / Indian
-                isGreen = !isWeekend && [1, 2, 4, 7, 8, 9, 11, 14, 15, 16, 18, 21, 22, 25, 28, 29].includes(dayNum);
-                isRed = !isWeekend && [3, 10, 17, 23, 24].includes(dayNum);
-                if (marketSegment === 'Indian') {
-                  pnlVal = isGreen ? (dayNum * 420 + 1500) : (isRed ? -(dayNum * 220 + 800) : 0);
-                } else if (marketSegment === 'US') {
-                  pnlVal = isGreen ? (dayNum * 65 + 240) : (isRed ? -(dayNum * 35 + 120) : 0);
-                } else {
-                  // Forex
-                  pnlVal = isGreen ? (dayNum * 32 + 140) : (isRed ? -(dayNum * 18 + 70) : 0);
-                }
+                pnlVal = 0;
+                isGreen = false;
+                isRed = false;
               }
 
               return {

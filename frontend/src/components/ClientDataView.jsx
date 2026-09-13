@@ -83,12 +83,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
   todayStart.setHours(0, 0, 0, 0);
   const todayCompletedOrders = (orders || []).filter(o => (o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED') && new Date(o.created_at) >= todayStart);
   const todayTradesCount = todayCompletedOrders.length;
-  let todayRealizedLoss = 0;
+  let todayNetPnL = 0;
   todayCompletedOrders.forEach(o => {
-    if (o.realized_pnl && parseFloat(o.realized_pnl) < 0) {
-      todayRealizedLoss += Math.abs(parseFloat(o.realized_pnl));
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
+      todayNetPnL += parseFloat(o.realized_pnl);
     }
   });
+  const todayRealizedLoss = todayNetPnL < 0 ? Math.abs(todayNetPnL) : 0;
   const isTradesLocked = isRiskActive && maxTrades && todayTradesCount >= Number(maxTrades);
   const isLossLocked = isRiskActive && maxLoss && todayRealizedLoss >= Number(maxLoss);
   const isLockedTonight = isTradesLocked || isLossLocked;

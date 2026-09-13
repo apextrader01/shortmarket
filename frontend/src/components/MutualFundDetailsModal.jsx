@@ -106,7 +106,14 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         setIsInvesting(true);
         setOrderStatus(null);
 
-        const currentNav = fund.nav || details?.nav || 1;
+        const rawNav = Number(fund.nav || details?.nav || 0);
+        if (!rawNav || rawNav <= 0 || isNaN(rawNav)) {
+            setStatusMsg('Unable to process order: Latest NAV is currently unavailable. Please try again shortly.');
+            setOrderStatus('error');
+            setIsInvesting(false);
+            return;
+        }
+        const currentNav = rawNav;
         const numAmount = Number(amount) || 0;
         let res;
 
@@ -171,10 +178,13 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
         }
     };
 
-    const holdingCurrentValue = userHolding ? (userHolding.quantity * (fund.nav || details?.nav || userHolding.ltp)) : 0;
+    const rawNav = Number(fund.nav || details?.nav || 0);
+    const hasValidNav = rawNav > 0 && !isNaN(rawNav);
+    const holdingCurrentValue = userHolding ? (userHolding.quantity * (rawNav || userHolding.ltp || 0)) : 0;
     const holdingInvested = userHolding ? parseFloat(userHolding.average_price || 0) * Number(userHolding.quantity || 0) : 0;
     const holdingPnL = holdingCurrentValue - holdingInvested;
     const holdingPnLPct = holdingInvested > 0 ? (holdingPnL / holdingInvested) * 100 : 0;
+    const isSubmitDisabled = isInvesting || !hasValidNav || (actionMode === 'INVEST' && Number(amount) < 100) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue);
 
     return (
         <>
@@ -726,19 +736,19 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                         </div>
                                     ) : (
                                         <button 
-                                            disabled={isInvesting || (actionMode === 'INVEST' && Number(amount) < 100) || (actionMode === 'REDEEM' && redeemType === 'CUSTOM' && Number(amount) > holdingCurrentValue)}
+                                            disabled={isSubmitDisabled}
                                             onClick={handleAction}
                                             style={{ 
                                                 width: '100%', padding: '16px', 
                                                 background: actionMode === 'INVEST' ? 'var(--color-blue)' : 'var(--color-red)', 
                                                 color: '#fff', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '700', 
-                                                cursor: (isInvesting || (actionMode === 'INVEST' && Number(amount) < 100)) ? 'not-allowed' : 'pointer', 
-                                                opacity: (isInvesting || (actionMode === 'INVEST' && Number(amount) < 100)) ? 0.7 : 1,
+                                                cursor: isSubmitDisabled ? 'not-allowed' : 'pointer', 
+                                                opacity: isSubmitDisabled ? 0.7 : 1,
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                                             }}
                                         >
                                             {isInvesting ? <Activity size={20} className="spin" /> : null}
-                                            {isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem'}
+                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem')}
                                         </button>
                                     )}
                                 </div>

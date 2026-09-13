@@ -90,7 +90,11 @@ export default function TradingJournalView({ onBack }) {
       const key = `pos-${p.id || p.symbol}`;
       if (isClosed && !seen.has(key)) {
         seen.add(key);
-        closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}`);
+        if (p.id) closedPosSignatures.add(`pos_id_${p.id}`);
+        const timeBucket = p.updated_at ? Math.floor(new Date(p.updated_at).getTime() / 30000) : 0;
+        if (timeBucket > 0) {
+          closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}_${timeBucket}`);
+        }
         const entrySide = p.side || (Number(p.closed_quantity) < 0 ? 'SELL' : 'BUY');
         list.push({
           id: key,
@@ -114,13 +118,13 @@ export default function TradingJournalView({ onBack }) {
       const pnl = (o.realized_pnl !== null && o.realized_pnl !== undefined) ? Number(o.realized_pnl) : null;
       if (!isExecuted || pnl === null || isNaN(pnl)) return;
 
-      const sig = `${o.symbol}_${Math.round(pnl * 100)}`;
-      if (closedPosSignatures.has(sig)) return;
+      if (o.position_id && closedPosSignatures.has(`pos_id_${o.position_id}`)) return;
+      const timeBucket = o.created_at ? Math.floor(new Date(o.created_at).getTime() / 30000) : 0;
+      if (timeBucket > 0 && closedPosSignatures.has(`${o.symbol}_${Math.round(pnl * 100)}_${timeBucket}`)) return;
 
       const key = `ord-${o.id}`;
       if (!seen.has(key)) {
         seen.add(key);
-        closedPosSignatures.add(sig);
         const originalEntrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
         list.push({
           id: key,

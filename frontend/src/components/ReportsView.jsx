@@ -44,6 +44,10 @@ const LedgerStatement = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterPeriod, filterType, customStart, customEnd]);
+
   const { token, user } = useStore(useShallow(state => ({ token: state.token, user: state.user })));
 
   useEffect(() => {
@@ -371,6 +375,10 @@ const TradesAndCharges = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [viewMode, setViewMode] = useState('Date-Wise View');
+
+  useEffect(() => {
+    setTradesPage(1);
+  }, [filterPeriod, customStart, customEnd, viewMode]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -943,6 +951,10 @@ const TradingInsights = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [selectedSegment, setSelectedSegment] = useState('All');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    setInsightsPage(1);
+  }, [filterPeriod, selectedSegment, customStart, customEnd]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
