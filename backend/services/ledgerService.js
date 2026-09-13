@@ -12,7 +12,7 @@ class LedgerService {
         const parsedAmount = parseFloat(amount) || 0;
         if (parsedAmount <= 0) return;
         
-        const user = await trx('users').where({ id: userId }).first();
+        const user = await trx('users').where({ id: userId }).forUpdate().first();
         if (parseFloat(user.balance) < parsedAmount) {
             throw new Error('Insufficient funds');
         }
@@ -33,7 +33,7 @@ class LedgerService {
         const parsedAmount = parseFloat(amount) || 0;
         if (parsedAmount <= 0) return;
         
-        const user = await trx('users').where({ id: userId }).first();
+        const user = await trx('users').where({ id: userId }).forUpdate().first();
         await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + parsedAmount });
         await trx('ledger').insert({
             user_id: userId,
@@ -51,7 +51,7 @@ class LedgerService {
         const totalTaxes = taxesObj.totalTaxes;
         
         if (totalTaxes > 0) {
-            const user = await trx('users').where({ id: userId }).first();
+            const user = await trx('users').where({ id: userId }).forUpdate().first();
             await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - totalTaxes });
             await trx('ledger').insert({
                 user_id: userId,
@@ -68,7 +68,7 @@ class LedgerService {
      * Optionally applies a ₹59 RMS Penalty for forced exits.
      */
     static async closePosition(trx, userId, positionId, exitPrice, isForcedRMSExit = false, customRemark = '') {
-        const position = await trx('positions').where({ id: positionId }).first();
+        const position = await trx('positions').where({ id: positionId }).forUpdate().first();
         if (!position || Number(position.quantity) === 0) return;
 
         const quantity = Number(position.quantity);
@@ -118,7 +118,7 @@ class LedgerService {
         const netRelease = marginBlocked + realizedPnl - exitTaxes - rmsPenalty;
 
         // 5. Update Ledger & Balance
-        const user = await trx('users').where({ id: userId }).first();
+        const user = await trx('users').where({ id: userId }).forUpdate().first();
         await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + netRelease });
 
         if (marginBlocked > 0) {

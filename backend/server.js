@@ -112,21 +112,7 @@ function isValidPublicIp(ip) {
 }
 
 function getClientIp(req, optionalBodyIp) {
-  // 1. Direct header sent by frontend client
-  const customHeader = req.headers['x-client-public-ip'];
-  if (isValidPublicIp(customHeader)) {
-    return customHeader.trim().replace(/^::ffff:/, '');
-  }
-
-  // 2. Body IP sent by frontend in login / register / telemetry
-  if (isValidPublicIp(optionalBodyIp)) {
-    return optionalBodyIp.trim().replace(/^::ffff:/, '');
-  }
-  if (isValidPublicIp(req.body?.client_ip)) {
-    return req.body.client_ip.trim().replace(/^::ffff:/, '');
-  }
-
-  // 3. Proxy & Cloud Provider Headers
+  // 1. Trusted Reverse Proxy & Cloud Provider Headers
   const cfIp = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'];
   if (isValidPublicIp(cfIp)) {
     return cfIp.trim().replace(/^::ffff:/, '');
@@ -145,11 +131,24 @@ function getClientIp(req, optionalBodyIp) {
     return realIp.trim().replace(/^::ffff:/, '');
   }
 
-  // 4. Raw connection address
+  // 2. Direct connection address
   const raw = req.ip || req.socket?.remoteAddress || '';
   const cleanRaw = raw.replace(/^::ffff:/, '').trim();
   if (isValidPublicIp(cleanRaw)) {
     return cleanRaw;
+  }
+
+  // 3. Fallback to client-provided IP only if no public proxy/socket IP detected
+  const customHeader = req.headers['x-client-public-ip'];
+  if (isValidPublicIp(customHeader)) {
+    return customHeader.trim().replace(/^::ffff:/, '');
+  }
+
+  if (isValidPublicIp(optionalBodyIp)) {
+    return optionalBodyIp.trim().replace(/^::ffff:/, '');
+  }
+  if (isValidPublicIp(req.body?.client_ip)) {
+    return req.body.client_ip.trim().replace(/^::ffff:/, '');
   }
 
   return cleanRaw || '127.0.0.1';
@@ -568,7 +567,7 @@ const orderLimiter = rateLimit({
   skip: (req) => {
     const ip = req.ip || req.connection?.remoteAddress || '';
     const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    return isLoopback || Boolean(req.body?.is_system_close);
+    return isLoopback;
   }
 });
 
@@ -1356,7 +1355,7 @@ app.post('/api/user/kyc', authenticateToken, async (req, res) => {
 app.post('/api/user/password', authenticateToken, async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
     
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -2649,16 +2648,19 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/user/watchlists', authenticateToken, async (req, res) => {
+app.post(['/api/user/watchlists', '/api/watchlists'], authenticateToken, async (req, res) => {
   try {
     const { watchlists } = req.body;
+    if (!watchlists || !Array.isArray(watchlists)) {
+      return res.status(400).json({ error: 'Watchlists must be an array' });
+    }
     
     // Check subscription tier
     const user = await db('users').where({ id: req.user.id }).first();
     const isPro = user.subscription_tier === 'PRO' && (!user.subscription_expires || new Date(user.subscription_expires) > new Date());
     const limit = isPro ? 5 : 3;
     
-    if (watchlists && watchlists.length > limit) {
+    if (watchlists.length > limit) {
       return res.status(403).json({ error: `Your ${isPro ? 'PRO' : 'BASIC'} plan allows a maximum of ${limit} watchlists. Please upgrade to add more.` });
     }
 
@@ -4691,29 +4693,32 @@ app.post('/api/user/risk-guardian', authenticateToken, async (req, res) => {
 // ⚡ Exit All Holdings ⚡
 app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
   try {
-    const activeHoldings = await db('holdings')
-      .where({ user_id: req.user.id })
-      .where('quantity', '>', 0);
-
-    if (!activeHoldings || activeHoldings.length === 0) {
-      return res.status(400).json({ error: 'No active holdings to exit' });
-    }
-
     let totalSoldAmount = 0;
     const exitOrders = [];
 
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
+      
+      const activeHoldings = await trx('holdings')
+        .where({ user_id: req.user.id })
+        .where('quantity', '>', 0)
+        .forUpdate();
+
+      if (!activeHoldings || activeHoldings.length === 0) {
+        throw Object.assign(new Error('No active holdings to exit'), { statusCode: 400 });
+      }
+
       const LedgerService = require('./services/ledgerService');
       for (const holding of activeHoldings) {
         const qty = parseFloat(holding.quantity);
         const ltp = priceCache[holding.symbol]?.ltp || parseFloat(holding.average_price) || 0;
         if (ltp <= 0) {
-          throw new Error(`Live price unavailable for ${holding.symbol}. Cannot exit holdings.`);
+          throw Object.assign(new Error(`Live price unavailable for ${holding.symbol}. Cannot exit holdings.`), { statusCode: 400 });
         }
         const totalValue = qty * ltp;
         totalSoldAmount += totalValue;
 
+        const principalAmount = qty * parseFloat(holding.average_price);
         const realizedPnl = (ltp - parseFloat(holding.average_price)) * qty;
         const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, req.user.id, holding.symbol, 'DEL', 'SELL', qty, ltp);
 
@@ -4756,16 +4761,21 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           updated_at: new Date()
         });
 
-        // 3. Credit funds to ledger and user balance
+        // 3. Credit gross proceeds to user balance (taxes were debited in chargeExecutionTaxes)
         await trx('users').where({ id: req.user.id }).increment('balance', totalValue);
-        await trx('ledger').insert({
-          user_id: req.user.id,
-          amount: totalValue,
-          type: 'MARGIN_RELEASE',
-          description: `Exited Holdings: SELL ${qty} ${holding.symbol} @ ₹${ltp.toFixed(2)}`,
-          created_at: new Date()
-        });
 
+        // Record principal capital unencumbered
+        if (principalAmount > 0) {
+          await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: principalAmount,
+            type: 'MARGIN_RELEASE',
+            description: `Holding principal released: SELL ${qty} ${holding.symbol} @ avg ₹${parseFloat(holding.average_price).toFixed(2)}`,
+            created_at: new Date()
+          });
+        }
+
+        // Record realized PnL separately
         if (realizedPnl !== 0) {
           await trx('ledger').insert({
             user_id: req.user.id,
@@ -5309,8 +5319,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
       if (quantity !== undefined && quantity !== null) {
         const parsedQty = Number(quantity);
-        if (isNaN(parsedQty) || parsedQty <= 0 || !isFinite(parsedQty)) {
-          return res.status(400).json({ error: 'Quantity must be a positive number' });
+        if (isNaN(parsedQty) || parsedQty <= 0 || !isFinite(parsedQty) || !Number.isInteger(parsedQty)) {
+          return res.status(400).json({ error: 'Quantity must be a positive whole integer' });
         }
       }
       if (price !== undefined && price !== null && price !== '') {
@@ -5410,10 +5420,31 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                 throw Object.assign(new Error(`Insufficient holdings. You only have ${totalAvailable} shares available.`), { statusCode: 400 });
               }
             }
-          } else if (oldMargin === 0 && Number(quantity) === Number(order.quantity)) {
-            // If the order originally required 0 margin (e.g. position exit limit order or bracket leg) and quantity is unchanged,
-            // modifying price or trigger price must not suddenly demand entry margin.
-            newMargin = 0;
+          }
+
+          if (quantity !== undefined && quantity !== null) {
+            const { getLotSize } = require('./services/instruments');
+            const lotSize = getLotSize(order.symbol);
+            if (lotSize > 1 && Number(quantity) % lotSize !== 0) {
+              throw Object.assign(new Error(`Quantity must be a multiple of lot size (${lotSize})`), { statusCode: 400 });
+            }
+          }
+
+          if (oldMargin === 0) {
+            // Check if this order is closing an existing open position or holding
+            const openPos = await trx('positions')
+              .where({ user_id: req.user.id, symbol: order.symbol, product_type: order.product_type })
+              .whereNot('quantity', 0)
+              .first();
+            const isOpposingPos = openPos && ((Number(openPos.quantity) > 0 && order.side === 'SELL') || (Number(openPos.quantity) < 0 && order.side === 'BUY'));
+            if (isOpposingPos && Number(quantity) <= Math.abs(Number(openPos.quantity))) {
+              newMargin = 0;
+            } else if (Number(quantity) === Number(order.quantity)) {
+              newMargin = 0;
+            } else if (!order.parent_order_id) {
+              const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
+              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
+            }
           } else if (!order.parent_order_id) {
               const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
               newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
@@ -5422,7 +5453,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           const marginDifference = newMargin - oldMargin;
       
           // Check if user has enough balance if margin increases
-          const user = await trx('users').where({ id: req.user.id }).first();
+          const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
           if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
              throw Object.assign(new Error('Insufficient Funds.'), { statusCode: 400 });
           }
