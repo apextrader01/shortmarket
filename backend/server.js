@@ -3824,7 +3824,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       const isMarket = type === 'MARKET' && !hasTrigger;
       const isTriggerOrder = hasTrigger;
       const status = isTriggerOrder ? 'PENDING_TRIGGER' : 'PENDING';
-      const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
+      let execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
       const resolvedTriggerPrice = trigger_price ? parseFloat(trigger_price) : (type && type.startsWith('SL') && price ? parseFloat(price) : null);
       
       // 2. Deduct Margin from User Balance
@@ -3929,6 +3929,14 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       let finalMargin = 0;
       if (requiresMargin) {
+          if (isMarket && execPrice <= 0) {
+              const fallbackPrice = priceCache[symbol]?.close || 0;
+              if (fallbackPrice > 0) {
+                  execPrice = fallbackPrice;
+              } else {
+                  throw new Error(`Live market price is currently unavailable for ${symbol}. Please specify a limit price or wait for market data to connect.`);
+              }
+          }
           const { calculateRequiredMargin } = require('./services/marginEngine');
           finalMargin = calculateRequiredMargin(symbol, effectiveProductType, side, marginQty, execPrice);
       }
@@ -5069,10 +5077,20 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
       
       // OCO: Cancel sibling legs if this is a BO leg
-      if (order.parent_order_id) {
-          const cancelledSiblings = await trx('orders')
-            .where({ parent_order_id: order.parent_order_id, status: 'PENDING_TRIGGER' })
+      if (order.parent_order_id || order.linked_order_id) {
+          const siblingQuery = trx('orders')
+            .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
             .whereNot({ id: order.id });
+
+          if (order.parent_order_id && order.linked_order_id) {
+            siblingQuery.where(b => b.where({ parent_order_id: order.parent_order_id }).orWhere({ id: order.linked_order_id }));
+          } else if (order.parent_order_id) {
+            siblingQuery.where({ parent_order_id: order.parent_order_id });
+          } else {
+            siblingQuery.where({ id: order.linked_order_id });
+          }
+
+          const cancelledSiblings = await siblingQuery;
 
           for (const sib of cancelledSiblings) {
             await trx('orders').where({ id: sib.id }).update({ status: 'CANCELLED', updated_at: new Date() });

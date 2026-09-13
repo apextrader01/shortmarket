@@ -10,6 +10,7 @@ let clientSubscriptions = new Set();
 let mfSubscriptions = new Set();
 let watchdogInterval = null;
 let reconnectAttempts = 0;
+let reconnectTimer = null;
 let lastDataSocketError = null;
 let lastTickTime = Date.now();
 let isMasterNode = false;
@@ -32,6 +33,7 @@ fyers.setRedirectUrl(REDIRECT_URL);
 
 // Keep track of the active access token
 let activeAccessToken = null;
+let activeAppId = APP_ID;
 let isFyersConnected = false;
 
 // Global map to ensure Fyers symbols map perfectly back to the exact requested frontend symbol
@@ -101,10 +103,14 @@ function getFyersAuthURL() {
     return fyers.generateAuthCode();
 }
 
-async function verifyFyersAuth(auth_code, customSecretKey = null) {
+async function verifyFyersAuth(auth_code, customSecretKey = null, customAppId = null) {
     try {
+        const clientId = customAppId || APP_ID;
+        activeAppId = clientId;
+        fyers.setAppId(clientId);
+
         const response = await fyers.generate_access_token({
-            client_id: APP_ID,
+            client_id: clientId,
             secret_key: customSecretKey || SECRET_ID,
             auth_code: auth_code
         });
@@ -116,6 +122,11 @@ async function verifyFyersAuth(auth_code, customSecretKey = null) {
             
             // Save token to disk so it survives restarts for the rest of the day
             fs.writeFileSync(path.join(__dirname, '../fyers_token.txt'), activeAccessToken);
+            if (customAppId) {
+                try {
+                    fs.writeFileSync(path.join(__dirname, '../fyers_appid.txt'), customAppId);
+                } catch(e) {}
+            }
             
             // Publish to Redis so all PM2 workers reload the token
             try {
@@ -139,6 +150,15 @@ async function verifyFyersAuth(auth_code, customSecretKey = null) {
 // On boot, try to load token from disk
 function loadTokenFromDisk() {
     try {
+        const pAppId = path.join(__dirname, '../fyers_appid.txt');
+        if (fs.existsSync(pAppId)) {
+            const appIdFromFile = fs.readFileSync(pAppId, 'utf8');
+            if (appIdFromFile && appIdFromFile.trim().length > 3) {
+                activeAppId = appIdFromFile.trim();
+                fyers.setAppId(activeAppId);
+            }
+        }
+
         const p = path.join(__dirname, '../fyers_token.txt');
         if (fs.existsSync(p)) {
             const token = fs.readFileSync(p, 'utf8');
@@ -264,18 +284,22 @@ async function initFyers(io, pc, isMaster = true) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
     if (wsInstance) { try { if (wsInstance.close) wsInstance.close(); if (wsInstance.disconnect) wsInstance.disconnect(); } catch(e) {} }
     // With fyers-api-v3, we MUST use getInstance() instead of new DataSocket
     // to prevent 'Only one instance of DataSocket is allowed' errors during reconnects.
     // If wsInstance exists, we just let it be, but we will call connect() later.
     
     // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
-    const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+    const effectiveAppId = activeAppId || process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     
     try {
         const logPath = path.join(__dirname, '../logs');
         if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
-        wsInstance = DataSocket.getInstance(`${APP_ID}:${activeAccessToken.trim()}`, logPath, false);
+        wsInstance = DataSocket.getInstance(`${effectiveAppId}:${activeAccessToken.trim()}`, logPath, false);
         lastDataSocketError = null;
     } catch(err) {
         lastDataSocketError = err.stack || err.message || err.toString();
@@ -297,6 +321,14 @@ function startLiveWebSocket() {
         console.log('✅ Fyers WebSocket Connected!');
         lastTickTime = Date.now();
         isFyersConnected = true;
+        reconnectAttempts = 0;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (global_io) {
+            global_io.emit('market_feed_status', { connected: true, lastTickTime });
+        }
         
         // CRITICAL: Always enable autoreconnect unconditionally so Fyers can
         // recover from hourly session drops even when no clients are connected at boot.
@@ -436,22 +468,35 @@ function startLiveWebSocket() {
     
     wsInstance.on('error', (err) => {
         console.error("Fyers WS Error:", err);
+        const errMsg = (err && (err.message || err.toString())) || '';
+        if (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized')) {
+            console.warn("🚨 Fyers token expired or unauthorized. Please re-authenticate Fyers via Admin Settings / API.");
+        }
     });
     
-    wsInstance.on('close', () => {
-        console.log("Fyers WS Closed — resetting state and scheduling reconnect.");
-        isFyersConnected = false;  // CRITICAL FIX: was never set to false, causing false "Connected" status
+    wsInstance.on('close', (reason) => {
+        console.log("Fyers WS Closed — resetting state and scheduling reconnect.", reason || '');
+        isFyersConnected = false;
+        if (global_io) {
+            global_io.emit('market_feed_status', { connected: false, lastTickTime });
+        }
         
-        // Safety-net manual reconnect after 5 seconds.
-        // autoreconnect() should handle this, but if the SDK silently fails
-        // (which happens when Fyers drops the connection due to token expiry),
-        // this ensures we always attempt a fresh connection.
-        setTimeout(() => {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
+        reconnectAttempts++;
+        // Exponential backoff: 5s, 7.5s, 11.2s, 16.8s, up to max 30s
+        const backoffDelay = Math.min(30000, Math.round(5000 * Math.pow(1.5, Math.min(reconnectAttempts - 1, 4))));
+        console.log(`[WS] Scheduling reconnect attempt #${reconnectAttempts} in ${Math.round(backoffDelay / 1000)}s`);
+
+        reconnectTimer = setTimeout(() => {
             if (!isFyersConnected && activeAccessToken) {
-                console.log("[WS] Manual reconnect triggered after close.");
+                console.log("[WS] Backoff reconnect triggered.");
                 startLiveWebSocket();
             }
-        }, 5000);
+        }, backoffDelay);
     });
     
     wsInstance.connect();

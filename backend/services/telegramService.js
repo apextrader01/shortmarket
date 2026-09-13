@@ -27,9 +27,15 @@ let stats = {
 function isPeakHourActive() {
   if (!systemConfig.peak_protection_active) return false;
   try {
-    const now = new Date();
-    const istTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const curMins = istTime.getHours() * 60 + istTime.getMinutes();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(new Date());
+    const istH = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const istM = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const curMins = istH * 60 + istM;
 
     const [sH, sM] = (systemConfig.peak_start_time || '09:15').split(':').map(Number);
     const [eH, eM] = (systemConfig.peak_end_time || '10:15').split(':').map(Number);

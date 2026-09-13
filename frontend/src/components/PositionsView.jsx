@@ -862,6 +862,10 @@ export default function PositionsView() {
                     alert(`Invalid quantity. Max allowed (unencumbered): ${maxQty / ls} lots`);
                     return;
                   }
+                  if (partialExitType === 'LIMIT' && (!partialExitPrice || parseFloat(partialExitPrice) <= 0 || isNaN(parseFloat(partialExitPrice)))) {
+                    alert('Please enter a valid limit price greater than 0.');
+                    return;
+                  }
                   const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
                   const ok = await useStore.getState().placeOrder({
                     symbol: partialExitPos.symbol,

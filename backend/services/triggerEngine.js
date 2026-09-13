@@ -632,15 +632,38 @@ class TriggerEngine {
             await this.spawnBracketLegs(trx, order);
 
             // 4. OCO (One Cancels Other) Logic for BO
-            if (order.parent_order_id) {
-                const siblings = await trx('orders')
-                    .where({ parent_order_id: order.parent_order_id })
+            if (order.parent_order_id || order.linked_order_id) {
+                const siblingQuery = trx('orders')
                     .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
-                    .whereNot({ id: order.id });
+                    .whereNot({ id: order.id })
+                    .forUpdate();
+
+                if (order.parent_order_id && order.linked_order_id) {
+                    siblingQuery.where(b => b.where({ parent_order_id: order.parent_order_id }).orWhere({ id: order.linked_order_id }));
+                } else if (order.parent_order_id) {
+                    siblingQuery.where({ parent_order_id: order.parent_order_id });
+                } else {
+                    siblingQuery.where({ id: order.linked_order_id });
+                }
+
+                const siblings = await siblingQuery;
                 
                 for (const sibling of siblings) {
                     await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                    this.removeOrderFromMemory(sibling.id, sibling.symbol);
+                    const sibMargin = parseFloat(sibling.margin) || 0;
+                    if (sibMargin > 0) {
+                        const user = await trx('users').where({ id: order.user_id }).first();
+                        if (user) {
+                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + sibMargin });
+                            await trx('ledger').insert({
+                                user_id: order.user_id,
+                                amount: sibMargin,
+                                type: 'MARGIN_RELEASE',
+                                description: `Margin released for cancelled OCO sibling order ${sibling.symbol}`
+                            });
+                        }
+                    }
+                    await this.removeOrderFromMemory(sibling.id, sibling.symbol);
                 }
             }
             

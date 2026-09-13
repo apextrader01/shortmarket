@@ -66,6 +66,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
         console.log(`[CRON] Phase 2 (${assetType}): Sweeping pending Intraday/CO/BO entry orders...`);
         const affectedUserIds = new Set();
+        const ordersToCleanFromRedis = [];
         try {
             await db.transaction(async (trx) => {
                 const pendingOrders = await trx('orders').whereIn('status', ['PENDING']);
@@ -94,7 +95,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         if (parseFloat(order.margin) > 0) {
                             await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
                         }
-                        triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                        ordersToCleanFromRedis.push({ id: order.id, symbol: order.symbol });
                         console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type || 'DEL'} order ${order.id} for ${order.symbol}`);
                     }
                 }
@@ -121,11 +122,16 @@ function initCronJobs(priceCache, triggerEngine) {
                         if (parseFloat(trigger.margin) > 0) {
                             await LedgerService.releaseMargin(trx, trigger.user_id, trigger.margin, `End of Day Sweep Cancelled: ${trigger.symbol}`);
                         }
-                        triggerEngine.removeOrderFromMemory(trigger.id, trigger.symbol);
+                        ordersToCleanFromRedis.push({ id: trigger.id, symbol: trigger.symbol });
                         console.log(`[CRON] Phase 2: Cancelled pending trigger order ${trigger.id} for ${trigger.symbol}`);
                     }
                 }
             });
+
+            // Clean up memory and Redis caches outside transaction
+            if (triggerEngine && ordersToCleanFromRedis.length > 0) {
+                await Promise.allSettled(ordersToCleanFromRedis.map(o => triggerEngine.removeOrderFromMemory(o.id, o.symbol)));
+            }
 
             // ⚡ Real-Time Socket Sync: Instantly refresh orders and balances on affected client screens
             if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
@@ -153,6 +159,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
         console.log(`[CRON] Phase 3 (${assetType}): Forcing Auto Square-Off for all open Intraday/BO/CO positions...`);
         const affectedUserIds = new Set();
+        const ordersToCleanFromRedis = [];
         try {
             await db.transaction(async (trx) => {
                 // Get ALL intraday-type positions (INT, BO, CO) that are still open
@@ -205,7 +212,7 @@ function initCronJobs(priceCache, triggerEngine) {
                             if (parseFloat(t.margin) > 0) {
                                 await LedgerService.releaseMargin(trx, pos.user_id, t.margin, `Phase 3 Cancelled: ${t.symbol}`);
                             }
-                            triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                            ordersToCleanFromRedis.push({ id: t.id, symbol: t.symbol });
                         }
                     }
                     
@@ -221,11 +228,16 @@ function initCronJobs(priceCache, triggerEngine) {
                             if (parseFloat(o.margin) > 0) {
                                 await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Phase 3 Cancelled: ${o.symbol}`);
                             }
-                            triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+                            ordersToCleanFromRedis.push({ id: o.id, symbol: o.symbol });
                         }
                     }
                 }
             });
+
+            // Clean up memory and Redis caches outside transaction
+            if (triggerEngine && ordersToCleanFromRedis.length > 0) {
+                await Promise.allSettled(ordersToCleanFromRedis.map(o => triggerEngine.removeOrderFromMemory(o.id, o.symbol)));
+            }
 
             // ⚡ Real-Time Socket Sync: Instantly refresh positions, orders, and balance on affected user screens
             if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {

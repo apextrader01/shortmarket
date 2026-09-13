@@ -410,21 +410,24 @@ export const useStore = create(persist((set, get) => ({
   })),
 
   placeBasketOrder: async (basketPayload) => {
-    
     try {
-      const res = await fetch(`${API}/api/basket-order`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const res = await fetch(`${API}/api/basket-order`, {
+        credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(basketPayload),
       });
       const data = await res.json();
-      if (data.success) { 
+      if (res.ok && data.success) { 
         get().fetchUserData(); 
         get().clearBasket();
         get().setBasketModalOpen(false);
-        return true; 
+        return { success: true, orders: data.orders }; 
       }
-      return false;
-    } catch (_) { return false; }
+      return { success: false, error: data.error || data.message || 'Failed to place basket order' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Network error while placing basket order' };
+    }
   },
 
   orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null },

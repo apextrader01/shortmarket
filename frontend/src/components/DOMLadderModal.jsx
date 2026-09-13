@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore, socket } from '../store';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
@@ -12,7 +13,11 @@ export default function DOMLadderModal() {
   const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
   const { closeDomLadderModal, placeOrder, openOrderModal } = useStore.getState();
 
-  const lotsize = domLadderModal.lotsize || basicData.lotsize || 1;
+  const lotsize = (domLadderModal.lotsize && Number(domLadderModal.lotsize) > 1) 
+    ? Number(domLadderModal.lotsize) 
+    : (basicData.lotsize && Number(basicData.lotsize) > 1) 
+      ? Number(basicData.lotsize) 
+      : getInstantLotsize(symbol);
   
   const [centerPrice, setCenterPrice] = useState(0);
   const scrollRef = useRef(null);

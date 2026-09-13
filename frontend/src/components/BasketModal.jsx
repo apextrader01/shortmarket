@@ -766,10 +766,11 @@ export default function BasketModal() {
       items: itemsWithAllocatedMargin
     };
 
-    const success = await placeBasketOrder(payload);
+    const result = await placeBasketOrder(payload);
     setIsSubmitting(false);
-    if (!success) {
-      alert("Failed to place basket orders. Please try again.");
+    const isSuccess = typeof result === 'boolean' ? result : result?.success;
+    if (!isSuccess) {
+      alert(result?.error || "Failed to place basket orders. Please try again.");
     }
   };
 

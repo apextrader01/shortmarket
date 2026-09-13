@@ -172,7 +172,7 @@ async function performFyersAutoLogin(retryCount = 0) {
         }
 
         // Step 5: Exchange Auth Code for Access Token
-        const result = await verifyFyersAuth(authCode, secret_id);
+        const result = await verifyFyersAuth(authCode, secret_id, app_id);
         if (result.success) {
             console.log('✅ [FYERS AUTO-LOGIN] Access Token successfully generated and active!');
             return { success: true, message: 'Automated Fyers login successful' };
