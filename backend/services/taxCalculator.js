@@ -126,17 +126,17 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
  * @returns {object} { brokerage, stt, exchangeCharge, gst, sebiCharge, stampDuty, dpCharge, totalTaxes }
  */
 function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null) {
-    const turnover = quantity * price;
+    const turnover = (quantity || 0) * (price || 0);
     
     const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
     const isMutualFund = clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+    const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
     const isOption = !isMutualFund && /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
-    const isFuture = !isMutualFund && !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT'));
-    const isEquity = !isMutualFund && !isOption && !isFuture;
-    const isCommodity = symbol.includes('MCX') || symbol.includes('NCDEX') || symbol.includes('GOLD') || symbol.includes('SILVER') || symbol.includes('CRUDE') || symbol.includes('NATURALGAS') || symbol.includes('COPPER') || symbol.includes('ZINC');
+    const isFuture = !isMutualFund && !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || isCommodity);
+    const isEquity = !isMutualFund && !isOption && !isFuture && !isCommodity;
 
     const freezeLimit = getFreezeLimit(symbol);
-    const slicesCount = slicesOverride || (quantity > freezeLimit ? Math.min(100, Math.ceil(quantity / freezeLimit)) : 1);
+    const slicesCount = slicesOverride !== null ? slicesOverride : (quantity > 0 ? (quantity > freezeLimit ? Math.min(100, Math.ceil(quantity / freezeLimit)) : 1) : 0);
 
     let brokerage = 0;
     let stt = 0;
@@ -158,7 +158,12 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        brokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
+        if (slicesCount > 0) {
+            const sliceTurnover = turnover / slicesCount;
+            brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
+        } else {
+            brokerage = 0;
+        }
         if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0001 : 0.0002); // 0.02% STT on Futures sale (revised Oct 2024)
         }
@@ -174,7 +179,12 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
             // Intraday Equity (INT, BO, CO, MIS)
-            brokerage = Math.min(turnover * 0.0003, 20 * slicesCount); // 0.03% or ₹20 max per slice
+            if (slicesCount > 0) {
+                const sliceTurnover = turnover / slicesCount;
+                brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
+            } else {
+                brokerage = 0;
+            }
             if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
             if (side === 'BUY') stampDuty = turnover * 0.00003;
         }
@@ -195,34 +205,36 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         }
     }
 
-    // 6. SEBI Turnover Charge
-    sebiCharge = turnover * (isCommodity && !symbol.includes('AGRI') ? 0.000001 : 0.000001); // ₹10 per crore
+    // 6. SEBI Turnover Charge (₹1 per crore for Agri derivatives, ₹10 per crore standard)
+    const isAgri = isCommodity && (symbol.includes('AGRI') || symbol.includes('COTTON') || symbol.includes('CHANA') || symbol.includes('JEERA') || symbol.includes('SOYBEAN'));
+    sebiCharge = turnover * (isAgri ? 0.0000001 : 0.000001);
 
     // 7. GST (Broken down into CGST 9% and SGST 9%)
     const gst = (brokerage + exchangeCharge + sebiCharge) * 0.18; // 18% on services
     const cgst = gst / 2;
     const sgst = gst / 2;
 
-    // 8. Capital Gains Tax (STCG & LTCG for Mutual Funds & Equity Investments)
+    // 8. Capital Gains Tax (STCG & LTCG for Equity Delivery & Mutual Funds only; derivatives are business income under Sec 43(5))
     const isDebt = isMutualFund && (symbol.toLowerCase().includes('debt') || symbol.toLowerCase().includes('liquid') || symbol.toLowerCase().includes('gilt') || symbol.toLowerCase().includes('bond'));
     let stcg = 0;
     let ltcg = 0;
     let capitalGainsTax = 0;
     
-    if (side === 'SELL' && entryPrice > 0 && price > entryPrice) {
-        const profit = (price - entryPrice) * quantity;
-        if (isDebt) {
-            capitalGainsTax = Number((profit * 0.01).toFixed(2)); // 1% for Debt Funds
-            stcg = capitalGainsTax;
-        } else if (holdingDays > 365) {
-            // LTCG: 12.5% on profit exceeding ₹1.25 Lakh per financial year
-            const taxableProfit = Math.max(0, profit - 125000);
-            ltcg = Number((taxableProfit * 0.125).toFixed(2));
-            capitalGainsTax = ltcg;
-        } else {
-            // STCG: 20% on profit held <= 12 months
-            stcg = Number((profit * 0.20).toFixed(2));
-            capitalGainsTax = stcg;
+    if ((isEquity && (productType === 'DEL' || productType === 'CNC' || productType === 'DELIVERY')) || isMutualFund) {
+        if (side === 'SELL' && entryPrice > 0 && price > entryPrice) {
+            const profit = (price - entryPrice) * quantity;
+            if (isDebt) {
+                stcg = Number((profit * 0.30).toFixed(2)); // Debt Funds taxed at slab rates
+                capitalGainsTax = stcg;
+            } else if (holdingDays > 365) {
+                // LTCG: 12.5% under revised Finance Act 2024
+                ltcg = Number((profit * 0.125).toFixed(2));
+                capitalGainsTax = ltcg;
+            } else {
+                // STCG: 20% under revised Finance Act 2024
+                stcg = Number((profit * 0.20).toFixed(2));
+                capitalGainsTax = stcg;
+            }
         }
     }
 

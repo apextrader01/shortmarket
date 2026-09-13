@@ -503,6 +503,7 @@ export default function BasketModal() {
       sgst: 0,
       sebiCharge: 0,
       stampDuty: 0,
+      dpCharge: 0,
       totalTaxes: 0,
       legsCount: enhancedItems.length,
       totalExecutionSlices
@@ -516,10 +517,10 @@ export default function BasketModal() {
       const turnover = qty * p;
       
       const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
       const isOption = item.isOption || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
-      const isFuture = !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT'));
-      const isEquity = !isOption && !isFuture;
-      const isCommodity = sym.includes('MCX') || sym.includes('NCDEX') || ['GOLD', 'SILVER', 'CRUDE', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => clean.startsWith(c));
+      const isFuture = !isOption && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || isCommodity);
+      const isEquity = !isOption && !isFuture && !isCommodity;
 
       const freezeLimit = getFreezeLimit(sym, item.lotsize);
       const slicesCount = getOrderSlicesCount(sym, qty, item.lotsize) || 1;
@@ -529,19 +530,21 @@ export default function BasketModal() {
       let legExchange = 0;
       let legStamp = 0;
       let legSebi = 0;
+      let legDp = 0;
 
       if (isOption) {
         legBrokerage = 20 * slicesCount;
         if (side === 'SELL') {
-          legStt = turnover * (isCommodity ? 0.0005 : 0.000625);
+          legStt = turnover * (isCommodity ? 0.0005 : 0.001); // 0.1% STT on Options sale (revised Oct 2024)
         }
         legExchange = turnover * (isCommodity ? 0.000418 : 0.0003553);
         if (side === 'BUY') legStamp = turnover * 0.00003;
         legSebi = turnover * 0.000001;
       } else if (isFuture) {
-        legBrokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
+        const sliceTurnover = slicesCount > 0 ? turnover / slicesCount : turnover;
+        legBrokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
         if (side === 'SELL') {
-          legStt = turnover * (isCommodity ? 0.0001 : 0.000125);
+          legStt = turnover * (isCommodity ? 0.0001 : 0.0002); // 0.02% STT on Futures sale (revised Oct 2024)
         }
         legExchange = turnover * (isCommodity ? 0.000021 : 0.0000183);
         if (side === 'BUY') legStamp = turnover * 0.00002;
@@ -552,8 +555,10 @@ export default function BasketModal() {
           legBrokerage = 0;
           legStt = turnover * 0.001;
           if (side === 'BUY') legStamp = turnover * 0.00015;
+          if (side === 'SELL') legDp = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
-          legBrokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
+          const sliceTurnover = slicesCount > 0 ? turnover / slicesCount : turnover;
+          legBrokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
           if (side === 'SELL') legStt = turnover * 0.00025;
           if (side === 'BUY') legStamp = turnover * 0.00003;
         }
@@ -564,7 +569,7 @@ export default function BasketModal() {
       const legGst = (legBrokerage + legExchange + legSebi) * 0.18;
       const legCgst = legGst / 2;
       const legSgst = legGst / 2;
-      const legTotal = legBrokerage + legStt + legExchange + legStamp + legSebi + legGst;
+      const legTotal = legBrokerage + legStt + legExchange + legStamp + legSebi + legGst + legDp;
 
       agg.brokerage += legBrokerage;
       agg.exchangeCharge += legExchange;
@@ -574,6 +579,7 @@ export default function BasketModal() {
       agg.sgst += legSgst;
       agg.sebiCharge += legSebi;
       agg.stampDuty += legStamp;
+      agg.dpCharge += legDp;
       agg.totalTaxes += legTotal;
     });
 
@@ -2007,6 +2013,12 @@ export default function BasketModal() {
                   <span>Stamp Duty</span>
                   <span>₹{Number(estimatedTaxes?.stampDuty || 0).toFixed(2)}</span>
                 </div>
+                {Number(estimatedTaxes?.dpCharge || 0) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                    <span>CDSL DP Charges</span>
+                    <span>₹{Number(estimatedTaxes?.dpCharge || 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
               
               <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
