@@ -51,8 +51,18 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
           exp = new Date(year, month, day);
         }
       } else {
-        const parsed = new Date(expiryDate);
-        if (!isNaN(parsed)) exp = parsed;
+        if (typeof expiryDate === 'string' && expiryDate.includes('-')) {
+          const parts = expiryDate.split('-');
+          if (parts.length === 3) {
+            exp = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          } else {
+            const parsed = new Date(expiryDate);
+            if (!isNaN(parsed)) exp = parsed;
+          }
+        } else {
+          const parsed = new Date(expiryDate);
+          if (!isNaN(parsed)) exp = parsed;
+        }
       }
     }
     exp.setHours(0,0,0,0);
@@ -84,7 +94,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     let tDelta = 0, tTheta = 0, tGamma = 0, tVega = 0;
 
     legs.forEach(leg => {
-      const price = leg.price || 0;
+      const price = (leg.price !== undefined && leg.price !== null && leg.price !== '' && !isNaN(Number(leg.price))) ? Number(leg.price) : (leg.livePrice || 0);
       const qty = getLegQty(leg);
       const val = price * qty;
       const sign = leg.side === 'BUY' ? 1 : -1;
@@ -103,7 +113,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       let totalPnl = 0;
       legs.forEach(leg => {
         const strike = leg.strike || 0;
-        const price = leg.price || 0;
+        const price = (leg.price !== undefined && leg.price !== null && leg.price !== '' && !isNaN(Number(leg.price))) ? Number(leg.price) : (leg.livePrice || 0);
         const qty = getLegQty(leg);
         let intrinsic = leg.optionType === 'CE' ? Math.max(0, priceAtExpiry - strike) : Math.max(0, strike - priceAtExpiry);
         totalPnl += (leg.side === 'BUY') ? (intrinsic - price) * qty : (price - intrinsic) * qty;
@@ -115,7 +125,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       let totalPnl = 0;
       legs.forEach(leg => {
         const strike = leg.strike || 0;
-        const price = leg.price || 0;
+        const price = (leg.price !== undefined && leg.price !== null && leg.price !== '' && !isNaN(Number(leg.price))) ? Number(leg.price) : (leg.livePrice || 0);
         const qty = getLegQty(leg);
         const iv = leg.iv > 0 ? leg.iv : 0.2;
         
@@ -154,8 +164,12 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       const prev = dataPoints[i - 1];
       const curr = dataPoints[i];
       if ((prev.pnlExpiry < 0 && curr.pnlExpiry >= 0) || (prev.pnlExpiry > 0 && curr.pnlExpiry <= 0)) {
-        const ratio = Math.abs(prev.pnlExpiry) / (Math.abs(prev.pnlExpiry) + Math.abs(curr.pnlExpiry));
-        be.push(prev.price + (curr.price - prev.price) * ratio);
+        const denom = Math.abs(prev.pnlExpiry) + Math.abs(curr.pnlExpiry);
+        const ratio = denom > 0 ? Math.abs(prev.pnlExpiry) / denom : 0.5;
+        const interpolated = prev.price + (curr.price - prev.price) * ratio;
+        if (Number.isFinite(interpolated)) {
+          be.push(interpolated);
+        }
       }
     }
     const finalBE = [...new Set(be.map(b => Math.round(b)))];
@@ -168,12 +182,20 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     
     if (sigmaT > 0 && effectiveSpot > 0) {
       if (finalBE.length === 0) {
-        popSum = pMax > 0 ? 100 : 0;
+        if (pMin >= 0) {
+          popSum = 100;
+        } else if (pMax <= 0) {
+          popSum = 0;
+        } else {
+          const currentPnl = calculateExpiryPayoff(effectiveSpot);
+          popSum = currentPnl > 0 ? 80 : 20;
+        }
       } else if (finalBE.length === 1) {
         const b = finalBE[0];
         const d2 = (Math.log(effectiveSpot / b) + (0.1 - (avgIv * avgIv)/2) * (diffDays/365)) / sigmaT;
         // If profit is on the right side of BE
-        if (calculateExpiryPayoff(b + 10) > 0) {
+        const epsilon = Math.max(0.05, b * 0.001);
+        if (calculateExpiryPayoff(b + epsilon) > 0) {
           popSum = N(d2) * 100;
         } else {
           popSum = N(-d2) * 100;
@@ -232,7 +254,8 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
     if (dataMax <= 0) return 0;
     if (dataMin >= 0) return 1;
 
-    return dataMax / (dataMax - dataMin);
+    const range = dataMax - dataMin;
+    return range === 0 ? 0.5 : dataMax / range;
   }, [data]);
 
   if (!legs || legs.length === 0) {
@@ -287,7 +310,7 @@ export default function OptionsStrategyBuilder({ legs, spotPrice, expiryDate, on
       {/* METRICS ROW */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
         <MetricCard title="Max Profit" value={maxProfit === Infinity ? 'Unlimited' : `₹${maxProfit.toFixed(2)}`} color={maxProfit === Infinity ? 'var(--color-green)' : 'var(--text-primary)'} />
-        <MetricCard title="Max Loss" value={maxLoss === -Infinity ? 'Unlimited' : `-₹${Math.abs(maxLoss).toFixed(2)}`} color={maxLoss === -Infinity ? 'var(--color-red)' : 'var(--text-primary)'} />
+        <MetricCard title="Max Loss" value={maxLoss === -Infinity ? 'Unlimited' : (maxLoss >= 0 ? `+₹${maxLoss.toFixed(2)} (Guaranteed Profit)` : `-₹${Math.abs(maxLoss).toFixed(2)}`)} color={maxLoss === -Infinity ? 'var(--color-red)' : (maxLoss >= 0 ? 'var(--color-green)' : 'var(--text-primary)')} />
         <MetricCard title="Risk / Reward" value={maxLoss === -Infinity || maxLoss === 0 || maxProfit === Infinity ? 'N/A' : `1 : ${(Math.abs(maxProfit) / Math.abs(maxLoss)).toFixed(1)}`} />
         <MetricCard title="POP" value={`${pop.toFixed(1)}%`} color={pop > 50 ? 'var(--color-green)' : 'var(--color-yellow)'} />
         <MetricCard title="Net Premium" value={netPremium > 0 ? `+ ₹${netPremium.toFixed(0)}` : `- ₹${Math.abs(netPremium).toFixed(0)}`} color={netPremium > 0 ? 'var(--color-green)' : 'var(--color-red)'} />

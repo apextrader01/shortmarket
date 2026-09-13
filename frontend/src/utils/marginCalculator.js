@@ -87,9 +87,10 @@ export function getFuturesMarginRate(symbol) {
     if (upper.startsWith(key)) return rate;
   }
 
-  // 2. Index Check
-  for (const [key, rate] of Object.entries(INDEX_FUTURES_MARGIN_RATES)) {
-    if (upper.startsWith(key)) return rate;
+  // 2. Index Check (sorted descending by key length to avoid NIFTY shadowing NIFTYNXT50)
+  const sortedIndexKeys = Object.keys(INDEX_FUTURES_MARGIN_RATES).sort((a, b) => b.length - a.length);
+  for (const key of sortedIndexKeys) {
+    if (upper.startsWith(key)) return INDEX_FUTURES_MARGIN_RATES[key];
   }
 
   // 3. Specific Stock Futures Check
@@ -117,26 +118,27 @@ export function calculateOrderMargin({
   const isBuy = String(side || 'BUY').toUpperCase() === 'BUY';
   const cleanSym = String(symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
   const isCommodity = symbol?.includes('MCX') || isCommodityContract(symbol);
-  const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : (getInstantLotsize(symbol) || 1);
   const totalQty = Number(quantity) || 1;
   const unitPrice = parseFloat(price) || 0;
   const totalValue = totalQty * unitPrice;
 
-  // Determine contract category
+  if (!symbol || totalQty <= 0) {
+    return { requiredMargin: 0, leverageText: '1x', marginRate: 1.0 };
+  }
+
   const isOpt = isOption !== null 
     ? isOption 
     : /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
-  const isFut = !isOpt && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT'));
-  const isEq = !isOpt && !isFut;
-
-  const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY', 'MIDCAPNIFTY', 'NIFTYNXT50', 'BANKEX'].some(idx => cleanSym.startsWith(idx));
+  const isFut = !isOpt && (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT') || isCommodity);
+  const isEq = !isOpt && !isFut && !isCommodity;
+  const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'].some(idx => cleanSym.startsWith(idx));
 
   let requiredMargin = 0;
   let leverageText = '1x';
   let marginRate = 1.0;
 
   if (isOpt) {
-    if (isBuy) {
+    if (side === 'BUY') {
       // 1. Option Buy: 100% upfront premium
       requiredMargin = totalValue;
       leverageText = '1x';
@@ -149,21 +151,19 @@ export function calculateOrderMargin({
       let strikeVal = optionStrike;
       if (!strikeVal || strikeVal <= 0) {
         // Format 1: Monthly (e.g. NIFTY24SEP25000CE or RELIANCE24OCT1400PE)
-        const monthlyMatch = cleanSym.match(/^([A-Z]+)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
+        const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)$/i);
         if (monthlyMatch) {
           strikeVal = parseFloat(monthlyMatch[4]);
         } else {
           // Format 2: Weekly (e.g. NIFTY2491225000CE or SENSEX24D1569100CE)
-          const weeklyMatch = cleanSym.match(/^([A-Z]+)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+          const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
           if (weeklyMatch) {
             strikeVal = parseFloat(weeklyMatch[5]);
           } else {
-            // Format 3: General fallback
-            const genMatch = cleanSym.match(/(\d+)(CE|PE)$/i);
+            // Format 3: General fallback matching trailing strike digits
+            const genMatch = cleanSym.match(/(\d{3,6})(CE|PE)$/i);
             if (genMatch) {
-              let s = genMatch[1];
-              if (s.length > 5) s = s.slice(-5);
-              strikeVal = parseFloat(s);
+              strikeVal = parseFloat(genMatch[1]);
             }
           }
         }
@@ -171,10 +171,10 @@ export function calculateOrderMargin({
 
       if (strikeVal > 0) {
         const grossMargin = strikeVal * totalQty * sellMarginRate;
-        const premiumCollected = totalValue;
-        requiredMargin = Math.max(grossMargin - premiumCollected, totalQty * (isIndex ? 40 : 80));
+        requiredMargin = Math.max(grossMargin, totalValue, totalQty * (isIndex ? 40 : 80));
       } else {
-        requiredMargin = totalQty * (isIndex ? 4500 : 9000);
+        const effectiveLots = Math.max(1, Math.ceil(totalQty / (isIndex ? 25 : 500)));
+        requiredMargin = effectiveLots * (isIndex ? 4500 : 9000);
       }
       leverageText = '1x';
     }

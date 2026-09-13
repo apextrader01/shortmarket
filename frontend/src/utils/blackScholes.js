@@ -32,29 +32,68 @@ function N(x) {
  * @returns {object} { price, delta, gamma, theta, vega }
  */
 export function calculateGreeks(type, S, K, T, r, sigma) {
-  if (T <= 0 || sigma <= 0 || S <= 0 || K <= 0 || isNaN(T) || isNaN(sigma) || isNaN(S) || isNaN(K)) {
+  const optType = (type || 'CE').toUpperCase();
+  
+  if (S <= 0 || K <= 0 || isNaN(S) || isNaN(K)) {
     return { price: 0, delta: 0, gamma: 0, theta: 0, vega: 0 };
   }
 
-  const d1 = (Math.log(S / K) + (r + (sigma * sigma) / 2) * T) / (sigma * Math.sqrt(T));
-  const d2 = d1 - sigma * Math.sqrt(T);
+  // Boundary condition at or past expiration (T <= 0 or DTE = 0)
+  if (T <= 0 || isNaN(T)) {
+    if (optType === 'CE') {
+      const price = Math.max(0, S - K);
+      const delta = S > K ? 1.0 : (S === K ? 0.5 : 0.0);
+      return { price, delta, gamma: 0, theta: 0, vega: 0 };
+    } else {
+      const price = Math.max(0, K - S);
+      const delta = S < K ? -1.0 : (S === K ? -0.5 : 0.0);
+      return { price, delta, gamma: 0, theta: 0, vega: 0 };
+    }
+  }
+
+  // Zero or negative volatility
+  if (sigma <= 0 || isNaN(sigma)) {
+    const discount = Math.exp(-r * T);
+    if (optType === 'CE') {
+      const price = Math.max(0, S - K * discount);
+      const delta = S > K ? 1.0 : 0.0;
+      return { price, delta, gamma: 0, theta: 0, vega: 0 };
+    } else {
+      const price = Math.max(0, K * discount - S);
+      const delta = S < K ? -1.0 : 0.0;
+      return { price, delta, gamma: 0, theta: 0, vega: 0 };
+    }
+  }
+
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(S / K) + (r + (sigma * sigma) / 2) * T) / (sigma * sqrtT);
+  const d2 = d1 - sigma * sqrtT;
 
   let price, delta, theta;
   
-  const gamma = N_prime(d1) / (S * sigma * Math.sqrt(T));
-  const vega = (S * N_prime(d1) * Math.sqrt(T)) / 100; // Divided by 100 for 1% change
+  const denom = S * sigma * sqrtT;
+  const gamma = denom > 1e-7 ? (N_prime(d1) / denom) : 0;
+  const vega = (S * N_prime(d1) * sqrtT) / 100; // Divided by 100 for 1% change
 
-  if (type === 'CE') {
+  if (optType === 'CE') {
     price = S * N(d1) - K * Math.exp(-r * T) * N(d2);
     delta = N(d1);
-    theta = (-(S * N_prime(d1) * sigma) / (2 * Math.sqrt(T)) - r * K * Math.exp(-r * T) * N(d2)) / 365;
+    const thetaTerm1 = sqrtT > 1e-7 ? (-(S * N_prime(d1) * sigma) / (2 * sqrtT)) : 0;
+    theta = (thetaTerm1 - r * K * Math.exp(-r * T) * N(d2)) / 365;
   } else {
     price = K * Math.exp(-r * T) * N(-d2) - S * N(-d1);
     delta = N(d1) - 1;
-    theta = (-(S * N_prime(d1) * sigma) / (2 * Math.sqrt(T)) + r * K * Math.exp(-r * T) * N(-d2)) / 365;
+    const thetaTerm1 = sqrtT > 1e-7 ? (-(S * N_prime(d1) * sigma) / (2 * sqrtT)) : 0;
+    theta = (thetaTerm1 + r * K * Math.exp(-r * T) * N(-d2)) / 365;
   }
 
-  return { price, delta, gamma, theta, vega };
+  return {
+    price: Number.isFinite(price) ? Math.max(0, price) : 0,
+    delta: Number.isFinite(delta) ? delta : 0,
+    gamma: Number.isFinite(gamma) ? gamma : 0,
+    theta: Number.isFinite(theta) ? theta : 0,
+    vega: Number.isFinite(vega) ? vega : 0
+  };
 }
 
 /**
@@ -70,9 +109,11 @@ export function calculateGreeks(type, S, K, T, r, sigma) {
 export function calculateIV(type, marketPrice, S, K, T, r) {
   if (marketPrice <= 0 || T <= 0 || S <= 0 || K <= 0) return 0;
   
-  // Basic bounds checking for intrinsic value
-  const intrinsic = type === 'CE' ? Math.max(0, S - K) : Math.max(0, K - S);
-  if (marketPrice < intrinsic) return 0;
+  const optType = (type || 'CE').toUpperCase();
+  // Theoretical lower bound
+  const discount = Math.exp(-r * T);
+  const lowerBound = optType === 'CE' ? Math.max(0, S - K * discount) : Math.max(0, K * discount - S);
+  if (marketPrice < lowerBound * 0.99) return 0;
 
   let low = 0.0001;
   let high = 5.0;
@@ -80,7 +121,7 @@ export function calculateIV(type, marketPrice, S, K, T, r) {
 
   for (let i = 0; i < 60; i++) {
     mid = (low + high) / 2;
-    const greeks = calculateGreeks(type, S, K, T, r, mid);
+    const greeks = calculateGreeks(optType, S, K, T, r, mid);
     const diff = greeks.price - marketPrice;
     
     if (Math.abs(diff) < 0.001) {
