@@ -6788,243 +6788,7 @@ app.get('/api/referrals', authenticateToken, async (req, res) => {
   }
 });
 
-app.use((req, res) => {
-  // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
-  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
-    return res.status(404).send('Asset not found');
-  }
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
-});
-
-// ─── Start ────────────────────────────────────────────────────────────────
-const { initFyers, setPriceCache } = require('./services/fyers');
-setPriceCache(priceCache);
-
-const { updateOptionsMaster } = require('./database/updateOptionsMaster');
-
-const PORT = process.env.PORT || 5000;
-
-
-
-server.listen(PORT, async () => {
-  console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
-
-    // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
-    await initFyers(io, priceCache, isMaster);
-
-    if (isMaster) {
-      console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
-
-      // Zero Trade Data Deletion: Preserve historical closed positions for tax reports, audit trails, and journals
-      console.log('👑 Master Instance: Historical positions preserved for reporting.');
-
-      
-      // Listen for WebSocket subscriptions from Worker nodes
-      const { subClient: cacheSubClient } = require('./services/redisClient');
-      const setupMasterSubscriptions = () => {
-          cacheSubClient.subscribe('fyers_subscribe', (message) => {
-              try {
-                  const symbols = JSON.parse(message);
-                  const { addSubscriptionBatch } = require('./services/fyers');
-                  if (addSubscriptionBatch) addSubscriptionBatch(symbols);
-              } catch(e){}
-          }).catch(console.error);
-
-          cacheSubClient.subscribe('fyers_ping', (message) => {
-              try {
-                  const symbols = JSON.parse(message);
-                  const { handlePingSubscriptions } = require('./services/fyers');
-                  if (handlePingSubscriptions) handlePingSubscriptions(symbols);
-              } catch(e){}
-          }).catch(console.error);
-      };
-      
-      if (cacheSubClient.isReady) setupMasterSubscriptions();
-      else cacheSubClient.on('ready', setupMasterSubscriptions);
-
-      // --- BOOT & RECURRING SELF-SUBSCRIPTION ---
-      const bootSubscribeFromDB = async (includeWatchlists = false) => {
-        try {
-          const db = require('./database/db');
-          const { addSubscriptionBatch } = require('./services/fyers');
-          if (!addSubscriptionBatch) return;
-          const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
-
-          if (includeWatchlists) {
-            const userRows = await db('users').select('watchlists').catch(() => []);
-            userRows.forEach(row => {
-              try {
-                const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);
-                wls.forEach(wl => {
-                  (wl.symbols || []).forEach(sym => {
-                    const s = typeof sym === 'string' ? sym : sym && sym.symbol;
-                    if (s && !s.endsWith('-MF')) allSymbols.add(s);
-                  });
-                });
-              } catch(e) {}
-            });
-          }
-
-          const posRows = await db('positions').where('quantity', '!=', 0).select('symbol').catch(() => []);
-          posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
-          const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
-          ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
-          const list = Array.from(allSymbols);
-          if (list.length > 0) {
-            addSubscriptionBatch(list);
-          }
-        } catch(e) { console.error('Self-sub error:', e.message); }
-      };
-      setTimeout(() => bootSubscribeFromDB(true), 5000);
-      setTimeout(() => bootSubscribeFromDB(false), 20000);
-      setInterval(async () => {
-        // ⚡ Guard: If markets are closed across all segments, skip heavy recurring DB scans
-        try {
-          const eq = isSegmentMarketOpen(false);
-          const mcx = isSegmentMarketOpen(true);
-          if (!eq.open && !mcx.open) {
-            return; // All markets closed (nights/weekends/holidays) — nap and skip DB scan
-          }
-        } catch(e) {}
-        bootSubscribeFromDB(false);
-      }, 5 * 60 * 1000);
-      // ---------------------------------
-
-      // Update options master in background
-      updateOptionsMaster().catch(e => console.error(e));
-    
-    // Start Cron Jobs
-    const { startSquareOffJobs } = require('./services/autoSquareOff');
-    const { initRiskyStocksSync } = require('./services/riskyStocksSync');
-    const { initOrderExecutor } = require('./services/orderExecutor');
-    const triggerEngine = require('./services/triggerEngine');
-    const MTMRiskManager = require('./services/mtmRiskManager');
-    const { initCronJobs } = require('./services/cronJobs');
-    const schedule = require('node-schedule');
-
-    // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Mon-Fri & Weekends)
-    const loginRule = new schedule.RecurrenceRule();
-    loginRule.hour = 8;
-    loginRule.minute = 0;
-    loginRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(loginRule, async () => {
-      console.log('⏰ Daily 08:00 AM Cron: Running automated Fyers TOTP Login...');
-      try {
-        const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
-        await performFyersAutoLogin();
-      } catch(e) { console.error('Auto-login cron error:', e); }
-    });
-
-    const loginBackupRule = new schedule.RecurrenceRule();
-    loginBackupRule.hour = 8;
-    loginBackupRule.minute = 30;
-    loginBackupRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(loginBackupRule, async () => {
-      console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
-      try {
-        const { getFyersStatus } = require('./services/fyers');
-        const status = getFyersStatus ? getFyersStatus() : {};
-        if (!status.hasAccessToken || status.tokenExpired) {
-          const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
-          await performFyersAutoLogin();
-        }
-      } catch(e) { console.error('Backup auto-login cron error:', e); }
-    });
-
-    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun)
-    const optionsMorningRule = new schedule.RecurrenceRule();
-    optionsMorningRule.hour = 8;
-    optionsMorningRule.minute = 15;
-    optionsMorningRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(optionsMorningRule, async () => {
-      console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
-      try {
-        await updateOptionsMaster();
-      } catch(e) { console.error('Options Master update cron error:', e); }
-    });
-
-    // RAM Optimization: Clean expired derivative contracts from priceCache daily at 08:05 AM IST
-    async function cleanStaleOptionCache() {
-      try {
-        const now = Date.now();
-        let cleaned = 0;
-        const keys = Object.keys(priceCache);
-        for (const sym of keys) {
-          if (isDerivativeContract(sym)) {
-            const inst = await db('instruments').where({ unique_symbol: sym }).whereNotNull('expiry_timestamp').first();
-            if (inst && Number(inst.expiry_timestamp) < now) {
-              delete priceCache[sym];
-              cleaned++;
-            }
-          }
-        }
-        if (cleaned > 0) {
-          console.log(`🧹 [RAM OPTIMIZATION] Purged ${cleaned} expired option contracts from memory cache.`);
-        }
-      } catch(e) {}
-    }
-    const pruneCacheRule = new schedule.RecurrenceRule();
-    pruneCacheRule.hour = 8;
-    pruneCacheRule.minute = 5;
-    pruneCacheRule.tz = 'Asia/Kolkata';
-    schedule.scheduleJob(pruneCacheRule, () => cleanStaleOptionCache());
-    setTimeout(cleanStaleOptionCache, 60000); // Also prune 60s after server boot
-
-
-    // Initialize TriggerEngine
-    triggerEngine.setSocketIo(io);
-    await triggerEngine.loadPendingOrders();
-    console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
-
-    // Initialize EOD Positions Engine (Cron Automations)
-    require('./services/positionsEngine');
-
-    // Initialize MTM Risk Manager with live Admin Market Status integration
-    new MTMRiskManager(priceCache, () => {
-      const eq = isSegmentMarketOpen(false);
-      const mcx = isSegmentMarketOpen(true);
-      return eq.open || mcx.open;
-    }).start();
-    console.log('🛡️  MTM Risk Manager active (95% auto-liquidation, synced with Admin Market Status)');
-
-    initCronJobs(priceCache, triggerEngine);
-    startSquareOffJobs();
-    initRiskyStocksSync();
-    initOrderExecutor(priceCache);
-    SIPEngine.init(priceCache);
-  } else {
-    console.log(`👷 Worker Instance: Listening for API requests and WS connections...`);
-  }
-});
-
-// Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
-const cleanupAndExit = () => {
-  console.log('Stopping server and releasing port...');
-  server.close(() => {
-    console.log('Server stopped.');
-    process.exit(0);
-  });
-  setTimeout(() => {
-    console.log('Forced exit.');
-    process.exit(0);
-  }, 2000);
-};
-
-process.on('SIGINT', cleanupAndExit);
-process.on('SIGTERM', cleanupAndExit);
-
-module.exports = { io, priceCache };
-
-
-
-
-
-
-
-
-
-
+// ─── Security Shield & Ban Management & Journal Endpoints ──────────────────────
 // ─── Security Shield & Ban Management ──────────────────────────────────────────
 app.get('/api/admin/banned', authenticateToken, async (req, res) => {
   try {
@@ -7389,3 +7153,234 @@ app.delete('/api/journal/rules/:id', authenticateToken, async (req, res) => {
   }
 });
 
+app.use((req, res) => {
+  // If the request is for an API endpoint that wasn't found, return 404 JSON instead of HTML!
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+  }
+  // If the request is for a static asset that wasn't found, return 404 to avoid serving HTML as JS
+  if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|mjs|map)$/)) {
+    return res.status(404).send('Asset not found');
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
+// ─── Start ────────────────────────────────────────────────────────────────
+const { initFyers, setPriceCache } = require('./services/fyers');
+setPriceCache(priceCache);
+
+const { updateOptionsMaster } = require('./database/updateOptionsMaster');
+
+const PORT = process.env.PORT || 5000;
+
+
+
+server.listen(PORT, async () => {
+  console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
+
+    // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
+    await initFyers(io, priceCache, isMaster);
+
+    if (isMaster) {
+      console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
+
+      // Zero Trade Data Deletion: Preserve historical closed positions for tax reports, audit trails, and journals
+      console.log('👑 Master Instance: Historical positions preserved for reporting.');
+
+      
+      // Listen for WebSocket subscriptions from Worker nodes
+      const { subClient: cacheSubClient } = require('./services/redisClient');
+      const setupMasterSubscriptions = () => {
+          cacheSubClient.subscribe('fyers_subscribe', (message) => {
+              try {
+                  const symbols = JSON.parse(message);
+                  const { addSubscriptionBatch } = require('./services/fyers');
+                  if (addSubscriptionBatch) addSubscriptionBatch(symbols);
+              } catch(e){}
+          }).catch(console.error);
+
+          cacheSubClient.subscribe('fyers_ping', (message) => {
+              try {
+                  const symbols = JSON.parse(message);
+                  const { handlePingSubscriptions } = require('./services/fyers');
+                  if (handlePingSubscriptions) handlePingSubscriptions(symbols);
+              } catch(e){}
+          }).catch(console.error);
+      };
+      
+      if (cacheSubClient.isReady) setupMasterSubscriptions();
+      else cacheSubClient.on('ready', setupMasterSubscriptions);
+
+      // --- BOOT & RECURRING SELF-SUBSCRIPTION ---
+      const bootSubscribeFromDB = async (includeWatchlists = false) => {
+        try {
+          const db = require('./database/db');
+          const { addSubscriptionBatch } = require('./services/fyers');
+          if (!addSubscriptionBatch) return;
+          const allSymbols = new Set(['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX']);
+
+          if (includeWatchlists) {
+            const userRows = await db('users').select('watchlists').catch(() => []);
+            userRows.forEach(row => {
+              try {
+                const wls = typeof row.watchlists === 'string' ? JSON.parse(row.watchlists) : (row.watchlists || []);
+                wls.forEach(wl => {
+                  (wl.symbols || []).forEach(sym => {
+                    const s = typeof sym === 'string' ? sym : sym && sym.symbol;
+                    if (s && !s.endsWith('-MF')) allSymbols.add(s);
+                  });
+                });
+              } catch(e) {}
+            });
+          }
+
+          const posRows = await db('positions').where('quantity', '!=', 0).select('symbol').catch(() => []);
+          posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
+          const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
+          ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
+          const list = Array.from(allSymbols);
+          if (list.length > 0) {
+            addSubscriptionBatch(list);
+          }
+        } catch(e) { console.error('Self-sub error:', e.message); }
+      };
+      setTimeout(() => bootSubscribeFromDB(true), 5000);
+      setTimeout(() => bootSubscribeFromDB(false), 20000);
+      setInterval(async () => {
+        // ⚡ Guard: If markets are closed across all segments, skip heavy recurring DB scans
+        try {
+          const eq = isSegmentMarketOpen(false);
+          const mcx = isSegmentMarketOpen(true);
+          if (!eq.open && !mcx.open) {
+            return; // All markets closed (nights/weekends/holidays) — nap and skip DB scan
+          }
+        } catch(e) {}
+        bootSubscribeFromDB(false);
+      }, 5 * 60 * 1000);
+      // ---------------------------------
+
+      // Update options master in background
+      updateOptionsMaster().catch(e => console.error(e));
+    
+    // Start Cron Jobs
+    const { startSquareOffJobs } = require('./services/autoSquareOff');
+    const { initRiskyStocksSync } = require('./services/riskyStocksSync');
+    const { initOrderExecutor } = require('./services/orderExecutor');
+    const triggerEngine = require('./services/triggerEngine');
+    const MTMRiskManager = require('./services/mtmRiskManager');
+    const { initCronJobs } = require('./services/cronJobs');
+    const schedule = require('node-schedule');
+
+    // Automated Fyers TOTP Login daily at 08:00 AM & 08:30 AM IST (Mon-Fri & Weekends)
+    const loginRule = new schedule.RecurrenceRule();
+    loginRule.hour = 8;
+    loginRule.minute = 0;
+    loginRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(loginRule, async () => {
+      console.log('⏰ Daily 08:00 AM Cron: Running automated Fyers TOTP Login...');
+      try {
+        const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+        await performFyersAutoLogin();
+      } catch(e) { console.error('Auto-login cron error:', e); }
+    });
+
+    const loginBackupRule = new schedule.RecurrenceRule();
+    loginBackupRule.hour = 8;
+    loginBackupRule.minute = 30;
+    loginBackupRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(loginBackupRule, async () => {
+      console.log('⏰ Daily 08:30 AM Backup Cron: Checking / Re-verifying Fyers Token...');
+      try {
+        const { getFyersStatus } = require('./services/fyers');
+        const status = getFyersStatus ? getFyersStatus() : {};
+        if (!status.hasAccessToken || status.tokenExpired) {
+          const { performFyersAutoLogin } = require('./services/fyersAutoLogin');
+          await performFyersAutoLogin();
+        }
+      } catch(e) { console.error('Backup auto-login cron error:', e); }
+    });
+
+    // Automated Options & Futures Master & Lot Sizes Download daily at 08:15 AM IST (Mon-Sun)
+    const optionsMorningRule = new schedule.RecurrenceRule();
+    optionsMorningRule.hour = 8;
+    optionsMorningRule.minute = 15;
+    optionsMorningRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(optionsMorningRule, async () => {
+      console.log('⏰ Daily 08:15 AM Cron: Downloading latest Master Contracts & Lot Sizes...');
+      try {
+        await updateOptionsMaster();
+      } catch(e) { console.error('Options Master update cron error:', e); }
+    });
+
+    // RAM Optimization: Clean expired derivative contracts from priceCache daily at 08:05 AM IST
+    async function cleanStaleOptionCache() {
+      try {
+        const now = Date.now();
+        let cleaned = 0;
+        const keys = Object.keys(priceCache);
+        for (const sym of keys) {
+          if (isDerivativeContract(sym)) {
+            const inst = await db('instruments').where({ unique_symbol: sym }).whereNotNull('expiry_timestamp').first();
+            if (inst && Number(inst.expiry_timestamp) < now) {
+              delete priceCache[sym];
+              cleaned++;
+            }
+          }
+        }
+        if (cleaned > 0) {
+          console.log(`🧹 [RAM OPTIMIZATION] Purged ${cleaned} expired option contracts from memory cache.`);
+        }
+      } catch(e) {}
+    }
+    const pruneCacheRule = new schedule.RecurrenceRule();
+    pruneCacheRule.hour = 8;
+    pruneCacheRule.minute = 5;
+    pruneCacheRule.tz = 'Asia/Kolkata';
+    schedule.scheduleJob(pruneCacheRule, () => cleanStaleOptionCache());
+    setTimeout(cleanStaleOptionCache, 60000); // Also prune 60s after server boot
+
+
+    // Initialize TriggerEngine
+    triggerEngine.setSocketIo(io);
+    await triggerEngine.loadPendingOrders();
+    console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
+
+    // Initialize EOD Positions Engine (Cron Automations)
+    require('./services/positionsEngine');
+
+    // Initialize MTM Risk Manager with live Admin Market Status integration
+    new MTMRiskManager(priceCache, () => {
+      const eq = isSegmentMarketOpen(false);
+      const mcx = isSegmentMarketOpen(true);
+      return eq.open || mcx.open;
+    }).start();
+    console.log('🛡️  MTM Risk Manager active (95% auto-liquidation, synced with Admin Market Status)');
+
+    initCronJobs(priceCache, triggerEngine);
+    startSquareOffJobs();
+    initRiskyStocksSync();
+    initOrderExecutor(priceCache);
+    SIPEngine.init(priceCache);
+  } else {
+    console.log(`👷 Worker Instance: Listening for API requests and WS connections...`);
+  }
+});
+
+// Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
+const cleanupAndExit = () => {
+  console.log('Stopping server and releasing port...');
+  server.close(() => {
+    console.log('Server stopped.');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.log('Forced exit.');
+    process.exit(0);
+  }, 2000);
+};
+
+process.on('SIGINT', cleanupAndExit);
+process.on('SIGTERM', cleanupAndExit);
+
+module.exports = { io, priceCache };
