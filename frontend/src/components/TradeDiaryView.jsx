@@ -309,7 +309,13 @@ export default function TradeDiaryView({ onOpenPaperTrading, onBack, onOpenProfi
     accentBlueLight: isLight ? '#1d4ed8' : '#60a5fa',
     accentGreen: isLight ? '#16a34a' : '#10b981',
     accentRed: isLight ? '#dc2626' : '#ef4444',
-    cardShadow: isLight ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : 'none'
+    accentPurple: isLight ? '#7c3aed' : '#a78bfa',
+    accentOrange: isLight ? '#ea580c' : '#f97316',
+    accentCyan: isLight ? '#0891b2' : '#06b6d4',
+    bgCardHover: isLight ? '#f8fafc' : '#182438',
+    cardShadow: isLight ? '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)' : '0 1px 3px rgba(0,0,0,0.2)',
+    cardShadowHover: isLight ? '0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)' : '0 4px 16px rgba(0,0,0,0.35)',
+    kpiGlass: isLight ? 'rgba(255,255,255,0.7)' : 'rgba(19,29,49,0.85)'
   }), [isLight]);
 
   // Filter states
@@ -2785,158 +2791,134 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   </div>
                 </div>
 
-                {/* 6 KPI INSTITUTIONAL METRIC CARDS MATRIX */}
+                {/* 6 KPI METRIC CARDS — ACCENT-BAR DESIGN */}
                 <div style={{ 
                   display: 'grid', 
-                  gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)', 
-                  gap: isMobile ? '8px' : '12px' 
-                }}>
-                  {/* 1. NET REALIZED P&L */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>NET REALIZED P&L</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed, marginTop: '4px' }}>
-                        {formatMoney(metrics.totalPnL, marketSegment)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Gross: {formatMoneyPlain(metrics.totalGross, marketSegment)}
-                    </div>
-                  </div>
-
-                  {/* 2. WIN RATE */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>WIN RATE</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: colors.accentBlueLight, marginTop: '4px' }}>
-                        {metrics.winRate}%
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      {metrics.wins}W / {metrics.losses}L Trades
-                    </div>
-                  </div>
-
-                  {/* 3. PROFIT FACTOR */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>PROFIT FACTOR</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: colors.accentGreen, marginTop: '4px' }}>
-                        {metrics.profitFactor}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Expectancy: {formatMoneyPlain(metrics.expectancy, marketSegment)}/tr
-                    </div>
-                  </div>
-
-                  {/* 4. AVG. RISK/REWARD */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>RISK / REWARD</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: '#a855f7', marginTop: '4px' }}>
-                        {metrics.avgRiskReward}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Target: 1:2.0+
-                    </div>
-                  </div>
-
-                  {/* 5. LARGEST WIN (CURRENCY BUG FIXED) */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>LARGEST WIN</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: colors.accentGreen, marginTop: '4px' }}>
-                        {formatMoney(metrics.highestPnl, marketSegment)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Peak Single Session
-                    </div>
-                  </div>
-
-                  {/* 6. TOTAL TRADES */}
-                  <div style={{ 
-                    backgroundColor: colors.bgCard, 
-                    border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '12px' : '14px 16px', 
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    boxShadow: colors.cardShadow
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>LOGGED TRADES</div>
-                      <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '900', color: '#f97316', marginTop: '4px' }}>
-                        {metrics.tradesCount}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted, marginTop: '6px' }}>
-                      Journaled in {marketSegment}
-                    </div>
-                  </div>
-                </div>
-
-                {/* INSTITUTIONAL 6-SHORTCUT ACTION COMMAND BAR */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)',
-                  gap: '8px'
+                  gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', 
+                  gap: isMobile ? '10px' : '14px' 
                 }}>
                   {[
-                    { id: 'CHECKLIST', label: 'Daily Checklist', sub: 'Pre & post market', icon: CheckSquare, color: '#2563eb', bg: 'rgba(37, 99, 235, 0.1)' },
-                    { id: 'AI_SUMMARIZER', label: 'AI Coach Audit', sub: 'Behavioral leaks', icon: Sparkles, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-                    { id: 'RISK_MANAGEMENT', label: 'Risk Calculator', sub: 'ATR stops & size', icon: ShieldCheck, color: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.1)' },
-                    { id: 'CALENDAR', label: 'P&L Calendar', sub: 'Weekly summaries', icon: Calendar, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
-                    { id: 'STRATEGIES', label: 'Playbook Rules', sub: 'Alpha setups', icon: TrendingUp, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
-                    { id: 'COMMUNITY', label: 'Community Feed', sub: 'Shared setups', icon: Users, color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' }
+                    {
+                      label: 'Net Realized P&L',
+                      value: formatMoney(metrics.totalPnL, marketSegment),
+                      sub: `Gross: ${formatMoneyPlain(metrics.totalGross, marketSegment)}`,
+                      accent: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed,
+                      icon: DollarSign,
+                      gradStart: metrics.totalPnL >= 0 ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+                      gradEnd: 'transparent'
+                    },
+                    {
+                      label: 'Win Rate',
+                      value: `${metrics.winRate}%`,
+                      sub: `${metrics.wins}W / ${metrics.losses}L Trades`,
+                      accent: colors.accentBlueLight,
+                      icon: Target,
+                      gradStart: 'rgba(37,99,235,0.06)',
+                      gradEnd: 'transparent'
+                    },
+                    {
+                      label: 'Profit Factor',
+                      value: metrics.profitFactor,
+                      sub: `Expectancy: ${formatMoneyPlain(metrics.expectancy, marketSegment)}/tr`,
+                      accent: colors.accentGreen,
+                      icon: TrendingUp,
+                      gradStart: 'rgba(16,185,129,0.06)',
+                      gradEnd: 'transparent'
+                    },
+                    {
+                      label: 'Risk / Reward',
+                      value: metrics.avgRiskReward,
+                      sub: 'Target: 1:2.0+',
+                      accent: colors.accentPurple,
+                      icon: Scale,
+                      gradStart: 'rgba(139,92,246,0.06)',
+                      gradEnd: 'transparent'
+                    },
+                    {
+                      label: 'Largest Win',
+                      value: formatMoney(metrics.highestPnl, marketSegment),
+                      sub: 'Peak Single Session',
+                      accent: colors.accentCyan,
+                      icon: Trophy,
+                      gradStart: 'rgba(6,182,212,0.06)',
+                      gradEnd: 'transparent'
+                    },
+                    {
+                      label: 'Logged Trades',
+                      value: metrics.tradesCount,
+                      sub: `Journaled in ${marketSegment}`,
+                      accent: colors.accentOrange,
+                      icon: BarChart3,
+                      gradStart: 'rgba(249,115,22,0.06)',
+                      gradEnd: 'transparent'
+                    }
+                  ].map((kpi, ki) => {
+                    const KpiIcon = kpi.icon;
+                    return (
+                      <div
+                        key={ki}
+                        style={{
+                          position: 'relative',
+                          backgroundColor: colors.bgCard,
+                          border: `1px solid ${colors.borderColor}`,
+                          borderRadius: '14px',
+                          padding: isMobile ? '14px 14px 14px 18px' : '18px 20px 18px 22px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          overflow: 'hidden',
+                          boxShadow: colors.cardShadow,
+                          background: `linear-gradient(135deg, ${kpi.gradStart} 0%, ${kpi.gradEnd} 60%)`,
+                          transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+                          cursor: 'default'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow = colors.cardShadowHover; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow = colors.cardShadow; e.currentTarget.style.transform = 'translateY(0)'; }}
+                      >
+                        {/* Left accent bar */}
+                        <div style={{ position: 'absolute', left: 0, top: '12px', bottom: '12px', width: '4px', borderRadius: '0 4px 4px 0', backgroundColor: kpi.accent }} />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontSize: '10.5px', fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{kpi.label}</div>
+                            <div style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: kpi.accent, marginTop: '6px', letterSpacing: '-0.5px' }}>
+                              {kpi.value}
+                            </div>
+                          </div>
+                          <div style={{
+                            width: '36px', height: '36px', borderRadius: '10px',
+                            backgroundColor: `${kpi.accent}15`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <KpiIcon size={18} color={kpi.accent} strokeWidth={2.2} />
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '11px', color: colors.textSecondary, fontWeight: '500' }}>
+                          {kpi.sub}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* QUICK ACTION COMMAND BAR — PILL STYLE */}
+                <div style={{
+                  display: 'flex',
+                  gap: '10px',
+                  overflowX: 'auto',
+                  paddingBottom: '4px',
+                  scrollbarWidth: 'none'
+                }}>
+                  {[
+                    { id: 'CHECKLIST', label: 'Daily Checklist', sub: 'Pre & post market', icon: CheckSquare, color: '#2563eb', bg: 'rgba(37, 99, 235, 0.08)' },
+                    { id: 'AI_SUMMARIZER', label: 'AI Coach Audit', sub: 'Behavioral leaks', icon: Sparkles, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.08)' },
+                    { id: 'RISK_MANAGEMENT', label: 'Risk Calculator', sub: 'ATR stops & size', icon: ShieldCheck, color: colors.accentGreen, bg: 'rgba(16, 185, 129, 0.08)' },
+                    { id: 'CALENDAR', label: 'P&L Calendar', sub: 'Weekly summaries', icon: Calendar, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.08)' },
+                    { id: 'STRATEGIES', label: 'Playbook Rules', sub: 'Alpha setups', icon: TrendingUp, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.08)' },
+                    { id: 'COMMUNITY', label: 'Community Feed', sub: 'Shared setups', icon: Users, color: '#ec4899', bg: 'rgba(236, 72, 153, 0.08)' }
                   ].map(sc => {
                     const IconComp = sc.icon;
                     return (
@@ -2946,81 +2928,122 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         style={{
                           backgroundColor: colors.bgCard,
                           border: `1px solid ${colors.borderColor}`,
-                          borderRadius: '10px',
-                          padding: '10px 12px',
+                          borderLeft: `3px solid ${sc.color}`,
+                          borderRadius: '12px',
+                          padding: isMobile ? '10px 14px' : '12px 18px',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '10px',
+                          gap: '12px',
                           cursor: 'pointer',
                           boxShadow: colors.cardShadow,
                           textAlign: 'left',
-                          transition: 'transform 0.1s ease'
+                          transition: 'all 0.18s ease',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          minWidth: isMobile ? '160px' : 'auto',
+                          background: `linear-gradient(135deg, ${sc.bg} 0%, transparent 70%)`
                         }}
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 14px ${sc.color}22`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow = colors.cardShadow; e.currentTarget.style.transform = 'translateY(0)'; }}
                       >
-                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: sc.bg, color: sc.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <IconComp size={16} />
+                        <div style={{
+                          width: '34px', height: '34px', borderRadius: '10px',
+                          backgroundColor: sc.bg, color: sc.color,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                        }}>
+                          <IconComp size={17} strokeWidth={2.2} />
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '11.5px', fontWeight: '700', color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sc.label}</div>
-                          <div style={{ fontSize: '10px', color: colors.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sc.sub}</div>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary }}>{sc.label}</div>
+                          <div style={{ fontSize: '10.5px', color: colors.textSecondary, marginTop: '1px' }}>{sc.sub}</div>
                         </div>
+                        <ChevronRight size={14} color={colors.textMuted} style={{ marginLeft: '4px', opacity: 0.5, flexShrink: 0 }} />
                       </button>
                     );
                   })}
                 </div>
 
-                {/* CONFIDENCE & DISCIPLINE SCORECARD */}
+                {/* DISCIPLINE & CONFIDENCE SCORECARD — ENHANCED */}
                 <div style={{ 
                   backgroundColor: colors.bgCard, 
                   border: `1px solid ${colors.borderColor}`, 
-                  borderRadius: '12px', 
-                  padding: isMobile ? '14px' : '16px 20px', 
+                  borderRadius: '14px', 
+                  padding: isMobile ? '16px' : '20px 24px', 
                   display: 'flex', 
                   flexDirection: 'column', 
-                  gap: '10px',
-                  boxShadow: colors.cardShadow
+                  gap: '14px',
+                  boxShadow: colors.cardShadow,
+                  background: `linear-gradient(135deg, rgba(245,158,11,0.04) 0%, transparent 50%)`
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Award size={16} color="#f59e0b" /> Trader Discipline & Execution Confidence Index
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Award size={16} color="#f59e0b" strokeWidth={2.5} />
+                      </div>
+                      Discipline & Confidence Index
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: '800', color: colors.accentGreen }}>
-                      {metrics.confidenceScore}% Systematic Score
-                    </span>
+                    <div style={{
+                      padding: '4px 14px',
+                      borderRadius: '20px',
+                      backgroundColor: metrics.confidenceScore >= 70 ? 'rgba(16,185,129,0.12)' : metrics.confidenceScore >= 40 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                      color: metrics.confidenceScore >= 70 ? colors.accentGreen : metrics.confidenceScore >= 40 ? '#f59e0b' : colors.accentRed,
+                      fontSize: '13px',
+                      fontWeight: '900',
+                      letterSpacing: '-0.3px'
+                    }}>
+                      {metrics.confidenceScore}% Score
+                    </div>
                   </div>
 
-                  <div style={{ position: 'relative', marginTop: '2px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: '700', color: colors.textMuted, marginBottom: '5px' }}>
-                      <span style={{ color: colors.accentRed }}>⚠️ Emotional Hesitation / Leak</span>
-                      <span style={{ color: colors.accentGreen }}>⭐ Flawless Risk Adherence</span>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: '600', color: colors.textMuted, marginBottom: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <AlertTriangle size={10} color={colors.accentRed} /> Emotional Leak
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        Flawless <Star size={10} color={colors.accentGreen} />
+                      </span>
                     </div>
-                    <div style={{ height: '7px', borderRadius: '4px', background: 'linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%)', position: 'relative' }}>
-                      <div style={{ 
-                        position: 'absolute', 
-                        left: `${metrics.confidenceScore}%`, 
-                        top: '-4px', 
-                        transform: 'translateX(-50%)', 
-                        width: '15px', 
-                        height: '15px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#ffffff', 
-                        border: '2px solid #2563eb', 
-                        boxShadow: '0 0 6px rgba(0,0,0,0.4)' 
+                    {/* Segmented progress bar */}
+                    <div style={{ height: '8px', borderRadius: '4px', background: isLight ? '#e2e8f0' : '#1e293b', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${metrics.confidenceScore}%`,
+                        borderRadius: '4px',
+                        background: metrics.confidenceScore >= 70
+                          ? 'linear-gradient(90deg, #f59e0b 0%, #10b981 100%)'
+                          : metrics.confidenceScore >= 40
+                          ? 'linear-gradient(90deg, #ef4444 0%, #f59e0b 100%)'
+                          : 'linear-gradient(90deg, #ef4444 0%, #ef4444 100%)',
+                        transition: 'width 0.5s ease'
                       }} />
                     </div>
+                    {/* Tick marks */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', padding: '0 1px' }}>
+                      {[0, 25, 50, 75, 100].map(v => (
+                        <span key={v} style={{ fontSize: '9px', color: colors.textMuted, fontWeight: '600' }}>{v}</span>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Micro Discipline Metrics */}
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '8px', paddingTop: '4px', borderTop: `1px solid ${colors.borderColor}` }}>
-                    <div style={{ fontSize: '11px', color: colors.textSecondary }}>
-                      ✓ <b>Checklist Adherence:</b> <span style={{ color: colors.accentGreen }}>94%</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: colors.textSecondary }}>
-                      ✓ <b>Stop-Loss Respect:</b> <span style={{ color: colors.accentGreen }}>96% (No moving SL)</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: colors.textSecondary }}>
-                      ✓ <b>Overtrading Protection:</b> <span style={{ color: '#2563eb' }}>0 Circuit Breaches</span>
-                    </div>
+                  {/* Sub-metrics with icons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px', paddingTop: '10px', borderTop: `1px solid ${colors.borderColor}` }}>
+                    {[
+                      { icon: CheckCircle, label: 'Checklist Adherence', value: '94%', color: colors.accentGreen },
+                      { icon: ShieldCheck, label: 'Stop-Loss Respect', value: '96%', color: colors.accentGreen },
+                      { icon: Zap, label: 'Overtrading Protection', value: '0 Breaches', color: colors.accentBlueLight }
+                    ].map((m, mi) => {
+                      const MIcon = m.icon;
+                      return (
+                        <div key={mi} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <MIcon size={14} color={m.color} strokeWidth={2.2} />
+                          <div>
+                            <div style={{ fontSize: '10.5px', color: colors.textSecondary, fontWeight: '500' }}>{m.label}</div>
+                            <div style={{ fontSize: '12px', color: m.color, fontWeight: '800' }}>{m.value}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -3030,24 +3053,29 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', 
                   gap: isMobile ? '12px' : '16px' 
                 }}>
-                  {/* Cumulative Performance Card with Dynamic D / W / M SVG Equity Curve */}
+                  {/* Cumulative Performance Card — ENHANCED */}
                   <div style={{ 
                     backgroundColor: colors.bgCard, 
                     border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '16px' : '20px 24px', 
+                    borderTop: `3px solid #2563eb`,
+                    borderRadius: '14px', 
+                    padding: isMobile ? '16px' : '22px 26px', 
                     display: 'flex', 
                     flexDirection: 'column', 
-                    minHeight: isMobile ? '240px' : '290px',
+                    minHeight: isMobile ? '240px' : '300px',
                     boxShadow: colors.cardShadow
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>
-                        <TrendingUp size={16} color="#2563eb" /> Cumulative Equity Curve ({marketSegment})
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>
+                        <div style={{ width: '30px', height: '30px', borderRadius: '8px', backgroundColor: 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <TrendingUp size={16} color="#2563eb" strokeWidth={2.5} />
+                        </div>
+                        Equity Curve
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: colors.textMuted, backgroundColor: colors.bgInner, padding: '2px 8px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>{marketSegment}</span>
                       </div>
 
-                      {/* Working D / W / M Period Buttons */}
-                      <div style={{ display: 'flex', gap: '3px', backgroundColor: colors.bgInner, padding: '2px', borderRadius: '6px', border: `1px solid ${colors.borderColor}` }}>
+                      {/* Period Toggle — Pill Style */}
+                      <div style={{ display: 'flex', gap: '2px', backgroundColor: colors.bgInner, padding: '3px', borderRadius: '8px', border: `1px solid ${colors.borderColor}` }}>
                         {[
                           { key: 'D', label: 'Daily' },
                           { key: 'W', label: 'Weekly' },
@@ -3057,14 +3085,15 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             key={p.key} 
                             onClick={() => setPnlPeriod(p.key)} 
                             style={{ 
-                              padding: '3px 8px', 
+                              padding: '4px 12px', 
                               fontSize: '11px', 
                               fontWeight: '700', 
-                              borderRadius: '4px', 
+                              borderRadius: '6px', 
                               border: 'none', 
                               backgroundColor: pnlPeriod === p.key ? '#2563eb' : 'transparent', 
                               color: pnlPeriod === p.key ? '#ffffff' : colors.textMuted, 
-                              cursor: 'pointer' 
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
                             }}
                           >
                             {p.label}
@@ -3074,12 +3103,22 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     </div>
 
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '900', color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed, marginBottom: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                        <div style={{
+                          fontSize: isMobile ? '24px' : '30px', fontWeight: '900',
+                          color: metrics.totalPnL >= 0 ? colors.accentGreen : colors.accentRed,
+                          letterSpacing: '-1px'
+                        }}>
                           {formatMoney(metrics.totalPnL, marketSegment)}
                         </div>
-                        <div style={{ fontSize: '11.5px', color: colors.textSecondary, marginBottom: '8px' }}>
-                          Net P&L across {metrics.tradesCount} {marketSegment} trades ({metrics.wins} Wins / {metrics.losses} Losses) • Charges: {formatMoneyPlain(metrics.totalCharges, marketSegment)}
+                        <div style={{
+                          fontSize: '11px', color: colors.textSecondary,
+                          backgroundColor: colors.bgInner,
+                          padding: '3px 10px', borderRadius: '6px',
+                          border: `1px solid ${colors.borderColor}`,
+                          fontWeight: '600'
+                        }}>
+                          {metrics.tradesCount} trades • {metrics.wins}W / {metrics.losses}L • Charges: {formatMoneyPlain(metrics.totalCharges, marketSegment)}
                         </div>
                       </div>
 
@@ -3198,12 +3237,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     </div>
                   </div>
 
-                  {/* Top Highlight Trades Reel */}
+                  {/* Highlight Trades — ENHANCED */}
                   <div style={{ 
                     backgroundColor: colors.bgCard, 
                     border: `1px solid ${colors.borderColor}`, 
-                    borderRadius: '12px', 
-                    padding: isMobile ? '16px' : '20px 24px', 
+                    borderTop: `3px solid ${colors.accentGreen}`,
+                    borderRadius: '14px', 
+                    padding: isMobile ? '16px' : '22px 26px', 
                     display: 'flex', 
                     flexDirection: 'column', 
                     minHeight: isMobile ? '180px' : '260px',
@@ -3211,17 +3251,24 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     justifyContent: 'space-between'
                   }}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '800', color: colors.textPrimary }}>Highlight Trades</div>
-                        <button onClick={() => setActiveTab('TRADES')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          View All ({metrics.tradesCount}) →
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '800', color: colors.textPrimary }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Trophy size={15} color={colors.accentGreen} strokeWidth={2.5} />
+                          </div>
+                          Top Trades
+                        </div>
+                        <button onClick={() => setActiveTab('TRADES')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11.5px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          View All ({metrics.tradesCount}) <ChevronRight size={13} />
                         </button>
                       </div>
 
                       {metrics.topTrades.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '24px 12px', color: colors.textMuted, fontSize: '11.5px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                          <Award size={26} color={colors.textMuted} />
-                          <div>No winning highlight trades in this timeframe.</div>
+                        <div style={{ textAlign: 'center', padding: '28px 12px', color: colors.textMuted, fontSize: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: colors.bgInner, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.borderColor}` }}>
+                            <Award size={22} color={colors.textMuted} />
+                          </div>
+                          <div style={{ fontWeight: '600' }}>No winning trades yet</div>
                           <button
                             onClick={() => {
                               setNewTradeForm(prev => ({
@@ -3231,9 +3278,13 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                               }));
                               setShowNewTradeModal(true);
                             }}
-                            style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: '700', cursor: 'pointer', marginTop: '4px' }}
+                            style={{
+                              background: 'rgba(37,99,235,0.08)', border: `1px solid rgba(37,99,235,0.2)`,
+                              color: '#2563eb', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                              padding: '6px 14px', borderRadius: '8px', marginTop: '4px'
+                            }}
                           >
-                            + Log a new trade now
+                            + Log a trade
                           </button>
                         </div>
                       ) : (
@@ -3242,35 +3293,47 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                             <div 
                               key={trade.id || idx} 
                               style={{ 
-                                padding: '9px 12px', 
+                                padding: '10px 14px 10px 16px', 
                                 backgroundColor: colors.bgInner, 
-                                borderRadius: '8px', 
+                                borderRadius: '10px', 
                                 border: `1px solid ${colors.borderColor}`, 
+                                borderLeft: `3px solid ${colors.accentGreen}`,
                                 display: 'flex', 
                                 justifyContent: 'space-between', 
-                                alignItems: 'center' 
+                                alignItems: 'center',
+                                transition: 'background 0.15s ease'
                               }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = colors.bgCardHover}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = colors.bgInner}
                             >
                               <div>
-                                <div style={{ fontSize: '12px', fontWeight: '700', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: colors.accentGreen, fontWeight: '800' }}>
+                                <div style={{ fontSize: '12.5px', fontWeight: '800', color: colors.textPrimary, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                                  <span style={{ 
+                                    fontSize: '9.5px', padding: '2px 7px', borderRadius: '5px', 
+                                    backgroundColor: (trade.trade_type || 'BUY') === 'BUY' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', 
+                                    color: (trade.trade_type || 'BUY') === 'BUY' ? colors.accentGreen : colors.accentRed, 
+                                    fontWeight: '800', letterSpacing: '0.3px' 
+                                  }}>
                                     {trade.trade_type || 'BUY'}
                                   </span>
                                   {trade.symbol}
                                 </div>
-                                <div style={{ fontSize: '10px', color: colors.textSecondary, marginTop: '2px' }}>
+                                <div style={{ fontSize: '10.5px', color: colors.textSecondary, marginTop: '3px', fontWeight: '500' }}>
                                   {trade.trade_date} • {trade.strategy || 'Breakout'}
                                 </div>
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '800', color: colors.accentGreen }}>
+                                <span style={{ 
+                                  fontSize: '13px', fontWeight: '900', color: colors.accentGreen,
+                                  backgroundColor: 'rgba(16,185,129,0.08)', padding: '3px 8px', borderRadius: '6px'
+                                }}>
                                   {formatMoney(Number(trade.net_pnl !== undefined ? trade.net_pnl : trade.realized_pnl), marketSegment)}
                                 </span>
                                 <button
                                   onClick={() => setSelectedTradeForShare(trade)}
                                   title="Share P&L Card"
-                                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '2px' }}
+                                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '3px' }}
                                 >
                                   <Share2 size={14} />
                                 </button>
@@ -3281,9 +3344,17 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                       )}
                     </div>
 
-                    <div style={{ paddingTop: '10px', borderTop: `1px solid ${colors.borderColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: colors.textMuted }}>
-                      <span>Discipline: <b>{metrics.confidenceScore}%</b></span>
-                      <span>Market: <b>{marketSegment}</b></span>
+                    <div style={{ paddingTop: '12px', borderTop: `1px solid ${colors.borderColor}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                      <span style={{ color: colors.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Award size={12} color="#f59e0b" /> Discipline: <b style={{ color: colors.textPrimary }}>{metrics.confidenceScore}%</b>
+                      </span>
+                      <span style={{ 
+                        color: colors.textMuted, backgroundColor: colors.bgInner, 
+                        padding: '2px 8px', borderRadius: '5px', border: `1px solid ${colors.borderColor}`,
+                        fontWeight: '600', fontSize: '10.5px'
+                      }}>
+                        {marketSegment}
+                      </span>
                     </div>
                   </div>
                 </div>
