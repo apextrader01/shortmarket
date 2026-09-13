@@ -475,6 +475,8 @@ class TriggerEngine {
                 }
             };
 
+            let bracketTargetQty = Number(order.quantity);
+
             if (existingPos) {
                 // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "10.0000" + 1 = "10.00001")
                 existingPos.quantity = Number(existingPos.quantity);
@@ -491,6 +493,13 @@ class TriggerEngine {
                     const absQty = Math.abs(Number(order.quantity));
                     const absPosQty = Math.abs(existingPos.quantity);
                     const closeQty = Math.min(absQty, absPosQty);
+
+                    // Closing orders must not spawn bracket legs; reversals protect only the net new position
+                    if (absQty <= absPosQty) {
+                        bracketTargetQty = 0;
+                    } else {
+                        bracketTargetQty = Math.abs(absQty - absPosQty);
+                    }
                     
                     let realizedPnl = 0;
                     if (existingPos.quantity > 0) {
@@ -629,7 +638,9 @@ class TriggerEngine {
             }
 
             // 3. Bracket Order (CO/BO) Leg Generation
-            await this.spawnBracketLegs(trx, order);
+            if (bracketTargetQty > 0) {
+                await this.spawnBracketLegs(trx, order, bracketTargetQty);
+            }
 
             // 4. OCO (One Cancels Other) Logic for BO
             if (order.parent_order_id || order.linked_order_id) {
@@ -704,9 +715,9 @@ class TriggerEngine {
         } catch (e) {}
     }
 
-    async spawnBracketLegs(trx, order) {
+    async spawnBracketLegs(trx, order, childQty) {
         const { spawnBracketOrders } = require('./orderExecutor');
-        await spawnBracketOrders(trx, order);
+        await spawnBracketOrders(trx, order, childQty);
     }
 }
 

@@ -78,12 +78,15 @@ function initOrderExecutor(priceCache) {
 
 const { calculateTaxes } = require('./taxCalculator');
 
-async function spawnBracketOrders(trx, order) {
+async function spawnBracketOrders(trx, order, childQty) {
   // Check if SL or Target prices were provided on the parent order
   const hasSL = order.sl_price !== null && order.sl_price !== undefined && Number(order.sl_price) > 0;
   const hasTgt = order.tgt_price !== null && order.tgt_price !== undefined && Number(order.tgt_price) > 0;
   
   if (!hasSL && !hasTgt) return []; // Not a bracket order
+
+  const finalQty = childQty !== undefined ? childQty : order.quantity;
+  if (!finalQty || Number(finalQty) <= 0) return []; // No child orders if position is closed or invalid quantity
   
   // The side of the child orders is OPPOSITE to the parent order's side
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
@@ -98,7 +101,7 @@ async function spawnBracketOrders(trx, order) {
       symbol: order.symbol,
       type: 'SL-M', // Stop Loss Market
       side: childSide,
-      quantity: order.quantity,
+      quantity: finalQty,
       price: null,
       status: 'PENDING_TRIGGER',
       trigger_price: order.sl_price,
@@ -118,7 +121,7 @@ async function spawnBracketOrders(trx, order) {
       symbol: order.symbol,
       type: 'LIMIT',
       side: childSide,
-      quantity: order.quantity,
+      quantity: finalQty,
       price: order.tgt_price,
       status: 'PENDING_TRIGGER',
       trigger_price: order.tgt_price,

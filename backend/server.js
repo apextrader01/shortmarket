@@ -2797,12 +2797,14 @@ app.get('/api/cleanup-expired', async (req, res) => {
 
 // ─── Convert Position (INT <-> DEL) ───────────────────────────────────────
 app.post('/api/position/convert', authenticateToken, async (req, res) => {
-  const { positionId, newProductType } = req.body;
+  const { positionId } = req.body;
+  const rawProductType = String(req.body.newProductType || '').toUpperCase();
+  const newProductType = rawProductType === 'CNC' ? 'DEL' : rawProductType;
   if (!positionId || !newProductType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   if (!['INT', 'DEL'].includes(newProductType)) {
-    return res.status(400).json({ error: 'Invalid product type. Must be INT or DEL.' });
+    return res.status(400).json({ error: 'Invalid product type. Must be INT or DEL (CNC).' });
   }
   
   try {
@@ -2824,12 +2826,18 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       }
 
       const { calculateRequiredMargin } = require('./services/marginEngine');
-      const currentPrice = priceCache[position.symbol]?.ltp || Number(position.average_price) || 0;
+      const avgPrice = Number(position.average_price) || 0;
+      const ltp = Number(priceCache[position.symbol]?.ltp) || avgPrice;
+      // Delivery conversion requires 100% of the cost basis (average_price) to prevent cash extraction during market drops
+      const priceBasis = (newProductType === 'DEL' && avgPrice > 0) ? avgPrice : (ltp > 0 ? ltp : avgPrice);
+      if (priceBasis <= 0) {
+        throw Object.assign(new Error('Unable to determine price basis for margin calculation.'), { statusCode: 400 });
+      }
       const absQty = Math.abs(Number(position.quantity));
       const side = Number(position.quantity) > 0 ? 'BUY' : 'SELL';
 
       const oldMargin = parseFloat(position.margin) || 0;
-      const newMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, currentPrice);
+      const newMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, priceBasis);
       const marginDifference = newMargin - oldMargin;
 
       const user = await trx('users').where({ id: req.user.id }).first();
@@ -3665,7 +3673,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       .where('quantity', '>', 0)
       .first();
 
-    if (existingLongPos && Number(existingLongPos.quantity) >= Number(quantity)) {
+    if (existingLongPos && Number(existingLongPos.quantity) >= Number(quantity) - 0.0001) {
       isClosingOrder = true;
     } else if (isDeliveryProduct) {
       // Check holdings
@@ -3699,7 +3707,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       .where('quantity', '<', 0)
       .first();
 
-    if (existingShortPos && Math.abs(Number(existingShortPos.quantity)) >= Number(quantity)) {
+    if (existingShortPos && Math.abs(Number(existingShortPos.quantity)) >= Number(quantity) - 0.0001) {
       isClosingOrder = true;
     }
   }
@@ -3713,6 +3721,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Note: Risk Guardian NEVER blocks closing/square-off orders for existing positions/holdings.
   const currentUser = await db('users').where({ id: req.user.id }).first();
   if (currentUser && currentUser.risk_guardian_active && !isClosingOrder) {
+    if (side === 'SELL' && existingLongPos && Number(existingLongPos.quantity) > 0) {
+      return res.status(400).json({
+        error: `🛡️ Risk Guardian is active. You can only place closing orders up to your open position size (${existingLongPos.quantity} shares).`
+      });
+    }
+    if (side === 'BUY' && existingShortPos && Math.abs(Number(existingShortPos.quantity)) > 0) {
+      return res.status(400).json({
+        error: `🛡️ Risk Guardian is active. You can only place closing orders up to your open short position size (${Math.abs(Number(existingShortPos.quantity))} shares).`
+      });
+    }
     const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
     const parts = formatter.formatToParts(new Date());
     const year = parts.find(p => p.type === 'year').value;
