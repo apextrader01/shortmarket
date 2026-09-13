@@ -838,7 +838,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 // Active Client Telemetry Sync (Instant location and device fingerprinting)
 app.post('/api/user/telemetry', authenticateToken, async (req, res) => {
   try {
-    const clientIp = getClientIp(req, req.body?.client_ip);
+    const clientIp = getClientIp(req);
     const userAgent = req.headers['user-agent'] || '';
     const { deviceModel, osName, browserName } = parseDeviceDetails(userAgent);
     
