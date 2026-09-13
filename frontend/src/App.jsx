@@ -5,33 +5,55 @@ import LoginView from './components/LoginView';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getInstantLotsize } from './utils/lotsizeHelper';
 
+// ⚡ Resilient Lazy Loader: Auto-reloads on deployment chunk hash changes
+const lazyWithRetry = (importFn) => lazy(async () => {
+  try {
+    return await importFn();
+  } catch (error) {
+    const msg = error?.message || String(error || '');
+    if (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('dynamically imported module') ||
+      msg.includes('Loading chunk') ||
+      msg.includes('Importing a module script failed')
+    ) {
+      const lastReload = parseInt(sessionStorage.getItem('last_chunk_reload') || '0', 10);
+      if (Date.now() - lastReload > 10000) {
+        sessionStorage.setItem('last_chunk_reload', String(Date.now()));
+        window.location.reload();
+      }
+    }
+    throw error;
+  }
+});
+
 // ⚡ Lazy Loaded Sub-Views & Modals (Reduces initial JS bundle by 85% for instant page load)
-const ChartWidget = lazy(() => import('./components/ChartWidget'));
-const PositionsView = lazy(() => import('./components/PositionsView'));
-const OrdersView = lazy(() => import('./components/OrdersView'));
-const PortfolioView = lazy(() => import('./components/PortfolioView'));
-const ClientDataView = lazy(() => import('./components/ClientDataView'));
-const OrderModal = lazy(() => import('./components/OrderModal'));
-const EditOrderModal = lazy(() => import('./components/EditOrderModal'));
-const DepositModal = lazy(() => import('./components/DepositModal'));
-const AlertModal = lazy(() => import('./components/AlertModal'));
-const BasketModal = lazy(() => import('./components/BasketModal'));
-const BiometricLockModal = lazy(() => import('./components/BiometricLockModal'));
-const OptionChainView = lazy(() => import('./components/OptionChainView'));
-const MutualFundsView = lazy(() => import('./components/MutualFundsView'));
-const AboutUsView = lazy(() => import('./components/AboutUsView'));
-const ReportsView = lazy(() => import('./components/ReportsView'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
-const AnalyticsView = lazy(() => import('./components/AnalyticsView'));
-const PricingView = lazy(() => import('./components/PricingView'));
-const ReferralsView = lazy(() => import('./components/ReferralsView'));
-const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
-const TradingJournalView = lazy(() => import('./components/TradingJournalView'));
-const TradeDiaryView = lazy(() => import('./components/TradeDiaryView'));
-const OnboardingWizard = lazy(() => import('./components/OnboardingWizard'));
-const DOMLadderModal = lazy(() => import('./components/DOMLadderModal'));
-const MarketDepthModal = lazy(() => import('./components/MarketDepthModal'));
-const ChartModal = lazy(() => import('./components/ChartModal'));
+const ChartWidget = lazyWithRetry(() => import('./components/ChartWidget'));
+const PositionsView = lazyWithRetry(() => import('./components/PositionsView'));
+const OrdersView = lazyWithRetry(() => import('./components/OrdersView'));
+const PortfolioView = lazyWithRetry(() => import('./components/PortfolioView'));
+const ClientDataView = lazyWithRetry(() => import('./components/ClientDataView'));
+const OrderModal = lazyWithRetry(() => import('./components/OrderModal'));
+const EditOrderModal = lazyWithRetry(() => import('./components/EditOrderModal'));
+const DepositModal = lazyWithRetry(() => import('./components/DepositModal'));
+const AlertModal = lazyWithRetry(() => import('./components/AlertModal'));
+const BasketModal = lazyWithRetry(() => import('./components/BasketModal'));
+const BiometricLockModal = lazyWithRetry(() => import('./components/BiometricLockModal'));
+const OptionChainView = lazyWithRetry(() => import('./components/OptionChainView'));
+const MutualFundsView = lazyWithRetry(() => import('./components/MutualFundsView'));
+const AboutUsView = lazyWithRetry(() => import('./components/AboutUsView'));
+const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
+const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard'));
+const AnalyticsView = lazyWithRetry(() => import('./components/AnalyticsView'));
+const PricingView = lazyWithRetry(() => import('./components/PricingView'));
+const ReferralsView = lazyWithRetry(() => import('./components/ReferralsView'));
+const LeaderboardView = lazyWithRetry(() => import('./components/LeaderboardView'));
+const TradingJournalView = lazyWithRetry(() => import('./components/TradingJournalView'));
+const TradeDiaryView = lazyWithRetry(() => import('./components/TradeDiaryView'));
+const OnboardingWizard = lazyWithRetry(() => import('./components/OnboardingWizard'));
+const DOMLadderModal = lazyWithRetry(() => import('./components/DOMLadderModal'));
+const MarketDepthModal = lazyWithRetry(() => import('./components/MarketDepthModal'));
+const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
