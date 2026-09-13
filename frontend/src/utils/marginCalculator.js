@@ -208,3 +208,5 @@ export function calculateOrderMargin({
     isEquity: isEq
   };
 }
+
+export const calculateMarginRequirement = calculateOrderMargin;

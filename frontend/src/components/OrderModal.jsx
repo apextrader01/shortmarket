@@ -4,7 +4,7 @@ import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
-import { calculateOrderMargin } from '../utils/marginCalculator';
+import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
@@ -140,7 +140,7 @@ export default function OrderModal() {
     return () => clearTimeout(timer);
   }, [symbol, totalQuantity, orderType, price, livePrice, productType, side]);
 
-  const marginCalc = calculateMarginRequirement({
+  const marginCalc = calculateOrderMargin({
     symbol,
     side,
     quantity: totalQuantity,
