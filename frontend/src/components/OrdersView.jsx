@@ -266,11 +266,16 @@ export default function OrdersView() {
                 <button
                   onClick={async () => {
                     if (window.confirm(`Are you sure you want to cancel all ${displayTriggers.length} pending triggers?`)) {
-                      const cancelPromises = displayTriggers.map(trigger => {
-                        if (trigger.isBackendOrder) return useStore.getState().cancelOrder(trigger.id);
-                        return removePendingTrigger(trigger.id);
-                      });
-                      await Promise.allSettled(cancelPromises);
+                      const backendCancels = displayTriggers
+                        .filter(t => t.isBackendOrder || t.status === 'PENDING_TRIGGER')
+                        .map(t => useStore.getState().cancelOrder(t.id));
+
+                      if (typeof removePendingTrigger === 'function') {
+                        (pendingTriggers || []).forEach(pt => removePendingTrigger(pt.id));
+                      }
+                      useStore.setState({ pendingTriggers: [] });
+
+                      await Promise.allSettled(backendCancels);
                       await useStore.getState().fetchUserData().catch(() => {});
                       alert(`Cancelled ${displayTriggers.length} trigger(s).`);
                     }

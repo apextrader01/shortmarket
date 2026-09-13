@@ -13,14 +13,48 @@ export default function MutualFundModal({ fund, onClose }) {
   const balanceNum = Number(user?.balance) || 0;
   const isInsufficient = tab === 'Lumpsum' && balanceNum < Number(amount);
 
-  const handleInvest = () => {
-      // In a real app, this would dispatch to backend. For now, just show a success alert and close.
+  const [investLoading, setInvestLoading] = useState(false);
+
+  const handleInvest = async () => {
+    if (isInsufficient) {
+      alert('Insufficient account balance for this transaction.');
+      return;
+    }
+    setInvestLoading(true);
+    try {
       if (tab === 'SIP') {
-          alert(`Success! Started a monthly SIP of ₹${amount} in ${fund.name} to be deducted on the ${sipDate}th of every month.`);
+        const createSip = useStore.getState().createSip;
+        if (createSip) {
+          const res = await createSip({
+            scheme_code: fund?.scheme_code || fund?.id,
+            scheme_name: fund?.name,
+            amount: Number(amount),
+            frequency: 'MONTHLY',
+            sip_day: Number(sipDate)
+          });
+          if (res?.success) {
+            alert(`SIP successfully registered for ${fund.name}!`);
+            onClose();
+            return;
+          }
+        }
       } else {
-          alert(`Success! Placed a one-time Lumpsum order of ₹${amount} in ${fund.name}.`);
+        const buyMf = useStore.getState().buyMutualFund;
+        if (buyMf) {
+          const res = await buyMf(fund?.scheme_code || fund?.id, Number(amount));
+          if (res?.success) {
+            alert(`Lumpsum order placed for ${fund.name}!`);
+            onClose();
+            return;
+          }
+        }
       }
       onClose();
+    } catch (err) {
+      alert(`Transaction failed: ${err.message}`);
+    } finally {
+      setInvestLoading(false);
+    }
   };
 
   return (

@@ -194,11 +194,15 @@ export default function PortfolioView() {
   allMergedHoldings.forEach(h => calculatePnL(h, true));
   (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC' && p.product_type !== 'DELIVERY').forEach(p => calculatePnL(p, false));
 
+  const getISTDate = (date) => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+  };
+
   const isToday = (dateString) => {
     if (!dateString) return false;
     const d = new Date(dateString);
-    const today = new Date();
-    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    if (isNaN(d.getTime())) return false;
+    return getISTDate(d) === getISTDate(new Date());
   };
 
   let todayRealizedPnl = 0;

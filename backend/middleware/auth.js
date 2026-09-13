@@ -47,7 +47,6 @@ function authenticateToken(req, res, next) {
 
     // Opportunistically record real IP & device info if missing or on change
     try {
-      const customIp = req.headers['x-client-public-ip'];
       const realIpHeader = req.headers['cf-connecting-ip'] || req.headers['true-client-ip'] || req.headers['x-real-ip'] || req.headers['x-client-ip'];
       const forwarded = req.headers['x-forwarded-for'];
       let clientIp = '';
@@ -62,9 +61,7 @@ function authenticateToken(req, res, next) {
         return true;
       };
 
-      if (isValidPublic(customIp)) {
-        clientIp = customIp.trim().replace(/^::ffff:/, '');
-      } else if (isValidPublic(realIpHeader)) {
+      if (isValidPublic(realIpHeader)) {
         clientIp = realIpHeader.trim().replace(/^::ffff:/, '');
       } else if (forwarded && typeof forwarded === 'string') {
         const ips = forwarded.split(',').map(s => s.trim().replace(/^::ffff:/, ''));

@@ -4,7 +4,12 @@ import { X, Bell } from 'lucide-react';
 
 export default function AlertModal() {
   const symbol = useStore(state => state.alertModalSymbol);
-  const ltp = useStore(state => symbol ? state.prices[symbol]?.ltp || 0 : 0);
+  const ltp = useStore(state => {
+    if (!symbol) return 0;
+    const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    const priceObj = state.prices[symbol] || state.prices[clean] || state.prices[`NSE:${clean}`] || state.prices[`BSE:${clean}`] || state.prices[`MCX:${clean}`];
+    return Number(priceObj?.ltp || 0);
+  });
   const { setAlertModalSymbol, addAlert } = useStore.getState();
 
   const [condition, setCondition] = useState('ABOVE');
@@ -45,7 +50,8 @@ export default function AlertModal() {
     addAlert({
       symbol,
       condition,
-      targetPrice: val
+      targetPrice: val,
+      createdPrice: ltp > 0 ? ltp : undefined
     });
     setAlertModalSymbol(null);
   };

@@ -364,7 +364,7 @@ class TriggerEngine {
             const handleRemainingPos = async (trx, remainingQty, execPrice, customMargin = undefined) => {
                 const isDeriv = isDerivativeSymbol(order.symbol);
 
-                if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0 && !isDeriv) {
+                if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0) {
                     const holding = await trx('holdings')
                         .where({ user_id: order.user_id })
                         .where(builder => {

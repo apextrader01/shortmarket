@@ -32,9 +32,23 @@ function initCronJobs(priceCache, triggerEngine) {
         isEquityIntradayBlocked = true;
     }, TZ);
 
+    const isMCXWinterSession = () => {
+        const month = new Date().getMonth(); // 0 = Jan, 1 = Feb, 2 = Mar, 10 = Nov, 11 = Dec
+        return month === 10 || month === 11 || month === 0 || month === 1 || month === 2;
+    };
+
     cron.schedule('50 22 * * *', () => {
-        console.log('[CRON] Phase 1 (Commodities): Blocking new Intraday placements.');
-        isCommodityIntradayBlocked = true;
+        if (!isMCXWinterSession()) {
+            console.log('[CRON] Phase 1 (Commodities Summer): Blocking new Intraday placements.');
+            isCommodityIntradayBlocked = true;
+        }
+    }, TZ);
+
+    cron.schedule('30 23 * * *', () => {
+        if (isMCXWinterSession()) {
+            console.log('[CRON] Phase 1 (Commodities Winter): Blocking new Intraday placements.');
+            isCommodityIntradayBlocked = true;
+        }
     }, TZ);
 
     // Reset the block next day
@@ -169,7 +183,12 @@ function initCronJobs(priceCache, triggerEngine) {
     };
 
     cron.schedule('19 15 * * *', () => phase2Sweep('EQ'), TZ);
-    cron.schedule('59 22 * * *', () => phase2Sweep('COM'), TZ);
+    cron.schedule('59 22 * * *', () => {
+        if (!isMCXWinterSession()) phase2Sweep('COM');
+    }, TZ);
+    cron.schedule('39 23 * * *', () => {
+        if (isMCXWinterSession()) phase2Sweep('COM');
+    }, TZ);
 
     // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
     const phase3SquareOff = async (assetType) => {
@@ -216,7 +235,27 @@ function initCronJobs(priceCache, triggerEngine) {
                             } catch(e) {}
                         }
                         if (!ltp || ltp <= 0) {
-                            // Safe breakeven fallback so intraday positions are NEVER abandoned overnight
+                            // 1. Check cached close or previous settlement price
+                            const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                            const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`MCX:${cleanSym}`];
+                            if (cached?.close > 0) {
+                                ltp = Number(cached.close);
+                            } else if (cached?.prev_close_price > 0) {
+                                ltp = Number(cached.prev_close_price);
+                            }
+                        }
+                        if (!ltp || ltp <= 0) {
+                            // 2. Check latest executed market trade for this symbol
+                            const lastOrder = await trx('orders')
+                                .where({ symbol: pos.symbol, status: 'EXECUTED' })
+                                .orderBy('created_at', 'desc')
+                                .first();
+                            if (lastOrder && Number(lastOrder.price) > 0) {
+                                ltp = Number(lastOrder.price);
+                            }
+                        }
+                        if (!ltp || ltp <= 0) {
+                            // 3. Safe fallback so intraday positions are not abandoned overnight
                             ltp = Number(pos.average_price) || 0;
                         }
 
@@ -299,7 +338,12 @@ function initCronJobs(priceCache, triggerEngine) {
     };
 
     cron.schedule('20 15 * * *', () => phase3SquareOff('EQ'), TZ);
-    cron.schedule('0 23 * * *', () => phase3SquareOff('COM'), TZ);
+    cron.schedule('0 23 * * *', () => {
+        if (!isMCXWinterSession()) phase3SquareOff('COM');
+    }, TZ);
+    cron.schedule('40 23 * * *', () => {
+        if (isMCXWinterSession()) phase3SquareOff('COM');
+    }, TZ);
 
     // Note: Daily/Weekly/Monthly SIP execution is authoritatively handled by sipEngine.js at 09:30 AM & 03:30 PM
 

@@ -33,40 +33,7 @@ function initOrderExecutor(priceCache) {
       for (const order of pendingOrders) {
         const ltp = priceCache[order.symbol]?.ltp;
         if (!ltp) continue; // No live price available yet
-
-        let shouldExecute = false;
-
-        // --- GTT / SL Trigger Logic ---
-        if (order.trigger_price) {
-           const trigger = Number(order.trigger_price);
-           if (order.side === 'BUY') {
-              // Buy SL triggers when price goes UP to/above trigger.
-              // Buy Target/GTT triggers when price goes DOWN to/below trigger.
-              if (order.type.startsWith('SL')) {
-                  if (ltp >= trigger) shouldExecute = true;
-              } else {
-                  if (ltp <= trigger) shouldExecute = true;
-              }
-           } else if (order.side === 'SELL') {
-              // Sell SL triggers when price goes DOWN to/below trigger.
-              // Sell Target/GTT triggers when price goes UP to/above trigger.
-              if (order.type.startsWith('SL')) {
-                  if (ltp <= trigger) shouldExecute = true;
-              } else {
-                  if (ltp >= trigger) shouldExecute = true;
-              }
-           }
-        } else if (order.type === 'LIMIT') {
-           const limitPrice = Number(order.price);
-           if (order.side === 'BUY' && ltp <= limitPrice) shouldExecute = true;
-           if (order.side === 'SELL' && ltp >= limitPrice) shouldExecute = true;
-        } else if (order.type === 'MARKET') {
-           shouldExecute = true;
-        }
-
-        if (shouldExecute) {
-           await executeOrder(order, ltp);
-        }
+        await executeOrder(order, ltp);
       }
     } catch (err) {
       console.error('OrderExecutor Error:', err.message);

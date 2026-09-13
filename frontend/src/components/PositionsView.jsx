@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Activity, X, Share2 } from 'lucide-react';
+import { Activity, X, Share2, RefreshCw } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
 const EMPTY_PRICES = {};
@@ -16,6 +16,8 @@ export default function PositionsView() {
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [shareModalTrade, setShareModalTrade] = useState(null);
+  const [convertModalPos, setConvertModalPos] = useState(null);
+  const [convertLoading, setConvertLoading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -595,6 +597,31 @@ export default function PositionsView() {
                             <Share2 size={12} /> Share
                           </button>
                           {viewMode === 'OPEN' && (
+                            <button
+                              type="button"
+                              title="Convert Position (INT <-> DEL)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConvertModalPos(pos);
+                              }}
+                              style={{
+                                background: 'rgba(99, 102, 241, 0.1)',
+                                border: '1px solid rgba(99, 102, 241, 0.25)',
+                                color: '#818cf8',
+                                borderRadius: '6px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}
+                            >
+                              <RefreshCw size={11} /> Convert
+                            </button>
+                          )}
+                          {viewMode === 'OPEN' && (
                             <X 
                               size={18} 
                               style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
@@ -785,6 +812,27 @@ export default function PositionsView() {
                             <Share2 size={10} /> Share
                           </button>
                           {viewMode === 'OPEN' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConvertModalPos(pos);
+                              }}
+                              style={{
+                                fontSize: '10px',
+                                color: '#818cf8',
+                                background: 'rgba(99,102,241,0.12)',
+                                border: '1px solid rgba(99,102,241,0.3)',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Convert
+                            </button>
+                          )}
+                          {viewMode === 'OPEN' && (
                             <span style={{ fontSize: '10px', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>
                               Exit ✕
                             </span>
@@ -909,6 +957,95 @@ export default function PositionsView() {
           </div>
         </div>
       )}
+
+      {/* Convert Position Modal */}
+      {convertModalPos && (() => {
+        const currentProd = convertModalPos.product_type || convertModalPos.productLabel || 'INT';
+        const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
+        const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
+        const absQty = Math.abs(Number(convertModalPos.qty || convertModalPos.quantity || 1));
+        const avgPrice = Number(convertModalPos.avg || convertModalPos.average_price || 0);
+        const reqMargin = isCurrentlyInt ? (absQty * avgPrice) : 0;
+
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+          }}>
+            <div style={{
+              background: 'var(--bg-dark)', width: '380px', borderRadius: '12px',
+              border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Convert Position</h3>
+                <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setConvertModalPos(null)} />
+              </div>
+              <div style={{ padding: '24px 20px' }}>
+                <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+                  {convertModalPos.symbol}
+                </div>
+                <div style={{ background: 'var(--bg-hover)', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Current Product:</span>
+                    <span style={{ fontWeight: '700' }}>{currentProd}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Target Product:</span>
+                    <span style={{ fontWeight: '700', color: '#818cf8' }}>{targetProd} ({targetProd === 'DEL' ? 'Delivery / CNC' : 'Intraday / MIS'})</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
+                    <span style={{ fontWeight: '700' }}>{absQty}</span>
+                  </div>
+                  {isCurrentlyInt && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Est. Cash Required:</span>
+                      <span style={{ fontWeight: '700', color: 'var(--color-green-light)' }}>₹{reqMargin.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  disabled={convertLoading}
+                  onClick={async () => {
+                    setConvertLoading(true);
+                    try {
+                      const posId = convertModalPos.id;
+                      const res = await useStore.getState().convertPosition(posId, targetProd, reqMargin);
+                      if (res && res.success) {
+                        alert(`Position successfully converted to ${targetProd}!`);
+                        setConvertModalPos(null);
+                      } else {
+                        alert(`Conversion failed: ${res?.error || 'Insufficient funds or conversion rejected.'}`);
+                      }
+                    } catch (err) {
+                      alert(`Error: ${err.message}`);
+                    } finally {
+                      setConvertLoading(false);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    background: '#6366f1',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 16px',
+                    borderRadius: '6px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: convertLoading ? 'not-allowed' : 'pointer',
+                    opacity: convertLoading ? 0.7 : 1
+                  }}
+                >
+                  {convertLoading ? 'Converting...' : `Convert to ${targetProd}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {shareModalTrade && (
         <PnLShareCardModal

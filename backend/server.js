@@ -139,19 +139,6 @@ function getClientIp(req, optionalBodyIp) {
     return cleanRaw;
   }
 
-  // 3. Fallback to client-provided IP only if no public proxy/socket IP detected
-  const customHeader = req.headers['x-client-public-ip'];
-  if (isValidPublicIp(customHeader)) {
-    return customHeader.trim().replace(/^::ffff:/, '');
-  }
-
-  if (isValidPublicIp(optionalBodyIp)) {
-    return optionalBodyIp.trim().replace(/^::ffff:/, '');
-  }
-  if (isValidPublicIp(req.body?.client_ip)) {
-    return req.body.client_ip.trim().replace(/^::ffff:/, '');
-  }
-
   return cleanRaw || '127.0.0.1';
 }
 const priceCache = {};
@@ -563,12 +550,10 @@ const authLimiter = rateLimit({
 
 const orderLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 120, // limit each IP to 120 orders per minute
+  max: 120, // limit each user/IP to 120 orders per minute
   message: { error: 'Order rate limit exceeded (max 120/min)' },
-  skip: (req) => {
-    const ip = req.ip || req.connection?.remoteAddress || '';
-    const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    return isLoopback;
+  keyGenerator: (req) => {
+    return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
   }
 });
 
@@ -635,7 +620,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     const defaultWatchlist = JSON.stringify([{ id: 1, name: 'Watchlist 1', symbols: [] }]);
     
-    const clientIp = getClientIp(req, req.body?.client_ip);
+    const clientIp = getClientIp(req);
     
     // Check if IP or Phone is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -739,7 +724,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   }
 });
 
-app.post('/api/auth/pre-login', async (req, res) => {
+app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
@@ -764,7 +749,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
-    const clientIp = getClientIp(req, req.body?.client_ip);
+    const clientIp = getClientIp(req);
     
     // Check if IP or Account is banned
     if (await isIpBanned(clientIp, generalClient)) {
@@ -894,19 +879,43 @@ app.post('/api/auth/skip-onboarding', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const token = (req.cookies && req.cookies.token) || 
+                  (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+    if (token) {
+      const tokenHash = hashToken(token);
+      if (tokenHash) {
+        await db('user_sessions').where({ token_hash: tokenHash }).del();
+      }
+    }
+  } catch (err) {
+    console.error('Error removing session on logout:', err);
+  }
   const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
   res.cookie('token', '', { expires: new Date(0), httpOnly: true, sameSite: isHttps ? 'none' : 'lax', secure: isHttps });
   res.json({ success: true });
 });
 
+// Rate limiting and attempt tracker for password reset OTP
+const passwordResetAttempts = new Map();
+
 // ─── Forgot Password ────────────────────────────────────────────────────────
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
+  const normalizedEmail = email.toLowerCase().trim();
+  const attemptRecord = passwordResetAttempts.get(normalizedEmail) || { count: 0, lockedUntil: 0 };
+  const now = Date.now();
+
+  if (attemptRecord.lockedUntil && now < attemptRecord.lockedUntil) {
+    const waitMins = Math.ceil((attemptRecord.lockedUntil - now) / 60000);
+    return res.status(429).json({ error: `Account temporarily locked due to excessive failed attempts. Please try again in ${waitMins} minute(s).` });
+  }
+
   try {
-    const user = await db('users').where({ email }).first();
+    const user = await db('users').where({ email: normalizedEmail }).first();
     if (!user) return res.status(404).json({ error: 'No account found with this email' });
 
     // Generate 6 digit OTP
@@ -955,18 +964,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(500).json({ error: `Failed to send email: ${errText}` });
     }
 
-    // Reset failed attempts tracker on new OTP request
-    passwordResetAttempts.delete(email.toLowerCase().trim());
-
     res.json({ success: true, message: 'OTP sent to email' });
   } catch (error) {
     console.error('Forgot Password Error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Rate limiting and attempt tracker for password reset OTP
-const passwordResetAttempts = new Map();
 
 // ─── Verify Reset OTP ───────────────────────────────────────────────────────
 app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
@@ -1425,11 +1428,41 @@ app.post('/api/user/password', authenticateToken, async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await db('users').where({ id: req.user.id }).update({ password_hash: newHash });
     
+    // Revoke all active sessions for this user across all devices to prevent unauthorized access
+    await db('user_sessions').where({ user_id: req.user.id }).del().catch(() => {});
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+const handleUpdateUserDetails = async (req, res) => {
+  try {
+    const { phone, pan_card, address, upi_id, bank_account_no, bank_ifsc } = req.body || {};
+    const updates = {};
+    if (phone !== undefined) updates.phone = String(phone).trim();
+    if (pan_card !== undefined) updates.pan_card = String(pan_card).trim().toUpperCase();
+    if (address !== undefined) updates.address = String(address).trim();
+    if (upi_id !== undefined) updates.upi_id = String(upi_id).trim();
+    if (bank_account_no !== undefined) updates.bank_account_no = String(bank_account_no).trim();
+    if (bank_ifsc !== undefined) updates.bank_ifsc = String(bank_ifsc).trim().toUpperCase();
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update' });
+    }
+
+    await db('users').where({ id: req.user.id }).update(updates);
+    const updatedUser = await db('users').where({ id: req.user.id }).first();
+    res.json({ success: true, message: 'Profile details updated successfully', user: updatedUser });
+  } catch (err) {
+    console.error('Error updating user details:', err);
+    res.status(500).json({ error: 'Failed to update profile details' });
+  }
+};
+
+app.post('/api/user/details', authenticateToken, handleUpdateUserDetails);
+app.put('/api/user/details', authenticateToken, handleUpdateUserDetails);
 
 app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
   try {
@@ -3705,8 +3738,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  if (type === 'GTT') {
-    return res.status(400).json({ error: 'GTT orders are not supported.' });
+  if (type === 'GTT' && (!trigger_price || parseFloat(trigger_price) <= 0 || isNaN(parseFloat(trigger_price)))) {
+    return res.status(400).json({ error: 'GTT orders require a valid trigger price greater than 0.' });
   }
 
   // Validate Limit and Stop-Loss prices
@@ -3892,6 +3925,16 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const isCommodity = isCommodityContract(symbol);
     const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
     
+    // Phase 1 Intraday Cutoff Enforcement (15:15 IST Equities / 22:50 IST Commodities)
+    if (isIntradayProduct) {
+      const { isIntradayBlocked } = require('./services/cronJobs');
+      if (typeof isIntradayBlocked === 'function' && isIntradayBlocked(symbol)) {
+        return res.status(400).json({
+          error: `Intraday order placement is closed for the day (${isCommodity ? '10:50 PM' : '3:15 PM'} cutoff). Only CNC/Delivery orders or position exits are allowed.`
+        });
+      }
+    }
+
     const marketCheck = isSegmentMarketOpen(isCommodity);
     if (!marketCheck.open) {
       if (marketCheck.isTotalBlock || isIntradayProduct) {
@@ -5500,12 +5543,33 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           if (oldMargin === 0) {
             // Check if this order is closing an existing open position or holding
+            const cleanSym = order.symbol && order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
             const openPos = await trx('positions')
-              .where({ user_id: req.user.id, symbol: order.symbol, product_type: order.product_type })
+              .where({ user_id: req.user.id, product_type: order.product_type })
+              .where(function() {
+                this.where('symbol', order.symbol)
+                    .orWhere('symbol', cleanSym)
+                    .orWhere('symbol', `NSE:${cleanSym}`)
+                    .orWhere('symbol', `BSE:${cleanSym}`)
+                    .orWhere('symbol', `MCX:${cleanSym}`);
+              })
               .whereNot('quantity', 0)
               .first();
-            const isOpposingPos = openPos && ((Number(openPos.quantity) > 0 && order.side === 'SELL') || (Number(openPos.quantity) < 0 && order.side === 'BUY'));
-            if (isOpposingPos && Number(quantity) <= Math.abs(Number(openPos.quantity))) {
+            const openHolding = (order.product_type === 'DEL' || order.product_type === 'CNC') && order.side === 'SELL'
+              ? await trx('holdings')
+                  .where({ user_id: req.user.id })
+                  .where(function() {
+                    this.where('symbol', order.symbol)
+                        .orWhere('symbol', cleanSym)
+                        .orWhere('symbol', `NSE:${cleanSym}`)
+                        .orWhere('symbol', `BSE:${cleanSym}`);
+                  })
+                  .where('quantity', '>', 0)
+                  .first()
+              : null;
+            const isOpposingPos = (openPos && ((Number(openPos.quantity) > 0 && order.side === 'SELL') || (Number(openPos.quantity) < 0 && order.side === 'BUY'))) ||
+                                  (openHolding && Number(quantity) <= Number(openHolding.quantity));
+            if (isOpposingPos && (openHolding || Number(quantity) <= Math.abs(Number(openPos.quantity)))) {
               newMargin = 0;
             } else if (Number(quantity) === Number(order.quantity)) {
               newMargin = 0;
@@ -7109,6 +7173,29 @@ app.post('/api/journal/mistakes', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/journal/mistakes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { mistake_name, category, loss_incurred, lessons_learned, frequency } = req.body;
+    const updates = {};
+    if (mistake_name !== undefined) updates.mistake_name = mistake_name;
+    if (category !== undefined) updates.category = category;
+    if (loss_incurred !== undefined) updates.loss_incurred = parseFloat(loss_incurred) || 0;
+    if (lessons_learned !== undefined) updates.lessons_learned = lessons_learned;
+    if (frequency !== undefined) updates.frequency = parseInt(frequency) || 1;
+    updates.updated_at = new Date();
+
+    const [updated] = await db('trading_mistakes')
+      .where({ id: req.params.id, user_id: req.user.id })
+      .update(updates)
+      .returning('*');
+
+    res.json({ success: true, mistake: updated });
+  } catch (err) {
+    console.error('Update Mistake Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/journal/mistakes/:id', authenticateToken, async (req, res) => {
   try {
     await db('trading_mistakes').where({ id: req.params.id, user_id: req.user.id }).del();
@@ -7124,6 +7211,7 @@ app.get('/api/journal/strategies', authenticateToken, async (req, res) => {
     const strategies = await db('trading_strategies').where({ user_id: req.user.id }).orderBy('net_pnl', 'desc');
     res.json({ success: true, strategies });
   } catch (err) {
+    console.error('Fetch Strategies Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -7142,6 +7230,31 @@ app.post('/api/journal/strategies', authenticateToken, async (req, res) => {
     }).returning('*');
     res.json({ success: true, strategy });
   } catch (err) {
+    console.error('Add Strategy Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/journal/strategies/:id', authenticateToken, async (req, res) => {
+  try {
+    const { strategy_name, description, win_rate, total_trades, net_pnl, color } = req.body;
+    const updates = {};
+    if (strategy_name !== undefined) updates.strategy_name = strategy_name;
+    if (description !== undefined) updates.description = description;
+    if (win_rate !== undefined) updates.win_rate = parseFloat(win_rate) || 0;
+    if (total_trades !== undefined) updates.total_trades = parseInt(total_trades) || 0;
+    if (net_pnl !== undefined) updates.net_pnl = parseFloat(net_pnl) || 0;
+    if (color !== undefined) updates.color = color;
+    updates.updated_at = new Date();
+
+    const [updated] = await db('trading_strategies')
+      .where({ id: req.params.id, user_id: req.user.id })
+      .update(updates)
+      .returning('*');
+
+    res.json({ success: true, strategy: updated });
+  } catch (err) {
+    console.error('Update Strategy Error:', err);
     res.status(500).json({ error: err.message });
   }
 });

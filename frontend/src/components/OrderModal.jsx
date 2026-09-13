@@ -177,7 +177,8 @@ export default function OrderModal() {
   const isOpposingPositionExit = !!matchingOpenPos && totalQuantity <= openPosQty;
 
   const isFuture = marginCalc.isFuture;
-  const isModalExplicitExit = orderModal.isExit && side === orderModal.type && (orderModal.exitQuantity ? totalQuantity <= Number(orderModal.exitQuantity) : true);
+  const explicitExitMax = Number(orderModal.totalExitQty || orderModal.exitQuantity || 0);
+  const isModalExplicitExit = Boolean(orderModal.isExit && side === orderModal.type && explicitExitMax > 0 && totalQuantity <= explicitExitMax);
   const isTrueExit = isModalExplicitExit || isDelSellFromHoldings || isOpposingPositionExit;
   const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
   const isInsufficient = !isTrueExit && balanceNum < requiredMargin;

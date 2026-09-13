@@ -94,8 +94,10 @@ function getSymbolToExpiryMap() {
 }
 
 function parseExpiryDate(symbol) {
+    if (!symbol) return null;
     const map = getSymbolToExpiryMap();
-    const expiryStr = map[symbol];
+    const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    const expiryStr = map[symbol] || map[cleanSym] || map[`NSE:${cleanSym}`] || map[`BSE:${cleanSym}`] || map[`MCX:${cleanSym}`];
     if (!expiryStr) return null;
     
     // Fyers expiryStr format is "YYYY-MM-DD"
@@ -148,14 +150,15 @@ const ensureLivePrices = async (symbols) => {
     }
 };
 
-async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-Off (RMS)') {
+async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-Off (RMS)', isRmsPenalty = true) {
     const affectedUser = pos.user_id;
     await db.transaction(async (trx) => {
-        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true, customRemark);
+        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, isRmsPenalty, customRemark);
 
-        // Cancel all PENDING_TRIGGER brackets for this user+symbol
+        // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
         const triggers = await trx('orders')
-            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' });
+            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         for (const t of triggers) {
             const updated = await trx('orders')
                 .where({ id: t.id, status: 'PENDING_TRIGGER' })
@@ -168,9 +171,10 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
             }
         }
 
-        // Also cancel any remaining PENDING entry orders for this user+symbol
+        // Also cancel any remaining PENDING entry orders for this user+symbol (only intraday types)
         const pendingOrders = await trx('orders')
-            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' });
+            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         for (const o of pendingOrders) {
             const updated = await trx('orders')
                 .where({ id: o.id, status: 'PENDING' })
@@ -231,7 +235,7 @@ async function runAutoSquareOff(exchangeFilter) {
                     : 0;
 
                 try {
-                    await squareOffPositionInProcess(pos, ltp, 'Expiry Auto Square-Off (RMS)');
+                    await squareOffPositionInProcess(pos, ltp, 'Contract Expiry Settlement', false);
                     closedCount++;
                     console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
                 } catch(e) {

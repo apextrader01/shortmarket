@@ -130,7 +130,9 @@ const ActiveAlertChecker = React.memo(() => {
     if (activeAlertSymbols.length === 0) return {};
     const map = {};
     for (const sym of activeAlertSymbols) {
-      if (state.prices[sym]) map[sym] = state.prices[sym];
+      const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+      const priceObj = state.prices[sym] || state.prices[clean] || state.prices[`NSE:${clean}`] || state.prices[`BSE:${clean}`] || state.prices[`MCX:${clean}`];
+      if (priceObj) map[sym] = priceObj;
     }
     return map;
   }));
@@ -139,17 +141,20 @@ const ActiveAlertChecker = React.memo(() => {
     if (!alerts || alerts.length === 0) return;
     const activeAlerts = alerts.filter(a => !a.triggered);
     activeAlerts.forEach(alert => {
-      const priceData = alertPrices[alert.symbol];
+      const clean = alert.symbol.includes(':') ? alert.symbol.split(':')[1] : alert.symbol;
+      const priceData = alertPrices[alert.symbol] || alertPrices[clean];
       if (!priceData) return;
       
       const ltp = parseFloat(priceData.ltp || 0);
       if (!ltp || ltp <= 0) return;
       let triggered = false;
       
-      if (alert.condition === 'ABOVE' && ltp >= alert.targetPrice) {
-        triggered = true;
-      } else if (alert.condition === 'BELOW' && ltp <= alert.targetPrice) {
-        triggered = true;
+      if (alert.condition === 'ABOVE') {
+        if (alert.createdPrice && alert.createdPrice >= alert.targetPrice) return;
+        if (ltp >= alert.targetPrice) triggered = true;
+      } else if (alert.condition === 'BELOW') {
+        if (alert.createdPrice && alert.createdPrice <= alert.targetPrice) return;
+        if (ltp <= alert.targetPrice) triggered = true;
       }
       
       if (triggered) {

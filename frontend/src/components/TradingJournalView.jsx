@@ -95,7 +95,19 @@ export default function TradingJournalView({ onBack }) {
         if (timeBucket > 0) {
           closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}_${timeBucket}`);
         }
-        const entrySide = p.side || (Number(p.closed_quantity) < 0 ? 'SELL' : 'BUY');
+        let entrySide = p.side;
+        if (!entrySide) {
+          const closingOrder = (orders || []).find(o => (o.position_id === p.id || o.symbol === p.symbol) && (o.status === 'COMPLETED' || o.status === 'EXECUTED') && (o.closed_quantity > 0 || (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off')))));
+          if (closingOrder) {
+            entrySide = closingOrder.side === 'BUY' ? 'SELL' : 'BUY';
+          } else if (p.exit_price && p.average_price && p.exit_price !== p.average_price) {
+            const longPnl = (Number(p.exit_price) - Number(p.average_price)) * Number(p.closed_quantity || 1);
+            entrySide = Math.abs(pnl - longPnl) < 1 ? 'BUY' : 'SELL';
+          } else {
+            entrySide = 'BUY';
+          }
+        }
+
         list.push({
           id: key,
           rawId: p.id,
@@ -126,15 +138,26 @@ export default function TradingJournalView({ onBack }) {
       if (!seen.has(key)) {
         seen.add(key);
         const originalEntrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
+        const exitPrice = Number(o.average_price || o.price || 0);
+        const qty = Math.abs(Number(o.closed_quantity || o.quantity || 1));
+        let entryPrice = exitPrice;
+        if (qty > 0 && pnl !== null && !isNaN(pnl)) {
+          if (originalEntrySide === 'BUY') {
+            entryPrice = exitPrice - (pnl / qty);
+          } else {
+            entryPrice = exitPrice + (pnl / qty);
+          }
+        }
+
         list.push({
           id: key,
           rawId: o.id,
           symbol: o.symbol,
           product_type: o.product_type || 'INT',
           side: originalEntrySide,
-          qty: Math.abs(o.quantity || 1),
-          avg: Number(o.price || o.average_price || 0),
-          exit_price: Number(o.average_price || o.price || 0),
+          qty: qty,
+          avg: Number(entryPrice.toFixed(2)),
+          exit_price: Number(exitPrice.toFixed(2)),
           pnl: pnl,
           date: o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN') : 'Today',
           rawDate: o.created_at || new Date().toISOString()

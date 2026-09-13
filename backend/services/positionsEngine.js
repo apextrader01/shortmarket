@@ -198,8 +198,21 @@ class PositionsEngine {
                 const priceCache = await ensureLivePrices(positionsToExit.map(p => p.symbol));
 
                 for (const pos of positionsToExit) {
-                    const ltp = priceCache[pos.symbol]?.ltp;
-                    if (ltp === undefined || ltp === null || ltp <= 0) {
+                    let ltp = priceCache[pos.symbol]?.ltp;
+                    if (!ltp || ltp <= 0) {
+                        const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                        const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`MCX:${cleanSym}`];
+                        if (cached?.close > 0) ltp = Number(cached.close);
+                        else if (cached?.prev_close_price > 0) ltp = Number(cached.prev_close_price);
+                    }
+                    if (!ltp || ltp <= 0) {
+                        const lastOrder = await trx('orders').where({ symbol: pos.symbol, status: 'EXECUTED' }).orderBy('created_at', 'desc').first();
+                        if (lastOrder && Number(lastOrder.price) > 0) ltp = Number(lastOrder.price);
+                    }
+                    if (!ltp || ltp <= 0) {
+                        ltp = Number(pos.average_price) || 0;
+                    }
+                    if (ltp <= 0) {
                         console.warn(`[EOD SQUARE-OFF] No valid LTP for ${pos.symbol}, skipping square-off.`);
                         continue;
                     }
