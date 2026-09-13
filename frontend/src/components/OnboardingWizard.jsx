@@ -61,7 +61,7 @@ export default function OnboardingWizard() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     if (!formData.trading_experience || !formData.preferred_segment || !formData.trading_style || !formData.primary_strategy || !formData.hear_about_us) {
       return setError('Please complete all selections.');
     }
@@ -101,8 +101,9 @@ export default function OnboardingWizard() {
 
         {/* Progress Stepper */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: '24px', left: '10%', right: '10%', height: '2px', background: 'var(--border-color)', zIndex: 0 }} />
-          <div style={{ position: 'absolute', top: '24px', left: '10%', right: '10%', height: '2px', background: 'var(--color-blue-light)', zIndex: 0, width: `${((step - 1) / 2) * 100}%`, transition: 'width 0.3s ease' }} />
+          <div style={{ position: 'absolute', top: '24px', left: '12%', right: '12%', height: '2px', background: 'var(--border-color)', zIndex: 0 }}>
+            <div style={{ height: '100%', background: 'var(--color-blue-light)', width: `${((step - 1) / 2) * 100}%`, transition: 'width 0.3s ease' }} />
+          </div>
           
           {steps.map((s, i) => {
             const isActive = step >= s.id;
@@ -131,6 +132,7 @@ export default function OnboardingWizard() {
           </div>
         )}
 
+        <form onSubmit={step === 3 ? handleSubmit : (e) => { e.preventDefault(); handleNext(); }}>
         {/* Step 1: Personal */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', animation: 'fadeIn 0.3s ease' }}>
@@ -275,25 +277,26 @@ export default function OnboardingWizard() {
         {/* Footer Buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px' }}>
           {step > 1 ? (
-            <button onClick={handlePrev} style={{ padding: '12px 24px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
+            <button type="button" onClick={handlePrev} style={{ padding: '12px 24px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
               <ChevronLeft size={16} /> Back
             </button>
           ) : (
-            <button onClick={skipOnboarding} style={{ padding: '12px 24px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
+            <button type="button" onClick={skipOnboarding} style={{ padding: '12px 24px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '600' }}>
               Skip for now
             </button>
           )}
           
           {step < 3 ? (
-            <button onClick={handleNext} style={{ padding: '12px 32px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '700' }}>
+            <button type="submit" style={{ padding: '12px 32px', background: 'white', color: 'black', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '700' }}>
               Continue <ChevronRight size={16} />
             </button>
           ) : (
-            <button onClick={handleSubmit} disabled={loading} style={{ padding: '12px 32px', background: 'var(--color-blue-light)', color: 'black', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '700', opacity: loading ? 0.7 : 1 }}>
+            <button type="submit" disabled={loading} style={{ padding: '12px 32px', background: 'var(--color-blue-light)', color: 'black', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '700', opacity: loading ? 0.7 : 1 }}>
               {loading ? 'Saving...' : 'Start Trading'} <CheckCircle size={16} />
             </button>
           )}
         </div>
+        </form>
         
       </div>
     </div>

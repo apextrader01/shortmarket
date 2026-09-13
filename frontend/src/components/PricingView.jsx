@@ -16,6 +16,7 @@ export default function PricingView({ setActiveTab }) {
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
+      if (window.Razorpay) return resolve(true);
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.onload = () => resolve(true);
@@ -147,7 +148,7 @@ export default function PricingView({ setActiveTab }) {
           </ul>
 
           <button className="btn btn-secondary" style={{ width: '100%', padding: '12px', borderRadius: '8px', opacity: 0.6, cursor: 'not-allowed', fontWeight: '700', fontSize: '13px' }} disabled>
-            Current Plan
+            {isPro ? 'Free Tier' : 'Current Plan'}
           </button>
         </div>
 

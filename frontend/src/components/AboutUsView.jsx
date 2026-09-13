@@ -39,7 +39,7 @@ export default function AboutUsView({ setActiveTab }) {
   const regulators = ['BSE', 'NSE', 'NCDEX', 'SEBI', 'MCX-SX', 'SCORES', 'MCX'];
 
   return (
-    <div style={{ padding: '20px', color: '#E2E8F0', height: '100%', overflowY: 'auto' }}>
+    <div style={{ padding: '20px', color: 'var(--text-primary)', height: '100%', overflowY: 'auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '40px', cursor: 'pointer' }} onClick={() => setActiveTab('ClientData')}>
         <ChevronLeft size={20} style={{ marginRight: '8px' }} />
@@ -81,7 +81,9 @@ export default function AboutUsView({ setActiveTab }) {
             <Phone size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Phone</div>
-              <div style={{ fontSize: '14px', fontWeight: '600' }}>1800 123 4567</div>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                <a href="tel:18001234567" style={{ color: 'inherit', textDecoration: 'none' }}>1800 123 4567</a>
+              </div>
             </div>
           </div>
           
@@ -89,7 +91,9 @@ export default function AboutUsView({ setActiveTab }) {
             <Mail size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>support@shortedge.in</div>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                <a href="mailto:support@shortedge.in" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>support@shortedge.in</a>
+              </div>
             </div>
           </div>
 
@@ -97,7 +101,9 @@ export default function AboutUsView({ setActiveTab }) {
             <Globe size={20} color="var(--text-secondary)" style={{ marginRight: '16px', marginTop: '2px' }} />
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Website</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>https://www.shortedge.in</div>
+              <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                <a href="https://www.shortedge.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>https://www.shortedge.in</a>
+              </div>
             </div>
           </div>
 

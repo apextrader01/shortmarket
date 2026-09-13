@@ -40,8 +40,8 @@ export default function ReferralsView({ setActiveTab }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ referrals: [], stats: { totalEarned: 0, pendingCount: 0, completedCount: 0, totalCount: 0, totalWithdrawn: 0, pendingWithdrawalAmount: 0, availableRewardBalance: 0 } });
   
-  const refCode = user?.client_id || user?.id || 'unknown';
-  const refLink = `${window.location.origin}/register?ref=${refCode}`;
+  const refCode = user?.client_id || user?.username || '';
+  const refLink = refCode ? `${window.location.origin}/register?ref=${encodeURIComponent(refCode)}` : `${window.location.origin}/register`;
 
   useEffect(() => {
     fetchReferrals();
@@ -66,9 +66,11 @@ export default function ReferralsView({ setActiveTab }) {
   };
 
   const maskEmail = (email) => {
-    if (!email) return '***@***.com';
-    const [name, domain] = email.split('@');
-    return `${name.substring(0, 3)}***@${domain}`;
+    if (!email || typeof email !== 'string') return '***@***.com';
+    const parts = email.split('@');
+    if (parts.length < 2) return `${email.substring(0, 3)}***`;
+    const [name, domain] = parts;
+    return `${name.substring(0, Math.min(3, name.length))}***@${domain}`;
   };
 
   return (
@@ -130,7 +132,7 @@ export default function ReferralsView({ setActiveTab }) {
             {withdrawMsg.text}
           </div>
         )}
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px', alignItems: isMobile ? 'stretch' : 'center' }}>
+        <form onSubmit={handleWithdraw} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px', alignItems: isMobile ? 'stretch' : 'center' }}>
           <input 
             type="number" 
             className="input" 
@@ -140,14 +142,14 @@ export default function ReferralsView({ setActiveTab }) {
             style={{ flex: 1, padding: '10px 14px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', borderRadius: '6px', color: '#fff', outline: 'none' }}
           />
           <button 
+            type="submit"
             className="btn btn-primary" 
-            onClick={handleWithdraw} 
-            disabled={withdrawLoading || !withdrawAmount || withdrawAmount <= 0}
+            disabled={withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0}
             style={{ padding: '10px 20px', fontWeight: '700', borderRadius: '6px', whiteSpace: 'nowrap' }}
           >
             {withdrawLoading ? 'Requesting...' : 'Request Withdrawal'}
           </button>
-        </div>
+        </form>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '10px' }}>
           Note: Update your Bank/UPI details in Settings before withdrawing. Minimum withdrawal is ₹100.
         </div>

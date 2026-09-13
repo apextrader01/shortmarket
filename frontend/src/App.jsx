@@ -314,15 +314,12 @@ function App() {
   // Sync activeTab to URL and handle browser back/forward buttons
   useEffect(() => {
     if (activeTab) {
-      let newPath = activeTab === 'TradeDiary' ? '/' : `/${activeTab.toLowerCase()}`;
-      if (activeTab === 'Portfolio' && typeof portfolioSubTab !== 'undefined') {
-        newPath = `/portfolio/${portfolioSubTab.toLowerCase()}`;
-      }
+      const newPath = activeTab === 'TradeDiary' ? '/' : `/${activeTab.toLowerCase()}`;
       if (window.location.pathname !== newPath) {
         window.history.pushState(null, '', newPath);
       }
     }
-  }, [activeTab, typeof portfolioSubTab !== 'undefined' ? portfolioSubTab : null]);
+  }, [activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {

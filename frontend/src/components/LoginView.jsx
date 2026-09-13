@@ -5,7 +5,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function LoginView() {
-  const { login, preLogin, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, preLogin: state.preLogin, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
+  const { login, register, forgotPassword, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, register: state.register, forgotPassword: state.forgotPassword, resetPassword: state.resetPassword, authError: state.authError })));
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset'
   const [view, setView] = useState(() => {
@@ -65,11 +65,14 @@ export default function LoginView() {
     }
     else if (view === 'register') {
       try {
-        if (!window.recaptchaVerifier) {
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible'
-          });
+        // Clear stale recaptcha verifier to avoid expired token errors
+        if (window.recaptchaVerifier) {
+          try { window.recaptchaVerifier.clear(); } catch (_) {}
+          window.recaptchaVerifier = null;
         }
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible'
+        });
         const formattedPhone = '+91' + phone;
         const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
         setConfirmationResult(confirmation);
@@ -130,7 +133,7 @@ export default function LoginView() {
     border:       '1px solid var(--border-color)',
     padding:      '12px',
     borderRadius: '6px',
-    color:        '#fff',
+    color:        'var(--text-primary)',
     fontSize:     '14px',
     outline:      'none',
     boxSizing:    'border-box',
@@ -284,7 +287,7 @@ export default function LoginView() {
             </div>
           )}
 
-          {(view === 'login' || view === 'register' || view === 'reset') && (
+          {(view === 'login' || view === 'login_otp' || view === 'register' || view === 'reset') && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>{view === 'reset' ? 'New Password' : 'Password'}</label>
