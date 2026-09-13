@@ -1,3 +1,8 @@
+import React, { useState } from 'react';
+import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
+import { Target, Clock } from 'lucide-react';
+
 const TradingInsights = () => {
   const [filterPeriod, setFilterPeriod] = useState('Month');
   
@@ -33,19 +38,17 @@ const TradingInsights = () => {
     }
   });
 
-  const profitableTradePercent = totalTrades > 0 ? ((profitableTrades / totalTrades) * 100).toFixed(1) : '-';
+  const profitableTradePercent = totalTrades > 0 ? ((profitableTrades / totalTrades) * 100).toFixed(1) : '0';
+  const lossTradePercent = totalTrades > 0 ? ((lossTrades / totalTrades) * 100).toFixed(1) : '0';
   const profitFactor = totalGrossLoss > 0 ? (totalGrossProfit / totalGrossLoss).toFixed(2) : (totalGrossProfit > 0 ? 'MAX' : '-');
 
-  // Daily orders (for Day Trades list)
-  const executedOrders = (orders || []).filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
-  
   const StatCard = ({ title, value, sub, icon: Icon, colorClass }) => (
     <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '160px', flex: 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{title}</div>
         {Icon && <Icon size={16} color="var(--text-secondary)" />}
       </div>
-      <div style={{ fontSize: '24px', fontWeight: '700', color: colorClass ? \ar(\)\ : 'white' }}>{value}</div>
+      <div style={{ fontSize: '24px', fontWeight: '700', color: colorClass ? `var(${colorClass})` : 'white' }}>{value}</div>
       {sub && <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{sub}</div>}
     </div>
   );
@@ -70,9 +73,9 @@ const TradingInsights = () => {
       <div>
         <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>F&O Key Metrics</div>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-          <StatCard title="Gross P/L" value={\\₹\\} colorClass={grossPnl >= 0 ? '--color-green-light' : '--color-red-light'} />
+          <StatCard title="Gross P/L" value={`₹${grossPnl.toFixed(2)}`} colorClass={grossPnl >= 0 ? '--color-green-light' : '--color-red-light'} />
           <StatCard title="Profitable Day %" value="-" sub="DAYS" />
-          <StatCard title="Profitable Trade %" value={\\%\} sub={\\ TRADES\} colorClass="--color-green-light" />
+          <StatCard title="Profitable Trade %" value={`${profitableTradePercent}%`} sub={`${profitableTrades} / ${totalTrades} TRADES`} colorClass="--color-green-light" />
           <StatCard title="Profit Factor" value={profitFactor} icon={Target} />
           <StatCard title="Avg. Holding Time" value="-" icon={Clock} />
         </div>
@@ -86,8 +89,8 @@ const TradingInsights = () => {
         ) : (
           <>
             <div style={{ height: '8px', display: 'flex', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
-              <div style={{ width: \\%\, background: 'var(--color-green-light)' }}></div>
-              <div style={{ width: \\%\, background: 'var(--color-red-light)' }}></div>
+              <div style={{ width: `${profitableTradePercent}%`, background: 'var(--color-green-light)' }}></div>
+              <div style={{ width: `${lossTradePercent}%`, background: 'var(--color-red-light)' }}></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
               <div>Profitable Trades ({profitableTrades})</div>
@@ -95,12 +98,6 @@ const TradingInsights = () => {
             </div>
           </>
         )}
-      </div>
-
-      {/* Heatmap */}
-      <div className="glass-panel" style={{ padding: '24px' }}>
-         <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '24px' }}>Performance</div>
-         <PnLCalendarHeatmap positions={positions} orders={orders} />
       </div>
 
       {/* Trades List */}
@@ -137,7 +134,7 @@ const TradingInsights = () => {
                        {pnl > 0 ? '+' : ''}{pnl !== '--' ? `₹${pnl}` : pnl}
                     </td>
                   </tr>
-                )
+                );
               })
             )}
           </tbody>
@@ -146,5 +143,7 @@ const TradingInsights = () => {
     </div>
   );
 };
+
+export default TradingInsights;
 
 

@@ -131,9 +131,9 @@ export function calculateIndianCharges(order) {
   if (isDelivery) {
     stt = tradeValue * 0.001;
   } else if (isOption) {
-    stt = isSell ? tradeValue * 0.000625 : 0;
+    stt = isSell ? tradeValue * 0.001 : 0; // 0.1% STT on Options sale (revised Oct 2024)
   } else if (isFuture) {
-    stt = isSell ? tradeValue * 0.000125 : 0;
+    stt = isSell ? tradeValue * 0.0002 : 0; // 0.02% STT on Futures sale (revised Oct 2024)
   } else if (isMCX) {
     stt = isSell ? tradeValue * 0.0001 : 0;
   } else {
@@ -380,10 +380,14 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
   const scripMap = {};
   executed.forEach(o => {
     const sym = o.symbol || 'UNKNOWN';
-    if (!scripMap[sym]) {
-      scripMap[sym] = {
+    const isDelivery = (o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY');
+    const segment = isDerivativeOption(sym) ? 'F&O Options' : (isDerivativeFuture(sym) ? 'F&O Futures' : (isDelivery ? 'Equity Delivery' : 'Equity Intraday'));
+    const scripKey = `${sym}_${segment}`;
+
+    if (!scripMap[scripKey]) {
+      scripMap[scripKey] = {
         symbol: sym,
-        segment: isDerivativeOption(sym) ? 'F&O Options' : (isDerivativeFuture(sym) ? 'F&O Futures' : ((o.product_type === 'DEL' || o.product_type === 'CNC' || o.product_type === 'DELIVERY') ? 'Equity Delivery' : 'Equity Intraday')),
+        segment: segment,
         buyQty: 0,
         buyVal: 0,
         sellQty: 0,
@@ -398,18 +402,18 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
     const isBuy = (o.side === 'BUY' || o.type === 'BUY');
 
     if (isBuy) {
-      scripMap[sym].buyQty += qty;
-      scripMap[sym].buyVal += val;
+      scripMap[scripKey].buyQty += qty;
+      scripMap[scripKey].buyVal += val;
     } else {
-      scripMap[sym].sellQty += qty;
-      scripMap[sym].sellVal += val;
+      scripMap[scripKey].sellQty += qty;
+      scripMap[scripKey].sellVal += val;
     }
 
     if (o.realized_pnl !== null && o.realized_pnl !== undefined && parseFloat(o.realized_pnl) !== 0) {
-      scripMap[sym].realizedPnl += parseFloat(o.realized_pnl);
+      scripMap[scripKey].realizedPnl += parseFloat(o.realized_pnl);
     }
     const ch = calculateIndianCharges(o);
-    scripMap[sym].charges += ch.totalCharges;
+    scripMap[scripKey].charges += ch.totalCharges;
   });
 
   const scripList = Object.values(scripMap);
@@ -853,11 +857,12 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
 // 4. STATEMENT - LEDGER GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Records', format = 'excel', customStart = '', customEnd = '') {
-  const filtered = filterRecordsByPeriod(ledger, dateRange, customStart, customEnd);
-  
   let currentBalance = parseFloat(user.balance || 0);
   if (isNaN(currentBalance)) currentBalance = 0;
-  const ledgerWithBalance = (filtered || []).map(entry => {
+
+  // Calculate true historical running balance across the complete chronological ledger (newest first)
+  const fullSorted = [...ledger].sort((a, b) => new Date(b.created_at || b.date || 0) - new Date(a.created_at || a.date || 0));
+  const fullLedgerWithBalance = fullSorted.map(entry => {
     if (entry.running_balance !== undefined && entry.running_balance !== null && !isNaN(Number(entry.running_balance))) {
       return { ...entry, running_balance: Number(entry.running_balance) };
     }
@@ -868,8 +873,16 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
     return { ...entry, running_balance: isNaN(balanceAfter) ? 0 : balanceAfter };
   });
 
-  const totalCredits = filtered.filter(l => Number(l.amount) > 0).reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-  const totalDebits = filtered.filter(l => Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount) || 0), 0);
+  const filtered = filterRecordsByPeriod(fullLedgerWithBalance, dateRange, customStart, customEnd);
+  const ledgerWithBalance = filtered;
+
+  const isRealCashFlow = (l) => {
+    const t = String(l.type || '').toUpperCase();
+    return t !== 'MARGIN_BLOCK' && t !== 'MARGIN_RELEASE';
+  };
+
+  const totalCredits = filtered.filter(l => isRealCashFlow(l) && Number(l.amount) > 0).reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+  const totalDebits = filtered.filter(l => isRealCashFlow(l) && Number(l.amount) < 0).reduce((acc, l) => acc + Math.abs(Number(l.amount) || 0), 0);
   const closingBalance = parseFloat(user.balance || 0);
 
   const displayPeriod = dateRange === 'Custom' ? `${customStart || 'Start'} to ${customEnd || 'End'}` : dateRange;

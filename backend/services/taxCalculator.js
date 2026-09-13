@@ -152,7 +152,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     } else if (isOption) {
         brokerage = 20 * slicesCount; // Flat ₹20 per executed order/slice for Options
         if (side === 'SELL') {
-            stt = turnover * (isCommodity ? 0.0005 : 0.000625);
+            stt = turnover * (isCommodity ? 0.0005 : 0.001); // 0.1% STT on Options sale (revised Oct 2024)
         }
         exchangeCharge = turnover * (isCommodity ? 0.000418 : 0.0003553);
         if (side === 'BUY') stampDuty = turnover * 0.00003;
@@ -160,7 +160,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
     } else if (isFuture) {
         brokerage = Math.min(turnover * 0.0003, 20 * slicesCount);
         if (side === 'SELL') {
-            stt = turnover * (isCommodity ? 0.0001 : 0.000125);
+            stt = turnover * (isCommodity ? 0.0001 : 0.0002); // 0.02% STT on Futures sale (revised Oct 2024)
         }
         exchangeCharge = turnover * (isCommodity ? 0.000021 : 0.0000183);
         if (side === 'BUY') stampDuty = turnover * 0.00002;

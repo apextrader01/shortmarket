@@ -9,25 +9,25 @@ const calculateDateBounds = (preset, customStart, customEnd) => {
   if (preset === 'week') {
     return {
       startDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      endDate: ''
+      endDate: now.toISOString()
     };
   }
   if (preset === '15days') {
     return {
       startDate: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      endDate: ''
+      endDate: now.toISOString()
     };
   }
   if (preset === 'month') {
     return {
       startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      endDate: ''
+      endDate: now.toISOString()
     };
   }
   if (preset === '3months') {
     return {
       startDate: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-      endDate: ''
+      endDate: now.toISOString()
     };
   }
   if (preset === 'custom') {

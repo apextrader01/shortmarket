@@ -381,10 +381,9 @@ export const useStore = create(persist((set, get) => ({
     alerts: state.alerts.map(a => a.id === id ? { ...a, ...updates } : a) 
   })),
   clearOldAlerts: () => set((state) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Only purge alerts that have already been triggered. Active/pending alerts remain intact.
     return {
-      alerts: state.alerts.filter(a => new Date(a.createdAt).getTime() >= today.getTime())
+      alerts: state.alerts.filter(a => !a.triggered && a.status !== 'TRIGGERED')
     };
   }),
   

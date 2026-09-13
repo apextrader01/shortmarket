@@ -4295,8 +4295,10 @@ app.post('/api/ltp-batch', async (req, res) => {
 
 // 🧮 Estimate Charges 🧮
 // TEMPORARY FIX ROUTE FOR TCS POSITION
-app.get('/api/admin/fix-tcs-position', async (req, res) => {
+app.get('/api/admin/fix-tcs-position', authenticateToken, async (req, res) => {
   try {
+     const caller = await db('users').where({ id: req.user.id }).first();
+     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
      const count = await db('positions').where({ symbol: 'TCS-BSE', quantity: 1 }).update({ quantity: 11, average_price: 2429.00 });
      res.json({ message: `Fixed ${count} position(s) for TCS.` });
   } catch(e) {

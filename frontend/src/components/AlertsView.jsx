@@ -29,7 +29,7 @@ export default function AlertsView() {
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button onClick={clearOldAlerts} className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-            Clear Old Alerts
+            Clear Triggered Alerts
           </button>
 
           {/* Ask for permission button if not granted */}

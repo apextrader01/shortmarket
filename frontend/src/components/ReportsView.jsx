@@ -115,8 +115,12 @@ const LedgerStatement = () => {
   const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
   const paginatedLedger = filteredLedger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const totalCredits = filteredLedger.filter(l => Number(l.amount) > 0).reduce((a, b) => a + Number(b.amount), 0);
-  const totalDebits = filteredLedger.filter(l => Number(l.amount) < 0).reduce((a, b) => a + Math.abs(Number(b.amount)), 0);
+  const isRealCashFlow = (l) => {
+    const t = String(l.type || '').toUpperCase();
+    return t !== 'MARGIN_BLOCK' && t !== 'MARGIN_RELEASE';
+  };
+  const totalCredits = filteredLedger.filter(l => isRealCashFlow(l) && Number(l.amount) > 0).reduce((a, b) => a + Number(b.amount), 0);
+  const totalDebits = filteredLedger.filter(l => isRealCashFlow(l) && Number(l.amount) < 0).reduce((a, b) => a + Math.abs(Number(b.amount)), 0);
 
   const renderLedgerBadge = (type, amount) => {
     const t = (type || '').toUpperCase();

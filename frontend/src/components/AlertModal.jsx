@@ -13,6 +13,7 @@ export default function AlertModal() {
   useEffect(() => {
     if (symbol) {
       setTargetPrice('');
+      setCondition('ABOVE');
     }
   }, [symbol]);
 

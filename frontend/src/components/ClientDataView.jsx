@@ -100,9 +100,13 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       const lossVal = lossOverride !== undefined ? lossOverride : maxLoss;
       
       setRiskMsg('Saving rules...');
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${API}/api/user/risk-guardian`, {
+        credentials: 'include',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           risk_guardian_active: activeVal,
           max_daily_trades: tradesVal ? Number(tradesVal) : null,

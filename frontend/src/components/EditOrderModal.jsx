@@ -67,8 +67,15 @@ export default function EditOrderModal() {
     } else {
       const rawPrice = parseFloat(price) || livePrice || 0;
       const contractValue = (Number(quantity) || 0) * rawPrice;
-      const isLeveraged = ['INT', 'INTRADAY', 'CO', 'BO'].includes(effectiveProductType);
-      const newMargin = isLeveraged ? contractValue * 0.20 : contractValue;
+      const cleanSym = String(order.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+      const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+      const isLeveraged = ['INT', 'INTRADAY', 'MIS', 'CO', 'BO'].includes(effectiveProductType);
+      let newMargin = contractValue;
+      if (isOption && order.side === 'BUY') {
+        newMargin = contractValue; // 100% upfront premium required for options buying
+      } else if (isLeveraged && !isOption) {
+        newMargin = contractValue * 0.20; // 5x leverage for cash intraday
+      }
       marginDifference = newMargin - oldMargin;
     }
   }
@@ -89,7 +96,8 @@ export default function EditOrderModal() {
     const marketFlag = isPendingTrigger ? isMarket : false;
     const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
 
-    if (!marketFlag && !isPendingTrigger && (isNaN(finalPrice) || finalPrice <= 0)) {
+    const requiresLimitPrice = !marketFlag && (order.type === 'LIMIT' || order.type === 'SL' || order.type === 'SL-L');
+    if (requiresLimitPrice && (isNaN(finalPrice) || finalPrice <= 0)) {
       alert('Please enter a valid limit price greater than 0.');
       return;
     }
@@ -299,7 +307,15 @@ export default function EditOrderModal() {
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To update, please add ₹{(marginDifference - balanceNum).toFixed(2)}</div>
                 </div>
               </div>
-              <button style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
+              <button 
+                onClick={() => {
+                  closeEditOrderModal();
+                  window.dispatchEvent(new CustomEvent('open-deposit-modal'));
+                }}
+                style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                ADD FUNDS
+              </button>
             </div>
           )}
 

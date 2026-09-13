@@ -323,7 +323,12 @@ function App() {
       setActiveTab(tabsMap[path.toLowerCase()] || 'TradeDiary');
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const handleOpenDeposit = () => setShowDepositModal(true);
+    window.addEventListener('open-deposit-modal', handleOpenDeposit);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('open-deposit-modal', handleOpenDeposit);
+    };
   }, []);
 
   // ── ALL hooks must be declared before any conditional return ─────────────────
