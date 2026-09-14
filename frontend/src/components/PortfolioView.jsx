@@ -34,7 +34,16 @@ export default function PortfolioView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const containerRef = React.useRef(null);
   const [activeTab, setActiveTab] = useState('Overview');
+
+  const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('VALUE_DESC'); // 'VALUE_DESC', 'PNL_DESC', 'PNL_ASC', 'NAME_ASC'
   const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'PROFIT', 'LOSS'
@@ -388,33 +397,38 @@ export default function PortfolioView() {
   };
 
   return (
-    <div style={{ 
-      flex: 1, 
-      display: 'flex', 
-      flexDirection: 'column', 
-      background: 'var(--bg-dark)', 
-      width: '100%', 
-      height: '100%',
-      minHeight: 0,
-      minWidth: 0,
-      overflowY: 'auto', 
-      overflowX: 'hidden',
-      WebkitOverflowScrolling: 'touch',
-      boxSizing: 'border-box',
-      position: 'relative'
-    }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        background: 'var(--bg-dark)', 
+        width: '100%', 
+        height: '100%',
+        minHeight: 0,
+        minWidth: 0,
+        overflowY: 'auto', 
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        boxSizing: 'border-box',
+        position: 'relative'
+      }}>
       
       {/* Sub Navigation Bar - Sticky at Top */}
       <div style={{ 
         position: 'sticky',
         top: 0,
-        zIndex: 30,
+        zIndex: 50,
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
         padding: isMobile ? '0 16px' : '0 28px', 
         borderBottom: '1px solid var(--border-color)', 
-        background: 'var(--bg-panel)',
+        background: '#0d1527',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px' }}>
@@ -427,7 +441,7 @@ export default function PortfolioView() {
             return (
               <div
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1120,15 +1134,15 @@ export default function PortfolioView() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '14px 20px', fontWeight: '600' }}>Symbol / Scheme</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Qty / Units</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Live LTP / NAV</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Current Value</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Total Return (P&L)</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600' }}>Symbol / Scheme</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Qty / Units</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Live LTP / NAV</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Current Value</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Total Return (P&L)</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1154,7 +1168,7 @@ export default function PortfolioView() {
                               transition: 'background 0.15s ease'
                             }}
                           >
-                            <td style={{ padding: '14px 20px', fontWeight: '700' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: '700' }}>
                               {pos.isMf ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1176,12 +1190,12 @@ export default function PortfolioView() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
                               {pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                               {pos.isMf ? (
                                 <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
                                   Daily NAV
@@ -1197,9 +1211,9 @@ export default function PortfolioView() {
                                 </>
                               )}
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                               <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}
                               </div>
@@ -1207,7 +1221,7 @@ export default function PortfolioView() {
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                 {pos.isMf ? (
                                   <>

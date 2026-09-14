@@ -495,75 +495,184 @@ export default function PositionsView() {
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table className="responsive-mobile-table positions-layout positions-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
-                <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ padding: '16px 20px', textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Symbol</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Buy/Sell</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>{viewMode === 'CLOSED' ? 'Closed Qty' : 'Net Quantity'}</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Avg. Price</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>{viewMode === 'CLOSED' ? 'Exit Price' : 'Last Price (LTP)'}</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Unrealized P&L</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Realized P&L</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Segment</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Exchange</th>
-                  <th style={{ textAlign: 'left', fontWeight: '600', color: 'var(--text-secondary)' }}>Product</th>
-                  <th style={{ textAlign: 'center', paddingRight: '20px', fontWeight: '600', color: 'var(--text-secondary)' }}></th>
+                <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600' }}>
+                    {viewMode === 'HOLDINGS' ? 'Holding / Scheme' : 'Instrument'}
+                  </th>
+                  {viewMode === 'OPEN' && (
+                    <th style={{ padding: '12px 12px', textAlign: 'left', fontWeight: '600' }}>Side</th>
+                  )}
+                  <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>
+                    {viewMode === 'CLOSED' ? 'Closed Qty' : viewMode === 'HOLDINGS' ? 'Qty / Units' : 'Net Qty'}
+                  </th>
+                  <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>
+                    {viewMode === 'HOLDINGS' ? 'Avg. Buy Price' : viewMode === 'CLOSED' ? 'Entry Price' : 'Avg. Price'}
+                  </th>
+                  <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>
+                    {viewMode === 'CLOSED' ? 'Exit Price' : viewMode === 'HOLDINGS' ? 'Live LTP / NAV' : 'Last Price (LTP)'}
+                  </th>
+                  {viewMode === 'HOLDINGS' && (
+                    <>
+                      <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>Invested Value</th>
+                      <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>Current Value</th>
+                    </>
+                  )}
+                  {viewMode !== 'CLOSED' && (
+                    <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>
+                      {viewMode === 'HOLDINGS' ? 'Total P&L' : 'Unrealized P&L (MTM)'}
+                    </th>
+                  )}
+                  {viewMode !== 'HOLDINGS' && (
+                    <th style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600' }}>Realized P&L</th>
+                  )}
+                  {viewMode === 'CLOSED' && (
+                    <th style={{ padding: '12px 12px', textAlign: 'center', fontWeight: '600' }}>Status</th>
+                  )}
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {flatPositions.map((pos, idx) => {
                   const isProfit = pos.pnl >= 0;
-                  const sideText = pos.qty > 0 ? 'Buy' : (pos.qty < 0 ? 'Sell' : '-');
+                  const sideText = pos.qty > 0 ? 'BUY' : (pos.qty < 0 ? 'SELL' : '-');
+                  const isBuy = pos.qty > 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
-                  
+                  const isMf = isMutualFund(pos.symbol);
+                  const mfName = isMf ? getMfName(pos.symbol) : null;
+                  const safeSymbol = pos.symbol || '';
+                  const cleanSym = safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0];
+                  const exchange = (safeSymbol.includes(':') ? safeSymbol.split(':')[0] : pos.exchange) || 'NSE';
+                  const holdingQty = Math.abs(pos.quantity !== undefined ? pos.quantity : pos.qty);
+                  const investedVal = (pos.avg || 0) * holdingQty;
+                  const currentVal = ((pos.ltp || pos.avg) || 0) * holdingQty;
+                  const holdingPnl = currentVal - investedVal;
+                  const holdingPnlPct = investedVal > 0 ? (holdingPnl / investedVal) * 100 : 0;
+
                   return (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                      <td data-label="Symbol" style={{ padding: '16px 20px' }}>
-                        {isMutualFund(pos.symbol) ? (
-                          <div>
+                    <tr 
+                      key={pos.id || idx} 
+                      style={{ 
+                        borderBottom: '1px solid var(--border-color)', 
+                        background: idx % 2 === 0 ? 'var(--bg-card)' : 'transparent',
+                        transition: 'background 0.15s ease' 
+                      }}
+                    >
+                      {/* Column 1: Symbol / Scheme */}
+                      <td data-label="Symbol" style={{ padding: '12px 16px' }}>
+                        {isMf ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <span style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-primary)' }}>
-                                {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]}
+                                {mfName || cleanSym}
                               </span>
-                              <span style={{ fontSize: '10px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '2px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                              <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
                                 MF
                               </span>
                             </div>
-                            {getMfName(pos.symbol) && (
-                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={getMfName(pos.symbol)}>
-                                {getMfName(pos.symbol)}
-                              </div>
-                            )}
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              Code: {safeSymbol}
+                            </span>
                           </div>
                         ) : (
-                          <>
-                            {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]} <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '6px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{(pos.symbol.includes(':') ? pos.symbol.split(':')[0] : pos.exchange) || 'NSE'}</span>
-                          </>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                              {cleanSym}
+                            </span>
+                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-hover)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
+                              {exchange}
+                            </span>
+                            <span style={{ fontSize: '10px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.1)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
+                              {viewMode === 'HOLDINGS' ? 'CNC' : (pos.productLabel || pos.product_type || 'INT')}
+                            </span>
+                          </div>
                         )}
                       </td>
-                      <td data-label="Side" style={{ fontWeight: '600', color: pos.qty > 0 ? 'var(--color-blue-light)' : (pos.qty < 0 ? 'var(--color-red-light)' : 'var(--text-secondary)') }}>
-                        {viewMode === 'CLOSED' ? (
-                          <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 6px', borderRadius: '4px' }}>
+
+                      {/* Column 2: Side (Only in OPEN) */}
+                      {viewMode === 'OPEN' && (
+                        <td data-label="Side" style={{ padding: '12px 12px' }}>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            fontWeight: '700',
+                            padding: '2px 6px', 
+                            borderRadius: '4px', 
+                            background: isBuy ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)',
+                            color: isBuy ? '#38bdf8' : '#ef4444'
+                          }}>
+                            {sideText}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Column 3: Quantity */}
+                      <td data-label="Qty" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        {viewMode === 'CLOSED' 
+                          ? Math.abs(pos.closed_quantity || 0) 
+                          : viewMode === 'HOLDINGS' && isMf 
+                            ? Number(holdingQty).toFixed(4) 
+                            : Math.abs(pos.qty || holdingQty)}
+                      </td>
+
+                      {/* Column 4: Avg Price */}
+                      <td data-label="Avg Price" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '500', color: 'var(--text-secondary)' }}>
+                        ₹{(parseFloat(pos.avg) || 0).toFixed(2)}
+                      </td>
+
+                      {/* Column 5: Last Price (LTP) / Exit Price */}
+                      <td data-label="LTP" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>
+                        {viewMode === 'CLOSED' 
+                          ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') 
+                          : (pos.ltp > 0 ? `₹${parseFloat(pos.ltp).toFixed(2)}` : '—')}
+                      </td>
+
+                      {/* Column 6 & 7: Invested & Current Value (HOLDINGS only) */}
+                      {viewMode === 'HOLDINGS' && (
+                        <>
+                          <td data-label="Invested" style={{ padding: '12px 12px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                            ₹{investedVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td data-label="Current" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            ₹{currentVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </>
+                      )}
+
+                      {/* Column: Unrealized P&L / Total P&L */}
+                      {viewMode === 'OPEN' && (
+                        <td data-label="Unrealized P&L" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: (pos.unrealizedPnl || 0) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {(pos.unrealizedPnl || 0) > 0 ? '+' : ((pos.unrealizedPnl || 0) < 0 ? '-' : '')}₹{Math.abs(pos.unrealizedPnl || 0).toFixed(2)}
+                        </td>
+                      )}
+                      {viewMode === 'HOLDINGS' && (
+                        <td data-label="Total P&L" style={{ padding: '12px 12px', textAlign: 'right' }}>
+                          <div style={{ fontWeight: '700', color: holdingPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                            {holdingPnl >= 0 ? '+' : ''}₹{holdingPnl.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: holdingPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', opacity: 0.85 }}>
+                            {holdingPnl >= 0 ? '+' : ''}{holdingPnlPct.toFixed(2)}%
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Column: Realized P&L (OPEN & CLOSED) */}
+                      {viewMode !== 'HOLDINGS' && (
+                        <td data-label="Realized P&L" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
+                          {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+' : '-'}₹${Math.abs(realizedPnl).toFixed(2)}` : '₹0.00'}
+                        </td>
+                      )}
+
+                      {/* Column: Status (CLOSED only) */}
+                      {viewMode === 'CLOSED' && (
+                        <td data-label="Status" style={{ padding: '12px 12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '4px' }}>
                             CLOSED
                           </span>
-                        ) : sideText}
-                      </td>
-                      <td data-label="Net Qty" style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                        {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)}
-                      </td>
-                      <td style={{ fontWeight: '500' }}>₹{pos.avg.toFixed(2)}</td>
-                      <td data-label="LTP" style={{ fontWeight: '500' }}>{viewMode === 'CLOSED' ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') : (pos.ltp > 0 ? `₹${pos.ltp.toFixed(2)}` : '—')}
-                      </td>
-                      <td data-label="Unrealized P&L" style={{ fontWeight: '700', color: viewMode === 'CLOSED' ? 'var(--text-muted)' : ((pos.unrealizedPnl || 0) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
-                        {viewMode === 'CLOSED' ? '-' : `${(pos.unrealizedPnl || 0) > 0 ? '+' : ((pos.unrealizedPnl || 0) < 0 ? '-' : '')}₹${Math.abs(pos.unrealizedPnl || 0).toFixed(2)}`}
-                      </td>
-                      <td data-label="Realized P&L" style={{ fontWeight: '700', color: realizedPnl > 0 ? 'var(--color-green-light)' : (realizedPnl < 0 ? 'var(--color-red-light)' : 'var(--text-muted)') }}>
-                        {realizedPnl !== 0 ? `${realizedPnl > 0 ? '+' : '-'}₹${Math.abs(realizedPnl).toFixed(2)}` : '₹0.00'}
-                      </td>
-                      <td data-label="Segment" style={{ fontWeight: '500' }}>{pos.segment}</td>
-                      <td data-label="Exchange" style={{ fontWeight: '500' }}>{pos.exchange}</td>
-                      <td data-label="Product" style={{ fontWeight: '500' }}>{pos.productLabel}</td>
-                      <td data-label="Actions" style={{ textAlign: 'center', paddingRight: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        </td>
+                      )}
+
+                      {/* Column: Actions */}
+                      <td data-label="Actions" style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                           <button
                             type="button"
                             title="Share P&L Social Card"
@@ -571,12 +680,12 @@ export default function PositionsView() {
                               e.stopPropagation();
                               setShareModalTrade({
                                 symbol: pos.symbol,
-                                realized_pnl: realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0),
-                                pnl: realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0),
+                                realized_pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
+                                pnl: viewMode === 'HOLDINGS' ? holdingPnl : (realizedPnl !== 0 ? realizedPnl : (pos.pnl || 0)),
                                 avg: pos.avg,
                                 exit_price: pos.exit_price || pos.ltp,
-                                qty: Math.abs(pos.qty || pos.closed_quantity || 1),
-                                product_type: pos.productLabel || pos.product_type || 'INT',
+                                qty: Math.abs(pos.qty || pos.closed_quantity || holdingQty || 1),
+                                product_type: pos.productLabel || pos.product_type || (viewMode === 'HOLDINGS' ? 'DEL' : 'INT'),
                                 side: pos.qty >= 0 ? 'BUY' : 'SELL'
                               });
                             }}
@@ -596,6 +705,7 @@ export default function PositionsView() {
                           >
                             <Share2 size={12} /> Share
                           </button>
+
                           {viewMode === 'OPEN' && (
                             <button
                               type="button"
@@ -621,12 +731,14 @@ export default function PositionsView() {
                               <RefreshCw size={11} /> Convert
                             </button>
                           )}
+
                           {viewMode === 'OPEN' && (
                             <X 
                               size={18} 
                               style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
                               onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                              title="Exit Position"
                               onClick={() => {
                                 if (pos.unencumberedQty === 0) {
                                   alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
@@ -640,12 +752,14 @@ export default function PositionsView() {
                               }}
                             />
                           )}
+
                           {viewMode === 'HOLDINGS' && (
                             <X 
                               size={18} 
                               style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
                               onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                              title="Exit Holding"
                               onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
                             />
                           )}
@@ -654,7 +768,7 @@ export default function PositionsView() {
                     </tr>
                   );
                 })}
-                </tbody>
+              </tbody>
             </table>
           </div>
         </div>
