@@ -1,8 +1,9 @@
-import React, { useState, useMemo, Suspense, lazy } from 'react';
-import { useStore } from '../store';
+import React, { useState, useMemo, useEffect, Suspense, lazy } from 'react';
+import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 const AnalyticsView = lazy(() => import('./AnalyticsView'));
+import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { 
   Briefcase, 
   BarChart3, 
@@ -27,7 +28,7 @@ const EMPTY_PRICES = {};
 
 export default function PortfolioView() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
-  React.useEffect(() => {
+  useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -37,6 +38,49 @@ export default function PortfolioView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('VALUE_DESC'); // 'VALUE_DESC', 'PNL_DESC', 'PNL_ASC', 'NAME_ASC'
   const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'PROFIT', 'LOSS'
+  const [assetFilter, setAssetFilter] = useState('ALL'); // 'ALL', 'EQUITY', 'MF'
+  const [selectedMfFund, setSelectedMfFund] = useState(null);
+
+  const [mfNames, setMfNames] = useState({
+    'EDEL-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    'MIRA-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    'NIPP-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '118615-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    '118825-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    '118778-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '120197-MF': 'ICICI Prudential Liquid Fund - Direct Plan - Growth',
+    '118615': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    '118825': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    '118778': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '120197': 'ICICI Prudential Liquid Fund - Direct Plan - Growth'
+  });
+
+  const isMutualFund = (sym, assetClass) => {
+    if (assetClass === 'MUTUAL_FUND') return true;
+    if (!sym || typeof sym !== 'string') return false;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return clean.endsWith('-MF') || clean.includes('MUTUALFUND') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+  };
+
+  const getMfName = (sym) => {
+    if (!sym) return null;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return mfNames[sym] || mfNames[clean] || mfNames[`${clean}-MF`] || mfNames[clean.replace('-MF', '')] || null;
+  };
+
+  const handleMfAction = (pos, mode = 'INVEST') => {
+    const rawSym = pos.symbol || '';
+    const cleanId = rawSym.replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const fundName = getMfName(rawSym) || pos.name || cleanId;
+    setSelectedMfFund({
+      id: cleanId,
+      schemeCode: cleanId,
+      name: fundName,
+      nav: pos.ltp || pos.average_price,
+      symbol: rawSym,
+      initialMode: mode
+    });
+  };
 
   const { positions, holdings, orders } = useStore(
     useShallow(state => ({ 
@@ -101,7 +145,9 @@ export default function PortfolioView() {
   });
 
   (positions || []).forEach(p => {
-    if ((p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY') && Number(p.quantity) > 0) {
+    const isDelivery = (p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY');
+    const isMF = (p.symbol?.endsWith('-MF') || p.symbol?.includes('MUTUALFUND') || p.asset_class === 'MUTUAL_FUND');
+    if ((isDelivery || isMF) && Number(p.quantity) > 0) {
       const sym = p.symbol;
       const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
       const key = cleanSym || sym;
@@ -122,7 +168,37 @@ export default function PortfolioView() {
   });
 
   const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);
-  const deliveryPositions = allMergedHoldings.filter(h => !h.symbol.endsWith('-MF'));
+  const deliveryPositions = allMergedHoldings;
+
+  useEffect(() => {
+    const symbols = (deliveryPositions || []).map(p => p.symbol).filter(s => isMutualFund(s));
+    const unique = [...new Set(symbols)];
+    const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
+    if (needed.length === 0) return;
+
+    fetch(`${API}/api/mf/names`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: needed })
+    })
+    .then(r => r.ok ? r.json() : {})
+    .then(data => {
+      setMfNames(prev => ({ ...prev, ...data }));
+      needed.forEach(symbol => {
+        if (!data[symbol]) {
+          const cleanId = String(symbol).replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          fetch(`https://api.mfapi.in/mf/${cleanId}`)
+            .then(r => r.json())
+            .then(mfData => {
+              if (mfData && mfData.meta && mfData.meta.scheme_name) {
+                setMfNames(prev => ({ ...prev, [symbol]: mfData.meta.scheme_name }));
+              }
+            }).catch(() => {});
+        }
+      });
+    })
+    .catch(() => {});
+  }, [deliveryPositions]);
 
   // ⚡ Performance: subscribe exclusively to prices of held assets
   const portfolioSymbols = useMemo(() => {
@@ -249,6 +325,10 @@ export default function PortfolioView() {
       const pnl = current - invested;
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
       const dayChangeVal = chg * qty;
+      const isMf = isMutualFund(pos.symbol, pos.asset_class);
+      const displayName = isMf 
+        ? (getMfName(pos.symbol) || (pos.symbol || '').replace('-MF', ''))
+        : (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0];
       return {
         ...pos,
         ltp,
@@ -260,14 +340,26 @@ export default function PortfolioView() {
         current,
         pnl,
         pnlPct,
-        isProfit: pnl >= 0
+        isProfit: pnl >= 0,
+        isMf,
+        displayName
       };
     });
+
+    // Asset segment filter
+    if (assetFilter === 'EQUITY') {
+      list = list.filter(p => !p.isMf);
+    } else if (assetFilter === 'MF') {
+      list = list.filter(p => p.isMf);
+    }
 
     // Search filter
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
-      list = list.filter(p => (p.symbol || '').toLowerCase().includes(query));
+      list = list.filter(p => 
+        (p.symbol || '').toLowerCase().includes(query) ||
+        (p.displayName || '').toLowerCase().includes(query)
+      );
     }
 
     // Profit/Loss filter
@@ -282,12 +374,12 @@ export default function PortfolioView() {
       if (sortBy === 'VALUE_DESC') return b.current - a.current;
       if (sortBy === 'PNL_DESC') return b.pnl - a.pnl;
       if (sortBy === 'PNL_ASC') return a.pnl - b.pnl;
-      if (sortBy === 'NAME_ASC') return (a.symbol || '').localeCompare(b.symbol || '');
+      if (sortBy === 'NAME_ASC') return (a.displayName || a.symbol || '').localeCompare(b.displayName || b.symbol || '');
       return 0;
     });
 
     return list;
-  }, [deliveryPositions, portfolioPrices, searchTerm, filterType, sortBy]);
+  }, [deliveryPositions, portfolioPrices, searchTerm, filterType, assetFilter, sortBy, mfNames]);
 
   // Asset percentage helper
   const getAssetPct = (val) => {
@@ -836,6 +928,42 @@ export default function PortfolioView() {
                   />
                 </div>
 
+                {/* Asset Segment Filter Pills */}
+                <div style={{
+                  display: 'flex',
+                  background: 'var(--bg-card)',
+                  padding: '2px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  {[
+                    { id: 'ALL', label: 'All Assets' },
+                    { id: 'EQUITY', label: 'Stocks' },
+                    { id: 'MF', label: 'Mutual Funds' }
+                  ].map(a => {
+                    const active = assetFilter === a.id;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => setAssetFilter(a.id)}
+                        style={{
+                          background: active ? '#2563eb' : 'transparent',
+                          color: active ? '#ffffff' : 'var(--text-secondary)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '11px',
+                          fontWeight: active ? '700' : '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 {/* Filter Pills */}
                 <div style={{
                   display: 'flex',
@@ -906,7 +1034,13 @@ export default function PortfolioView() {
                       return (
                         <div
                           key={pos.id || idx}
-                          onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                          onClick={() => {
+                            if (pos.isMf) {
+                              handleMfAction(pos, 'REDEEM');
+                            } else {
+                              useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity);
+                            }
+                          }}
                           style={{
                             padding: '12px 16px',
                             borderBottom: '1px solid var(--border-color)',
@@ -920,9 +1054,15 @@ export default function PortfolioView() {
                         >
                           {/* Line 1: Exchange & Segment | Total P&L */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
-                              {safeSymbol.split(':')[0] || 'NSE'} • CNC
-                            </span>
+                            {pos.isMf ? (
+                              <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                MUTUAL FUND
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                                {safeSymbol.split(':')[0] || 'NSE'} • CNC
+                              </span>
+                            )}
                             <div style={{ 
                               fontSize: '13px', 
                               fontWeight: '700', 
@@ -933,33 +1073,35 @@ export default function PortfolioView() {
                           </div>
 
                           {/* Line 2: Symbol Name | Current Value */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                              {safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3' }}>
+                              {pos.displayName || safeSymbol}
                             </div>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               {formatCurrency(pos.current)}
                             </div>
                           </div>
 
-                          {/* Line 3: Qty & Avg Price | LTP & Sell button */}
+                          {/* Line 3: Qty & Avg Price | LTP/NAV & Sell/Redeem button */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                            <div>Qty: <strong style={{ color: 'var(--text-primary)' }}>{pos.qty}</strong> • Avg: ₹{parseFloat(pos.average_price).toFixed(2)}</div>
+                            <div>{pos.isMf ? 'Units' : 'Qty'}: <strong style={{ color: 'var(--text-primary)' }}>{pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}</strong> • Avg: ₹{parseFloat(pos.average_price).toFixed(2)}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>LTP: <strong style={{ color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</strong></span>
-                              <span style={{ fontSize: '10px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
-                                {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
-                              </span>
+                              <span>{pos.isMf ? 'NAV' : 'LTP'}: <strong style={{ color: '#2563eb' }}>₹{pos.ltp.toFixed(2)}</strong></span>
+                              {!pos.isMf && (
+                                <span style={{ fontSize: '10px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                  {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
+                                </span>
+                              )}
                               <span style={{ 
                                 fontSize: '10px', 
-                                color: '#FF3B30', 
-                                border: '1px solid rgba(255,59,48,0.3)', 
-                                background: 'rgba(255,59,48,0.08)',
+                                color: pos.isMf ? '#a855f7' : '#FF3B30', 
+                                border: `1px solid ${pos.isMf ? 'rgba(168,85,247,0.3)' : 'rgba(255,59,48,0.3)'}`, 
+                                background: pos.isMf ? 'rgba(168,85,247,0.08)' : 'rgba(255,59,48,0.08)',
                                 padding: '2px 6px', 
                                 borderRadius: '4px', 
                                 fontWeight: '700' 
                               }}>
-                                SELL
+                                {pos.isMf ? 'REDEEM' : 'SELL'}
                               </span>
                             </div>
                           </div>
@@ -978,10 +1120,10 @@ export default function PortfolioView() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '14px 20px', fontWeight: '600' }}>Symbol</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Qty</th>
+                      <th style={{ padding: '14px 20px', fontWeight: '600' }}>Symbol / Scheme</th>
+                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Qty / Units</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
-                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Live LTP</th>
+                      <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Live LTP / NAV</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>
                       <th style={{ padding: '14px 20px', fontWeight: '600', textAlign: 'right' }}>Current Value</th>
@@ -996,7 +1138,7 @@ export default function PortfolioView() {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <Layers size={36} style={{ opacity: 0.3 }} />
                             <div style={{ fontSize: '14px', fontWeight: '600' }}>No Delivery Holdings Found</div>
-                            <div style={{ fontSize: '12px', opacity: 0.7 }}>Buy delivery stocks to build and track your portfolio.</div>
+                            <div style={{ fontSize: '12px', opacity: 0.7 }}>Buy delivery stocks or invest in mutual funds to build and track your portfolio.</div>
                           </div>
                         </td>
                       </tr>
@@ -1013,23 +1155,47 @@ export default function PortfolioView() {
                             }}
                           >
                             <td style={{ padding: '14px 20px', fontWeight: '700' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ color: 'var(--text-primary)' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
-                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
-                                  {safeSymbol.split(':')[0] || 'NSE'}
-                                </span>
-                              </div>
+                              {pos.isMf ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{pos.displayName}</span>
+                                    <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                      MUTUAL FUND
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                    Code: {safeSymbol}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ color: 'var(--text-primary)' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
+                                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
+                                    {safeSymbol.split(':')[0] || 'NSE'}
+                                  </span>
+                                </div>
+                              )}
                             </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>{pos.qty}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
+                              {pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}
+                            </td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                              <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
-                                {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
-                              </div>
-                              <div style={{ fontSize: '11px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
-                                {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
-                              </div>
+                              {pos.isMf ? (
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
+                                  Daily NAV
+                                </div>
+                              ) : (
+                                <>
+                                  <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                                    {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                                    {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
+                                  </div>
+                                </>
+                              )}
                             </td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
                             <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
@@ -1043,40 +1209,81 @@ export default function PortfolioView() {
                             </td>
                             <td style={{ padding: '14px 20px', textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotSize || pos.lotsize || 1, 'DEL', false)}
-                                  title="Buy More"
-                                  style={{
-                                    background: 'rgba(0, 230, 118, 0.1)',
-                                    color: '#00E676',
-                                    border: '1px solid rgba(0, 230, 118, 0.3)',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  + BUY
-                                </button>
-                                <button
-                                  onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
-                                  title="Exit / Sell"
-                                  style={{
-                                    background: 'rgba(255, 59, 48, 0.1)',
-                                    color: '#FF3B30',
-                                    border: '1px solid rgba(255, 59, 48, 0.3)',
-                                    padding: '4px 10px',
-                                    borderRadius: '6px',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  SELL
-                                </button>
+                                {pos.isMf ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleMfAction(pos, 'INVEST')}
+                                      title="Invest More in Fund"
+                                      style={{
+                                        background: 'rgba(168, 85, 247, 0.1)',
+                                        color: '#a855f7',
+                                        border: '1px solid rgba(168, 85, 247, 0.3)',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      + INVEST
+                                    </button>
+                                    <button
+                                      onClick={() => handleMfAction(pos, 'REDEEM')}
+                                      title="Redeem Units"
+                                      style={{
+                                        background: 'rgba(255, 59, 48, 0.1)',
+                                        color: '#FF3B30',
+                                        border: '1px solid rgba(255, 59, 48, 0.3)',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      REDEEM
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => useStore.getState().openOrderModal(pos.symbol, 'BUY', pos.lotSize || pos.lotsize || 1, 'DEL', false)}
+                                      title="Buy More"
+                                      style={{
+                                        background: 'rgba(0, 230, 118, 0.1)',
+                                        color: '#00E676',
+                                        border: '1px solid rgba(0, 230, 118, 0.3)',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      + BUY
+                                    </button>
+                                    <button
+                                      onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                                      title="Exit / Sell"
+                                      style={{
+                                        background: 'rgba(255, 59, 48, 0.1)',
+                                        color: '#FF3B30',
+                                        border: '1px solid rgba(255, 59, 48, 0.3)',
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease'
+                                      }}
+                                    >
+                                      SELL
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1090,6 +1297,13 @@ export default function PortfolioView() {
           </div>
 
         </div>
+      )}
+
+      {selectedMfFund && (
+        <MutualFundDetailsModal 
+          fund={selectedMfFund} 
+          onClose={() => setSelectedMfFund(null)} 
+        />
       )}
     </div>
   );

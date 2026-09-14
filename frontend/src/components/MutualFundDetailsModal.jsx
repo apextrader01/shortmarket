@@ -20,7 +20,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     const [statusMsg, setStatusMsg] = useState('');
 
     // Right Column States
-    const [actionMode, setActionMode] = useState('INVEST'); // 'INVEST' | 'REDEEM'
+    const [actionMode, setActionMode] = useState(fund?.initialMode || 'INVEST'); // 'INVEST' | 'REDEEM'
     const [investType, setInvestType] = useState('MONTHLY_SIP'); // 'MONTHLY_SIP' | 'WEEKLY_SIP' | 'DAILY_SIP' | 'LUMPSUM'
     
     // Inputs
@@ -29,7 +29,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
     
     // Mobile responsive tab state
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [mobileTab, setMobileTab] = useState('overview'); // 'overview' | 'invest'
+    const [mobileTab, setMobileTab] = useState(fund?.initialMode === 'REDEEM' ? 'invest' : 'overview'); // 'overview' | 'invest'
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
