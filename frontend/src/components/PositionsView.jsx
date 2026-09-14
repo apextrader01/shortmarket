@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Activity, X, Share2, RefreshCw } from 'lucide-react';
+import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 
 const EMPTY_PRICES = {};
@@ -163,8 +163,10 @@ export default function PositionsView() {
   }));
 
   // Group positions by Symbol + Product Type (Flat List)
-  const { flatPositions, globalMTM } = useMemo(() => {
+  const { flatPositions, globalMTM, totalInvested, totalCurrent } = useMemo(() => {
     let globalMTM = 0;
+    let totalInvested = 0;
+    let totalCurrent = 0;
     const symbolAgg = {};
 
     sourceData.forEach(pos => {
@@ -280,7 +282,27 @@ export default function PositionsView() {
         ...pos, unencumberedQty, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
         segment, exchange, productLabel
       });
-      globalMTM += pnl;
+
+      if (viewMode === 'CLOSED') {
+        const closedQty = Math.abs(parseFloat(pos.closed_quantity) || 1);
+        const entryPrice = parseFloat(pos.average_price) || 0;
+        const exitPrice = parseFloat(pos.exit_price || ltp) || 0;
+        totalInvested += closedQty * entryPrice;
+        totalCurrent += closedQty * exitPrice;
+        globalMTM += realizedPnl;
+      } else if (viewMode === 'HOLDINGS') {
+        const hQty = Math.abs(pos.quantity !== undefined ? pos.quantity : qty);
+        const inv = avg * hQty;
+        const cur = (ltp || avg) * hQty;
+        totalInvested += inv;
+        totalCurrent += cur;
+        globalMTM += (cur - inv);
+      } else {
+        // OPEN
+        totalInvested += invested;
+        totalCurrent += currentValue;
+        globalMTM += pnl;
+      }
     });
 
     // Sort alphabetically by symbol
@@ -292,7 +314,7 @@ export default function PositionsView() {
         return String(a.symbol || '').localeCompare(String(b.symbol || ''));
     });
 
-    return { flatPositions: flatList, globalMTM };
+    return { flatPositions: flatList, globalMTM, totalInvested, totalCurrent };
   }, [sourceData, relevantPrices, viewMode]);
 
   const exitAllPositions = async () => {
@@ -383,36 +405,103 @@ export default function PositionsView() {
           </div>
         </div>
 
-        {/* Center/Middle: TOTAL PORTFOLIO MTM Widget */}
+        {/* Center/Right: Summary Metrics Group (Invested, Current & Total P&L) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-          border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-          padding: isMobile ? '6px 12px' : '6px 18px',
-          borderRadius: '10px',
-          boxShadow: `0 4px 16px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}`
+          gap: isMobile ? '8px' : '10px',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={18} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+          {/* Total Invested */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            padding: isMobile ? '5px 10px' : '6px 12px',
+            borderRadius: '10px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={14} color="#3b82f6" />
+            </div>
             <div>
-              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', lineHeight: 1.1 }}>
-                {viewMode === 'CLOSED' ? 'TOTAL REALIZED P&L' : 'TOTAL PORTFOLIO MTM'}
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.1 }}>
+                {viewMode === 'CLOSED' ? 'Total Entry' : 'Total Invested'}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.1 }}>
-                {viewMode === 'CLOSED' ? "Today's settled trades" : 'Live market ticks'}
+              <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '800', color: 'var(--text-primary)', marginTop: '2px', lineHeight: 1.1 }}>
+                ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
+
+          {/* Current Value */}
           <div style={{
-            fontSize: isMobile ? '15px' : '18px',
-            fontWeight: '900',
-            letterSpacing: '-0.3px',
-            color: globalMTM >= 0 ? '#10B981' : '#EF4444',
-            marginLeft: '4px'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            padding: isMobile ? '5px 10px' : '6px 12px',
+            borderRadius: '10px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           }}>
-            {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(168, 85, 247, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Wallet size={14} color="#a855f7" />
+            </div>
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.1 }}>
+                {viewMode === 'CLOSED' ? 'Total Exit' : 'Current Value'}
+              </div>
+              <div style={{ fontSize: isMobile ? '13px' : '15px', fontWeight: '800', color: 'var(--text-primary)', marginTop: '2px', lineHeight: 1.1 }}>
+                ₹{totalCurrent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* TOTAL PORTFOLIO MTM Widget */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: globalMTM >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+            border: `1px solid ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            padding: isMobile ? '5px 10px' : '6px 14px',
+            borderRadius: '10px',
+            boxShadow: `0 4px 16px ${globalMTM >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}`
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={18} color={globalMTM >= 0 ? '#10B981' : '#EF4444'} />
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', lineHeight: 1.1 }}>
+                  {viewMode === 'CLOSED' ? 'TOTAL REALIZED P&L' : 'TOTAL PORTFOLIO MTM'}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.1 }}>
+                  {viewMode === 'CLOSED' ? "Today's settled trades" : 'Live market ticks'}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginLeft: '4px' }}>
+              <span style={{
+                fontSize: isMobile ? '13px' : '15px',
+                fontWeight: '900',
+                letterSpacing: '-0.3px',
+                color: globalMTM >= 0 ? '#10B981' : '#EF4444'
+              }}>
+                {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              {totalInvested > 0 && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  color: globalMTM >= 0 ? '#10B981' : '#EF4444',
+                  opacity: 0.9
+                }}>
+                  ({globalMTM >= 0 ? '+' : ''}{((globalMTM / totalInvested) * 100).toFixed(2)}%)
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -790,17 +879,27 @@ export default function PositionsView() {
                   boxShadow: 'var(--card-shadow, 0 2px 8px rgba(0,0,0,0.05))'
                 }}>
                   <div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
-                      {viewMode === 'CLOSED' ? 'Realized P&L' : 'Total MTM (Live)'}
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                      {viewMode === 'CLOSED' ? 'Realized P&L' : 'Total MTM'}
                     </div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: globalMTM >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                      {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toFixed(2)}
+                    <div style={{ fontSize: '15px', fontWeight: '800', color: globalMTM >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                      {globalMTM >= 0 ? '+' : ''}₹{globalMTM.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                      {viewMode === 'CLOSED' ? 'Entry' : 'Invested'}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
+                      ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{flatPositions.length} Position(s)</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: '600' }}>
-                      {viewMode === 'CLOSED' ? 'Closed Trades' : viewMode === 'HOLDINGS' ? 'T+1 Holdings' : 'Open Positions'}
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
+                      {viewMode === 'CLOSED' ? 'Exit' : 'Current'}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
+                      ₹{totalCurrent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
