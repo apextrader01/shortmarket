@@ -156,7 +156,20 @@ function isCommodityContract(sym) {
   return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 }
 
-// Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
+function getLtpFromPriceCache(sym) {
+  if (!sym || typeof sym !== 'string') return 0;
+  if (priceCache[sym]?.ltp && Number(priceCache[sym].ltp) > 0) return Number(priceCache[sym].ltp);
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '');
+  if (priceCache[clean]?.ltp && Number(priceCache[clean].ltp) > 0) return Number(priceCache[clean].ltp);
+  if (priceCache[`NSE:${clean}`]?.ltp && Number(priceCache[`NSE:${clean}`].ltp) > 0) return Number(priceCache[`NSE:${clean}`].ltp);
+  if (priceCache[`NSE:${clean}-EQ`]?.ltp && Number(priceCache[`NSE:${clean}-EQ`].ltp) > 0) return Number(priceCache[`NSE:${clean}-EQ`].ltp);
+  if (priceCache[`BSE:${clean}`]?.ltp && Number(priceCache[`BSE:${clean}`].ltp) > 0) return Number(priceCache[`BSE:${clean}`].ltp);
+  if (priceCache[`MCX:${clean}`]?.ltp && Number(priceCache[`MCX:${clean}`].ltp) > 0) return Number(priceCache[`MCX:${clean}`].ltp);
+  if (priceCache[sym]?.close && Number(priceCache[sym].close) > 0) return Number(priceCache[sym].close);
+  if (priceCache[clean]?.close && Number(priceCache[clean].close) > 0) return Number(priceCache[clean].close);
+  return 0;
+}
+
 // Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
 const marketStatusCache = { equity: 'AUTO', commodity: 'AUTO' };
 const marketCalendarCache = new Map();
@@ -3068,7 +3081,7 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
 
       const { calculateRequiredMargin } = require('./services/marginEngine');
       const avgPrice = Number(position.average_price) || 0;
-      const ltp = Number(priceCache[position.symbol]?.ltp) || avgPrice;
+      const ltp = getLtpFromPriceCache(position.symbol) || avgPrice;
       // Delivery conversion requires 100% of the cost basis (average_price) to prevent cash extraction during market drops
       const priceBasis = (newProductType === 'DEL' && avgPrice > 0) ? avgPrice : (ltp > 0 ? ltp : avgPrice);
       if (priceBasis <= 0) {
@@ -3755,9 +3768,12 @@ const handleMutualFundBuy = async (req, res) => {
         type: 'MARKET',
         side: 'BUY',
         quantity: units,
+        filled_quantity: units,
+        pending_quantity: 0,
         price: nav,
         average_price: nav,
         status: 'EXECUTED',
+        order_variety: 'REGULAR',
         product_type: 'DEL',
         margin: parsedAmount,
         remarks: 'Lumpsum Mutual Fund Purchase',
@@ -4015,7 +4031,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   // Validate Bracket Order (BO) and Cover Order (CO) formats
   if (product_type === 'BO' || product_type === 'CO') {
-    const ltp = Number(priceCache[symbol]?.ltp) || 0;
+    const ltp = getLtpFromPriceCache(symbol);
     const entryPrice = parseFloat(price) || ltp || 0;
     
     if (entryPrice <= 0) {
@@ -4282,7 +4298,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       const isMarket = type === 'MARKET' && !hasTrigger;
       const isTriggerOrder = hasTrigger;
       const status = isTriggerOrder ? 'PENDING_TRIGGER' : 'PENDING';
-      let execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0; // Fetch live LTP here for market orders
+      let execPrice = parseFloat(price) || getLtpFromPriceCache(symbol); // Fetch live LTP here for market orders
       const resolvedTriggerPrice = trigger_price ? parseFloat(trigger_price) : (type && type.startsWith('SL') && price ? parseFloat(price) : null);
       
       // 2. Deduct Margin from User Balance
@@ -4393,7 +4409,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       if (requiresMargin) {
           let priceBasis = execPrice;
           if (!priceBasis || priceBasis <= 0) {
-              priceBasis = parseFloat(resolvedTriggerPrice) || parseFloat(trigger_price) || parseFloat(price) || Number(priceCache[symbol]?.ltp) || Number(priceCache[symbol]?.close) || 0;
+              priceBasis = parseFloat(resolvedTriggerPrice) || parseFloat(trigger_price) || parseFloat(price) || getLtpFromPriceCache(symbol);
           }
           if (priceBasis <= 0) {
               if (isMarket) {
@@ -4493,24 +4509,31 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     
     // Execute Market orders via Realistic Volume & Market Depth Matching Engine
     if (ord.isMarket) {
-      const baseLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
-        ? Number(priceCache[ord.symbol].ltp)
-        : (parseFloat(ord.price) || parseFloat(req.body.price) || 0);
-
-      if (baseLtp > 0) {
+      const isMutualFund = ord.symbol.endsWith('-MF') || ord.symbol.includes('MUTUALFUND') || /^\d+$/.test(ord.symbol);
+      if (isMutualFund) {
         try {
           await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
-          const volumeMatchingEngine = require('./services/volumeMatchingEngine');
-          await volumeMatchingEngine.submitOrder(ord, baseLtp);
+          const navPrice = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+          await triggerEngine.executeOrder(ord, navPrice);
         } catch (err) {
-          console.error('Volume matching submission error:', err);
+          console.error('Mutual fund direct execution error:', err);
+        }
+      } else {
+        const baseLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.price) || parseFloat(req.body.price) || 0;
+
+        if (baseLtp > 0) {
+          try {
+            await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+            const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+            await volumeMatchingEngine.submitOrder(ord, baseLtp);
+          } catch (err) {
+            console.error('Volume matching submission error:', err);
+          }
         }
       }
     } else if (ord.type === 'LIMIT') {
       // Check for marketable limit order (e.g. BUY with limit >= LTP, or SELL with limit <= LTP)
-      const currentLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
-        ? Number(priceCache[ord.symbol].ltp)
-        : (parseFloat(req.body.price) || 0);
+      const currentLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(req.body.price) || 0;
       
       const limitPrice = parseFloat(ord.price) || 0;
       if (currentLtp > 0 && limitPrice > 0) {
@@ -4626,8 +4649,12 @@ app.post('/api/sip', authenticateToken, async (req, res) => {
         type: 'MARKET',
         side: 'BUY',
         quantity: qty,
+        filled_quantity: qty,
+        pending_quantity: 0,
         price: execPrice,
+        average_price: execPrice,
         status: 'EXECUTED',
+        order_variety: 'SIP',
         product_type: 'DEL',
         margin: finalMargin,
         created_at: new Date(),
@@ -5146,7 +5173,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
       const LedgerService = require('./services/ledgerService');
       for (const holding of activeHoldings) {
         const qty = parseFloat(holding.quantity);
-        const ltp = priceCache[holding.symbol]?.ltp || parseFloat(holding.average_price) || 0;
+        const ltp = getLtpFromPriceCache(holding.symbol) || parseFloat(holding.average_price) || 0;
         if (ltp <= 0) {
           throw Object.assign(new Error(`Live price unavailable for ${holding.symbol}. Cannot exit holdings.`), { statusCode: 400 });
         }
@@ -5164,8 +5191,11 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           type: 'MARKET',
           side: 'SELL',
           quantity: qty,
+          filled_quantity: qty,
+          pending_quantity: 0,
           price: ltp,
           average_price: ltp,
+          order_variety: 'REGULAR',
           status: 'EXECUTED',
           product_type: 'DEL',
           margin: 0,
@@ -5509,7 +5539,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         const status = 'PENDING';
         const isMarket = type === 'MARKET';
         const effectiveProductType = product_type || 'INT';
-        const execPrice = parseFloat(price) || priceCache[symbol]?.ltp || 0;
+        const execPrice = parseFloat(price) || getLtpFromPriceCache(symbol);
         const qtyNum = Number(quantity) || 0;
         const slices = calculateOrderSlices(symbol, qtyNum);
         const isSliced = slices.length > 1;
@@ -5567,11 +5597,11 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
        let legError = null;
 
        if (ord.isMarket) {
-          const isMutualFund = ord.symbol.endsWith('-MF') || /^\d+$/.test(ord.symbol);
+          const isMutualFund = ord.symbol.endsWith('-MF') || ord.symbol.includes('MUTUALFUND') || /^\d+$/.test(ord.symbol);
           if (isMutualFund) {
              try {
                  const triggerEngineLocal = require('./services/triggerEngine');
-                 triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
+                 await triggerEngineLocal.removeOrderFromMemory(ord.id, ord.symbol);
                  await triggerEngineLocal.executeOrder(ord, ord.execPrice);
                  execStatus = 'EXECUTED';
              } catch(e) {
@@ -5579,10 +5609,12 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
                  console.error('Basket MF execution error:', e);
              }
           } else {
-             const realLtp = priceCache[ord.symbol]?.ltp || 0;
+             const realLtp = getLtpFromPriceCache(ord.symbol) || parseFloat(ord.execPrice) || 0;
              if (realLtp > 0) {
                 try {
-                  await triggerEngine.evaluateTick(ord.symbol, realLtp);
+                  await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+                  const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+                  await volumeMatchingEngine.submitOrder(ord, realLtp);
                   const freshOrder = await db('orders').where({ id: ord.id }).select('status').first();
                   if (freshOrder) execStatus = freshOrder.status;
                 } catch (err) {
@@ -5590,6 +5622,24 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
                   console.error('Immediate evaluation error for basket item:', err);
                 }
              }
+          }
+       } else if (ord.type === 'LIMIT') {
+          const realLtp = getLtpFromPriceCache(ord.symbol) || 0;
+          const limitPrice = parseFloat(ord.execPrice) || 0;
+          if (realLtp > 0 && limitPrice > 0) {
+            const isMarketableBuy = ord.side === 'BUY' && realLtp <= limitPrice;
+            const isMarketableSell = ord.side === 'SELL' && realLtp >= limitPrice;
+            if (isMarketableBuy || isMarketableSell) {
+              try {
+                await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+                await triggerEngine.executeOrder(ord, realLtp);
+                const freshOrder = await db('orders').where({ id: ord.id }).select('status').first();
+                if (freshOrder) execStatus = freshOrder.status;
+              } catch (err) {
+                legError = err.message;
+                console.error('Immediate marketable limit error for basket item:', err);
+              }
+            }
           }
        }
        
@@ -5687,7 +5737,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                  const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
                  
                  if (exitQty > 0) {
-                   autoExitLtp = priceCache[pos.symbol]?.ltp || Number(pos.average_price) || 0;
+                   autoExitLtp = getLtpFromPriceCache(pos.symbol) || Number(pos.average_price) || 0;
                    if (autoExitLtp <= 0) {
                      throw Object.assign(new Error('Live market price unavailable for auto-exit. Cannot cancel bracket protection without a valid price.'), { statusCode: 400 });
                    }
@@ -5884,7 +5934,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           // Handle Market Execution override for Pending Triggers
           if (isMarket && order.status === 'PENDING_TRIGGER') {
-             ltpForMarket = priceCache[order.symbol]?.ltp || Number(order.trigger_price) || Number(order.price) || 0;
+             ltpForMarket = getLtpFromPriceCache(order.symbol) || Number(order.trigger_price) || Number(order.price) || 0;
              if (ltpForMarket <= 0) throw Object.assign(new Error('Live price unavailable for market execution'), { statusCode: 400 });
              
              // Update the order type to MARKET and status to PENDING so triggerEngine accepts it
@@ -6005,13 +6055,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                  const entryPrice = parseFloat(parent.price);
                  const checkPrice = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
                  const cleanSym = order.symbol && order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
-                 const currentLtp = (priceCache[order.symbol]?.ltp && Number(priceCache[order.symbol].ltp) > 0)
-                     ? Number(priceCache[order.symbol].ltp)
-                     : (priceCache[cleanSym]?.ltp && Number(priceCache[cleanSym].ltp) > 0)
-                         ? Number(priceCache[cleanSym].ltp)
-                         : (priceCache[`NSE:${cleanSym}`]?.ltp && Number(priceCache[`NSE:${cleanSym}`].ltp) > 0)
-                             ? Number(priceCache[`NSE:${cleanSym}`].ltp)
-                             : entryPrice;
+                 const currentLtp = getLtpFromPriceCache(order.symbol) || entryPrice;
                  if (order.type === 'SL-M' || order.type === 'SL-L' || order.type === 'SL') {
                      if (order.side === 'SELL' && checkPrice >= currentLtp) {
                          throw Object.assign(new Error(`BO Buy: Stop-Loss (₹${checkPrice}) must be lower than current market price (₹${currentLtp}).`), { statusCode: 400 });

@@ -104,13 +104,19 @@ class LedgerService {
             type: 'MARKET',
             side: side,
             quantity: absQty,
+            filled_quantity: absQty,
+            pending_quantity: 0,
             price: validExitPrice,
+            average_price: validExitPrice,
+            order_variety: 'REGULAR',
             status: 'EXECUTED',
             product_type: productType,
             margin: 0,
             realized_pnl: realizedPnl,
             taxes: exitTaxes,
-            remarks: customRemark || (isForcedRMSExit ? 'Auto-Square-Off (RMS)' : 'Exit')
+            remarks: customRemark || (isForcedRMSExit ? 'Auto-Square-Off (RMS)' : 'Exit'),
+            created_at: new Date(),
+            updated_at: new Date()
         });
 
         // 4. Calculate Total Release Amount

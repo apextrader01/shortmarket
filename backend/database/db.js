@@ -567,9 +567,11 @@ async function ensureCriticalColumns() {
 
     // 2. Orders table critical columns (Guaranteed raw DDL fallback)
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS filled_quantity DECIMAL(14,4) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ALTER COLUMN filled_quantity SET DEFAULT 0').catch(() => {});
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS pending_quantity DECIMAL(14,4)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_variety VARCHAR(50) DEFAULT \'REGULAR\'');
+    await db.raw('ALTER TABLE orders ALTER COLUMN order_variety SET DEFAULT \'REGULAR\'').catch(() => {});
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS taxes DECIMAL(14,2) DEFAULT 0');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(50) DEFAULT \'REGULAR\'');
     await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE');

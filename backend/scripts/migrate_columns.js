@@ -105,9 +105,11 @@ async function runMigration() {
     // 2. Orders table partial fill, average price, taxes, variety, and bracket columns
     const orderColumns = [
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS filled_quantity DECIMAL(14,4) DEFAULT 0',
+      'ALTER TABLE orders ALTER COLUMN filled_quantity SET DEFAULT 0',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS pending_quantity DECIMAL(14,4)',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_variety VARCHAR(50) DEFAULT \'REGULAR\'',
+      'ALTER TABLE orders ALTER COLUMN order_variety SET DEFAULT \'REGULAR\'',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS taxes DECIMAL(14,2) DEFAULT 0',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(50) DEFAULT \'REGULAR\'',
       'ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE',

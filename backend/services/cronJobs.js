@@ -40,7 +40,8 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine 
             if (segment === 'COMMODITY' && !isCom) continue;
             if (segment === 'EQUITY' && isCom) continue;
 
-            const ltp = priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
+            const clean = ord.symbol ? ord.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '') : '';
+            const ltp = priceCache[ord.symbol]?.ltp || (clean ? (priceCache[clean]?.ltp || priceCache[`NSE:${clean}`]?.ltp || priceCache[`BSE:${clean}`]?.ltp || priceCache[`MCX:${clean}`]?.ltp) : null) || Number(ord.price || 0);
 
             if (ord.type === 'MARKET') {
                 await db('orders').where({ id: ord.id }).update({ status: 'PENDING', updated_at: new Date() });
