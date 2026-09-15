@@ -44,7 +44,11 @@ else
     echo "⚡ Backend dependencies unchanged. Skipping npm install."
 fi
 
-# 4. Reload PM2 (Zero Downtime Restart)
+# 4. Run Critical Database Schema Migrations
+echo "🗄️ Running Database Schema Migrations..."
+node scripts/migrate_columns.js || node -e "const db = require('./database/db'); db.ensureCriticalColumns().then(() => process.exit(0)).catch(() => process.exit(0));"
+
+# 5. Reload PM2 (Zero Downtime Restart)
 echo "🔄 Reloading PM2 Clusters (Zero Downtime)..."
 pm2 reload ecosystem.config.js --update-env
 

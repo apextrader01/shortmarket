@@ -17,11 +17,16 @@ class TriggerEngine {
         this.trailingOrders = new Map(); // ⚡ orderId -> orderObj for real-time Trailing Stop Loss (TSL)
         this.isProcessing = false;
         this.io = null;
+        this.priceCache = {};
         console.log('Real-Time WebSocket Trigger Engine Initialized.');
     }
     
     setSocketIo(ioInstance) {
         this.io = ioInstance;
+    }
+
+    setPriceCache(cache) {
+        this.priceCache = cache || {};
     }
 
     /**
@@ -78,21 +83,39 @@ class TriggerEngine {
                 // But if they do, we can just give them a 0 (Buy) or Infinity (Sell) score to trigger instantly.
                 key = `trigger:${order.symbol}:${order.side}:LIMIT`;
                 score = order.side === 'BUY' ? 999999999 : 0;
-            } else if (order.type && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) {
+            } else if (order.type && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP' || order.type === 'GTT')) {
                 const trigger = Number(order.trigger_price || order.price);
                 let isGreaterOrEqual = false;
-                if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
-                if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                if (order.type === 'GTT') {
+                    const curLtp = Number(this.priceCache?.[order.symbol]?.ltp || this.priceCache?.[order.symbol]?.close) || 0;
+                    if (order.side === 'BUY') {
+                        isGreaterOrEqual = curLtp > 0 ? (trigger >= curLtp) : true;
+                    } else {
+                        isGreaterOrEqual = curLtp > 0 ? (trigger >= curLtp) : false;
+                    }
+                } else {
+                    if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
+                    if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                }
                 key = isGreaterOrEqual ? `trigger:${order.symbol}:GTE` : `trigger:${order.symbol}:LTE`;
                 score = trigger;
             }
         } else if (order.status === 'PENDING_TRIGGER') {
             const trigger = Number(order.trigger_price || order.price);
-            if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'TRAILING_STOP')) {
+            if (order.type && (order.type.startsWith('SL') || order.type === 'LIMIT' || order.type === 'TRAILING_STOP' || order.type === 'GTT')) {
                 // Determine if this leg triggers on >= or <=
                 let isGreaterOrEqual = false;
-                if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
-                if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                if (order.type === 'GTT') {
+                    const curLtp = Number(this.priceCache?.[order.symbol]?.ltp || this.priceCache?.[order.symbol]?.close) || 0;
+                    if (order.side === 'BUY') {
+                        isGreaterOrEqual = curLtp > 0 ? (trigger >= curLtp) : true;
+                    } else {
+                        isGreaterOrEqual = curLtp > 0 ? (trigger >= curLtp) : false;
+                    }
+                } else {
+                    if (order.side === 'BUY' && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP')) isGreaterOrEqual = true;
+                    if (order.side === 'SELL' && order.type === 'LIMIT') isGreaterOrEqual = true;
+                }
                 
                 if (isGreaterOrEqual) {
                     key = `trigger:${order.symbol}:GTE`;
@@ -321,19 +344,21 @@ class TriggerEngine {
                 return; 
             }
 
-            // SL-L Gap Protection: For Stop-Loss Limit orders, verify limit price constraint
-            if (order.type === 'SL-L' || (order.type === 'SL' && order.price && Number(order.price) > 0)) {
+            // SL-L & GTT Gap Protection: For Stop-Loss Limit / GTT orders with price, verify limit price constraint
+            if (order.type === 'SL-L' || (order.type === 'SL' && order.price && Number(order.price) > 0) || (order.type === 'GTT' && order.price && Number(order.price) > 0)) {
                 const limitPrice = Number(order.price);
                 if (order.side === 'BUY' && execPrice > limitPrice) {
                     // Market gapped above limit price: keep as PENDING limit order at limit price
-                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', updated_at: new Date() });
+                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', type: 'LIMIT', updated_at: new Date() });
                     order.status = 'PENDING';
+                    order.type = 'LIMIT';
                     this.addOrderToMemory(order);
                     return;
                 } else if (order.side === 'SELL' && execPrice < limitPrice) {
                     // Market gapped below limit price: keep as PENDING limit order at limit price
-                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', updated_at: new Date() });
+                    await trx('orders').where({ id: order.id }).update({ status: 'PENDING', type: 'LIMIT', updated_at: new Date() });
                     order.status = 'PENDING';
+                    order.type = 'LIMIT';
                     this.addOrderToMemory(order);
                     return;
                 }

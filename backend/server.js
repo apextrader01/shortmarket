@@ -2819,6 +2819,9 @@ app.post('/api/admin/force-close', authenticateToken, async (req, res) => {
       type: 'MARKET',
       side: side,
       quantity: quantity,
+      filled_quantity: 0,
+      pending_quantity: quantity,
+      order_variety: 'REGULAR',
       product_type: position.product_type,
       status: 'PENDING'
     };
@@ -5520,6 +5523,10 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
             user_id: req.user.id,
             symbol, type, side,
             quantity: sliceQty,
+            filled_quantity: 0,
+            pending_quantity: sliceQty,
+            average_price: null,
+            order_variety: 'REGULAR',
             price: execPrice || null,
             sl_price, tgt_price,
             status,
@@ -5690,6 +5697,9 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                      type: 'MARKET',
                      side: exitSide,
                      quantity: exitQty,
+                     filled_quantity: 0,
+                     pending_quantity: exitQty,
+                     order_variety: 'REGULAR',
                      price: autoExitLtp || null,
                      status: 'PENDING',
                      product_type: pos.product_type || 'INT',
@@ -7802,8 +7812,18 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT} - Instance ${process.env.NODE_APP_INSTANCE || 0}`);
 
-    // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
-    await initFyers(io, priceCache, isMaster);
+  // Guarantee critical columns exist in PostgreSQL before accepting orders
+  try {
+    const db = require('./database/db');
+    if (typeof db.ensureCriticalColumns === 'function') {
+      await db.ensureCriticalColumns();
+    }
+  } catch(err) {
+    console.warn('Startup schema check error:', err.message);
+  }
+
+  // Always initialize Fyers (fyers.js has hardcoded fallback credentials)
+  await initFyers(io, priceCache, isMaster);
 
     if (isMaster) {
       console.log('👑 Master Instance: Starting background tasks and Fyers connection...');
@@ -7965,6 +7985,7 @@ server.listen(PORT, async () => {
 
 
     // Initialize TriggerEngine
+    triggerEngine.setPriceCache(priceCache);
     triggerEngine.setSocketIo(io);
     await triggerEngine.loadPendingOrders();
     console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');

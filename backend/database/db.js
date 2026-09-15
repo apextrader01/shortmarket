@@ -236,36 +236,12 @@ async function initSchema() {
         console.log('Added trigger_type to orders table');
       }
 
-      const hasHoldings = await db.schema.hasTable('holdings');
-      if (!hasHoldings) {
-        await db.schema.createTable('holdings', table => {
-          table.increments('id').primary();
-          table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
-          table.string('symbol').notNullable();
-          table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
-          table.decimal('average_price', 14, 2).notNullable();
-          table.string('asset_class').notNullable().defaultTo('STOCK');
-          table.timestamps(true, true);
-        });
-        console.log('Created holdings table');
-      }
-
-      console.log('Database initialization complete.');
-
       const hasMargin = await db.schema.hasColumn('orders', 'margin');
       if (!hasMargin) {
         await db.schema.alterTable('orders', table => {
           table.decimal('margin', 14, 2).defaultTo(0);
         });
         console.log('Added margin to orders table');
-      }
-      
-      const hasAssetClass = await db.schema.hasColumn('holdings', 'asset_class');
-      if (!hasAssetClass) {
-        await db.schema.alterTable('holdings', table => {
-          table.string('asset_class').notNullable().defaultTo('STOCK');
-        });
-        console.log('Added asset_class to holdings table');
       }
       
       const hasTriggerPrice = await db.schema.hasColumn('orders', 'trigger_price');
@@ -356,6 +332,29 @@ async function initSchema() {
           table.string('order_variety').defaultTo('REGULAR');
         });
         console.log('Added order_variety to orders table');
+      }
+    }
+
+    // 3.5 Holdings Table
+    const hasHoldings = await db.schema.hasTable('holdings');
+    if (!hasHoldings) {
+      await db.schema.createTable('holdings', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('symbol').notNullable();
+        table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
+        table.decimal('average_price', 14, 2).notNullable();
+        table.string('asset_class').notNullable().defaultTo('STOCK');
+        table.timestamps(true, true);
+      });
+      console.log('Created holdings table');
+    } else {
+      const hasAssetClass = await db.schema.hasColumn('holdings', 'asset_class');
+      if (!hasAssetClass) {
+        await db.schema.alterTable('holdings', table => {
+          table.string('asset_class').notNullable().defaultTo('STOCK');
+        });
+        console.log('Added asset_class to holdings table');
       }
     }
 
@@ -493,9 +492,138 @@ async function initSchema() {
   }
 }
 
-// Raw SQL fallback — guarantees critical columns exist even if Knex migration missed them
+// Raw SQL fallback — guarantees critical tables and columns exist even if Knex migration missed them
 async function ensureCriticalColumns() {
   try {
+    // 1. Ensure essential tables exist (guaranteed raw DDL)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS holdings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol VARCHAR(255) NOT NULL,
+        quantity DECIMAL(14,4) NOT NULL DEFAULT 0,
+        average_price DECIMAL(14,2) NOT NULL,
+        asset_class VARCHAR(50) NOT NULL DEFAULT 'STOCK',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS ledger (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS deposit_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS sips (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol VARCHAR(255) NOT NULL,
+        amount DECIMAL(14,2) NOT NULL,
+        frequency VARCHAR(50) NOT NULL DEFAULT 'MONTHLY',
+        next_execution_date DATE NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+        anchor_day INTEGER,
+        failure_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS instruments (
+        token VARCHAR(255) PRIMARY KEY,
+        symbol VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        exchange VARCHAR(50),
+        lotsize INTEGER DEFAULT 1,
+        unique_symbol VARCHAR(255),
+        expiry_timestamp BIGINT,
+        search_string VARCHAR(255),
+        is_cas_illiquid BOOLEAN DEFAULT FALSE,
+        average_volume_5d DECIMAL(16,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 2. Orders table critical columns (Guaranteed raw DDL fallback)
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS filled_quantity DECIMAL(14,4) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS pending_quantity DECIMAL(14,4)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_variety VARCHAR(50) DEFAULT \'REGULAR\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS taxes DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(50) DEFAULT \'REGULAR\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS linked_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS remarks TEXT DEFAULT \'\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS margin DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT \'DEL\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS sl_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tgt_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trail_amount DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_index INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_total INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS basket_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS high_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS low_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_trailing BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE');
+
+    // 3. Positions table critical columns
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity DECIMAL(14,4) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS margin DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT \'DEL\'');
+
+    // 4. Holdings & Instruments columns
+    await db.raw('ALTER TABLE holdings ADD COLUMN IF NOT EXISTS asset_class VARCHAR(50) DEFAULT \'STOCK\'');
+    await db.raw('ALTER TABLE instruments ADD COLUMN IF NOT EXISTS is_cas_illiquid BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE instruments ADD COLUMN IF NOT EXISTS average_volume_5d DECIMAL(16,2) DEFAULT 0');
+
+    // 5. Drop any legacy restrictive check constraints that block AMO, trailing stops, or bracket legs
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_type_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_side_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_product_type_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_trigger_type_check').catch(() => {});
+    await db.raw('ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_type_check').catch(() => {});
+    await db.raw('ALTER TABLE deposit_requests DROP CONSTRAINT IF EXISTS deposit_requests_status_check').catch(() => {});
+
+    // 6. Backfill nulls for data consistency
+    await db.raw('UPDATE orders SET pending_quantity = quantity - COALESCE(filled_quantity, 0) WHERE pending_quantity IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET filled_quantity = 0 WHERE filled_quantity IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET order_variety = \'REGULAR\' WHERE order_variety IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET trigger_type = \'REGULAR\' WHERE trigger_type IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
+    await db.raw('UPDATE positions SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
+    await db.raw('UPDATE positions SET closed_quantity = 0 WHERE closed_quantity IS NULL').catch(() => {});
+    await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
+
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(10)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
@@ -853,7 +981,13 @@ async function ensureCriticalColumns() {
   }
 }
 
-initSchema().then(() => ensureCriticalColumns());
+initSchema()
+  .catch(err => console.error('initSchema error:', err?.message || err))
+  .then(() => ensureCriticalColumns())
+  .catch(err => console.error('ensureCriticalColumns error:', err?.message || err));
+
+db.ensureCriticalColumns = ensureCriticalColumns;
+db.initSchema = initSchema;
 
 module.exports = db;
 
