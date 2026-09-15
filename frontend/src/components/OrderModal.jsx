@@ -24,6 +24,7 @@ export default function OrderModal() {
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
+  const [isAmo, setIsAmo] = useState(false); // Regular, AMO
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
   const [slTrigger, setSlTrigger] = useState('');
@@ -274,12 +275,23 @@ export default function OrderModal() {
   const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
   const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
 
+  // Auto-select AMO if market is closed outside trading hours
+  useEffect(() => {
+    if (orderModal.isOpen) {
+      if (!marketSession.open && marketSession.mode !== 'CLOSED') {
+        setIsAmo(true);
+      } else if (marketSession.open) {
+        setIsAmo(false);
+      }
+    }
+  }, [orderModal.isOpen, marketSession.open, marketSession.mode]);
+
   const handlePlaceOrder = async (bypassCaution = false) => {
     if (marketSession.mode === 'CLOSED') {
       alert(marketSession.reason);
       return;
     }
-    if (isIntradayBlocked) {
+    if (isIntradayBlocked && !isAmo) {
        setShowIntradayBlockedPopup(true);
        return;
     }
@@ -381,7 +393,10 @@ export default function OrderModal() {
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
       product_type: isBO ? 'BO' : isCO ? 'CO' : productType,
-      lotsize: orderModal.lotsize || 1
+      lotsize: orderModal.lotsize || 1,
+      order_variety: isAmo ? 'AMO' : 'REGULAR',
+      variety: isAmo ? 'AMO' : 'REGULAR',
+      is_amo: isAmo
     };
 
     try {
@@ -521,9 +536,10 @@ export default function OrderModal() {
           </div>
         </div>
 
-        {/* Product Type Tabs (Intraday / Overnight / GTT) */}
+        {/* Product Type & Order Variety Tabs */}
         {!isTrueExit && (
-        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-panel)' }}>
+        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--bg-panel)', flexWrap: 'wrap' }}>
+          {/* Product Type: Intraday vs Delivery */}
           <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
             <button
               type="button"
@@ -562,14 +578,72 @@ export default function OrderModal() {
               {isOption || isFuture ? 'Overnight' : 'Delivery'}
             </button>
           </div>
+
+          {/* Order Variety: Regular vs AMO */}
+          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
+            <button
+              type="button"
+              onClick={() => setIsAmo(false)} 
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer',
+                background: !isAmo ? '#2563eb' : 'transparent',
+                color: !isAmo ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Regular
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAmo(true)} 
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                background: isAmo ? '#f59e0b' : 'transparent',
+                color: isAmo ? '#000000' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '700',
+                transition: 'all 0.15s ease',
+                boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
+              }}
+              title="After Market Order (Queued for execution at market open)"
+            >
+              🌙 AMO
+            </button>
+          </div>
         </div>
         )}
 
         {/* Form Body */}
         <div style={{ padding: '14px 20px 18px 20px', background: 'var(--bg-panel)' }}>
+          {isAmo && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#fde68a', 
+              background: 'rgba(245, 158, 11, 0.12)', 
+              border: '1px solid rgba(245, 158, 11, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌙</span>
+              <span>
+                <strong>After Market Order (AMO):</strong> Market is currently closed or off-hours. This order will be safely queued and executed via realistic volume matching at market open (09:15 AM).
+              </span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '600', letterSpacing: '0.2px' }}>
-              {productType === 'INT' ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'}
+              {productType === 'INT' ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'} {isAmo ? '• 🌙 AMO' : ''}
             </div>
           </div>
 
@@ -907,7 +981,7 @@ export default function OrderModal() {
               }}
             >
               {isPlacing ? 'PLACING...' : (
-                isTrueExit ? `EXIT ${totalQuantity} Qty` : `${side} ${totalQuantity} Qty`
+                isTrueExit ? `EXIT ${totalQuantity} Qty ${isAmo ? '(AMO)' : ''}` : `${side} ${totalQuantity} Qty ${isAmo ? '(AMO)' : ''}`
               )}
             </button>
           </div>
