@@ -280,6 +280,10 @@ export default function OrderModal() {
     if (orderModal.isOpen) {
       if (!marketSession.open && marketSession.mode !== 'CLOSED') {
         setIsAmo(true);
+        setIsBO(false);
+        setIsCO(false);
+        setSlPrice('');
+        setTgtPrice('');
       } else if (marketSession.open) {
         setIsAmo(false);
       }
@@ -298,6 +302,11 @@ export default function OrderModal() {
     if (isRestricted && !bypassCaution && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
+    }
+
+    if (isAmo && (isBO || isCO)) {
+      alert("Bracket Orders (BO) and Cover Orders (CO) are not allowed in After Market Orders (AMO). Please place a regular Limit or Market AMO order.");
+      return;
     }
 
     if (user && user.risk_guardian_active && !orderModal.isExit) {
@@ -599,7 +608,13 @@ export default function OrderModal() {
             </button>
             <button
               type="button"
-              onClick={() => setIsAmo(true)} 
+              onClick={() => {
+                setIsAmo(true);
+                setIsBO(false);
+                setIsCO(false);
+                setSlPrice('');
+                setTgtPrice('');
+              }} 
               style={{ 
                 padding: '6px 14px', 
                 borderRadius: '4px',
@@ -731,8 +746,8 @@ export default function OrderModal() {
             </div>
           </div>
 
-          {/* Intraday Stoploss & Take Profit (CO & BO) */}
-          {productType === 'INT' && (
+          {/* Intraday Stoploss & Take Profit (CO & BO) - Regular Market Hours Only */}
+          {productType === 'INT' && !isAmo && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
               <div></div>
               <div>

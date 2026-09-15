@@ -4221,6 +4221,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
+  // Disallow Bracket Orders (BO) and Cover Orders (CO) for After Market Orders (AMO)
+  if (isAmo && (product_type === 'BO' || product_type === 'CO' || req.body.is_bo || req.body.is_co || Boolean(sl_price && tgt_price))) {
+    return res.status(400).json({
+      error: 'Bracket Orders (BO) and Cover Orders (CO) are not permitted in After Market Orders (AMO). Please place a regular Limit or Market AMO order.'
+    });
+  }
+
   // BUG FIX 4: Block ALL new orders for F&O/FUT contracts on their expiry day after auto-square-off triggers.
   // Equities auto-square-off at 03:25 PM. MCX auto-square-off at 07:00 PM.
   // After these times, no manual intervention is allowed as the system forces settlement.
@@ -5840,9 +5847,16 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
           const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).forUpdate().first();
           if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
-          if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER') {
-            throw Object.assign(new Error('Only PENDING or PENDING_TRIGGER orders can be modified'), { statusCode: 400 });
+          if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'AMO_PENDING' && order.status !== 'PARTIAL_FILLED') {
+            throw Object.assign(new Error('Only PENDING, PENDING_TRIGGER, AMO_PENDING, or PARTIAL_FILLED orders can be modified'), { statusCode: 400 });
           }
+
+          const filledQty = Number(order.filled_quantity || 0);
+          const newQty = quantity !== undefined && quantity !== null ? Number(quantity) : Number(order.quantity);
+          if (order.status === 'PARTIAL_FILLED' && newQty < filledQty) {
+            throw Object.assign(new Error(`Modified quantity (${newQty}) cannot be less than already filled quantity (${filledQty})`), { statusCode: 400 });
+          }
+          const newPendingQty = Math.max(0, newQty - filledQty);
 
           // Handle Market Execution override for Pending Triggers
           if (isMarket && order.status === 'PENDING_TRIGGER') {
@@ -5866,7 +5880,6 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           if (isDelSell) {
             newMargin = 0;
             // If quantity increased, verify sufficient holdings
-            const newQty = Number(quantity);
             if (newQty > Number(order.quantity)) {
               const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
               const holding = await trx('holdings')
@@ -5893,9 +5906,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                 .where(builder => {
                   builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                 })
-                .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
                 .whereNot({ id: order.id });
-              const otherPendingQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+              const otherPendingQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== null && o.pending_quantity !== undefined ? o.pending_quantity : o.quantity), 0);
 
               const totalAvailable = parseFloat((holdingQty + posQty - otherPendingQty).toFixed(4));
               if (newQty > totalAvailable) {
@@ -5993,7 +6006,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           // Build update object
           const updateObj = { 
-              quantity: Number(quantity),
+              quantity: newQty,
+              pending_quantity: newPendingQty,
               margin: newMargin,
               updated_at: new Date()
           };
@@ -6025,7 +6039,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           if (childOrders.length > 0) {
             for (const child of childOrders) {
               const childUpdate = {
-                quantity: Number(quantity),
+                quantity: newQty,
+                pending_quantity: newQty,
                 updated_at: new Date()
               };
               if (child.type === 'SL-M' && sl_price !== undefined) {
@@ -6042,7 +6057,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
           // Update Balance & Ledger (deduct difference if positive, refund if negative)
           if (marginDifference > 0) {
-              await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+              const newBal = Math.round((parseFloat(user.balance) - marginDifference + Number.EPSILON) * 100) / 100;
+              await trx('users').where({ id: req.user.id }).update({ balance: newBal });
               await trx('ledger').insert({
                 user_id: req.user.id,
                 amount: -marginDifference,
@@ -6050,8 +6066,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                 description: `Additional margin blocked for modified order: ${quantity} ${order.symbol} (${order.product_type})`
               });
           } else if (marginDifference < 0) {
-              const refundAmount = Math.abs(marginDifference);
-              await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refundAmount });
+              const refundAmount = Math.round((Math.abs(marginDifference) + Number.EPSILON) * 100) / 100;
+              const newBal = Math.round((parseFloat(user.balance) + refundAmount + Number.EPSILON) * 100) / 100;
+              await trx('users').where({ id: req.user.id }).update({ balance: newBal });
               await trx('ledger').insert({
                 user_id: req.user.id,
                 amount: refundAmount,
@@ -6072,7 +6089,19 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
         const triggerEngine = require('./services/triggerEngine');
         if (updatedOrder) {
             await triggerEngine.removeOrderFromMemory(updatedOrder.id, updatedOrder.symbol);
-            await triggerEngine.addOrderToMemory(updatedOrder);
+            if (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PENDING_TRIGGER') {
+                await triggerEngine.addOrderToMemory(updatedOrder);
+            }
+            try {
+                const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+                volumeMatchingEngine.updateOrder(updatedOrder.id, {
+                    quantity: updatedOrder.quantity,
+                    pending_quantity: updatedOrder.pending_quantity,
+                    price: updatedOrder.price,
+                    margin: updatedOrder.margin,
+                    status: updatedOrder.status
+                });
+            } catch(e) {}
         }
         for (const child of updatedChildOrders) {
             await triggerEngine.removeOrderFromMemory(child.id, child.symbol);

@@ -109,6 +109,19 @@ class VolumeMatchingEngine {
     const ordObj = this.activeOrders.get(order.id.toString());
     if (!ordObj) return;
 
+    // Check if limit order is currently unmarketable
+    if (ordObj.type === 'LIMIT' && ordObj.price) {
+      const limitPrice = Number(ordObj.price);
+      if (ordObj.side === 'BUY' && baseLtp > limitPrice) {
+        // Market is above buy limit, wait for incoming ticks at or below limit
+        return;
+      }
+      if (ordObj.side === 'SELL' && baseLtp < limitPrice) {
+        // Market is below sell limit, wait for incoming ticks at or above limit
+        return;
+      }
+    }
+
     const cached = this.priceCache[ordObj.symbol] || {};
     const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
     const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
@@ -125,6 +138,13 @@ class VolumeMatchingEngine {
         const levelQty = Number(level.qty || level.quantity || level.volume || 0);
 
         if (levelPrice > 0 && levelQty > 0) {
+          // Verify level conforms to limit order boundary
+          if (ordObj.type === 'LIMIT' && ordObj.price) {
+            const limitPrice = Number(ordObj.price);
+            if (ordObj.side === 'BUY' && levelPrice > limitPrice) break;
+            if (ordObj.side === 'SELL' && levelPrice < limitPrice) break;
+          }
+
           const fillQty = Math.min(remainingToFill, levelQty);
           if (fillQty > 0) {
             depthFilled += fillQty;
@@ -141,11 +161,19 @@ class VolumeMatchingEngine {
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
     } else {
       // If depth is not available in mock/feed or zero depth, fill a small initial slice
-      // or wait for incoming ticks. For large liquid stocks without depth object,
-      // allow an initial participation slice.
-      const initialSlice = Math.min(ordObj.pending_quantity, Math.max(1, Math.floor(ordObj.pending_quantity * 0.2)));
-      if (baseLtp && baseLtp > 0 && initialSlice > 0) {
-        await this.processSliceFill(ordObj, initialSlice, baseLtp);
+      // only if price satisfies order limit constraint (if limit order)
+      let canFillInitial = true;
+      if (ordObj.type === 'LIMIT' && ordObj.price) {
+        const limitPrice = Number(ordObj.price);
+        if (ordObj.side === 'BUY' && baseLtp > limitPrice) canFillInitial = false;
+        if (ordObj.side === 'SELL' && baseLtp < limitPrice) canFillInitial = false;
+      }
+
+      if (canFillInitial) {
+        const initialSlice = Math.min(ordObj.pending_quantity, Math.max(1, Math.floor(ordObj.pending_quantity * 0.2)));
+        if (baseLtp && baseLtp > 0 && initialSlice > 0) {
+          await this.processSliceFill(ordObj, initialSlice, baseLtp);
+        }
       }
     }
 
@@ -210,6 +238,13 @@ class VolumeMatchingEngine {
         const order = queue[i];
         if (!order || order.pending_quantity <= 0) continue;
 
+        // Check limit price constraint for limit orders
+        if (order.type === 'LIMIT' && order.price) {
+          const limitPrice = Number(order.price);
+          if (order.side === 'BUY' && ltp > limitPrice) continue;
+          if (order.side === 'SELL' && ltp < limitPrice) continue;
+        }
+
         // Realistic participation rate: Order can absorb up to 50% of tick volume
         const maxFill = Math.min(order.pending_quantity, Math.max(1, Math.floor(availableVol * 0.5)));
         const fillQty = Math.min(order.pending_quantity, maxFill);
@@ -248,6 +283,9 @@ class VolumeMatchingEngine {
         const prevFilled = Number(currentOrder.filled_quantity || 0);
         const prevAvg = Number(currentOrder.average_price || slicePrice);
         const totalQty = Number(currentOrder.quantity);
+
+        // Safe definition of proportional slice margin accessible across all branches
+        const sliceMargin = totalQty > 0 ? (sliceQty / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
 
         const newFilled = Math.min(totalQty, prevFilled + sliceQty);
         const newPending = Math.max(0, totalQty - newFilled);
@@ -291,6 +329,7 @@ class VolumeMatchingEngine {
         if (isClosing) {
           const absPosQty = Math.abs(Number(existingPos.quantity));
           const closeQty = Math.min(sliceQty, absPosQty);
+          const leftoverQty = sliceQty - closeQty;
           let realizedPnl = 0;
 
           if (existingPos.quantity > 0) {
@@ -314,6 +353,22 @@ class VolumeMatchingEngine {
               margin: 0,
               updated_at: new Date()
             });
+
+            // Position Reversal: If order slice quantity exceeds closed position, open reverse position
+            if (leftoverQty > 0) {
+              const revSide = order.side === 'BUY' ? 1 : -1;
+              const revPosQty = revSide * leftoverQty;
+              const revMargin = totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0;
+              await trx('positions').insert({
+                user_id: order.user_id,
+                symbol: order.symbol,
+                quantity: revPosQty,
+                average_price: slicePrice,
+                product_type: existingPos.product_type || order.product_type || 'INT',
+                margin: revMargin,
+                updated_at: new Date()
+              });
+            }
           } else {
             await trx('positions').where({ id: existingPos.id }).update({
               quantity: newPosQty,
@@ -377,18 +432,42 @@ class VolumeMatchingEngine {
             const realizedPnl = Math.round(((slicePrice - hAvg) * closeQty + Number.EPSILON) * 100) / 100;
             const grossProceeds = Math.round((slicePrice * closeQty) * 100) / 100;
 
-            // Record closed position for today
-            await trx('positions').insert({
-              user_id: order.user_id,
-              symbol: order.symbol,
-              quantity: 0,
-              closed_quantity: closeQty,
-              average_price: hAvg,
-              exit_price: slicePrice,
-              realized_pnl: realizedPnl,
-              product_type: order.product_type || 'DEL',
-              updated_at: new Date()
-            });
+            // Record or consolidate closed position for today to avoid duplicate fragmented rows
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            const existingClosedPos = await trx('positions')
+              .where({ user_id: order.user_id, symbol: order.symbol, quantity: 0 })
+              .where('updated_at', '>=', todayStart)
+              .first();
+
+            if (existingClosedPos) {
+              const prevClosedQty = Number(existingClosedPos.closed_quantity || 0);
+              const prevExitPrice = Number(existingClosedPos.exit_price || slicePrice);
+              const newTotalClosed = prevClosedQty + closeQty;
+              const newAvgExitPrice = newTotalClosed > 0
+                ? Number((((prevClosedQty * prevExitPrice) + (closeQty * slicePrice)) / newTotalClosed).toFixed(2))
+                : slicePrice;
+
+              await trx('positions').where({ id: existingClosedPos.id }).update({
+                closed_quantity: newTotalClosed,
+                exit_price: newAvgExitPrice,
+                realized_pnl: Number(existingClosedPos.realized_pnl || 0) + realizedPnl,
+                updated_at: new Date()
+              });
+            } else {
+              await trx('positions').insert({
+                user_id: order.user_id,
+                symbol: order.symbol,
+                quantity: 0,
+                closed_quantity: closeQty,
+                average_price: hAvg,
+                exit_price: slicePrice,
+                realized_pnl: realizedPnl,
+                product_type: order.product_type || 'DEL',
+                updated_at: new Date()
+              });
+            }
 
             // Credit net sale proceeds to user balance
             const user = await trx('users').where({ id: order.user_id }).first();
@@ -416,8 +495,6 @@ class VolumeMatchingEngine {
           }
         } else {
           // Opening or adding to position
-          const sliceMargin = totalQty > 0 ? (sliceQty / totalQty) * order.margin : order.margin;
-
           if (existingPos) {
             const prevPosQty = Number(existingPos.quantity);
             const prevPosAvg = Number(existingPos.average_price);
@@ -473,6 +550,24 @@ class VolumeMatchingEngine {
       });
     } catch (err) {
       console.error(`Error processing slice fill for order ${order.id}:`, err.message);
+    }
+  }
+
+  /**
+   * Update resting order in-memory if quantity or price is modified via API.
+   */
+  updateOrder(orderId, updates) {
+    if (!orderId) return;
+    const ordObj = this.activeOrders.get(orderId.toString());
+    if (ordObj && updates) {
+      if (updates.quantity !== undefined) ordObj.quantity = Number(updates.quantity);
+      if (updates.pending_quantity !== undefined) ordObj.pending_quantity = Number(updates.pending_quantity);
+      if (updates.price !== undefined) ordObj.price = updates.price ? Number(updates.price) : null;
+      if (updates.margin !== undefined) ordObj.margin = Number(updates.margin);
+      if (updates.status !== undefined) ordObj.status = updates.status;
+      if (ordObj.pending_quantity <= 0 || ordObj.status === 'CANCELLED' || ordObj.status === 'EXECUTED') {
+        this.dequeueOrder(orderId, ordObj.symbol);
+      }
     }
   }
 

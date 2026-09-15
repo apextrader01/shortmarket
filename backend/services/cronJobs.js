@@ -23,7 +23,7 @@ function isIntradayBlocked(symbol) {
     return isCommoditySymbol(symbol) ? isCommodityIntradayBlocked : isEquityIntradayBlocked;
 }
 
-async function executeAmoOrders(segment = 'ALL', priceCache = {}) {
+async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine = null) {
     const volumeMatchingEngine = require('./volumeMatchingEngine');
     console.log(`⏰ [CRON] Sweeping AMO orders for segment: ${segment}...`);
     try {
@@ -34,6 +34,7 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}) {
 
         if (amoOrders.length === 0) return;
 
+        let hasRestingTriggers = false;
         for (const ord of amoOrders) {
             const isCom = isCommoditySymbol(ord.symbol);
             if (segment === 'COMMODITY' && !isCom) continue;
@@ -49,20 +50,35 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}) {
                 if (isMarketable) {
                     await volumeMatchingEngine.submitOrder(ord, ltp);
                 } else {
-                    await db('orders').where({ id: ord.id }).update({ status: 'PENDING' });
+                    await db('orders').where({ id: ord.id }).update({ status: 'PENDING', updated_at: new Date() });
                     ord.status = 'PENDING';
+                    if (triggerEngine) {
+                        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+                        hasRestingTriggers = true;
+                    }
                 }
             } else {
-                await db('orders').where({ id: ord.id }).update({ status: 'PENDING_TRIGGER' });
+                await db('orders').where({ id: ord.id }).update({ status: 'PENDING_TRIGGER', updated_at: new Date() });
                 ord.status = 'PENDING_TRIGGER';
+                if (triggerEngine) {
+                    await triggerEngine.addOrderToMemory(ord).catch(() => {});
+                    hasRestingTriggers = true;
+                }
             }
+        }
+
+        if (hasRestingTriggers) {
+            try {
+                const { pubClient } = require('./redisClient');
+                if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
+            } catch(e) {}
         }
     } catch (err) {
         console.error(`[CRON] executeAmoOrders (${segment}) error:`, err.message);
     }
 }
 
-async function executeCasOpeningMatch(priceCache = {}) {
+async function executeCasOpeningMatch(priceCache = {}, triggerEngine = null) {
     const volumeMatchingEngine = require('./volumeMatchingEngine');
     console.log(`⏰ [CRON 09:08 AM] Matching Pre-Market CAS orders at opening equilibrium price...`);
     try {
@@ -72,9 +88,33 @@ async function executeCasOpeningMatch(priceCache = {}) {
 
         if (casOrders.length === 0) return;
 
+        let hasRestingTriggers = false;
         for (const ord of casOrders) {
             const ltp = priceCache[ord.symbol]?.open || priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
+
+            if (ord.type === 'LIMIT' && ord.price) {
+                const limitPrice = Number(ord.price);
+                const isCrossed = (ord.side === 'BUY' && ltp <= limitPrice) || (ord.side === 'SELL' && ltp >= limitPrice);
+                if (!isCrossed) {
+                    // Equilibrium open price is outside user limit. Transition to continuous trading session as PENDING
+                    await db('orders').where({ id: ord.id }).update({ status: 'PENDING', order_variety: 'REGULAR', updated_at: new Date() });
+                    ord.status = 'PENDING';
+                    if (triggerEngine) {
+                        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+                        hasRestingTriggers = true;
+                    }
+                    continue;
+                }
+            }
+
             await volumeMatchingEngine.submitOrder(ord, ltp);
+        }
+
+        if (hasRestingTriggers) {
+            try {
+                const { pubClient } = require('./redisClient');
+                if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
+            } catch(e) {}
         }
     } catch (err) {
         console.error(`[CRON] executeCasOpeningMatch error:`, err.message);
@@ -113,17 +153,17 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // ─── 09:00 AM IST: MCX Commodity AMO Sweep ──────────────────────────────────
     cron.schedule('0 9 * * 1-5', () => {
-        executeAmoOrders('COMMODITY', priceCache);
+        executeAmoOrders('COMMODITY', priceCache, triggerEngine);
     }, TZ);
 
     // ─── 09:08 AM IST: Pre-Market CAS Opening Price Match ───────────────────────
     cron.schedule('8 9 * * 1-5', () => {
-        executeCasOpeningMatch(priceCache);
+        executeCasOpeningMatch(priceCache, triggerEngine);
     }, TZ);
 
     // ─── 09:15 AM IST: Equity & F&O Market Open AMO Sweep ───────────────────────
     cron.schedule('15 9 * * 1-5', () => {
-        executeAmoOrders('EQUITY', priceCache);
+        executeAmoOrders('EQUITY', priceCache, triggerEngine);
     }, TZ);
 
     // ─── SUNDAY 00:00 AM IST: Weekly CAS & Illiquid Stock Review ────────────────
