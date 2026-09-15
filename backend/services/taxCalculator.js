@@ -283,5 +283,5 @@ function calculateOrderSlices(symbol, totalQty, explicitLotsize = null) {
     return slices;
 }
 
-module.exports = { calculateTaxes, getFreezeLimit, calculateOrderSlices, getInstantLotsize };
+module.exports = { calculateTaxes, getFreezeLimit, calculateOrderSlices, getInstantLotsize, isDerivativeContract, isCommodityContract };
 

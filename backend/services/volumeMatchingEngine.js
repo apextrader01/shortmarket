@@ -1,6 +1,23 @@
 const db = require('../database/db');
 const LedgerService = require('./ledgerService');
-const { calculateTaxes } = require('./taxCalculator');
+const { calculateTaxes, isDerivativeContract } = require('./taxCalculator');
+
+function normalizeSymbol(sym) {
+  if (!sym || typeof sym !== 'string') return '';
+  return sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '').toUpperCase();
+}
+
+function getCachedPrice(priceCache, symbol) {
+  if (!priceCache || !symbol) return {};
+  if (priceCache[symbol]) return priceCache[symbol];
+  const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '');
+  if (priceCache[clean]) return priceCache[clean];
+  if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
+  if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
+  if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
+  return {};
+}
 
 class VolumeMatchingEngine {
   constructor() {
@@ -52,10 +69,13 @@ class VolumeMatchingEngine {
   enqueueOrder(order) {
     if (!order || !order.id || !order.symbol) return;
     const sym = order.symbol;
+    const normSym = normalizeSymbol(sym);
     const ordObj = {
       id: order.id,
       user_id: order.user_id,
       symbol: order.symbol,
+      norm_symbol: normSym,
+      order_variety: order.order_variety || 'REGULAR',
       type: order.type,
       side: order.side,
       quantity: Number(order.quantity),
@@ -67,6 +87,7 @@ class VolumeMatchingEngine {
       price: order.price ? Number(order.price) : null,
       product_type: order.product_type,
       margin: Number(order.margin || 0),
+      taxes: Number(order.taxes || 0),
       status: order.status || 'PENDING',
       sl_price: order.sl_price,
       tgt_price: order.tgt_price,
@@ -77,24 +98,30 @@ class VolumeMatchingEngine {
 
     this.activeOrders.set(ordObj.id.toString(), ordObj);
 
-    if (!this.symbolQueues.has(sym)) {
-      this.symbolQueues.set(sym, []);
+    if (!this.symbolQueues.has(normSym)) {
+      this.symbolQueues.set(normSym, []);
     }
-    const queue = this.symbolQueues.get(sym);
+    const queue = this.symbolQueues.get(normSym);
     if (!queue.some(o => o.id === ordObj.id)) {
       queue.push(ordObj);
     }
   }
 
   dequeueOrder(orderId, symbol) {
+    if (!orderId) return;
+    const ord = this.activeOrders.get(orderId.toString());
+    const targetSym = symbol || ord?.symbol;
     this.activeOrders.delete(orderId.toString());
-    if (symbol && this.symbolQueues.has(symbol)) {
-      const queue = this.symbolQueues.get(symbol);
-      const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
-      if (filtered.length === 0) {
-        this.symbolQueues.delete(symbol);
-      } else {
-        this.symbolQueues.set(symbol, filtered);
+    if (targetSym) {
+      const normSym = normalizeSymbol(targetSym);
+      if (this.symbolQueues.has(normSym)) {
+        const queue = this.symbolQueues.get(normSym);
+        const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
+        if (filtered.length === 0) {
+          this.symbolQueues.delete(normSym);
+        } else {
+          this.symbolQueues.set(normSym, filtered);
+        }
       }
     }
   }
@@ -122,7 +149,15 @@ class VolumeMatchingEngine {
       }
     }
 
-    const cached = this.priceCache[ordObj.symbol] || {};
+    // Call Auction (CAS) 09:08 AM opening equilibrium match fills 100% of matched orders at baseLtp
+    if (ordObj.order_variety === 'CAS') {
+      if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
+        await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+      }
+      return;
+    }
+
+    const cached = getCachedPrice(this.priceCache, ordObj.symbol);
     const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
     const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
 
@@ -183,11 +218,13 @@ class VolumeMatchingEngine {
       order.pending_quantity = ordObj.pending_quantity;
       order.average_price = ordObj.average_price;
       order.status = ordObj.status;
+      order.taxes = ordObj.taxes;
     }
 
     // Initialize last volume tracker for this symbol
     if (cached.volume) {
-      this.lastSymbolVolume.set(ordObj.symbol, Number(cached.volume));
+      const normSym = normalizeSymbol(ordObj.symbol);
+      this.lastSymbolVolume.set(normSym, Number(cached.volume));
     }
   }
 
@@ -203,22 +240,23 @@ class VolumeMatchingEngine {
    */
   async onTick(symbol, tick) {
     if (!symbol || !tick) return;
-    const queue = this.symbolQueues.get(symbol);
+    const normSym = normalizeSymbol(symbol);
+    const queue = this.symbolQueues.get(normSym);
     if (!queue || queue.length === 0) {
       if (tick.volume || tick.vol_traded_today) {
-        this.lastSymbolVolume.set(symbol, Number(tick.volume || tick.vol_traded_today));
+        this.lastSymbolVolume.set(normSym, Number(tick.volume || tick.vol_traded_today));
       }
       return;
     }
 
-    if (this.processingSymbols.has(symbol)) return;
-    this.processingSymbols.add(symbol);
+    if (this.processingSymbols.has(normSym)) return;
+    this.processingSymbols.add(normSym);
 
     try {
       const currentVol = Number(tick.volume || tick.vol_traded_today || 0);
-      const prevVol = this.lastSymbolVolume.get(symbol) || currentVol;
+      const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
       let deltaVol = currentVol > prevVol ? (currentVol - prevVol) : 0;
-      this.lastSymbolVolume.set(symbol, currentVol);
+      this.lastSymbolVolume.set(normSym, currentVol);
 
       const ltp = Number(tick.ltp || 0);
       if (ltp <= 0) return;
@@ -233,10 +271,11 @@ class VolumeMatchingEngine {
 
       // Distribute available tick volume to active orders in FIFO order
       let availableVol = deltaVol;
+      const snapshotQueue = [...queue];
 
-      for (let i = 0; i < queue.length; i++) {
-        const order = queue[i];
-        if (!order || order.pending_quantity <= 0) continue;
+      for (let i = 0; i < snapshotQueue.length; i++) {
+        const order = snapshotQueue[i];
+        if (!order || !this.activeOrders.has(order.id.toString()) || order.pending_quantity <= 0) continue;
 
         // Check limit price constraint for limit orders
         if (order.type === 'LIMIT' && order.price) {
@@ -259,7 +298,7 @@ class VolumeMatchingEngine {
     } catch (err) {
       console.error(`VolumeMatchingEngine onTick error for ${symbol}:`, err.message);
     } finally {
-      this.processingSymbols.delete(symbol);
+      this.processingSymbols.delete(normSym);
     }
   }
 
@@ -284,6 +323,19 @@ class VolumeMatchingEngine {
         const prevAvg = Number(currentOrder.average_price || slicePrice);
         const totalQty = Number(currentOrder.quantity);
 
+        // Deduct Brokerage & Regulatory Taxes for this executed slice
+        const sliceTaxes = await LedgerService.chargeExecutionTaxes(
+          trx,
+          order.user_id,
+          order.symbol,
+          order.product_type,
+          order.side,
+          sliceQty,
+          slicePrice
+        );
+        const currentTaxes = Number(currentOrder.taxes || 0);
+        const accumulatedTaxes = Math.round((currentTaxes + sliceTaxes + Number.EPSILON) * 100) / 100;
+
         // Safe definition of proportional slice margin accessible across all branches
         const sliceMargin = totalQty > 0 ? (sliceQty / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
 
@@ -302,15 +354,27 @@ class VolumeMatchingEngine {
           pending_quantity: newPending,
           average_price: newAvgPrice,
           price: isComplete ? newAvgPrice : (currentOrder.price || newAvgPrice),
+          taxes: accumulatedTaxes,
           status: newStatus,
           updated_at: new Date()
         });
 
         // 2. Incremental Position Update
         const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+        const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'BO' || order.product_type === 'CO');
+        const isDeliveryProduct = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
         const existingPos = await trx('positions')
           .where({ user_id: order.user_id })
-          .whereIn('product_type', [order.product_type, 'INT', 'DEL', 'CNC'])
+          .where(builder => {
+            if (isIntradayProduct) {
+              builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+            } else if (isDeliveryProduct) {
+              builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+            } else {
+              builder.where({ product_type: order.product_type });
+            }
+          })
           .where(b => {
             b.where({ symbol: order.symbol })
               .orWhere({ symbol: cleanSym })
@@ -358,7 +422,31 @@ class VolumeMatchingEngine {
             if (leftoverQty > 0) {
               const revSide = order.side === 'BUY' ? 1 : -1;
               const revPosQty = revSide * leftoverQty;
-              const revMargin = totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0;
+              const { calculateRequiredMargin } = require('./marginEngine');
+              const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, leftoverQty, slicePrice);
+              const revMargin = calcMargin > 0 ? calcMargin : (totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0);
+
+              const orderMarginBlocked = Number(order.margin || 0);
+              const marginDelta = revMargin - orderMarginBlocked;
+              if (marginDelta > 0) {
+                await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                await trx('ledger').insert({
+                  user_id: order.user_id,
+                  amount: -marginDelta,
+                  type: 'MARGIN_BLOCK',
+                  description: `Margin blocked for reversed position ${revPosQty} ${order.symbol}`
+                });
+              } else if (marginDelta < 0) {
+                const excessRefund = Math.round((Math.abs(marginDelta) + Number.EPSILON) * 100) / 100;
+                await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                await trx('ledger').insert({
+                  user_id: order.user_id,
+                  amount: excessRefund,
+                  type: 'MARGIN_RELEASE',
+                  description: `Excess margin refunded on reversal ${revPosQty} ${order.symbol}`
+                });
+              }
+
               await trx('positions').insert({
                 user_id: order.user_id,
                 symbol: order.symbol,
@@ -482,6 +570,11 @@ class VolumeMatchingEngine {
               description: `Delivery Holding Sale: ${closeQty} ${order.symbol} @ ₹${slicePrice}`
             });
           } else {
+            const isDeriv = isDerivativeContract(order.symbol);
+            if (!isDeriv) {
+              console.warn(`[SAFEGUARD] Blocked negative DEL cash equity position for user ${order.user_id}, symbol ${order.symbol}`);
+              return;
+            }
             const initialPosQty = -sliceQty;
             await trx('positions').insert({
               user_id: order.user_id,
@@ -526,10 +619,25 @@ class VolumeMatchingEngine {
         order.filled_quantity = newFilled;
         order.pending_quantity = newPending;
         order.average_price = newAvgPrice;
+        order.taxes = accumulatedTaxes;
         order.status = newStatus;
 
         if (isComplete) {
           this.dequeueOrder(order.id, order.symbol);
+
+          // 3. Bracket Order (CO/BO) Leg Generation upon completion
+          const hasSL = (currentOrder.sl_price && Number(currentOrder.sl_price) > 0) || (order.sl_price && Number(order.sl_price) > 0);
+          const hasTgt = (currentOrder.tgt_price && Number(currentOrder.tgt_price) > 0) || (order.tgt_price && Number(order.tgt_price) > 0);
+
+          if (hasSL || hasTgt || order.product_type === 'BO' || order.product_type === 'CO') {
+            const { spawnBracketOrders } = require('./orderExecutor');
+            await spawnBracketOrders(trx, {
+              ...currentOrder,
+              ...order,
+              price: newAvgPrice,
+              quantity: newFilled
+            }, newFilled);
+          }
         }
 
         // Broadcast real-time partial fill to user socket
@@ -543,6 +651,7 @@ class VolumeMatchingEngine {
             filledQty: newFilled,
             pendingQty: newPending,
             avgPrice: newAvgPrice,
+            taxes: accumulatedTaxes,
             status: newStatus
           });
           this.io.emit('sync_user_data', { userId: order.user_id });
@@ -600,6 +709,24 @@ class VolumeMatchingEngine {
         remarks: `Partially filled: ${order.filled_quantity || 0} executed, ${pendingQty} cancelled`,
         updated_at: new Date()
       });
+
+      // If partially filled BO/CO is cancelled, spawn protection legs for the filled portion
+      const prevFilled = Number(order.filled_quantity || 0);
+      if (prevFilled > 0) {
+        const hasSL = order.sl_price && Number(order.sl_price) > 0;
+        const hasTgt = order.tgt_price && Number(order.tgt_price) > 0;
+        if (hasSL || hasTgt || order.product_type === 'BO' || order.product_type === 'CO') {
+          const existingChild = await trx('orders').where({ parent_order_id: order.id }).first();
+          if (!existingChild) {
+            const { spawnBracketOrders } = require('./orderExecutor');
+            await spawnBracketOrders(trx, {
+              ...order,
+              price: order.average_price,
+              quantity: prevFilled
+            }, prevFilled);
+          }
+        }
+      }
 
       if (refundAmount > 0) {
         const user = await trx('users').where({ id: userId }).first();

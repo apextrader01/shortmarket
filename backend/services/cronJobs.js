@@ -43,11 +43,15 @@ async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine 
             const ltp = priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
 
             if (ord.type === 'MARKET') {
+                await db('orders').where({ id: ord.id }).update({ status: 'PENDING', updated_at: new Date() });
+                ord.status = 'PENDING';
                 await volumeMatchingEngine.submitOrder(ord, ltp);
             } else if (ord.type === 'LIMIT') {
                 const limitPrice = Number(ord.price);
                 const isMarketable = (ord.side === 'BUY' && ltp <= limitPrice) || (ord.side === 'SELL' && ltp >= limitPrice);
                 if (isMarketable) {
+                    await db('orders').where({ id: ord.id }).update({ status: 'PENDING', updated_at: new Date() });
+                    ord.status = 'PENDING';
                     await volumeMatchingEngine.submitOrder(ord, ltp);
                 } else {
                     await db('orders').where({ id: ord.id }).update({ status: 'PENDING', updated_at: new Date() });
@@ -107,6 +111,9 @@ async function executeCasOpeningMatch(priceCache = {}, triggerEngine = null) {
                 }
             }
 
+            await db('orders').where({ id: ord.id }).update({ status: 'PENDING', order_variety: 'REGULAR', updated_at: new Date() });
+            ord.status = 'PENDING';
+            ord.order_variety = 'REGULAR';
             await volumeMatchingEngine.submitOrder(ord, ltp);
         }
 

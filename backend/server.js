@@ -5622,6 +5622,20 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+
+      // If a partially filled BO/CO order is cancelled, spawn protection legs for the already executed portion
+      const filledQty = parseFloat(order.filled_quantity || 0);
+      if (filledQty > 0 && (order.sl_price || order.tgt_price || order.product_type === 'BO' || order.product_type === 'CO')) {
+        const existingChild = await trx('orders').where({ parent_order_id: order.id }).first();
+        if (!existingChild) {
+          const { spawnBracketOrders } = require('./services/orderExecutor');
+          await spawnBracketOrders(trx, {
+            ...order,
+            price: order.average_price,
+            quantity: filledQty
+          }, filledQty);
+        }
+      }
       
       // OCO: Cancel sibling legs if this is a BO leg
       if (order.parent_order_id || order.linked_order_id) {
