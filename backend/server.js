@@ -3980,6 +3980,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   const margin = req.body.margin;
   const product_type = req.body.product_type || req.body.productType || 'INT';
   const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL') ? 'DEL' : product_type;
+  const rawVariety = req.body.order_variety || req.body.variety || (req.body.is_amo ? 'AMO' : null);
 
   if (!symbol || !type || !side || !quantity) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -4173,26 +4174,49 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     }
   }
 
-  // Block new orders when market is closed (square-off / closing orders are always permitted)
+  // Check market status & determine AMO vs CAS vs Regular
   const isMF = String(symbol).endsWith('-MF') || String(symbol).includes('MUTUALFUND');
-  if (!isClosingOrder && !isMF) {
+  let isAmo = (rawVariety === 'AMO' || Boolean(req.body.is_amo));
+  let isCas = (rawVariety === 'CAS' || Boolean(req.body.is_cas));
+
+  if (!isMF) {
     const isCommodity = isCommodityContract(symbol);
     const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
     
-    // Phase 1 Intraday Cutoff Enforcement (15:15 IST Equities / 22:50 IST Commodities)
-    if (isIntradayProduct) {
-      const { isIntradayBlocked } = require('./services/cronJobs');
-      if (typeof isIntradayBlocked === 'function' && isIntradayBlocked(symbol)) {
-        return res.status(400).json({
-          error: `Intraday order placement is closed for the day (${isCommodity ? '10:50 PM' : '3:15 PM'} cutoff). Only CNC/Delivery orders or position exits are allowed.`
-        });
-      }
+    // Pre-Market CAS Session: 09:00 AM - 09:08 AM on trading days for cash equities
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
+    const istDay = istParts.find(p => p.type === 'weekday')?.value;
+    const istH = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const istM = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
+    const isCasWindow = !isWeekend && istH === 9 && istM < 8;
+
+    if (isCasWindow && !isCommodity && !isDerivativeContract(symbol)) {
+      isCas = true;
     }
 
     const marketCheck = isSegmentMarketOpen(isCommodity);
     if (!marketCheck.open) {
-      if (marketCheck.isTotalBlock || isIntradayProduct) {
+      // 1. If Market is FORCED CLOSED / Holiday by Administrator, strictly block ALL orders (including exits and square-offs)
+      if (marketCheck.isTotalBlock) {
         return res.status(400).json({ error: marketCheck.reason });
+      }
+
+      // 2. If it is an Intraday product (INT/BO/CO) after market hours:
+      if (isIntradayProduct) {
+        if (isClosingOrder) {
+          return res.status(400).json({
+            error: `Market is closed (${marketCheck.reason || 'Trading hours closed'}). Intraday square-off is not permitted outside exchange trading hours (09:15 AM - 03:20 PM IST).`
+          });
+        }
+        // New intraday entry orders outside hours are routed to AMO
+        isAmo = true;
+      } else {
+        // 3. Delivery / Holdings (DEL/CNC) or regular equity orders:
+        // Automatically route as After Market Order (AMO) so it sits safely in AMO_PENDING
+        // and does NOT execute instantly at night!
+        isAmo = true;
       }
     }
   }
@@ -4278,20 +4302,20 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   .first();
               const posQty = existingPos && Number(existingPos.quantity) > 0 ? Number(existingPos.quantity) : 0;
               
-              // 3. Fetch Pending Sell Orders for this symbol
+              // 3. Fetch Pending Sell Orders for this symbol (including AMO and partial fills)
               const pendingOrders = await trx('orders')
                   .where({ user_id: req.user.id, side: 'SELL' })
                   .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
                   .where(builder => {
                     builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                   })
-                  .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-              const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+                  .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+              const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== undefined && o.pending_quantity !== null ? o.pending_quantity : o.quantity), 0);
               
               const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
               
               if (Number(quantity) > totalAvailable) {
-                  throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell.`);
+                  throw new Error(`Insufficient holdings. You only have ${totalAvailable} shares available to sell${pendingSellQty > 0 ? ` (${pendingSellQty} shares reserved in open/AMO orders)` : ''}.`);
               }
               requiresMargin = false; // Selling DEL from holdings requires no margin
           } else {
@@ -4397,22 +4421,52 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       // Ensure margin passed down to insert is the final margin
       const marginToSave = requiresMargin ? finalMargin : 0;
       const orderRemarks = req.body.slice_group_id ? `Slice ${req.body.slice_index || 1}/${req.body.slice_total || 1} [${req.body.slice_group_id}]` : (req.body.remarks || '');
+      const orderVariety = isCas ? 'CAS' : (isAmo ? 'AMO' : 'REGULAR');
+      const initialStatus = (isAmo || isCas) ? 'AMO_PENDING' : status;
 
       // 3. Insert Order
       const [id] = await trx('orders').insert({
         user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        filled_quantity: 0, pending_quantity: quantity, average_price: null,
+        order_variety: orderVariety,
+        status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         remarks: orderRemarks
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
       req.orderToProcess = {
         id: orderId, user_id: req.user.id, symbol, type, side, quantity, price: execPrice || null,
-        status, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
+        filled_quantity: 0, pending_quantity: quantity, average_price: null,
+        order_variety: orderVariety,
+        status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         remarks: orderRemarks,
-        isMarket
+        isMarket,
+        isAmo,
+        isCas
       };
     });
+
+    if (req.orderToProcess.isAmo || req.orderToProcess.isCas) {
+      const ord = req.orderToProcess;
+      const isCasOrder = ord.isCas;
+      const msg = isCasOrder
+        ? 'Pre-Market CAS order placed! Will be matched at discovered equilibrium opening price at 09:08 AM.'
+        : 'After Market Order (AMO) placed! Will be executed via realistic volume matching at market open.';
+
+      sendPushNotification(req.user.id, {
+        title: `${isCasOrder ? 'CAS' : 'AMO'} Order Placed: ${side} ${quantity} ${symbol}`,
+        body: msg,
+        url: '/orders'
+      }).catch(() => {});
+
+      return res.json({
+        success: true,
+        orderId: ord.id,
+        status: 'AMO_PENDING',
+        order_variety: ord.order_variety,
+        message: msg
+      });
+    }
 
     const triggerEngine = require('./services/triggerEngine');
     const ord = req.orderToProcess;
@@ -4427,19 +4481,19 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         } catch(e) {}
     }, 500);
     
-    // Instantly execute Market orders & Marketable Limit orders with 0ms delay
+    // Execute Market orders via Realistic Volume & Market Depth Matching Engine
     if (ord.isMarket) {
       const baseLtp = (priceCache[ord.symbol]?.ltp && Number(priceCache[ord.symbol].ltp) > 0)
         ? Number(priceCache[ord.symbol].ltp)
         : (parseFloat(ord.price) || parseFloat(req.body.price) || 0);
 
       if (baseLtp > 0) {
-        const execLtp = calculateExecutionPrice(ord.symbol, ord.side, ord.quantity, baseLtp);
         try {
           await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
-          await triggerEngine.executeOrder(ord, execLtp);
+          const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+          await volumeMatchingEngine.submitOrder(ord, baseLtp);
         } catch (err) {
-          console.error('Immediate market execution error:', err);
+          console.error('Volume matching submission error:', err);
         }
       }
     } else if (ord.type === 'LIMIT') {
@@ -5556,8 +5610,8 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // BUG FIX: Use throw instead of return res.status() inside a transaction.
       // 'return' only exits the callback arrow function, NOT the transaction — throw aborts it properly.
       if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
-      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER')
-        throw Object.assign(new Error('Only pending orders can be cancelled'), { statusCode: 400 });
+      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'PARTIAL_FILLED' && order.status !== 'AMO_PENDING')
+        throw Object.assign(new Error('Only pending, partially filled, or AMO orders can be cancelled'), { statusCode: 400 });
       
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
@@ -5633,20 +5687,27 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
           }
       }
       
-      // BUG FIX: Always use order.margin for refund.
-      // Previous fallback (order.quantity * order.price) gave ₹0 refund for MARKET orders
-      // because market order price is null at placement time.
-      const refundAmount = parseFloat(order.margin) || 0;
+      // Pro-rata margin refund for unfilled portion of order
+      const totalMargin = parseFloat(order.margin) || 0;
+      const totalQty = parseFloat(order.quantity) || 1;
+      const pendingQty = (order.pending_quantity !== null && order.pending_quantity !== undefined)
+        ? parseFloat(order.pending_quantity)
+        : (order.status === 'PARTIAL_FILLED' ? Math.max(0, totalQty - parseFloat(order.filled_quantity || 0)) : totalQty);
+
+      const refundAmount = totalQty > 0
+        ? Math.round(((pendingQty / totalQty) * totalMargin + Number.EPSILON) * 100) / 100
+        : totalMargin;
+
       if (refundAmount > 0) {
           const user = await trx('users').where({ id: req.user.id }).first();
           if (user) {
               await trx('users').where({ id: req.user.id }).update({ balance: Math.round((parseFloat(user.balance) + refundAmount + Number.EPSILON) * 100) / 100 });
-              // BUG FIX: Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
+              // Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
               await trx('ledger').insert({
                 user_id: req.user.id,
                 amount: refundAmount,
                 type: 'MARGIN_RELEASE',
-                description: `Margin refunded for cancelled order: ${order.quantity} ${order.symbol} ${order.side}`
+                description: `Margin refunded for cancelled order: ${pendingQty} ${order.symbol} ${order.side}`
               });
           }
       }
@@ -5656,6 +5717,10 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
     const triggerEngine = require('./services/triggerEngine');
     triggerEngine.removeOrderFromMemory(req.params.id, cancelledOrder.symbol);
+    try {
+      const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+      volumeMatchingEngine.dequeueOrder(req.params.id, cancelledOrder.symbol);
+    } catch(e) {}
     for (const sib of siblingsToClean) {
       triggerEngine.removeOrderFromMemory(sib.id, sib.symbol);
     }
@@ -7860,6 +7925,11 @@ server.listen(PORT, async () => {
     triggerEngine.setSocketIo(io);
     await triggerEngine.loadPendingOrders();
     console.log('⚡ TriggerEngine active (LIMIT + SL/TP/CO/BO order matching)');
+
+    // Initialize Volume & Market Depth Matching Engine
+    const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+    volumeMatchingEngine.init(priceCache, io);
+    console.log('📊 VolumeMatchingEngine active (Depth + POV tick-by-tick matching)');
 
     // Initialize EOD Positions Engine (Cron Automations)
     require('./services/positionsEngine');

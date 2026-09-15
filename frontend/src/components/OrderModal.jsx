@@ -392,6 +392,10 @@ export default function OrderModal() {
         closeOrderModal();
         if (result.status === 'EXECUTED') {
           alert("✅ Order Executed Successfully!");
+        } else if (result.status === 'AMO_PENDING') {
+          alert("🌙 " + (result.message || "After Market Order (AMO) Placed! Your order is queued for market open."));
+        } else if (result.status === 'PARTIAL_FILLED') {
+          alert("⚡ Order Partially Filled (Remaining quantity held in volume queue)");
         } else if (result.status === 'PENDING_TRIGGER') {
           alert("⏳ Trigger Order Placed (Pending Trigger)");
         } else if (result.status === 'REJECTED') {

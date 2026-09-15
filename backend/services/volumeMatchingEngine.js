@@ -1,0 +1,533 @@
+const db = require('../database/db');
+const LedgerService = require('./ledgerService');
+const { calculateTaxes } = require('./taxCalculator');
+
+class VolumeMatchingEngine {
+  constructor() {
+    this.priceCache = {};
+    this.io = null;
+    // symbol -> Array of active order objects (FIFO queue)
+    this.symbolQueues = new Map();
+    // orderId -> active order object
+    this.activeOrders = new Map();
+    // symbol -> last cumulative volume recorded from ticks
+    this.lastSymbolVolume = new Map();
+    // Prevent overlapping tick processing for same symbol
+    this.processingSymbols = new Set();
+    console.log('📊 Volume & Market Depth Matching Engine initialized.');
+  }
+
+  init(priceCacheRef, ioInstance) {
+    this.priceCache = priceCacheRef || {};
+    this.io = ioInstance || null;
+    this.loadPendingVolumeOrders();
+  }
+
+  setSocketIo(ioInstance) {
+    this.io = ioInstance;
+  }
+
+  /**
+   * Load any PARTIAL_FILLED or PENDING market orders from DB on server startup.
+   */
+  async loadPendingVolumeOrders() {
+    try {
+      const pending = await db('orders')
+        .whereIn('status', ['PARTIAL_FILLED'])
+        .orWhere(builder => {
+          builder.where({ status: 'PENDING', type: 'MARKET' });
+        });
+
+      for (const ord of pending) {
+        this.enqueueOrder(ord);
+      }
+      if (pending.length > 0) {
+        console.log(`📊 Loaded ${pending.length} resting volume-matching orders into queue.`);
+      }
+    } catch (err) {
+      console.warn('VolumeMatchingEngine.loadPendingVolumeOrders error:', err.message);
+    }
+  }
+
+  enqueueOrder(order) {
+    if (!order || !order.id || !order.symbol) return;
+    const sym = order.symbol;
+    const ordObj = {
+      id: order.id,
+      user_id: order.user_id,
+      symbol: order.symbol,
+      type: order.type,
+      side: order.side,
+      quantity: Number(order.quantity),
+      filled_quantity: Number(order.filled_quantity || 0),
+      pending_quantity: order.pending_quantity !== undefined && order.pending_quantity !== null
+        ? Number(order.pending_quantity)
+        : Number(order.quantity) - Number(order.filled_quantity || 0),
+      average_price: order.average_price ? Number(order.average_price) : null,
+      price: order.price ? Number(order.price) : null,
+      product_type: order.product_type,
+      margin: Number(order.margin || 0),
+      status: order.status || 'PENDING',
+      sl_price: order.sl_price,
+      tgt_price: order.tgt_price,
+      trail_amount: order.trail_amount,
+      parent_order_id: order.parent_order_id,
+      created_at: order.created_at || new Date()
+    };
+
+    this.activeOrders.set(ordObj.id.toString(), ordObj);
+
+    if (!this.symbolQueues.has(sym)) {
+      this.symbolQueues.set(sym, []);
+    }
+    const queue = this.symbolQueues.get(sym);
+    if (!queue.some(o => o.id === ordObj.id)) {
+      queue.push(ordObj);
+    }
+  }
+
+  dequeueOrder(orderId, symbol) {
+    this.activeOrders.delete(orderId.toString());
+    if (symbol && this.symbolQueues.has(symbol)) {
+      const queue = this.symbolQueues.get(symbol);
+      const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
+      if (filtered.length === 0) {
+        this.symbolQueues.delete(symbol);
+      } else {
+        this.symbolQueues.set(symbol, filtered);
+      }
+    }
+  }
+
+  /**
+   * Submit an order for volume & depth matching.
+   * Step 1: Immediately fill whatever is available in Level-2 Order Book Depth.
+   * Step 2: If quantity remains, put the rest in the tick-by-tick volume queue.
+   */
+  async submitOrder(order, baseLtp) {
+    this.enqueueOrder(order);
+    const ordObj = this.activeOrders.get(order.id.toString());
+    if (!ordObj) return;
+
+    const cached = this.priceCache[ordObj.symbol] || {};
+    const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
+    const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
+
+    let depthFilled = 0;
+    let totalDepthCost = 0;
+
+    // Check if Level-2 market depth exists
+    if (Array.isArray(book) && book.length > 0) {
+      let remainingToFill = ordObj.pending_quantity;
+
+      for (const level of book) {
+        const levelPrice = Number(level.price);
+        const levelQty = Number(level.qty || level.quantity || level.volume || 0);
+
+        if (levelPrice > 0 && levelQty > 0) {
+          const fillQty = Math.min(remainingToFill, levelQty);
+          if (fillQty > 0) {
+            depthFilled += fillQty;
+            totalDepthCost += (fillQty * levelPrice);
+            remainingToFill -= fillQty;
+          }
+          if (remainingToFill <= 0) break;
+        }
+      }
+    }
+
+    if (depthFilled > 0) {
+      const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
+      await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
+    } else {
+      // If depth is not available in mock/feed or zero depth, fill a small initial slice
+      // or wait for incoming ticks. For large liquid stocks without depth object,
+      // allow an initial participation slice.
+      const initialSlice = Math.min(ordObj.pending_quantity, Math.max(1, Math.floor(ordObj.pending_quantity * 0.2)));
+      if (baseLtp && baseLtp > 0 && initialSlice > 0) {
+        await this.processSliceFill(ordObj, initialSlice, baseLtp);
+      }
+    }
+
+    // Sync back to caller's order reference if provided
+    if (order) {
+      order.filled_quantity = ordObj.filled_quantity;
+      order.pending_quantity = ordObj.pending_quantity;
+      order.average_price = ordObj.average_price;
+      order.status = ordObj.status;
+    }
+
+    // Initialize last volume tracker for this symbol
+    if (cached.volume) {
+      this.lastSymbolVolume.set(ordObj.symbol, Number(cached.volume));
+    }
+  }
+
+  /**
+   * Retrieve active order by ID
+   */
+  getOrder(orderId) {
+    return this.activeOrders.get(orderId?.toString());
+  }
+
+  /**
+   * Called on every live WebSocket tick from Fyers.
+   */
+  async onTick(symbol, tick) {
+    if (!symbol || !tick) return;
+    const queue = this.symbolQueues.get(symbol);
+    if (!queue || queue.length === 0) {
+      if (tick.volume || tick.vol_traded_today) {
+        this.lastSymbolVolume.set(symbol, Number(tick.volume || tick.vol_traded_today));
+      }
+      return;
+    }
+
+    if (this.processingSymbols.has(symbol)) return;
+    this.processingSymbols.add(symbol);
+
+    try {
+      const currentVol = Number(tick.volume || tick.vol_traded_today || 0);
+      const prevVol = this.lastSymbolVolume.get(symbol) || currentVol;
+      let deltaVol = currentVol > prevVol ? (currentVol - prevVol) : 0;
+      this.lastSymbolVolume.set(symbol, currentVol);
+
+      const ltp = Number(tick.ltp || 0);
+      if (ltp <= 0) return;
+
+      // If deltaVol is 0 (e.g. tick update without volume change), allow a minimum
+      // natural heartbeat volume for liquid stocks during active market hours
+      if (deltaVol <= 0 && currentVol > 50000) {
+        deltaVol = Math.floor(Math.random() * 20) + 1; // Natural micro-flow
+      }
+
+      if (deltaVol <= 0) return; // Low volume stock with 0 trades: wait for real volume
+
+      // Distribute available tick volume to active orders in FIFO order
+      let availableVol = deltaVol;
+
+      for (let i = 0; i < queue.length; i++) {
+        const order = queue[i];
+        if (!order || order.pending_quantity <= 0) continue;
+
+        // Realistic participation rate: Order can absorb up to 50% of tick volume
+        const maxFill = Math.min(order.pending_quantity, Math.max(1, Math.floor(availableVol * 0.5)));
+        const fillQty = Math.min(order.pending_quantity, maxFill);
+
+        if (fillQty > 0) {
+          availableVol -= fillQty;
+          await this.processSliceFill(order, fillQty, ltp);
+        }
+
+        if (availableVol <= 0) break;
+      }
+    } catch (err) {
+      console.error(`VolumeMatchingEngine onTick error for ${symbol}:`, err.message);
+    } finally {
+      this.processingSymbols.delete(symbol);
+    }
+  }
+
+  /**
+   * Atomically process a slice fill for an order in the database.
+   */
+  async processSliceFill(order, sliceQty, slicePrice) {
+    if (!order || sliceQty <= 0 || slicePrice <= 0) return;
+
+    try {
+      await db.transaction(async (trx) => {
+        // Lock user to prevent balance / position race conditions
+        await trx.raw('SELECT pg_advisory_xact_lock(?)', [order.user_id]);
+
+        const currentOrder = await trx('orders').where({ id: order.id }).forUpdate().first();
+        if (!currentOrder || currentOrder.status === 'CANCELLED' || currentOrder.status === 'EXECUTED') {
+          this.dequeueOrder(order.id, order.symbol);
+          return;
+        }
+
+        const prevFilled = Number(currentOrder.filled_quantity || 0);
+        const prevAvg = Number(currentOrder.average_price || slicePrice);
+        const totalQty = Number(currentOrder.quantity);
+
+        const newFilled = Math.min(totalQty, prevFilled + sliceQty);
+        const newPending = Math.max(0, totalQty - newFilled);
+        const newAvgPrice = prevFilled > 0
+          ? Number((((prevFilled * prevAvg) + (sliceQty * slicePrice)) / newFilled).toFixed(2))
+          : slicePrice;
+
+        const isComplete = newPending <= 0;
+        const newStatus = isComplete ? 'EXECUTED' : 'PARTIAL_FILLED';
+
+        // 1. Update Order record
+        await trx('orders').where({ id: order.id }).update({
+          filled_quantity: newFilled,
+          pending_quantity: newPending,
+          average_price: newAvgPrice,
+          price: isComplete ? newAvgPrice : (currentOrder.price || newAvgPrice),
+          status: newStatus,
+          updated_at: new Date()
+        });
+
+        // 2. Incremental Position Update
+        const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+        const existingPos = await trx('positions')
+          .where({ user_id: order.user_id })
+          .whereIn('product_type', [order.product_type, 'INT', 'DEL', 'CNC'])
+          .where(b => {
+            b.where({ symbol: order.symbol })
+              .orWhere({ symbol: cleanSym })
+              .orWhere({ symbol: `NSE:${cleanSym}` })
+              .orWhere({ symbol: `BSE:${cleanSym}` })
+              .orWhere({ symbol: `MCX:${cleanSym}` });
+          })
+          .whereNot({ quantity: 0 })
+          .first();
+
+        const isClosing = existingPos && (
+          (existingPos.quantity > 0 && order.side === 'SELL') ||
+          (existingPos.quantity < 0 && order.side === 'BUY')
+        );
+
+        if (isClosing) {
+          const absPosQty = Math.abs(Number(existingPos.quantity));
+          const closeQty = Math.min(sliceQty, absPosQty);
+          let realizedPnl = 0;
+
+          if (existingPos.quantity > 0) {
+            realizedPnl = (slicePrice - Number(existingPos.average_price)) * closeQty;
+          } else {
+            realizedPnl = (Number(existingPos.average_price) - slicePrice) * closeQty;
+          }
+          realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
+
+          const propClosed = closeQty / absPosQty;
+          const marginRefund = Math.round((Number(existingPos.margin || 0) * propClosed) * 100) / 100;
+
+          const newPosQty = existingPos.quantity > 0 ? (existingPos.quantity - closeQty) : (existingPos.quantity + closeQty);
+
+          if (newPosQty === 0) {
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: 0,
+              closed_quantity: Number(existingPos.closed_quantity || 0) + closeQty,
+              exit_price: slicePrice,
+              realized_pnl: Number(existingPos.realized_pnl || 0) + realizedPnl,
+              margin: 0,
+              updated_at: new Date()
+            });
+          } else {
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: newPosQty,
+              closed_quantity: Number(existingPos.closed_quantity || 0) + closeQty,
+              realized_pnl: Number(existingPos.realized_pnl || 0) + realizedPnl,
+              margin: Math.max(0, Number(existingPos.margin || 0) - marginRefund),
+              updated_at: new Date()
+            });
+          }
+
+          // Balance & Ledger updates
+          const user = await trx('users').where({ id: order.user_id }).first();
+          const netCredit = marginRefund + realizedPnl;
+          await trx('users').where({ id: order.user_id }).update({
+            balance: Math.round((Number(user.balance) + netCredit) * 100) / 100
+          });
+
+          if (marginRefund > 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: marginRefund,
+              type: 'MARGIN_RELEASE',
+              description: `Margin released for partial close: ${closeQty} ${order.symbol}`
+            });
+          }
+
+          if (realizedPnl !== 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: realizedPnl,
+              type: 'REALIZED_PNL',
+              description: `Realized P&L on ${closeQty} ${order.symbol}`
+            });
+          }
+        } else if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+          // Offsetting overnight delivery shares from holdings table
+          const holding = await trx('holdings')
+            .where({ user_id: order.user_id })
+            .where(b => {
+              b.where({ symbol: order.symbol })
+                .orWhere({ symbol: cleanSym })
+                .orWhere({ symbol: `NSE:${cleanSym}` })
+                .orWhere({ symbol: `BSE:${cleanSym}` })
+                .orWhere({ symbol: `MCX:${cleanSym}` });
+            })
+            .where('quantity', '>', 0)
+            .first();
+
+          if (holding) {
+            const hQty = Number(holding.quantity);
+            const hAvg = Number(holding.average_price);
+            const closeQty = Math.min(sliceQty, hQty);
+            const newHQty = hQty - closeQty;
+
+            if (newHQty <= 0) {
+              await trx('holdings').where({ id: holding.id }).del();
+            } else {
+              await trx('holdings').where({ id: holding.id }).update({ quantity: newHQty });
+            }
+
+            const realizedPnl = Math.round(((slicePrice - hAvg) * closeQty + Number.EPSILON) * 100) / 100;
+            const grossProceeds = Math.round((slicePrice * closeQty) * 100) / 100;
+
+            // Record closed position for today
+            await trx('positions').insert({
+              user_id: order.user_id,
+              symbol: order.symbol,
+              quantity: 0,
+              closed_quantity: closeQty,
+              average_price: hAvg,
+              exit_price: slicePrice,
+              realized_pnl: realizedPnl,
+              product_type: order.product_type || 'DEL',
+              updated_at: new Date()
+            });
+
+            // Credit net sale proceeds to user balance
+            const user = await trx('users').where({ id: order.user_id }).first();
+            await trx('users').where({ id: order.user_id }).update({
+              balance: Math.round((Number(user.balance) + grossProceeds) * 100) / 100
+            });
+
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: grossProceeds,
+              type: 'CREDIT',
+              description: `Delivery Holding Sale: ${closeQty} ${order.symbol} @ ₹${slicePrice}`
+            });
+          } else {
+            const initialPosQty = -sliceQty;
+            await trx('positions').insert({
+              user_id: order.user_id,
+              symbol: order.symbol,
+              quantity: initialPosQty,
+              average_price: slicePrice,
+              product_type: order.product_type || 'INT',
+              margin: sliceMargin,
+              updated_at: new Date()
+            });
+          }
+        } else {
+          // Opening or adding to position
+          const sliceMargin = totalQty > 0 ? (sliceQty / totalQty) * order.margin : order.margin;
+
+          if (existingPos) {
+            const prevPosQty = Number(existingPos.quantity);
+            const prevPosAvg = Number(existingPos.average_price);
+            const addQty = order.side === 'BUY' ? sliceQty : -sliceQty;
+            const newPosQty = prevPosQty + addQty;
+            const newPosAvg = Number((((Math.abs(prevPosQty) * prevPosAvg) + (sliceQty * slicePrice)) / Math.abs(newPosQty)).toFixed(2));
+
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: newPosQty,
+              average_price: newPosAvg,
+              margin: Number(existingPos.margin || 0) + sliceMargin,
+              updated_at: new Date()
+            });
+          } else {
+            const initialPosQty = order.side === 'BUY' ? sliceQty : -sliceQty;
+            await trx('positions').insert({
+              user_id: order.user_id,
+              symbol: order.symbol,
+              quantity: initialPosQty,
+              average_price: slicePrice,
+              product_type: order.product_type || 'INT',
+              margin: sliceMargin,
+              updated_at: new Date()
+            });
+          }
+        }
+
+        // Update in-memory state
+        order.filled_quantity = newFilled;
+        order.pending_quantity = newPending;
+        order.average_price = newAvgPrice;
+        order.status = newStatus;
+
+        if (isComplete) {
+          this.dequeueOrder(order.id, order.symbol);
+        }
+
+        // Broadcast real-time partial fill to user socket
+        if (this.io) {
+          this.io.emit('order_slice_filled', {
+            orderId: order.id,
+            userId: order.user_id,
+            symbol: order.symbol,
+            sliceQty,
+            slicePrice,
+            filledQty: newFilled,
+            pendingQty: newPending,
+            avgPrice: newAvgPrice,
+            status: newStatus
+          });
+          this.io.emit('sync_user_data', { userId: order.user_id });
+        }
+      });
+    } catch (err) {
+      console.error(`Error processing slice fill for order ${order.id}:`, err.message);
+    }
+  }
+
+  /**
+   * Cancel the remaining unfilled portion of a PARTIAL_FILLED order.
+   */
+  async cancelPartialOrder(orderId, userId) {
+    let refundAmount = 0;
+
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [userId]);
+
+      const order = await trx('orders').where({ id: orderId, user_id: userId }).forUpdate().first();
+      if (!order) throw new Error('Order not found');
+      if (order.status !== 'PARTIAL_FILLED' && order.status !== 'PENDING') {
+        throw new Error(`Cannot cancel order in status ${order.status}`);
+      }
+
+      const totalQty = Number(order.quantity);
+      const pendingQty = Number(order.pending_quantity || (totalQty - Number(order.filled_quantity || 0)));
+      const totalMargin = Number(order.margin || 0);
+
+      // Pro-rata refund for the unfilled portion
+      if (totalQty > 0 && pendingQty > 0 && totalMargin > 0) {
+        refundAmount = Math.round(((pendingQty / totalQty) * totalMargin) * 100) / 100;
+      }
+
+      await trx('orders').where({ id: orderId }).update({
+        status: 'CANCELLED',
+        remarks: `Partially filled: ${order.filled_quantity || 0} executed, ${pendingQty} cancelled`,
+        updated_at: new Date()
+      });
+
+      if (refundAmount > 0) {
+        const user = await trx('users').where({ id: userId }).first();
+        await trx('users').where({ id: userId }).update({
+          balance: Math.round((Number(user.balance) + refundAmount) * 100) / 100
+        });
+
+        await trx('ledger').insert({
+          user_id: userId,
+          amount: refundAmount,
+          type: 'MARGIN_RELEASE',
+          description: `Refund for unfilled portion of cancelled order: ${pendingQty} ${order.symbol}`
+        });
+      }
+    });
+
+    this.dequeueOrder(orderId);
+    if (this.io) {
+      this.io.emit('sync_user_data', { userId });
+    }
+    return { success: true, refundAmount };
+  }
+}
+
+const volumeMatchingEngine = new VolumeMatchingEngine();
+module.exports = volumeMatchingEngine;

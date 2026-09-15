@@ -62,8 +62,8 @@ export default function OrdersView() {
 
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
-    if (activeTab === 'Open Orders') return order.status === 'PENDING' && !order.parent_order_id;
-    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && isToday(order.updated_at || order.created_at);
+    if (activeTab === 'Open Orders') return (order.status === 'PENDING' || order.status === 'PARTIAL_FILLED' || order.status === 'AMO_PENDING') && !order.parent_order_id;
+    if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'PARTIAL_FILLED' && order.status !== 'AMO_PENDING' && isToday(order.updated_at || order.created_at);
     return false;
   });
   
@@ -386,13 +386,13 @@ export default function OrdersView() {
                               {order.side}
                             </span>
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                              Qty. {Number(order.quantity)}/{Number(order.quantity)}
+                              Qty. {order.status === 'PARTIAL_FILLED' ? `${Number(order.filled_quantity || 0)}/${Number(order.quantity)}` : `${Number(order.quantity)}/${Number(order.quantity)}`}
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
-                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: statusColor }}>
-                              {order.status}
+                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : statusColor) }}>
+                              {order.status === 'AMO_PENDING' ? 'AMO' : (order.status === 'PARTIAL_FILLED' ? 'PARTIAL' : order.status)}
                             </span>
                           </div>
                         </div>
@@ -598,7 +598,16 @@ export default function OrdersView() {
                         </span>
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>{Number(order.quantity)}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      {order.status === 'PARTIAL_FILLED' ? (
+                        <span>
+                          <span style={{ color: 'var(--color-yellow)', fontWeight: '700' }}>{Number(order.filled_quantity || 0)}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>/{Number(order.quantity)}</span>
+                        </span>
+                      ) : (
+                        Number(order.quantity)
+                      )}
+                    </td>
                     <td style={{ padding: '12px 16px' }}>
                       {order.type === 'TRAILING_STOP' ? (
                         <span title="Trailing Stop Loss" style={{ color: 'var(--color-yellow)' }}>
@@ -641,8 +650,12 @@ export default function OrdersView() {
                         )}
                       </td>
                     )}
-                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'PENDING' ? 'var(--color-yellow)' : ((order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE') ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
-                      {order.status}
+                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PENDING' || order.status === 'PARTIAL_FILLED') ? 'var(--color-yellow)' : ((order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE') ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                      {order.status === 'AMO_PENDING' ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(249,115,22,0.12)', color: '#f97316', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(249,115,22,0.3)', fontSize: '11px', fontWeight: '700' }}>
+                          🌙 AMO PENDING
+                        </span>
+                      ) : (order.status === 'PARTIAL_FILLED' ? 'PARTIALLY FILLED' : order.status)}
                     </td>
                     {activeTab === 'Open Orders' && (
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>

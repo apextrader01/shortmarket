@@ -23,8 +23,113 @@ function isIntradayBlocked(symbol) {
     return isCommoditySymbol(symbol) ? isCommodityIntradayBlocked : isEquityIntradayBlocked;
 }
 
+async function executeAmoOrders(segment = 'ALL', priceCache = {}) {
+    const volumeMatchingEngine = require('./volumeMatchingEngine');
+    console.log(`⏰ [CRON] Sweeping AMO orders for segment: ${segment}...`);
+    try {
+        const amoOrders = await db('orders')
+            .where({ status: 'AMO_PENDING' })
+            .whereNot({ order_variety: 'CAS' })
+            .orderBy('created_at', 'asc');
+
+        if (amoOrders.length === 0) return;
+
+        for (const ord of amoOrders) {
+            const isCom = isCommoditySymbol(ord.symbol);
+            if (segment === 'COMMODITY' && !isCom) continue;
+            if (segment === 'EQUITY' && isCom) continue;
+
+            const ltp = priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
+
+            if (ord.type === 'MARKET') {
+                await volumeMatchingEngine.submitOrder(ord, ltp);
+            } else if (ord.type === 'LIMIT') {
+                const limitPrice = Number(ord.price);
+                const isMarketable = (ord.side === 'BUY' && ltp <= limitPrice) || (ord.side === 'SELL' && ltp >= limitPrice);
+                if (isMarketable) {
+                    await volumeMatchingEngine.submitOrder(ord, ltp);
+                } else {
+                    await db('orders').where({ id: ord.id }).update({ status: 'PENDING' });
+                    ord.status = 'PENDING';
+                }
+            } else {
+                await db('orders').where({ id: ord.id }).update({ status: 'PENDING_TRIGGER' });
+                ord.status = 'PENDING_TRIGGER';
+            }
+        }
+    } catch (err) {
+        console.error(`[CRON] executeAmoOrders (${segment}) error:`, err.message);
+    }
+}
+
+async function executeCasOpeningMatch(priceCache = {}) {
+    const volumeMatchingEngine = require('./volumeMatchingEngine');
+    console.log(`⏰ [CRON 09:08 AM] Matching Pre-Market CAS orders at opening equilibrium price...`);
+    try {
+        const casOrders = await db('orders')
+            .where({ status: 'AMO_PENDING', order_variety: 'CAS' })
+            .orderBy('created_at', 'asc');
+
+        if (casOrders.length === 0) return;
+
+        for (const ord of casOrders) {
+            const ltp = priceCache[ord.symbol]?.open || priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
+            await volumeMatchingEngine.submitOrder(ord, ltp);
+        }
+    } catch (err) {
+        console.error(`[CRON] executeCasOpeningMatch error:`, err.message);
+    }
+}
+
+async function updateWeeklyCasStocksList(priceCache = {}) {
+    console.log(`🔄 [CRON SUNDAY] Running Weekly CAS & Illiquid Securities Liquidity Review...`);
+    try {
+        const allInstruments = await db('instruments').select('unique_symbol', 'symbol').catch(() => []);
+        let taggedCount = 0;
+        for (const inst of allInstruments) {
+            const sym = inst.unique_symbol || inst.symbol;
+            if (!sym || isCommoditySymbol(sym) || sym.includes('-MF')) continue;
+
+            const cached = priceCache[sym];
+            const currentVol = cached ? Number(cached.volume || cached.vol_traded_today || 0) : 0;
+            const isIlliquid = currentVol > 0 && currentVol < 1000;
+
+            await db('instruments')
+                .where({ unique_symbol: sym })
+                .orWhere({ symbol: sym })
+                .update({ is_cas_illiquid: isIlliquid, average_volume_5d: currentVol })
+                .catch(() => {});
+
+            if (isIlliquid) taggedCount++;
+        }
+        console.log(`✅ [CRON SUNDAY] Weekly CAS Liquidity Review complete: ${taggedCount} scrips classified as illiquid / periodic call auction.`);
+    } catch (err) {
+        console.error('[CRON SUNDAY] updateWeeklyCasStocksList error:', err.message);
+    }
+}
+
 function initCronJobs(priceCache, triggerEngine) {
     console.log('Initializing Cron Jobs...');
+
+    // ─── 09:00 AM IST: MCX Commodity AMO Sweep ──────────────────────────────────
+    cron.schedule('0 9 * * 1-5', () => {
+        executeAmoOrders('COMMODITY', priceCache);
+    }, TZ);
+
+    // ─── 09:08 AM IST: Pre-Market CAS Opening Price Match ───────────────────────
+    cron.schedule('8 9 * * 1-5', () => {
+        executeCasOpeningMatch(priceCache);
+    }, TZ);
+
+    // ─── 09:15 AM IST: Equity & F&O Market Open AMO Sweep ───────────────────────
+    cron.schedule('15 9 * * 1-5', () => {
+        executeAmoOrders('EQUITY', priceCache);
+    }, TZ);
+
+    // ─── SUNDAY 00:00 AM IST: Weekly CAS & Illiquid Stock Review ────────────────
+    cron.schedule('0 0 * * 0', () => {
+        updateWeeklyCasStocksList(priceCache);
+    }, TZ);
 
     // ─── PHASE 1: Intraday Block (15:15 Eq / 22:50 Com) ──────────────────────
     cron.schedule('15 15 * * *', () => {
@@ -441,5 +546,8 @@ module.exports = {
     initCronJobs,
     isIntradayBlocked,
     isEquityIntradayBlocked: () => isEquityIntradayBlocked,
-    isCommodityIntradayBlocked: () => isCommodityIntradayBlocked
+    isCommodityIntradayBlocked: () => isCommodityIntradayBlocked,
+    executeAmoOrders,
+    executeCasOpeningMatch,
+    updateWeeklyCasStocksList
 };

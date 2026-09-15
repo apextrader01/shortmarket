@@ -211,6 +211,10 @@ async function initSchema() {
         table.decimal('taxes', 14, 2).defaultTo(0);
         table.integer('parent_order_id').unsigned().references('id').inTable('orders').onDelete('CASCADE');
         table.integer('linked_order_id').unsigned().references('id').inTable('orders').onDelete('SET NULL');
+        table.decimal('filled_quantity', 14, 4).defaultTo(0);
+        table.decimal('pending_quantity', 14, 4);
+        table.decimal('average_price', 14, 2);
+        table.string('order_variety').defaultTo('REGULAR'); // REGULAR, AMO, CAS
         table.string('remarks').defaultTo('');
         table.timestamps(true, true);
       });
@@ -335,6 +339,24 @@ async function initSchema() {
         });
         console.log('Added linked_order_id to orders table');
       }
+
+      const hasFilledQuantity = await db.schema.hasColumn('orders', 'filled_quantity');
+      if (!hasFilledQuantity) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('filled_quantity', 14, 4).defaultTo(0);
+          table.decimal('pending_quantity', 14, 4);
+          table.decimal('average_price', 14, 2);
+        });
+        console.log('Added partial fill columns to orders table');
+      }
+
+      const hasOrderVariety = await db.schema.hasColumn('orders', 'order_variety');
+      if (!hasOrderVariety) {
+        await db.schema.alterTable('orders', table => {
+          table.string('order_variety').defaultTo('REGULAR');
+        });
+        console.log('Added order_variety to orders table');
+      }
     }
 
     // 4. Ledger Table
@@ -403,9 +425,20 @@ async function initSchema() {
         table.string('unique_symbol').index();
         table.bigInteger('expiry_timestamp');
         table.string('search_string').index(); // Simple B-tree index for ILIKE fallback or perfect matching
+        table.boolean('is_cas_illiquid').defaultTo(false);
+        table.decimal('average_volume_5d', 16, 2).defaultTo(0);
         table.timestamps(true, true);
       });
       console.log('Created instruments table');
+    } else {
+      const hasIsCasIlliquid = await db.schema.hasColumn('instruments', 'is_cas_illiquid');
+      if (!hasIsCasIlliquid) {
+        await db.schema.alterTable('instruments', table => {
+          table.boolean('is_cas_illiquid').defaultTo(false);
+          table.decimal('average_volume_5d', 16, 2).defaultTo(0);
+        });
+        console.log('Added is_cas_illiquid and average_volume_5d to instruments table');
+      }
     }
     // 9. User Profiles Table for KYC/Onboarding
     const hasUserProfiles = await db.schema.hasTable('user_profiles');

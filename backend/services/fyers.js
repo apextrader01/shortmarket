@@ -55,9 +55,11 @@ try {
 // For 200 subscribed symbols × 10 ticks/sec = 200,000 iterations/sec. This Map makes it O(1).
 const fyersToNameMap = new Map(Object.entries(nameToFyers).map(([k, v]) => [v, k]));
 
-// ── Pre-require triggerEngine at module level so it's not re-required in every tick ──
+// ── Pre-require triggerEngine and volumeMatchingEngine at module level so it's not re-required in every tick ──
 let triggerEngine = null;
 try { triggerEngine = require('./triggerEngine'); } catch(e) {}
+let volumeMatchingEngine = null;
+try { volumeMatchingEngine = require('./volumeMatchingEngine'); } catch(e) {}
 let gcInterval = null;
 
 
@@ -459,6 +461,15 @@ function startLiveWebSocket() {
                         if (uniqueSymbol.includes(':')) {
                             const raw = uniqueSymbol.split(':')[1];
                             triggerEngine.evaluateTick(raw, ltp).catch(() => {});
+                        }
+                    }
+
+                    // Feed tick into realistic volume and market depth matching engine
+                    if (volumeMatchingEngine) {
+                        volumeMatchingEngine.onTick(uniqueSymbol, priceObj).catch(() => {});
+                        if (uniqueSymbol.includes(':')) {
+                            const raw = uniqueSymbol.split(':')[1];
+                            volumeMatchingEngine.onTick(raw, priceObj).catch(() => {});
                         }
                     }
                 });
