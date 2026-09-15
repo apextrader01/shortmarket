@@ -49,6 +49,25 @@ try {
     console.error("Error loading fyers_map.json:", e);
 }
 
+// Canonical symbol resolution map for BSE & NSE symbols from stocks master
+const canonicalStockMap = new Map();
+try {
+    const stocksList = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/stocks.json'), 'utf8'));
+    stocksList.forEach(s => {
+        if (s.symbol && s.exchange) {
+            const clean = s.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+            canonicalStockMap.set(`${s.exchange}:${clean}`, s.symbol);
+            canonicalStockMap.set(`${s.exchange}:${clean.toUpperCase()}`, s.symbol);
+            if (s.name) {
+                canonicalStockMap.set(`${s.exchange}:${s.name}`, s.symbol);
+                canonicalStockMap.set(`${s.exchange}:${s.name.toUpperCase()}`, s.symbol);
+            }
+        }
+    });
+} catch(e) {
+    console.error("Error loading stocks.json for canonical mapping:", e);
+}
+
 
 // ── O(1) reverse lookup: fyersSymbol → our platform symbol (built once at boot) ──
 // The fromFyersSymbol() function was doing O(n) for-loop over nameToFyers on EVERY tick.
@@ -68,17 +87,21 @@ function toFyersSymbol(symbol) {
     if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
     if (!symbol) return null;
 
-    let sym = symbol;
+    // 1. If symbol has an exchange prefix (e.g. BSE:KITEX, NSE:KITEX, MCX:CRUDEOIL),
+    // check canonicalStockMap first to respect the specified exchange
     if (symbol.includes(':')) {
-        sym = symbol.split(':')[1];
+        if (canonicalStockMap.has(symbol)) return canonicalStockMap.get(symbol);
+        const [ex, symPart] = symbol.split(':');
+        const clean = symPart.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+        if (canonicalStockMap.has(`${ex}:${clean}`)) return canonicalStockMap.get(`${ex}:${clean}`);
+        if (nameToFyers[symbol]) return nameToFyers[symbol];
+        return symbol;
     }
-    
-    if (nameToFyers[sym]) return nameToFyers[sym];
+
+    // 2. Unprefixed symbol: check nameToFyers or canonical maps
     if (nameToFyers[symbol]) return nameToFyers[symbol];
-    
-    if (symbol.includes(':')) {
-        return symbol; // Already has exchange prefix (e.g. NSE:TCS-EQ, BSE:SENSEX-INDEX)
-    }
+    if (canonicalStockMap.has(`NSE:${symbol}`)) return canonicalStockMap.get(`NSE:${symbol}`);
+    if (canonicalStockMap.has(`BSE:${symbol}`)) return canonicalStockMap.get(`BSE:${symbol}`);
 
     // Auto-resolve exchange prefix for derivatives/equities passed without prefix
     if (/(GOLD|SILVER|CRUDEOIL|NATURALGAS|COPPER|ZINC|NICKEL|ALUMINIUM|LEAD|COTTON|MENTHAOIL|STEELREBAR)/i.test(symbol)) {
@@ -450,8 +473,13 @@ function startLiveWebSocket() {
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
                     if (uniqueSymbol.includes(':')) {
-                        const raw = uniqueSymbol.split(':')[1];
+                        const parts = uniqueSymbol.split(':');
+                        const ex = parts[0];
+                        const raw = parts[1];
                         sharedPriceCache[raw] = priceObj;
+                        const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+                        sharedPriceCache[clean] = priceObj;
+                        sharedPriceCache[`${ex}:${clean}`] = priceObj;
                     }
                     dirtySymbols.add(uniqueSymbol); // Broadcast canonical uniqueSymbol (cuts duplicate emissions)
                     

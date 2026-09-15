@@ -4,17 +4,24 @@ const { calculateTaxes, isDerivativeContract } = require('./taxCalculator');
 
 function normalizeSymbol(sym) {
   if (!sym || typeof sym !== 'string') return '';
-  return sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '').toUpperCase();
+  return sym
+    .replace(/^(NSE:|BSE:|MCX:)/i, '')
+    .replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '')
+    .toUpperCase();
 }
 
 function getCachedPrice(priceCache, symbol) {
   if (!priceCache || !symbol) return {};
   if (priceCache[symbol]) return priceCache[symbol];
-  const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '');
+  const clean = symbol
+    .replace(/^(NSE:|BSE:|MCX:)/i, '')
+    .replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
   if (priceCache[clean]) return priceCache[clean];
   if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
   if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
   if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
+  if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
   if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
   return {};
 }
@@ -253,7 +260,7 @@ class VolumeMatchingEngine {
     this.processingSymbols.add(normSym);
 
     try {
-      const currentVol = Number(tick.volume || tick.vol_traded_today || 0);
+      const currentVol = Number(tick.volume || tick.vol_traded_today || tick.vol || tick.v || 0);
       const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
       let deltaVol = currentVol > prevVol ? (currentVol - prevVol) : 0;
       this.lastSymbolVolume.set(normSym, currentVol);
@@ -262,8 +269,8 @@ class VolumeMatchingEngine {
       if (ltp <= 0) return;
 
       // If deltaVol is 0 (e.g. tick update without volume change), allow a minimum
-      // natural heartbeat volume for liquid stocks during active market hours
-      if (deltaVol <= 0 && currentVol > 50000) {
+      // natural heartbeat volume for active stocks during active market hours
+      if (deltaVol <= 0 && (currentVol > 1000 || currentVol === 0)) {
         deltaVol = Math.floor(Math.random() * 20) + 1; // Natural micro-flow
       }
 

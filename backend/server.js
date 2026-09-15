@@ -159,11 +159,13 @@ function isCommodityContract(sym) {
 function getLtpFromPriceCache(sym) {
   if (!sym || typeof sym !== 'string') return 0;
   if (priceCache[sym]?.ltp && Number(priceCache[sym].ltp) > 0) return Number(priceCache[sym].ltp);
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-EQ$/i, '');
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
   if (priceCache[clean]?.ltp && Number(priceCache[clean].ltp) > 0) return Number(priceCache[clean].ltp);
   if (priceCache[`NSE:${clean}`]?.ltp && Number(priceCache[`NSE:${clean}`].ltp) > 0) return Number(priceCache[`NSE:${clean}`].ltp);
   if (priceCache[`NSE:${clean}-EQ`]?.ltp && Number(priceCache[`NSE:${clean}-EQ`].ltp) > 0) return Number(priceCache[`NSE:${clean}-EQ`].ltp);
   if (priceCache[`BSE:${clean}`]?.ltp && Number(priceCache[`BSE:${clean}`].ltp) > 0) return Number(priceCache[`BSE:${clean}`].ltp);
+  if (priceCache[`BSE:${clean}-A`]?.ltp && Number(priceCache[`BSE:${clean}-A`].ltp) > 0) return Number(priceCache[`BSE:${clean}-A`].ltp);
+  if (priceCache[`BSE:${clean}-B`]?.ltp && Number(priceCache[`BSE:${clean}-B`].ltp) > 0) return Number(priceCache[`BSE:${clean}-B`].ltp);
   if (priceCache[`MCX:${clean}`]?.ltp && Number(priceCache[`MCX:${clean}`].ltp) > 0) return Number(priceCache[`MCX:${clean}`].ltp);
   if (priceCache[sym]?.close && Number(priceCache[sym].close) > 0) return Number(priceCache[sym].close);
   if (priceCache[clean]?.close && Number(priceCache[clean].close) > 0) return Number(priceCache[clean].close);
@@ -5678,7 +5680,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
         throw Object.assign(new Error('Only pending, partially filled, or AMO orders can be cancelled'), { statusCode: 400 });
       
       // Update status
-      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+      await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
 
       // If a partially filled BO/CO order is cancelled, spawn protection legs for the already executed portion
       const filledQty = parseFloat(order.filled_quantity || 0);

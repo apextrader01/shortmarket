@@ -386,13 +386,13 @@ export default function OrdersView() {
                               {order.side}
                             </span>
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                              Qty. {order.status === 'PARTIAL_FILLED' ? `${Number(order.filled_quantity || 0)}/${Number(order.quantity)}` : `${Number(order.quantity)}/${Number(order.quantity)}`}
+                              Qty. {Number(order.filled_quantity) > 0 ? `${Number(order.filled_quantity)}/${Number(order.quantity)}` : `${Number(order.quantity)}`}
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
-                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : statusColor) }}>
-                              {order.status === 'AMO_PENDING' ? 'AMO' : (order.status === 'PARTIAL_FILLED' ? 'PARTIAL' : order.status)}
+                            <span style={{ fontSize: '10.5px', fontWeight: '700', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? '#f59e0b' : statusColor)) }}>
+                              {order.status === 'AMO_PENDING' ? 'AMO' : (order.status === 'PARTIAL_FILLED' ? 'PARTIAL' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? `CANCELLED (${Number(order.filled_quantity)} filled)` : order.status))}
                             </span>
                           </div>
                         </div>
@@ -599,13 +599,15 @@ export default function OrdersView() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      {order.status === 'PARTIAL_FILLED' ? (
+                      {Number(order.filled_quantity) > 0 ? (
                         <span>
-                          <span style={{ color: 'var(--color-yellow)', fontWeight: '700' }}>{Number(order.filled_quantity || 0)}</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>/{Number(order.quantity)}</span>
+                          <span style={{ color: order.status === 'CANCELLED' ? '#f59e0b' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : 'var(--color-green-light)'), fontWeight: '700' }}>
+                            {Number(order.filled_quantity).toLocaleString('en-IN')}
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)' }}>/{Number(order.quantity).toLocaleString('en-IN')}</span>
                         </span>
                       ) : (
-                        Number(order.quantity)
+                        Number(order.quantity).toLocaleString('en-IN')
                       )}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -650,12 +652,16 @@ export default function OrdersView() {
                         )}
                       </td>
                     )}
-                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PENDING' || order.status === 'PARTIAL_FILLED') ? 'var(--color-yellow)' : ((order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE') ? 'var(--color-green-light)' : 'var(--color-red-light)') }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '600', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PENDING' || order.status === 'PARTIAL_FILLED') ? 'var(--color-yellow)' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? '#f59e0b' : ((order.status === 'EXECUTED' || order.status === 'COMPLETED' || order.status === 'COMPLETE') ? 'var(--color-green-light)' : 'var(--color-red-light)')) }}>
                       {order.status === 'AMO_PENDING' ? (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(249,115,22,0.12)', color: '#f97316', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(249,115,22,0.3)', fontSize: '11px', fontWeight: '700' }}>
                           🌙 AMO PENDING
                         </span>
-                      ) : (order.status === 'PARTIAL_FILLED' ? 'PARTIALLY FILLED' : order.status)}
+                      ) : (order.status === 'PARTIAL_FILLED' ? 'PARTIALLY FILLED' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245,158,11,0.3)', fontSize: '11px', fontWeight: '700' }} title={`Filled ${Number(order.filled_quantity).toLocaleString('en-IN')} shares before cancelling remaining ${Math.max(0, Number(order.quantity) - Number(order.filled_quantity)).toLocaleString('en-IN')} shares`}>
+                          CANCELLED ({Number(order.filled_quantity).toLocaleString('en-IN')} filled)
+                        </span>
+                      ) : order.status))}
                     </td>
                     {activeTab === 'Open Orders' && (
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
@@ -843,17 +849,37 @@ export default function OrdersView() {
                 <span style={{ fontWeight: '600' }}>₹{parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0).toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
-                <span style={{ fontWeight: '600' }}>{Number(selectedOrder.quantity)}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Total Quantity:</span>
+                <span style={{ fontWeight: '600' }}>{Number(selectedOrder.quantity).toLocaleString('en-IN')}</span>
               </div>
+              {Number(selectedOrder.filled_quantity) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Filled Quantity:</span>
+                  <span style={{ fontWeight: '700', color: selectedOrder.status === 'CANCELLED' ? '#f59e0b' : 'var(--color-green-light)' }}>
+                    {Number(selectedOrder.filled_quantity).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+              {Number(selectedOrder.filled_quantity) > 0 && selectedOrder.status === 'CANCELLED' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Cancelled Quantity:</span>
+                  <span style={{ fontWeight: '600', color: 'var(--color-red-light)' }}>
+                    {Math.max(0, Number(selectedOrder.quantity) - Number(selectedOrder.filled_quantity)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Order Value:</span>
-                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0) * Number(selectedOrder.quantity)).toFixed(2)}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{Number(selectedOrder.filled_quantity) > 0 && selectedOrder.status === 'CANCELLED' ? 'Filled Value:' : 'Order Value:'}</span>
+                <span style={{ fontWeight: '700', color: 'var(--color-blue)' }}>
+                  ₹{(parseFloat((selectedOrder.type === 'TRAILING_STOP' ? selectedOrder.trigger_price : (selectedOrder.average_price || selectedOrder.price)) || 0) * (Number(selectedOrder.filled_quantity) > 0 && selectedOrder.status === 'CANCELLED' ? Number(selectedOrder.filled_quantity) : Number(selectedOrder.quantity))).toFixed(2)}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
-                <span style={{ fontWeight: '700', color: (selectedOrder.status === 'EXECUTED' || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'COMPLETE') ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' || selectedOrder.status === 'CANCELLED' ? 'var(--color-red-light)' : 'var(--color-yellow)') }}>
-                  {selectedOrder.status}
+                <span style={{ fontWeight: '700', color: (selectedOrder.status === 'EXECUTED' || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'COMPLETE') ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' ? 'var(--color-red-light)' : (selectedOrder.status === 'CANCELLED' ? (Number(selectedOrder.filled_quantity) > 0 ? '#f59e0b' : 'var(--color-red-light)') : 'var(--color-yellow)')) }}>
+                  {selectedOrder.status === 'CANCELLED' && Number(selectedOrder.filled_quantity) > 0
+                    ? `CANCELLED (${Number(selectedOrder.filled_quantity).toLocaleString('en-IN')} filled)`
+                    : selectedOrder.status}
                 </span>
               </div>
             </div>
