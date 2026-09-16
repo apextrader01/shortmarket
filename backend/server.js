@@ -4420,14 +4420,21 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         return res.status(400).json({ error: marketCheck.reason });
       }
 
-      // 2. If it is an AMO window (3:45 PM - 8:57 AM or weekend)
-      if (marketCheck.isAmoWindow || rawVariety === 'AMO' || Boolean(req.body.is_amo)) {
+      // 2. If market is closed, check if user explicitly requested an After Market Order (AMO)
+      const userWantsAmo = (rawVariety === 'AMO' || Boolean(req.body.is_amo));
+      if (userWantsAmo) {
         if (!marketCheck.isAmoWindow) {
           return res.status(400).json({ error: marketCheck.reason || 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.' });
         }
         isAmo = true;
       } else {
-        // Otherwise (Intraday cutoff, Pre-market freeze, Settlement buffer): reject with descriptive reason
+        // Market is closed, and user did NOT select AMO (they placed as Regular)
+        if (marketCheck.isAmoWindow) {
+          return res.status(400).json({
+            error: 'Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.'
+          });
+        }
+        // Specific session cutoff (e.g. Intraday cutoff, Pre-market freeze, Settlement buffer)
         return res.status(400).json({ error: marketCheck.reason });
       }
     } else {

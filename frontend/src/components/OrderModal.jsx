@@ -463,20 +463,20 @@ export default function OrderModal() {
   const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
   const isIntradayBlocked = (isRestricted || isTimeBlocked || marketSession.session === 'INTRADAY_CUTOFF' || marketSession.session === 'PRE_MARKET_INTRADAY_BLOCKED') && productType === 'INT';
 
-  // Auto-select AMO if market is closed outside trading hours and in AMO window
+  // Variety selection: default to Regular unless explicitly opened with variety 'AMO'
   useEffect(() => {
     if (orderModal.isOpen) {
-      if (!marketSession.open && (marketSession.isAmoWindow || marketSession.mode === 'AUTO')) {
+      if (orderModal.variety === 'AMO') {
         setIsAmo(true);
         setIsBO(false);
         setIsCO(false);
         setSlPrice('');
         setTgtPrice('');
-      } else if (marketSession.open) {
+      } else {
         setIsAmo(false);
       }
     }
-  }, [orderModal.isOpen, marketSession.open, marketSession.isAmoWindow, marketSession.mode]);
+  }, [orderModal.isOpen, orderModal.variety]);
 
   const handlePlaceOrder = async (bypassCaution = false) => {
     if (marketSession.mode === 'CLOSED') {
@@ -485,6 +485,10 @@ export default function OrderModal() {
     }
     if (isAmo && !marketSession.isAmoWindow) {
       alert("After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.");
+      return;
+    }
+    if (!isAmo && !marketSession.open) {
+      alert("Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
       return;
     }
     if (isIntradayBlocked && !isAmo) {
@@ -795,6 +799,7 @@ export default function OrderModal() {
                 fontSize: '12.5px', fontWeight: '600',
                 transition: 'all 0.15s ease'
               }}
+              title={!marketSession.open ? "Market is closed. Regular orders can only be placed between 09:15 AM and 03:30 PM" : "Regular Order"}
             >
               Regular
             </button>

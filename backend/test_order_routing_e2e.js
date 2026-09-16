@@ -40,9 +40,19 @@ function simulateOrderPlacement(orderPayload, simulatedSession) {
             if (marketCheck.isTotalBlock) {
                 return { status: 400, error: marketCheck.reason };
             }
-            if (marketCheck.isAmoWindow || rawVariety === 'AMO' || Boolean(orderPayload.is_amo)) {
+            const userWantsAmo = (rawVariety === 'AMO' || Boolean(orderPayload.is_amo));
+            if (userWantsAmo) {
+                if (!marketCheck.isAmoWindow) {
+                    return { status: 400, error: marketCheck.reason || 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.' };
+                }
                 isAmo = true;
             } else {
+                if (marketCheck.isAmoWindow) {
+                    return {
+                        status: 400,
+                        error: 'Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.'
+                    };
+                }
                 return { status: 400, error: marketCheck.reason };
             }
         } else {
@@ -80,16 +90,23 @@ function simulateOrderPlacement(orderPayload, simulatedSession) {
 }
 
 // Test Cases:
-// 1. Morning AMO Window at 08:30 AM
+// 1. Explicit AMO Order during AMO Window at 08:30 AM
 const amoRes = simulateOrderPlacement(
-    { symbol: 'RELIANCE', product_type: 'DEL', type: 'LIMIT', price: 2900 },
+    { symbol: 'RELIANCE', product_type: 'DEL', type: 'LIMIT', price: 2900, is_amo: true },
     { open: false, isAmoWindow: true, session: 'AMO', reason: 'AMO Active' }
 );
-assert(amoRes.status === 200 && amoRes.order.order_variety === 'AMO' && amoRes.order.order_status === 'AMO_PENDING', '08:30 AM: Delivery order routes as AMO (status: AMO_PENDING)');
+assert(amoRes.status === 200 && amoRes.order.order_variety === 'AMO' && amoRes.order.order_status === 'AMO_PENDING', '08:30 AM: Explicit AMO order routes as AMO (status: AMO_PENDING)');
+
+// 1b. Regular order outside market hours is strictly rejected (NOT auto-converted to AMO)
+const regularClosedRes = simulateOrderPlacement(
+    { symbol: 'RELIANCE', product_type: 'DEL', type: 'LIMIT', price: 2900, is_amo: false },
+    { open: false, isAmoWindow: true, session: 'AMO', reason: 'AMO Active' }
+);
+assert(regularClosedRes.status === 400 && regularClosedRes.error.includes('Regular orders can only be placed during trading hours'), 'Regular order outside market hours is rejected with 400 error');
 
 // 2. BO / CO order during AMO is strictly blocked
 const amoBoRes = simulateOrderPlacement(
-    { symbol: 'RELIANCE', product_type: 'BO', type: 'LIMIT', price: 2900 },
+    { symbol: 'RELIANCE', product_type: 'BO', type: 'LIMIT', price: 2900, is_amo: true },
     { open: false, isAmoWindow: true, session: 'AMO', reason: 'AMO Active' }
 );
 assert(amoBoRes.status === 400 && amoBoRes.error.includes('Bracket Orders'), '08:30 AM: Bracket Order during AMO is blocked with 400 error');
