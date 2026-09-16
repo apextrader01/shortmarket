@@ -1830,33 +1830,53 @@ select option {
    MOBILE-ONLY GESTURES: WATCHLIST ROW SWIPE & BOTTOM SHEET
    ───────────────────────────────────────────────────────────── */
 
-/* Watchlist Row Swipe Container */
-.watchlist-swipe-container {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  background: transparent;
+/* Watchlist Row Swipe Container (Mobile Only) */
+@media (min-width: 769px) {
+  .watchlist-swipe-container {
+    overflow: visible !important;
+    background: transparent !important;
+  }
+  .watchlist-swipe-actions {
+    display: none !important;
+  }
+  .watchlist-swipe-row {
+    transform: none !important;
+    background: transparent !important;
+  }
 }
 
-.watchlist-swipe-row {
-  position: relative;
-  width: 100%;
-  background: var(--bg-card, transparent);
-  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-  will-change: transform;
-  z-index: 2;
-}
+@media (max-width: 768px) {
+  .watchlist-swipe-container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    background: transparent;
+  }
 
-/* 3-Action Tray Revealed on Swipe (B, S, Delete) */
-.watchlist-swipe-actions {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  display: flex;
-  align-items: stretch;
-  z-index: 1;
-  width: 165px;
+  .watchlist-swipe-row {
+    position: relative;
+    width: 100%;
+    background: var(--bg-card, #131722) !important;
+    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform;
+    z-index: 2;
+  }
+
+  .watchlist-swipe-row.selected {
+    background: rgba(37, 99, 235, 0.2) !important;
+  }
+
+  /* 3-Action Tray Revealed on Swipe (B, S, Delete) */
+  .watchlist-swipe-actions {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    align-items: stretch;
+    z-index: 1;
+    width: 165px;
+  }
 }
 
 .watchlist-swipe-btn {

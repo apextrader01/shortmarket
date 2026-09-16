@@ -4,7 +4,7 @@ import { useStore, API } from '../store';
 import { TrendingUp, TrendingDown, Minus, Search, Plus, X, Trash2, Check, AlignRight, List, Bell, SlidersHorizontal, ArrowDownUp, RotateCcw } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
 
-const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect, swipedSymbol, setSwipedSymbol }) => {
+const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watchlists, onStockSelect, swipedSymbol, setSwipedSymbol, isMobile }) => {
   const isSelected = useStore(state => state.selectedSymbol === stock.uniqueSymbol);
   const data = useStore(state => 
     state.prices[stock.uniqueSymbol] || 
@@ -22,19 +22,20 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
   const isInWatchlist = (activeWatchlist?.symbols || []).includes(stock.uniqueSymbol);
   const currentLotsize = (stock.lotsize && Number(stock.lotsize) > 1) ? Number(stock.lotsize) : (data?.lotsize && Number(data.lotsize) > 1) ? Number(data.lotsize) : getInstantLotsize(stock.uniqueSymbol);
 
-  const isSwiped = swipedSymbol === stock.uniqueSymbol;
+  const isSwiped = Boolean(isMobile) && swipedSymbol === stock.uniqueSymbol;
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const isSwiping = useRef(false);
 
   const handleTouchStart = (e) => {
+    if (!isMobile) return;
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
     isSwiping.current = true;
   };
 
   const handleTouchMove = (e) => {
-    if (!isSwiping.current) return;
+    if (!isMobile || !isSwiping.current) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
 
@@ -64,6 +65,137 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
     if (onStockSelect) onStockSelect(stock.uniqueSymbol);
   };
 
+  const rowContent = (
+    <>
+      <div 
+        style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}
+        onClick={() => {
+          if (isSearchMode) handleSelect();
+        }}
+      >
+        <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
+          {stock.symbol}
+          <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '9px', padding: '1px 3px', borderRadius: '3px' }}>{stock.exchange}</span>
+          {isSearchMode && isInWatchlist && (
+            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.15)', color: 'var(--color-green-light)', fontWeight: '600' }}>✓ In Watchlist</span>
+          )}
+        </div>
+        <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.description || stock.name}</div>
+      </div>
+
+      {isSearchMode ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {isInWatchlist ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 8px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '4px',
+                color: 'var(--color-red-light)',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+              title="Remove from Watchlist"
+            >
+              <Minus size={12} />
+              <span>Remove</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '5px 10px',
+                background: 'var(--color-blue)',
+                border: 'none',
+                borderRadius: '4px',
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(37,99,235,0.3)'
+              }}
+              title="Add to Watchlist"
+            >
+              <Plus size={12} />
+              <span>Add</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: '75px', minHeight: '30px' }}>
+          {/* Live Price Display - always in DOM, concealed via CSS on hover on desktop */}
+          <div className="watchlist-price-container" style={{ textAlign: 'right', flexShrink: 0 }}>
+            {data && data.ltp !== undefined ? (
+              <>
+                <div className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
+                  {data.ltp.toFixed(2)}
+                  {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
+                </div>
+                <div style={{ fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)' }}>
+                  {data.change !== undefined && data.pct !== undefined ? `${data.pct > 0 ? '+' : ''}${Number(data.change).toFixed(2)} (${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%)` : '—'}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>—</div>
+            )}
+          </div>
+
+          {/* Action Buttons - revealed purely via CSS :hover on desktop */}
+          <div className="watchlist-hover-actions">
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>B</div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>S</div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().setAlertModalSymbol(stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Set Price Alert"><Bell size={12} color="var(--color-yellow)" /></div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Remove"><Trash2 size={12} color="var(--color-red-light)" /></div>
+            <div onClick={(e) => { e.stopPropagation(); useStore.getState().openMarketDepthModal(stock.uniqueSymbol, currentLotsize); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Market Depth"><AlignRight size={12} color="var(--color-blue)" /></div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // Desktop View: clean, original background with NO swipe container or swipe actions
+  if (!isMobile) {
+    return (
+      <div
+        onClick={() => {
+          if (!isSearchMode) handleSelect();
+        }}
+        className={`watchlist-item ${isSelected ? 'selected' : ''}`}
+        style={{
+          padding: '7px 12px',
+          borderBottom: '1px solid var(--border-color)',
+          cursor: 'pointer',
+          background: isSelected ? 'rgba(37,99,235,0.08)' : 'transparent',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative',
+          minHeight: '44px'
+        }}
+      >
+        {rowContent}
+      </div>
+    );
+  }
+
+  // Mobile View: row with swipe actions tray underneath
   return (
     <div className="watchlist-swipe-container">
       {/* 3-Action Tray Revealed on Swipe (Buy, Sell, Delete) */}
@@ -128,7 +260,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
           padding: '7px 12px',
           borderBottom: '1px solid var(--border-color)',
           cursor: 'pointer',
-          background: isSelected ? 'rgba(37,99,235,0.08)' : 'var(--bg-panel, transparent)',
+          background: isSelected ? 'rgba(37,99,235,0.2)' : 'var(--bg-card, #131722)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -136,106 +268,7 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
           minHeight: '44px'
         }}
       >
-        <div 
-          style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}
-          onClick={() => {
-            if (isSearchMode) handleSelect();
-          }}
-        >
-          <div style={{ fontWeight: isSelected ? '700' : '600', fontSize: '12px', letterSpacing: '0.2px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--text-primary)' }}>
-            {stock.symbol}
-            <span className={`badge-${stock.exchange?.toLowerCase() || 'nse'}`} style={{ fontSize: '9px', padding: '1px 3px', borderRadius: '3px' }}>{stock.exchange}</span>
-            {isSearchMode && isInWatchlist && (
-              <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(16,185,129,0.15)', color: 'var(--color-green-light)', fontWeight: '600' }}>✓ In Watchlist</span>
-            )}
-          </div>
-          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>{stock.description || stock.name}</div>
-        </div>
-
-        {isSearchMode ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-            {isInWatchlist ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '5px 8px',
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '4px',
-                  color: 'var(--color-red-light)',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-                title="Remove from Watchlist"
-              >
-                <Minus size={12} />
-                <span>Remove</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  useStore.getState().addStockToWatchlist(activeWatchlistId, stock.uniqueSymbol);
-                }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '5px 10px',
-                  background: 'var(--color-blue)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(37,99,235,0.3)'
-                }}
-                title="Add to Watchlist"
-              >
-                <Plus size={12} />
-                <span>Add</span>
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: '75px', minHeight: '30px' }}>
-            {/* Live Price Display - always in DOM, concealed via CSS on hover on desktop */}
-            <div className="watchlist-price-container" style={{ textAlign: 'right', flexShrink: 0 }}>
-              {data && data.ltp !== undefined ? (
-                <>
-                  <div className={data.tickDirection === 1 ? 'flash-up' : data.tickDirection === -1 ? 'flash-down' : ''} style={{ fontWeight: '600', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: '1px 2px', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-primary)' }}>
-                    {data.ltp.toFixed(2)}
-                    {isUp ? <TrendingUp size={10} /> : isDown ? <TrendingDown size={10} /> : null}
-                  </div>
-                  <div style={{ fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px', justifyContent: 'flex-end', color: isUp ? 'var(--color-green-light)' : isDown ? 'var(--color-red-light)' : 'var(--text-secondary)' }}>
-                    {data.change !== undefined && data.pct !== undefined ? `${data.pct > 0 ? '+' : ''}${Number(data.change).toFixed(2)} (${data.pct > 0 ? '+' : ''}${Number(data.pct).toFixed(2)}%)` : '?'}
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>?</div>
-              )}
-            </div>
-
-            {/* Action Buttons - revealed purely via CSS :hover on desktop */}
-            <div className="watchlist-hover-actions">
-              <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-blue)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>B</div>
-              <div onClick={(e) => { e.stopPropagation(); useStore.getState().openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize); }} style={{ padding: '2px 6px', background: 'var(--color-red)', borderRadius: '3px', color: '#fff', fontSize: '10px', fontWeight: 'bold', display: 'flex', cursor: 'pointer' }}>S</div>
-              <div onClick={(e) => { e.stopPropagation(); useStore.getState().setAlertModalSymbol(stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Set Price Alert"><Bell size={12} color="var(--color-yellow)" /></div>
-              <div onClick={(e) => { e.stopPropagation(); useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Remove"><Trash2 size={12} color="var(--color-red-light)" /></div>
-              <div onClick={(e) => { e.stopPropagation(); useStore.getState().openMarketDepthModal(stock.uniqueSymbol, currentLotsize); }} style={{ padding: '3px', background: 'var(--border-color)', borderRadius: '3px', display: 'flex', marginLeft: '2px', cursor: 'pointer' }} title="Market Depth"><AlignRight size={12} color="var(--color-blue)" /></div>
-            </div>
-          </div>
-        )}
+        {rowContent}
       </div>
     </div>
   );
@@ -252,7 +285,14 @@ export default function MarketWatch({ className = '', onStockSelect }) {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortBy, setSortBy] = useState('DEFAULT');
   const [filterSegment, setFilterSegment] = useState('ALL');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const searchLotsizes = useRef({});
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const activeWatchlist = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
   const isSearchMode = searchQuery.trim().length > 0;
@@ -684,6 +724,7 @@ export default function MarketWatch({ className = '', onStockSelect }) {
             onStockSelect={onStockSelect}
             swipedSymbol={swipedSymbol}
             setSwipedSymbol={setSwipedSymbol}
+            isMobile={isMobile}
           />
         ))}
       </div>}
