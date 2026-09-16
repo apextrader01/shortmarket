@@ -1856,14 +1856,14 @@ select option {
   .watchlist-swipe-row {
     position: relative;
     width: 100%;
-    background: var(--bg-card, #131722) !important;
+    background: transparent;
     transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
     will-change: transform;
     z-index: 2;
   }
 
   .watchlist-swipe-row.selected {
-    background: rgba(37, 99, 235, 0.2) !important;
+    background: rgba(37, 99, 235, 0.08) !important;
   }
 
   /* 3-Action Tray Revealed on Swipe (B, S, Delete) */

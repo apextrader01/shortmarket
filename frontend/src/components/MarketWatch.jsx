@@ -197,48 +197,50 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
 
   // Mobile View: row with swipe actions tray underneath
   return (
-    <div className="watchlist-swipe-container">
-      {/* 3-Action Tray Revealed on Swipe (Buy, Sell, Delete) */}
-      <div className="watchlist-swipe-actions">
-        <button
-          type="button"
-          className="watchlist-swipe-btn watchlist-swipe-btn-buy"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (setSwipedSymbol) setSwipedSymbol(null);
-            useStore.getState().openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize);
-          }}
-          title="Buy"
-        >
-          B
-        </button>
-        <button
-          type="button"
-          className="watchlist-swipe-btn watchlist-swipe-btn-sell"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (setSwipedSymbol) setSwipedSymbol(null);
-            useStore.getState().openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize);
-          }}
-          title="Sell"
-        >
-          S
-        </button>
-        <button
-          type="button"
-          className="watchlist-swipe-btn watchlist-swipe-btn-delete"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (setSwipedSymbol) setSwipedSymbol(null);
-            useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
-          }}
-          title="Remove from Watchlist"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
+    <div className="watchlist-swipe-container" style={{ position: 'relative', overflow: 'hidden', width: '100%', background: 'transparent' }}>
+      {/* 3-Action Tray Revealed on Swipe (Buy, Sell, Delete) - only mounted when actively swiped */}
+      {isSwiped && (
+        <div className="watchlist-swipe-actions">
+          <button
+            type="button"
+            className="watchlist-swipe-btn watchlist-swipe-btn-buy"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (setSwipedSymbol) setSwipedSymbol(null);
+              useStore.getState().openOrderModal(stock.uniqueSymbol, 'BUY', currentLotsize);
+            }}
+            title="Buy"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            className="watchlist-swipe-btn watchlist-swipe-btn-sell"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (setSwipedSymbol) setSwipedSymbol(null);
+              useStore.getState().openOrderModal(stock.uniqueSymbol, 'SELL', currentLotsize);
+            }}
+            title="Sell"
+          >
+            S
+          </button>
+          <button
+            type="button"
+            className="watchlist-swipe-btn watchlist-swipe-btn-delete"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (setSwipedSymbol) setSwipedSymbol(null);
+              useStore.getState().removeStockFromWatchlist(activeWatchlistId, stock.uniqueSymbol);
+            }}
+            title="Remove from Watchlist"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )}
 
-      {/* Main Row Content */}
+      {/* Main Row Content - Old Clean Background Restored */}
       <div
         onClick={() => {
           if (isSwiped) {
@@ -256,11 +258,11 @@ const WatchlistRow = React.memo(({ stock, isSearchMode, activeWatchlistId, watch
         onTouchEnd={handleTouchEnd}
         className={`watchlist-item watchlist-swipe-row ${isSelected ? 'selected' : ''}`}
         style={{
-          transform: isSwiped ? 'translateX(-165px)' : 'translateX(0)',
+          transform: isSwiped ? 'translateX(-165px)' : 'none',
           padding: '7px 12px',
           borderBottom: '1px solid var(--border-color)',
           cursor: 'pointer',
-          background: isSelected ? 'rgba(37,99,235,0.2)' : 'var(--bg-card, #131722)',
+          background: isSelected ? 'rgba(37,99,235,0.08)' : (isSwiped ? 'var(--bg-card, #131722)' : 'transparent'),
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
