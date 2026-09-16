@@ -168,10 +168,24 @@ export default function PositionsView() {
     return clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
   };
 
+  const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
   const isDerivativeSymbol = (sym) => {
     if (!sym || typeof sym !== 'string') return false;
-    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
-    return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || sym.includes('-MCX');
+    if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+    if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
+    if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
+    if (COMMODITIES_LIST.some(c => clean.startsWith(c))) return true;
+    return false;
+  };
+
+  const getAssetCategoryOrder = (item) => {
+    const sym = typeof item === 'string' ? item : (item?.symbol || '');
+    const assetClass = item?.asset_class || '';
+    if (isMutualFund(sym, assetClass) || item?.isMf) return 3; // Mutual Funds (last)
+    if (isDerivativeSymbol(sym) || assetClass === 'DERIVATIVE' || assetClass === 'COMMODITY' || item?.segment === 'Option' || item?.segment === 'Future') return 2; // Derivatives (middle)
+    return 1; // Stocks & ETFs (first)
   };
 
   const getMfName = (sym) => {
@@ -376,13 +390,14 @@ export default function PositionsView() {
       }
     });
 
-    // Sort alphabetically by symbol
+    // Sort: 1. Stocks -> 2. Derivatives -> 3. Mutual Funds
     flatList.sort((a, b) => {
-        const isAmf = String(a.symbol || '').endsWith('-MF');
-        const isBmf = String(b.symbol || '').endsWith('-MF');
-        if (isAmf && !isBmf) return 1;
-        if (!isAmf && isBmf) return -1;
-        return String(a.symbol || '').localeCompare(String(b.symbol || ''));
+      const orderA = getAssetCategoryOrder(a);
+      const orderB = getAssetCategoryOrder(b);
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return String(a.symbol || '').localeCompare(String(b.symbol || ''));
     });
 
     return { flatPositions: flatList, globalMTM, totalInvested, totalCurrent };

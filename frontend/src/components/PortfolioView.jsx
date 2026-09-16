@@ -71,6 +71,26 @@ export default function PortfolioView() {
     return clean.endsWith('-MF') || clean.includes('MUTUALFUND') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
   };
 
+  const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+  const isDerivativeContract = (sym) => {
+    if (!sym || typeof sym !== 'string') return false;
+    if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+    if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
+    if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
+    if (COMMODITIES_LIST.some(c => clean.startsWith(c))) return true;
+    return false;
+  };
+
+  const getAssetCategoryOrder = (item) => {
+    const sym = typeof item === 'string' ? item : (item?.symbol || '');
+    const assetClass = item?.asset_class || '';
+    if (isMutualFund(sym, assetClass) || item?.isMf) return 3; // Mutual Funds (last)
+    if (isDerivativeContract(sym) || assetClass === 'DERIVATIVE' || assetClass === 'COMMODITY') return 2; // Derivatives (middle)
+    return 1; // Stocks & ETFs (first)
+  };
+
   const getMfName = (sym) => {
     if (!sym) return null;
     const clean = sym.includes(':') ? sym.split(':')[1] : sym;
@@ -358,7 +378,9 @@ export default function PortfolioView() {
 
     // Asset segment filter
     if (assetFilter === 'EQUITY') {
-      list = list.filter(p => !p.isMf);
+      list = list.filter(p => !p.isMf && !isDerivativeContract(p.symbol));
+    } else if (assetFilter === 'DERIVATIVES') {
+      list = list.filter(p => !p.isMf && isDerivativeContract(p.symbol));
     } else if (assetFilter === 'MF') {
       list = list.filter(p => p.isMf);
     }
@@ -379,13 +401,18 @@ export default function PortfolioView() {
       list = list.filter(p => p.pnl < 0);
     }
 
-    // Sorting
+    // Sorting: Primary sort is Category (1. Stocks -> 2. Derivatives -> 3. Mutual Funds)
     list.sort((a, b) => {
-      if (sortBy === 'VALUE_DESC') return b.current - a.current;
-      if (sortBy === 'PNL_DESC') return b.pnl - a.pnl;
-      if (sortBy === 'PNL_ASC') return a.pnl - b.pnl;
+      const orderA = getAssetCategoryOrder(a);
+      const orderB = getAssetCategoryOrder(b);
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      if (sortBy === 'VALUE_DESC') return (b.current || 0) - (a.current || 0);
+      if (sortBy === 'PNL_DESC') return (b.pnl || 0) - (a.pnl || 0);
+      if (sortBy === 'PNL_ASC') return (a.pnl || 0) - (b.pnl || 0);
       if (sortBy === 'NAME_ASC') return (a.displayName || a.symbol || '').localeCompare(b.displayName || b.symbol || '');
-      return 0;
+      return (b.current || 0) - (a.current || 0);
     });
 
     return list;
@@ -954,6 +981,7 @@ export default function PortfolioView() {
                   {[
                     { id: 'ALL', label: 'All Assets' },
                     { id: 'EQUITY', label: 'Stocks' },
+                    { id: 'DERIVATIVES', label: 'Derivatives' },
                     { id: 'MF', label: 'Mutual Funds' }
                   ].map(a => {
                     const active = assetFilter === a.id;
