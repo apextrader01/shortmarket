@@ -5163,12 +5163,26 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+      const parts = formatter.formatToParts(new Date());
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      const startOfToday = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+
       const activeHoldings = await trx('holdings')
         .where({ user_id: req.user.id })
         .where('quantity', '>', 0)
         .forUpdate();
 
-      if (!activeHoldings || activeHoldings.length === 0) {
+      const overnightPositions = await trx('positions')
+        .where({ user_id: req.user.id })
+        .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+        .where('quantity', '!=', 0)
+        .where('created_at', '<', startOfToday)
+        .forUpdate();
+
+      if ((!activeHoldings || activeHoldings.length === 0) && (!overnightPositions || overnightPositions.length === 0)) {
         throw Object.assign(new Error('No active holdings to exit'), { statusCode: 400 });
       }
 
@@ -5254,6 +5268,98 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
         }
 
         exitOrders.push({ symbol: holding.symbol, quantity: qty, price: ltp });
+      }
+
+      for (const pos of overnightPositions) {
+        const posQty = Number(pos.quantity);
+        const isShort = posQty < 0;
+        const qty = Math.abs(posQty);
+        const ltp = getLtpFromPriceCache(pos.symbol) || parseFloat(pos.average_price) || 0;
+        if (ltp <= 0) {
+          throw Object.assign(new Error(`Live price unavailable for ${pos.symbol}. Cannot exit holdings.`), { statusCode: 400 });
+        }
+        const exitSide = isShort ? 'BUY' : 'SELL';
+        const principalAmount = qty * parseFloat(pos.average_price);
+        const realizedPnl = isShort 
+          ? (parseFloat(pos.average_price) - ltp) * qty
+          : (ltp - parseFloat(pos.average_price)) * qty;
+
+        const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, req.user.id, pos.symbol, 'DEL', exitSide, qty, ltp);
+
+        if (!isShort) {
+          const totalValue = qty * ltp;
+          totalSoldAmount += totalValue;
+          await trx('users').where({ id: req.user.id }).increment('balance', totalValue);
+          if (principalAmount > 0) {
+            await trx('ledger').insert({
+              user_id: req.user.id,
+              amount: principalAmount,
+              type: 'MARGIN_RELEASE',
+              description: `Holding principal released: SELL ${qty} ${pos.symbol} @ avg ₹${parseFloat(pos.average_price).toFixed(2)}`,
+              created_at: new Date()
+            });
+          }
+        } else {
+          // Short delivery position releases blocked margin + realized PnL
+          const marginRelease = Number(pos.margin || 0);
+          if (marginRelease > 0) {
+            await trx('users').where({ id: req.user.id }).increment('balance', marginRelease);
+            await trx('ledger').insert({
+              user_id: req.user.id,
+              amount: marginRelease,
+              type: 'MARGIN_RELEASE',
+              description: `Short delivery margin released: BUY ${qty} ${pos.symbol}`,
+              created_at: new Date()
+            });
+          }
+          if (realizedPnl !== 0) {
+            await trx('users').where({ id: req.user.id }).increment('balance', realizedPnl);
+          }
+        }
+
+        // Insert executed exit order
+        await trx('orders').insert({
+          user_id: req.user.id,
+          symbol: pos.symbol,
+          type: 'MARKET',
+          side: exitSide,
+          quantity: qty,
+          filled_quantity: qty,
+          pending_quantity: 0,
+          price: ltp,
+          average_price: ltp,
+          order_variety: 'REGULAR',
+          status: 'EXECUTED',
+          product_type: pos.product_type || 'DEL',
+          margin: 0,
+          realized_pnl: realizedPnl,
+          taxes: totalTaxes,
+          remarks: 'Exit All Holdings',
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        // Close position record
+        await trx('positions').where({ id: pos.id }).update({
+          quantity: 0,
+          closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [qty]),
+          exit_price: ltp,
+          realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+          margin: 0,
+          updated_at: new Date()
+        });
+
+        if (realizedPnl !== 0) {
+          await trx('ledger').insert({
+            user_id: req.user.id,
+            amount: realizedPnl,
+            type: 'REALIZED_PNL',
+            description: `Realized P&L for exited holding ${pos.symbol}`,
+            created_at: new Date()
+          });
+        }
+
+        exitOrders.push({ symbol: pos.symbol, quantity: qty, price: ltp });
       }
     });
 

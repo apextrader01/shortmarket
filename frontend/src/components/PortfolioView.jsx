@@ -156,7 +156,7 @@ export default function PortfolioView() {
   (positions || []).forEach(p => {
     const isDelivery = (p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY');
     const isMF = (p.symbol?.endsWith('-MF') || p.symbol?.includes('MUTUALFUND') || p.asset_class === 'MUTUAL_FUND');
-    if ((isDelivery || isMF) && Number(p.quantity) > 0) {
+    if ((isDelivery || isMF) && Math.abs(Number(p.quantity)) > 0) {
       const sym = p.symbol;
       const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
       const key = cleanSym || sym;
@@ -169,14 +169,14 @@ export default function PortfolioView() {
         const addQty = Number(p.quantity) || 0;
         const addPrice = Number(p.average_price) || 0;
         const totalQty = prevQty + addQty;
-        const weightedAvg = totalQty > 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / totalQty : 0;
+        const weightedAvg = totalQty !== 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / Math.abs(totalQty) : 0;
         existing.quantity = totalQty;
         existing.average_price = weightedAvg;
       }
     }
   });
 
-  const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => h.quantity > 0);
+  const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => Math.abs(Number(h.quantity)) > 0);
   const deliveryPositions = allMergedHoldings;
 
   useEffect(() => {
@@ -329,9 +329,10 @@ export default function PortfolioView() {
       const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
       const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
       const qty = Math.abs(pos.quantity);
+      const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
       const invested = parseFloat(pos.average_price) * qty;
       const current = ltp * qty;
-      const pnl = current - invested;
+      const pnl = isShort ? (invested - current) : (current - invested);
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
       const dayChangeVal = chg * qty;
       const isMf = isMutualFund(pos.symbol, pos.asset_class);
@@ -1052,7 +1053,10 @@ export default function PortfolioView() {
                             if (pos.isMf) {
                               handleMfAction(pos, 'REDEEM');
                             } else {
-                              useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity);
+                              const rawQty = Number(pos.quantity);
+                              const exitSide = (rawQty < 0 || pos.side === 'SELL') ? 'BUY' : 'SELL';
+                              const exitQty = Math.abs(rawQty || 1);
+                              useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
                             }
                           }}
                           style={{
@@ -1073,9 +1077,16 @@ export default function PortfolioView() {
                                 MUTUAL FUND
                               </span>
                             ) : (
-                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
-                                {safeSymbol.split(':')[0] || 'NSE'} • CNC
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                                  {safeSymbol.split(':')[0] || 'NSE'} • CNC
+                                </span>
+                                {(Number(pos.quantity) < 0 || pos.side === 'SELL') && (
+                                  <span style={{ fontSize: '10px', color: '#ef4444', background: 'rgba(239,68,68,0.12)', padding: '2px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                                    SELL
+                                  </span>
+                                )}
+                              </div>
                             )}
                             <div style={{ 
                               fontSize: '13px', 
@@ -1187,6 +1198,16 @@ export default function PortfolioView() {
                                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
                                     {safeSymbol.split(':')[0] || 'NSE'}
                                   </span>
+                                  <span style={{ 
+                                    fontSize: '10px', 
+                                    fontWeight: '700', 
+                                    padding: '1px 5px', 
+                                    borderRadius: '4px', 
+                                    background: (Number(pos.quantity) < 0 || pos.side === 'SELL') ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)', 
+                                    color: (Number(pos.quantity) < 0 || pos.side === 'SELL') ? '#ef4444' : '#38bdf8' 
+                                  }}>
+                                    {(Number(pos.quantity) < 0 || pos.side === 'SELL') ? 'SELL' : 'BUY'}
+                                  </span>
                                 </div>
                               )}
                             </td>
@@ -1280,7 +1301,12 @@ export default function PortfolioView() {
                                       + BUY
                                     </button>
                                     <button
-                                      onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                                      onClick={() => {
+                                        const rawQty = Number(pos.quantity);
+                                        const exitSide = (rawQty < 0 || pos.side === 'SELL') ? 'BUY' : 'SELL';
+                                        const exitQty = Math.abs(rawQty || 1);
+                                        useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                                      }}
                                       title="Exit / Sell"
                                       style={{
                                         background: 'rgba(255, 59, 48, 0.1)',
@@ -1294,7 +1320,7 @@ export default function PortfolioView() {
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
-                                      SELL
+                                      {(Number(pos.quantity) < 0 || pos.side === 'SELL') ? 'COVER' : 'SELL'}
                                     </button>
                                   </>
                                 )}

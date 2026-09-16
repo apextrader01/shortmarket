@@ -7,11 +7,29 @@ import PnLShareCardModal from './PnLShareCardModal';
 const EMPTY_PRICES = {};
 
 export default function PositionsView() {
+  const getISTDate = (date) => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    } catch (e) {
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  };
+
   const isToday = (dateString) => {
     if (!dateString) return false;
     const d = new Date(dateString);
-    const today = new Date();
-    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    if (isNaN(d.getTime())) return false;
+    return getISTDate(d) === getISTDate(new Date());
+  };
+
+  const isDeliveryPosition = (p) => {
+    const prod = (p?.product_type || p?.productLabel || p?.product || '').toUpperCase();
+    return prod === 'DEL' || prod === 'CNC' || prod === 'DELIVERY';
+  };
+
+  const isOvernightDelivery = (p) => {
+    return isDeliveryPosition(p) && !isToday(p.created_at);
   };
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -30,10 +48,54 @@ export default function PositionsView() {
   const sourceData = useMemo(() => {
     if (viewMode === 'HOLDINGS') {
       const mergedHoldingsMap = {};
-      (holdings || []).forEach(h => { mergedHoldingsMap[h.symbol] = { ...h }; });
-      return Object.values(mergedHoldingsMap).filter(h => h.quantity > 0);
+      // 1. Existing database holdings
+      (holdings || []).forEach(h => {
+        if (h && h.symbol) {
+          mergedHoldingsMap[h.symbol] = {
+            ...h,
+            quantity: Number(h.quantity) || 0,
+            average_price: Number(h.average_price) || 0,
+            isDbHolding: true
+          };
+        }
+      });
+
+      // 2. Overnight delivery positions (bought yesterday or earlier)
+      (positions || []).filter(p => Number(p.quantity) !== 0 && isOvernightDelivery(p)).forEach(p => {
+        const qty = Number(p.quantity) || 0;
+        const avg = Number(p.average_price) || 0;
+        const cleanSym = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+
+        // Check if an existing DB holding exists for this symbol
+        const matchedKey = Object.keys(mergedHoldingsMap).find(k => {
+          const cleanK = k.replace(/^(NSE:|BSE:|MCX:)/i, '');
+          return k === p.symbol || cleanK === cleanSym;
+        });
+
+        if (matchedKey && mergedHoldingsMap[matchedKey].isDbHolding) {
+          const existing = mergedHoldingsMap[matchedKey];
+          const prevQty = Number(existing.quantity) || 0;
+          const prevPrice = Number(existing.average_price) || 0;
+          const totalQty = prevQty + qty;
+          const weightedAvg = totalQty !== 0 ? ((prevQty * prevPrice) + (qty * avg)) / totalQty : 0;
+          existing.quantity = totalQty;
+          existing.average_price = weightedAvg;
+        } else {
+          const key = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;
+          mergedHoldingsMap[key] = {
+            ...p,
+            id: p.id || key,
+            isOvernightPos: true,
+            quantity: qty,
+            average_price: avg,
+            side: p.side || (qty > 0 ? 'BUY' : 'SELL')
+          };
+        }
+      });
+
+      return Object.values(mergedHoldingsMap).filter(h => Math.abs(Number(h.quantity)) > 0);
     } else if (viewMode === 'OPEN') {
-      return (positions || []).filter(p => Number(p.quantity) !== 0);
+      return (positions || []).filter(p => Number(p.quantity) !== 0 && !isOvernightDelivery(p));
     } else if (viewMode === 'CLOSED') {
       const normalizeSym = (sym) => (sym ? String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '').trim() : '');
 
@@ -106,6 +168,12 @@ export default function PositionsView() {
     return clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
   };
 
+  const isDerivativeSymbol = (sym) => {
+    if (!sym || typeof sym !== 'string') return false;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT') || sym.includes('-MCX');
+  };
+
   const getMfName = (sym) => {
     if (!sym) return null;
     return mfNames[sym] || mfNames[sym + '-MF'] || mfNames[sym.replace('-MF', '')] || null;
@@ -175,7 +243,8 @@ export default function PositionsView() {
       if (viewMode === 'OPEN' && !isOpen) return;
       if (viewMode === 'CLOSED' && isOpen) return;
 
-      const key = `${pos.symbol}-${pos.product_type}`;
+      const normProd = viewMode === 'HOLDINGS' ? 'DEL' : (pos.product_type || 'INT');
+      const key = `${pos.symbol}-${normProd}`;
       if (!symbolAgg[key]) {
          symbolAgg[key] = { ...pos, encumberedQty: 0, unencumberedQty: 0 };
       }
@@ -292,11 +361,13 @@ export default function PositionsView() {
         globalMTM += realizedPnl;
       } else if (viewMode === 'HOLDINGS') {
         const hQty = Math.abs(pos.quantity !== undefined ? pos.quantity : qty);
+        const isShort = Number(pos.quantity !== undefined ? pos.quantity : qty) < 0 || pos.side === 'SELL';
         const inv = avg * hQty;
         const cur = (ltp || avg) * hQty;
         totalInvested += inv;
         totalCurrent += cur;
-        globalMTM += (cur - inv);
+        const hPnl = isShort ? (inv - cur) : (cur - inv);
+        globalMTM += hPnl;
       } else {
         // OPEN
         totalInvested += invested;
@@ -622,19 +693,21 @@ export default function PositionsView() {
               </thead>
               <tbody>
                 {flatPositions.map((pos, idx) => {
+                  const rawQty = Number(pos.quantity !== undefined ? pos.quantity : pos.qty);
+                  const isShort = rawQty < 0 || pos.side === 'SELL';
+                  const isBuy = !isShort;
+                  const sideText = isShort ? 'SELL' : 'BUY';
                   const isProfit = pos.pnl >= 0;
-                  const sideText = pos.qty > 0 ? 'BUY' : (pos.qty < 0 ? 'SELL' : '-');
-                  const isBuy = pos.qty > 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
                   const isMf = isMutualFund(pos.symbol);
                   const mfName = isMf ? getMfName(pos.symbol) : null;
                   const safeSymbol = pos.symbol || '';
                   const cleanSym = safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0];
                   const exchange = (safeSymbol.includes(':') ? safeSymbol.split(':')[0] : pos.exchange) || 'NSE';
-                  const holdingQty = Math.abs(pos.quantity !== undefined ? pos.quantity : pos.qty);
+                  const holdingQty = Math.abs(rawQty);
                   const investedVal = (pos.avg || 0) * holdingQty;
                   const currentVal = ((pos.ltp || pos.avg) || 0) * holdingQty;
-                  const holdingPnl = currentVal - investedVal;
+                  const holdingPnl = isShort ? (investedVal - currentVal) : (currentVal - investedVal);
                   const holdingPnlPct = investedVal > 0 ? (holdingPnl / investedVal) * 100 : 0;
 
                   return (
@@ -673,6 +746,18 @@ export default function PositionsView() {
                             <span style={{ fontSize: '10px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.1)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
                               {viewMode === 'HOLDINGS' ? 'CNC' : (pos.productLabel || pos.product_type || 'INT')}
                             </span>
+                            {viewMode === 'HOLDINGS' && (
+                              <span style={{ 
+                                fontSize: '10px', 
+                                fontWeight: '700', 
+                                padding: '1px 5px', 
+                                borderRadius: '4px', 
+                                background: isBuy ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', 
+                                color: isBuy ? '#38bdf8' : '#ef4444' 
+                              }}>
+                                {sideText}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
@@ -849,7 +934,11 @@ export default function PositionsView() {
                               onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                               title="Exit Holding"
-                              onClick={() => useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity)}
+                              onClick={() => {
+                                const exitSide = isShort ? 'BUY' : 'SELL';
+                                const exitQty = Math.abs(rawQty || 1);
+                                useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                              }}
                             />
                           )}
                         </div>
@@ -906,16 +995,22 @@ export default function PositionsView() {
 
                 {/* 📱 High-Density Kite/Fyers Position Rows (6-8 fit on screen) */}
                 {flatPositions.map((pos, idx) => {
+                  const rawQty = Number(pos.quantity !== undefined ? pos.quantity : pos.qty);
+                  const isShort = rawQty < 0 || pos.side === 'SELL';
+                  const isBuy = !isShort;
+                  const sideText = rawQty > 0 ? 'BUY' : (rawQty < 0 ? 'SELL' : (pos.side || '-'));
                   const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
-                  const displayPnl = viewMode === 'CLOSED' ? realizedPnl : pos.pnl;
+                  const displayPnl = viewMode === 'CLOSED' 
+                    ? realizedPnl 
+                    : (viewMode === 'HOLDINGS' 
+                      ? (isShort ? (((pos.avg || 0) - (pos.ltp || pos.avg || 0)) * Math.abs(rawQty)) : (((pos.ltp || pos.avg || 0) - (pos.avg || 0)) * Math.abs(rawQty))) 
+                      : pos.pnl);
                   const isDisplayProfit = displayPnl >= 0;
                   const investedBase = pos.invested > 0 
                     ? pos.invested 
                     : ((parseFloat(pos.closed_quantity) || 1) * (pos.avg || parseFloat(pos.average_price) || 1));
                   const pnlPercent = investedBase > 0 ? (displayPnl / investedBase) * 100 : 0;
-                  const sideText = pos.qty > 0 ? 'BUY' : (pos.qty < 0 ? 'SELL' : (pos.side || '-'));
-                  const isBuy = pos.qty > 0 || (viewMode === 'CLOSED' && pos.side !== 'SELL');
 
                   return (
                     <div 
@@ -933,7 +1028,9 @@ export default function PositionsView() {
                           setPartialExitType('MARKET');
                           setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
                         } else if (viewMode === 'HOLDINGS') {
-                          useStore.getState().openOrderModal(pos.symbol, 'SELL', pos.lotSize || pos.lotsize || 1, 'DEL', true, pos.quantity);
+                          const exitSide = isShort ? 'BUY' : 'SELL';
+                          const exitQty = Math.abs(rawQty || 1);
+                          useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
                         }
                       }}
                       style={{
@@ -1045,7 +1142,7 @@ export default function PositionsView() {
                               Convert
                             </button>
                           )}
-                          {viewMode === 'OPEN' && (
+                          {(viewMode === 'OPEN' || viewMode === 'HOLDINGS') && (
                             <span style={{ fontSize: '10px', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>
                               Exit ✕
                             </span>
