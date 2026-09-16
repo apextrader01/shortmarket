@@ -28,7 +28,7 @@ export const EMOTION_TAGS = [
   '😨 Panic Exit (Fear)'
 ];
 
-export default function TradingJournalView({ onBack }) {
+export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
   const { user, positions, orders } = useStore(useShallow(state => ({
     user: state.user,
     positions: state.positions,
@@ -48,8 +48,14 @@ export default function TradingJournalView({ onBack }) {
     }
   });
 
-  const [activeViewTab, setActiveViewTab] = useState('JOURNAL'); // 'JOURNAL' | 'CALENDAR'
+  const [activeViewTab, setActiveViewTab] = useState(initialTab); // 'JOURNAL' | 'CALENDAR'
   const [calendarDate, setCalendarDate] = useState(new Date());
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveViewTab(initialTab);
+    }
+  }, [initialTab]);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
 
   const [selectedTradeForShare, setSelectedTradeForShare] = useState(null);

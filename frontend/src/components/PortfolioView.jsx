@@ -3,10 +3,13 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 const AnalyticsView = lazy(() => import('./AnalyticsView'));
+const TradingJournalView = lazy(() => import('./TradingJournalView'));
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { 
   Briefcase, 
   BarChart3, 
+  CalendarDays,
+  BookOpen,
   Wallet, 
   TrendingUp, 
   TrendingDown, 
@@ -459,10 +462,12 @@ export default function PortfolioView() {
         boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px', overflowX: isMobile ? 'auto' : 'visible' }}>
           {[
             { id: 'Overview', label: 'Portfolio Overview', icon: Briefcase },
-            { id: 'Analytics', label: 'Trade Analytics', icon: BarChart3 }
+            { id: 'Analytics', label: 'Trade Analytics', icon: BarChart3 },
+            { id: 'Heatmap', label: 'P&L Calendar Heatmap', icon: CalendarDays },
+            { id: 'Journal', label: 'Trade Journal Log', icon: BookOpen }
           ].map(tab => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -480,7 +485,9 @@ export default function PortfolioView() {
                   color: active ? '#2563eb' : 'var(--text-secondary)',
                   borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
               >
                 <Icon size={16} style={{ color: active ? '#2563eb' : 'var(--text-secondary)' }} />
@@ -521,6 +528,18 @@ export default function PortfolioView() {
         <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading analytics...</div>}>
             <AnalyticsView />
+          </Suspense>
+        </div>
+      ) : activeTab === 'Heatmap' ? (
+        <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading calendar heatmap...</div>}>
+            <TradingJournalView initialTab="CALENDAR" onBack={() => handleTabClick('Overview')} />
+          </Suspense>
+        </div>
+      ) : activeTab === 'Journal' ? (
+        <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading trade journal log...</div>}>
+            <TradingJournalView initialTab="JOURNAL" onBack={() => handleTabClick('Overview')} />
           </Suspense>
         </div>
       ) : (
