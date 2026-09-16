@@ -218,6 +218,46 @@ async function runMigration() {
     await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
     console.log('  ✅ Historical records backfilled with valid defaults');
 
+    // 7B. Round fractional decimal quantities for non-MF symbols in orders, positions, and holdings
+    await db.raw(`
+      UPDATE orders
+      SET
+        quantity = ROUND(quantity),
+        filled_quantity = ROUND(filled_quantity),
+        pending_quantity = ROUND(pending_quantity)
+      WHERE
+        symbol NOT LIKE '%-MF'
+        AND symbol NOT LIKE '%:MF'
+        AND (
+          quantity != ROUND(quantity)
+          OR filled_quantity != ROUND(filled_quantity)
+          OR pending_quantity != ROUND(pending_quantity)
+        )
+    `).catch(() => {});
+    await db.raw(`
+      UPDATE positions
+      SET
+        quantity = ROUND(quantity),
+        closed_quantity = ROUND(closed_quantity)
+      WHERE
+        symbol NOT LIKE '%-MF'
+        AND symbol NOT LIKE '%:MF'
+        AND (
+          quantity != ROUND(quantity)
+          OR closed_quantity != ROUND(closed_quantity)
+        )
+    `).catch(() => {});
+    await db.raw(`
+      UPDATE holdings
+      SET
+        quantity = ROUND(quantity)
+      WHERE
+        symbol NOT LIKE '%-MF'
+        AND symbol NOT LIKE '%:MF'
+        AND quantity != ROUND(quantity)
+    `).catch(() => {});
+    console.log('  ✅ Non-MF decimal quantities sanitized to whole integers');
+
     // 8. Composite indexes
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)').catch(() => {});

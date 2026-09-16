@@ -4,6 +4,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
 
+const formatOrderQty = (order, qty) => {
+  const isMf = (order?.symbol || '').endsWith('-MF') || (order?.symbol || '').includes(':MF');
+  if (isMf) return Number(qty || 0).toFixed(4);
+  return Math.round(Number(qty || 0)).toLocaleString('en-IN');
+};
+
 export default function OrdersView() {
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   React.useEffect(() => {
@@ -386,13 +392,13 @@ export default function OrdersView() {
                               {order.side}
                             </span>
                             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                              Qty. {Number(order.filled_quantity) > 0 ? `${Number(order.filled_quantity)}/${Number(order.quantity)}` : `${Number(order.quantity)}`}
+                              Qty. {Number(order.filled_quantity) > 0 ? `${formatOrderQty(order, order.filled_quantity)}/${formatOrderQty(order, order.quantity)}` : `${formatOrderQty(order, order.quantity)}`}
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>🕒 {timeStr}</span>
                             <span style={{ fontSize: '10.5px', fontWeight: '700', color: order.status === 'AMO_PENDING' ? '#f97316' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? '#f59e0b' : statusColor)) }}>
-                              {order.status === 'AMO_PENDING' ? 'AMO' : (order.status === 'PARTIAL_FILLED' ? 'PARTIAL' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? `CANCELLED (${Number(order.filled_quantity)} filled)` : order.status))}
+                              {order.status === 'AMO_PENDING' ? 'AMO' : (order.status === 'PARTIAL_FILLED' ? 'PARTIAL' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? `CANCELLED (${formatOrderQty(order, order.filled_quantity)} filled)` : order.status))}
                             </span>
                           </div>
                         </div>
@@ -602,12 +608,12 @@ export default function OrdersView() {
                       {Number(order.filled_quantity) > 0 ? (
                         <span>
                           <span style={{ color: order.status === 'CANCELLED' ? '#f59e0b' : (order.status === 'PARTIAL_FILLED' ? 'var(--color-yellow)' : 'var(--color-green-light)'), fontWeight: '700' }}>
-                            {Number(order.filled_quantity).toLocaleString('en-IN')}
+                            {formatOrderQty(order, order.filled_quantity)}
                           </span>
-                          <span style={{ color: 'var(--text-secondary)' }}>/{Number(order.quantity).toLocaleString('en-IN')}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>/{formatOrderQty(order, order.quantity)}</span>
                         </span>
                       ) : (
-                        Number(order.quantity).toLocaleString('en-IN')
+                        formatOrderQty(order, order.quantity)
                       )}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -658,8 +664,8 @@ export default function OrdersView() {
                           🌙 AMO PENDING
                         </span>
                       ) : (order.status === 'PARTIAL_FILLED' ? 'PARTIALLY FILLED' : (order.status === 'CANCELLED' && Number(order.filled_quantity) > 0 ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245,158,11,0.3)', fontSize: '11px', fontWeight: '700' }} title={`Filled ${Number(order.filled_quantity).toLocaleString('en-IN')} shares before cancelling remaining ${Math.max(0, Number(order.quantity) - Number(order.filled_quantity)).toLocaleString('en-IN')} shares`}>
-                          CANCELLED ({Number(order.filled_quantity).toLocaleString('en-IN')} filled)
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(245,158,11,0.12)', color: '#f59e0b', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(245,158,11,0.3)', fontSize: '11px', fontWeight: '700' }} title={`Filled ${formatOrderQty(order, order.filled_quantity)} shares before cancelling remaining ${formatOrderQty(order, Math.max(0, Number(order.quantity) - Number(order.filled_quantity)))} shares`}>
+                          CANCELLED ({formatOrderQty(order, order.filled_quantity)} filled)
                         </span>
                       ) : order.status))}
                     </td>
@@ -850,13 +856,13 @@ export default function OrdersView() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Total Quantity:</span>
-                <span style={{ fontWeight: '600' }}>{Number(selectedOrder.quantity).toLocaleString('en-IN')}</span>
+                <span style={{ fontWeight: '600' }}>{formatOrderQty(selectedOrder, selectedOrder.quantity)}</span>
               </div>
               {Number(selectedOrder.filled_quantity) > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Filled Quantity:</span>
                   <span style={{ fontWeight: '700', color: selectedOrder.status === 'CANCELLED' ? '#f59e0b' : 'var(--color-green-light)' }}>
-                    {Number(selectedOrder.filled_quantity).toLocaleString('en-IN')}
+                    {formatOrderQty(selectedOrder, selectedOrder.filled_quantity)}
                   </span>
                 </div>
               )}
@@ -864,7 +870,7 @@ export default function OrdersView() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Cancelled Quantity:</span>
                   <span style={{ fontWeight: '600', color: 'var(--color-red-light)' }}>
-                    {Math.max(0, Number(selectedOrder.quantity) - Number(selectedOrder.filled_quantity)).toLocaleString('en-IN')}
+                    {formatOrderQty(selectedOrder, Math.max(0, Number(selectedOrder.quantity) - Number(selectedOrder.filled_quantity)))}
                   </span>
                 </div>
               )}
@@ -878,7 +884,7 @@ export default function OrdersView() {
                 <span style={{ color: 'var(--text-secondary)' }}>Status:</span>
                 <span style={{ fontWeight: '700', color: (selectedOrder.status === 'EXECUTED' || selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'COMPLETE') ? 'var(--color-green-light)' : (selectedOrder.status === 'REJECTED' ? 'var(--color-red-light)' : (selectedOrder.status === 'CANCELLED' ? (Number(selectedOrder.filled_quantity) > 0 ? '#f59e0b' : 'var(--color-red-light)') : 'var(--color-yellow)')) }}>
                   {selectedOrder.status === 'CANCELLED' && Number(selectedOrder.filled_quantity) > 0
-                    ? `CANCELLED (${Number(selectedOrder.filled_quantity).toLocaleString('en-IN')} filled)`
+                    ? `CANCELLED (${formatOrderQty(selectedOrder, selectedOrder.filled_quantity)} filled)`
                     : selectedOrder.status}
                 </span>
               </div>

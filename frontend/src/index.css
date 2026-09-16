@@ -1826,6 +1826,98 @@ select option {
   background: #94a3b8;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   MOBILE-ONLY GESTURES: WATCHLIST ROW SWIPE & BOTTOM SHEET
+   ───────────────────────────────────────────────────────────── */
+
+/* Watchlist Row Swipe Container */
+.watchlist-swipe-container {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  background: transparent;
+}
+
+.watchlist-swipe-row {
+  position: relative;
+  width: 100%;
+  background: var(--bg-card, transparent);
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
+  z-index: 2;
+}
+
+/* 3-Action Tray Revealed on Swipe (B, S, Delete) */
+.watchlist-swipe-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: stretch;
+  z-index: 1;
+  width: 165px;
+}
+
+.watchlist-swipe-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.watchlist-swipe-btn:active {
+  opacity: 0.8;
+}
+
+.watchlist-swipe-btn-buy {
+  flex: 1;
+  background: #00875a;
+  color: #ffffff;
+}
+
+.watchlist-swipe-btn-sell {
+  flex: 1;
+  background: #d32f2f;
+  color: #ffffff;
+}
+
+.watchlist-swipe-btn-delete {
+  flex: 1;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='light'] .watchlist-swipe-btn-delete {
+  background: #f1f5f9;
+  color: #dc2626;
+  border-left: 1px solid #e2e8f0;
+}
+
+/* Animations for Mobile Stock Overview Bottom Sheet */
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Watchlist Filter Dropdown Menu */
+.watchlist-filter-menu {
+  animation: fadeIn 0.15s ease-out;
+}
+
+
 
 
 

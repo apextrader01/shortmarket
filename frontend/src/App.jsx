@@ -54,6 +54,7 @@ const OnboardingWizard = lazyWithRetry(() => import('./components/OnboardingWiza
 const DOMLadderModal = lazyWithRetry(() => import('./components/DOMLadderModal'));
 const MarketDepthModal = lazyWithRetry(() => import('./components/MarketDepthModal'));
 const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
+const MobileStockOverviewModal = lazyWithRetry(() => import('./components/MobileStockOverviewModal'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
@@ -64,7 +65,7 @@ const TabLoader = () => (
 import { isUserPinEnabled, isAppLocked, setAppLocked, getAutoLockDuration } from './utils/biometricAuth';
 import { useStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, LogOut, Settings, Sun, Moon, User, LineChart, Briefcase, List, CircleDollarSign, Menu, X, Trophy, FileText, Gift, Star, Info, ShieldCheck, BookOpen, Layers } from 'lucide-react';
 
 const TOP_INDICES = ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'];
 
@@ -183,7 +184,7 @@ function App() {
   useEffect(() => {
     registerServiceWorker();
   }, []);
-  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
+  const { user, logout, initSocket, fetchUserData, refreshPrices, fetchBatchPrices, selectedSymbol, toggleTheme, theme, setTheme, orderModal, editOrderModal, clearOldAlerts, oneClickMultiplier, fontSize, setFontSize, hasSkippedOnboarding, announcement, fetchAnnouncement, setAnnouncement, marketDepthModal, domLadderModal, chartModalSymbol, mobileStockOverviewSymbol, alertModalSymbol, basketModalOpen } = useStore(useShallow(state => ({ user: state.user, logout: state.logout, initSocket: state.initSocket, fetchUserData: state.fetchUserData, refreshPrices: state.refreshPrices, fetchBatchPrices: state.fetchBatchPrices, selectedSymbol: state.selectedSymbol, toggleTheme: state.toggleTheme, theme: state.theme, setTheme: state.setTheme, orderModal: state.orderModal, editOrderModal: state.editOrderModal, clearOldAlerts: state.clearOldAlerts, oneClickMultiplier: state.oneClickMultiplier, fontSize: state.fontSize, setFontSize: state.setFontSize, hasSkippedOnboarding: state.hasSkippedOnboarding, announcement: state.announcement, fetchAnnouncement: state.fetchAnnouncement, setAnnouncement: state.setAnnouncement, marketDepthModal: state.marketDepthModal, domLadderModal: state.domLadderModal, chartModalSymbol: state.chartModalSymbol, mobileStockOverviewSymbol: state.mobileStockOverviewSymbol, alertModalSymbol: state.alertModalSymbol, basketModalOpen: state.basketModalOpen })));
 
   const [hotkeyToast, setHotkeyToast] = useState(null);
   const [dismissedAnnouncementId, setDismissedAnnouncementId] = useState(() => {
@@ -620,7 +621,13 @@ function App() {
             {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
               <MarketWatch 
                 className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
-                onStockSelect={() => window.innerWidth <= 1200 && setActiveTab('Chart')}
+                onStockSelect={(sym) => {
+                  if (window.innerWidth <= 768) {
+                    useStore.getState().setMobileStockOverviewSymbol(sym || selectedSymbol);
+                  } else if (window.innerWidth <= 1200) {
+                    setActiveTab('Chart');
+                  }
+                }}
               />
             )}
             <div className={`main-content ${(activeTab === 'Watchlist') ? 'mobile-hidden' : 'mobile-full'}`} style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
@@ -741,6 +748,7 @@ function App() {
         {marketDepthModal?.isOpen && <MarketDepthModal />}
         {domLadderModal?.isOpen && <DOMLadderModal />}
         {chartModalSymbol && <ChartModal />}
+        {mobileStockOverviewSymbol && <MobileStockOverviewModal />}
         {alertModalSymbol && <AlertModal />}
         {basketModalOpen && <BasketModal />}
         {user && isLocked && isUserPinEnabled(user.id) && (
@@ -803,15 +811,15 @@ function App() {
             <List size={20} />
             <span>Watchlist</span>
           </div>
-          <div className={`mobile-nav-item ${activeTab === 'Chart' ? 'active' : ''}`} onClick={() => setActiveTab('Chart')}>
-            <TrendingUp size={20} />
-            <span>Chart</span>
+          <div className={`mobile-nav-item ${activeTab === 'Positions' ? 'active' : ''}`} onClick={() => setActiveTab('Positions')}>
+            <Layers size={20} />
+            <span>Positions</span>
           </div>
           <div className={`mobile-nav-item ${activeTab === 'Orders' ? 'active' : ''}`} onClick={() => setActiveTab('Orders')}>
-            <List size={20} />
+            <FileText size={20} />
             <span>Orders</span>
           </div>
-          <div className={`mobile-nav-item ${activeTab === 'Portfolio' || activeTab === 'Positions' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
+          <div className={`mobile-nav-item ${activeTab === 'Portfolio' ? 'active' : ''}`} onClick={() => setActiveTab('Portfolio')}>
             <Briefcase size={20} />
             <span>Portfolio</span>
           </div>

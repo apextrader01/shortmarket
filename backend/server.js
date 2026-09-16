@@ -292,14 +292,14 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
   // 4. Equity & Derivatives Timing Schedule
 
-  // 4A. AMO Window: 4:00 PM (16:00 / 960m) until 8:57 AM (537m)
-  if (currentMinutes >= 960 || currentMinutes < 537) {
+  // 4A. AMO Window: 3:45 PM (15:45 / 945m) until 8:57 AM (537m)
+  if (currentMinutes >= 945 || currentMinutes < 537) {
     return {
       open: false,
       isTotalBlock: false,
       isAmoWindow: true,
       session: 'AMO',
-      reason: 'Equity & Derivatives trading is closed. The After Market Order (AMO) window is active (4:00 PM - 8:57 AM). Orders are queued for execution at 09:15 AM market open.'
+      reason: 'Equity & Derivatives trading is closed. The After Market Order (AMO) window is active (03:45 PM - 08:57 AM). Orders are queued for execution at 09:15 AM market open.'
     };
   }
 
@@ -402,7 +402,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
       open: false,
       isTotalBlock: false,
       session: 'SETTLEMENT',
-      reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+      reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
     };
   }
 
@@ -441,7 +441,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
       open: false,
       isTotalBlock: false,
       session: 'SETTLEMENT',
-      reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+      reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
     };
   }
 
@@ -467,7 +467,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
       open: false,
       isTotalBlock: false,
       session: 'SETTLEMENT',
-      reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 04:00 PM IST.'
+      reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 03:45 PM IST.'
     };
   }
 
@@ -4183,11 +4183,26 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   const symbol = req.body.symbol;
   const type = req.body.type || req.body.orderType;
   const side = req.body.side;
-  const quantity = req.body.quantity;
+
+  const isMF = String(symbol).endsWith('-MF') || String(symbol).includes('MUTUALFUND');
+  let quantity = req.body.quantity;
   const parsedQty = Number(quantity);
   if (!quantity || isNaN(parsedQty) || parsedQty <= 0) {
     return res.status(400).json({ error: 'Order quantity must be a positive number greater than 0.' });
   }
+
+  // Equities, F&O, and Commodities strictly require whole integer share/lot quantities. Only Mutual Funds allow fractional units.
+  if (!isMF) {
+    quantity = Math.round(parsedQty);
+    req.body.quantity = quantity;
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Order quantity must be a positive whole integer for stocks and derivatives.' });
+    }
+  } else {
+    quantity = Number(parsedQty.toFixed(4));
+    req.body.quantity = quantity;
+  }
+
   const price = req.body.price;
   const sl_price = req.body.sl_price ?? req.body.slPrice;
   const tgt_price = req.body.tgt_price ?? req.body.tgtPrice;
@@ -4215,14 +4230,14 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Stop Loss orders require a valid trigger price greater than 0.' });
   }
 
-  // Validate Quantity is a multiple of Lot Size for Options/Futures
-  if (isDerivativeContract(symbol)) {
+  // Validate Quantity is a multiple of Lot Size for Options/Futures and MCX Commodities
+  if (isDerivativeContract(symbol) || isCommodityContract(symbol)) {
     const { getLotSizes } = require('./services/instrumentsCache');
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
     const lotSizes = getLotSizes([symbol, cleanSym]);
     const lotsize = lotSizes[symbol] || lotSizes[cleanSym] || 1;
-    if (Number(quantity) % lotsize !== 0) {
-      return res.status(400).json({ error: `Quantity must be a multiple of lot size (${lotsize}).` });
+    if (lotsize > 1 && (Number(quantity) % lotsize !== 0)) {
+      return res.status(400).json({ error: `Quantity (${quantity}) must be a multiple of lot size (${lotsize}). Minimum order is 1 lot (${lotsize} qty).` });
     }
   }
 
@@ -4391,7 +4406,6 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Check market status & determine AMO vs CAS vs Regular
-  const isMF = String(symbol).endsWith('-MF') || String(symbol).includes('MUTUALFUND');
   let isAmo = (rawVariety === 'AMO' || Boolean(req.body.is_amo));
   let isCas = (rawVariety === 'CAS' || Boolean(req.body.is_cas));
 
@@ -4406,15 +4420,23 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         return res.status(400).json({ error: marketCheck.reason });
       }
 
-      // 2. If it is an AMO window (4:00 PM - 8:57 AM or weekend)
+      // 2. If it is an AMO window (3:45 PM - 8:57 AM or weekend)
       if (marketCheck.isAmoWindow || rawVariety === 'AMO' || Boolean(req.body.is_amo)) {
+        if (!marketCheck.isAmoWindow) {
+          return res.status(400).json({ error: marketCheck.reason || 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.' });
+        }
         isAmo = true;
       } else {
         // Otherwise (Intraday cutoff, Pre-market freeze, Settlement buffer): reject with descriptive reason
         return res.status(400).json({ error: marketCheck.reason });
       }
     } else {
-      // Market session is open
+      // Market session is open: strictly forbid AMO during continuous open session!
+      if (isAmo) {
+        return res.status(400).json({
+          error: 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.'
+        });
+      }
       if (marketCheck.isCas || marketCheck.session === 'PRE_MARKET' || marketCheck.session === 'CLOSING_AUCTION') {
         isCas = true;
       }

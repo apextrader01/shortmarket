@@ -796,10 +796,14 @@ export default function PositionsView() {
                       {/* Column 3: Quantity */}
                       <td data-label="Qty" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
                         {viewMode === 'CLOSED' 
-                          ? Math.abs(pos.closed_quantity || 0) 
+                          ? (isMf 
+                              ? Number(pos.closed_quantity || 0).toFixed(4) 
+                              : Math.round(Math.abs(pos.closed_quantity || 0)).toLocaleString('en-IN')) 
                           : viewMode === 'HOLDINGS' && isMf 
                             ? Number(holdingQty).toFixed(4) 
-                            : Math.abs(pos.qty || holdingQty)}
+                            : (isMf 
+                              ? Number(pos.qty || holdingQty || 0).toFixed(4) 
+                              : Math.round(Math.abs(pos.qty || holdingQty || 0)).toLocaleString('en-IN'))}
                       </td>
 
                       {/* Column 4: Avg Price */}
@@ -1100,7 +1104,9 @@ export default function PositionsView() {
                       {/* Line 3: Qty & Avg Price (Left) | LTP & Actions (Right) */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                         <div>
-                          Qty: {viewMode === 'CLOSED' ? Math.abs(pos.closed_quantity || 0) : Math.abs(pos.qty)} • Avg: ₹{pos.avg.toFixed(2)}
+                          Qty: {viewMode === 'CLOSED' 
+                            ? (isMf ? Number(pos.closed_quantity || 0).toFixed(4) : Math.round(Math.abs(pos.closed_quantity || 0)).toLocaleString('en-IN')) 
+                            : (isMf ? Number(pos.qty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || 0)).toLocaleString('en-IN'))} • Avg: ₹{pos.avg.toFixed(2)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span>LTP: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
@@ -1207,7 +1213,7 @@ export default function PositionsView() {
                     onChange={(e) => setPartialExitQty(e.target.value)}
                     max={Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)}
                     min="1"
-                    step="any"
+                    step={partialExitPos && ((partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF')) ? "any" : "1"}
                     style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
                   />
                 </div>
@@ -1240,7 +1246,8 @@ export default function PositionsView() {
                 onClick={async () => {
                   const inputVal = parseFloat(partialExitQty);
                   const ls = partialExitPos.lotSize || 1;
-                  const qtyToExit = inputVal * ls;
+                  const isMfPos = (partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF');
+                  const qtyToExit = isMfPos ? parseFloat((inputVal * ls).toFixed(4)) : Math.round(inputVal * ls);
                   const maxQty = Math.abs(partialExitPos.unencumberedQty);
                   if (!qtyToExit || qtyToExit <= 0 || qtyToExit > maxQty) {
                     alert(`Invalid quantity. Max allowed (unencumbered): ${maxQty / ls} lots`);

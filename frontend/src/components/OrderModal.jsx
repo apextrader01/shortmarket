@@ -107,8 +107,8 @@ export default function OrderModal() {
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
-  const isMutualFund = cleanSym.endsWith('-MF') || /^\d{5,6}$/.test(cleanSym) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym);
-  const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : ((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
+  const isMutualFund = cleanSym.endsWith('-MF') || ['EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym) || (/^\d{5,6}$/.test(cleanSym) && !symbol.startsWith('BSE:') && !symbol.startsWith('NSE:'));
+  const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : Math.round((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
   const slicesCount = getOrderSlicesCount(symbol, totalQuantity, orderModal.lotsize);
   
   // Fetch Estimated Charges
@@ -289,14 +289,14 @@ export default function OrderModal() {
 
     // 4. Equity & Derivatives Timing Schedule
 
-    // 4A. AMO Window: 4:00 PM (16:00 / 960m) until 8:57 AM (537m)
-    if (curMins >= 960 || curMins < 537) {
+    // 4A. AMO Window: 3:45 PM (15:45 / 945m) until 8:57 AM (537m)
+    if (curMins >= 945 || curMins < 537) {
       return {
         open: false,
         mode: 'AUTO',
         session: 'AMO',
         isAmoWindow: true,
-        reason: 'Equity & Derivatives markets are closed. The AMO window is active (4:00 PM - 8:57 AM). Orders will be executed at 09:15 AM market open.'
+        reason: 'Equity & Derivatives markets are closed. The AMO window is active (03:45 PM - 08:57 AM). Orders will be executed at 09:15 AM market open.'
       };
     }
 
@@ -394,7 +394,7 @@ export default function OrderModal() {
         open: false,
         mode: 'AUTO',
         session: 'SETTLEMENT',
-        reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+        reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
       };
     }
 
@@ -430,7 +430,7 @@ export default function OrderModal() {
         open: false,
         mode: 'AUTO',
         session: 'SETTLEMENT',
-        reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+        reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
       };
     }
 
@@ -452,7 +452,7 @@ export default function OrderModal() {
         open: false,
         mode: 'AUTO',
         session: 'SETTLEMENT',
-        reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 04:00 PM IST.'
+        reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 03:45 PM IST.'
       };
     }
 
@@ -481,6 +481,10 @@ export default function OrderModal() {
   const handlePlaceOrder = async (bypassCaution = false) => {
     if (marketSession.mode === 'CLOSED') {
       alert(marketSession.reason);
+      return;
+    }
+    if (isAmo && !marketSession.isAmoWindow) {
+      alert("After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.");
       return;
     }
     if (isIntradayBlocked && !isAmo) {
@@ -797,6 +801,10 @@ export default function OrderModal() {
             <button
               type="button"
               onClick={() => {
+                if (!marketSession.isAmoWindow) {
+                  alert("After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.");
+                  return;
+                }
                 setIsAmo(true);
                 setIsBO(false);
                 setIsCO(false);
@@ -807,14 +815,16 @@ export default function OrderModal() {
                 padding: '6px 14px', 
                 borderRadius: '4px',
                 border: 'none',
-                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                cursor: !marketSession.isAmoWindow ? 'not-allowed' : 'pointer',
+                opacity: !marketSession.isAmoWindow ? 0.5 : 1,
                 background: isAmo ? '#f59e0b' : 'transparent',
                 color: isAmo ? '#000000' : 'var(--text-secondary)',
                 fontSize: '12.5px', fontWeight: '700',
                 transition: 'all 0.15s ease',
                 boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
               }}
-              title="After Market Order (Queued for execution at market open)"
+              title={!marketSession.isAmoWindow ? "AMO is only open between 03:45 PM and 08:57 AM" : "After Market Order (Queued for execution at market open)"}
             >
               🌙 AMO
             </button>
@@ -839,7 +849,7 @@ export default function OrderModal() {
             }}>
               <span>🌙</span>
               <span>
-                <strong>After Market Order (AMO):</strong> Window active (04:00 PM - 08:57 AM). Order will be safely queued and executed at market open ({isCommodity ? '09:00 AM' : '09:15 AM'}).
+                <strong>After Market Order (AMO):</strong> Window active (03:45 PM - 08:57 AM). Order will be safely queued and executed at market open ({isCommodity ? '09:00 AM' : '09:15 AM'}).
               </span>
             </div>
           )}

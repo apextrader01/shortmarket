@@ -369,6 +369,9 @@ export const useStore = create(persist((set, get) => ({
   chartModalSymbol: null,
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
+  mobileStockOverviewSymbol: null,
+  setMobileStockOverviewSymbol: (symbol) => set({ mobileStockOverviewSymbol: symbol }),
+
   marketDepthModal: { isOpen: false, symbol: null, lotsize: 1 },
   openMarketDepthModal: (symbol, lotsize) => {
     const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);

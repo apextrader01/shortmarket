@@ -507,11 +507,13 @@ class TriggerEngine {
                 }
             };
 
-            let bracketTargetQty = Number(order.quantity);
+            const isMF = String(order.symbol).endsWith('-MF') || String(order.symbol).includes('MUTUALFUND');
+            const roundQty = (q) => isMF ? Number(Number(q).toFixed(4)) : Math.round(Number(q));
+            let bracketTargetQty = roundQty(Number(order.quantity));
 
             if (existingPos) {
                 // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "10.0000" + 1 = "10.00001")
-                existingPos.quantity = Number(existingPos.quantity);
+                existingPos.quantity = roundQty(Number(existingPos.quantity));
                 existingPos.average_price = Number(existingPos.average_price);
                 existingPos.margin = Number(existingPos.margin || 0);
                 
@@ -522,15 +524,15 @@ class TriggerEngine {
                 }
 
                 if (isPartialClose) {
-                    const absQty = Math.abs(Number(order.quantity));
-                    const absPosQty = Math.abs(existingPos.quantity);
+                    const absQty = roundQty(Math.abs(Number(order.quantity)));
+                    const absPosQty = roundQty(Math.abs(existingPos.quantity));
                     const closeQty = Math.min(absQty, absPosQty);
 
                     // Closing orders must not spawn bracket legs; reversals protect only the net new position
                     if (absQty <= absPosQty) {
                         bracketTargetQty = 0;
                     } else {
-                        bracketTargetQty = Math.abs(absQty - absPosQty);
+                        bracketTargetQty = roundQty(Math.abs(absQty - absPosQty));
                     }
                     
                     let realizedPnl = 0;
@@ -545,7 +547,7 @@ class TriggerEngine {
                     const marginRefund = Math.round(((existingPos.margin || 0) * proportionClosed + Number.EPSILON) * 100) / 100;
                     const newMargin = Math.max(0, Math.round(((existingPos.margin || 0) - marginRefund + Number.EPSILON) * 100) / 100);
                     
-                    const newQty = existingPos.quantity + qtyChange;
+                    const newQty = roundQty(existingPos.quantity + qtyChange);
                     
                     const isFullyClosed = absQty >= absPosQty;
                     
@@ -553,7 +555,7 @@ class TriggerEngine {
                     if (isFullyClosed) {
                         await trx('positions').where({ id: existingPos.id }).update({ 
                            quantity: 0, 
-                           closed_quantity: (parseFloat(existingPos.closed_quantity) || 0) + closeQty, 
+                           closed_quantity: roundQty((parseFloat(existingPos.closed_quantity) || 0) + closeQty), 
                            exit_price: execPrice, 
                            margin: 0,
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
@@ -596,7 +598,7 @@ class TriggerEngine {
                         await trx('positions').where({ id: existingPos.id }).update({
                            quantity: newQty,
                            margin: newMargin,
-                           closed_quantity: (parseFloat(existingPos.closed_quantity) || 0) + closeQty,
+                           closed_quantity: roundQty((parseFloat(existingPos.closed_quantity) || 0) + closeQty),
                            exit_price: execPrice,
                            realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl,
                            updated_at: new Date()
@@ -712,7 +714,7 @@ class TriggerEngine {
                     // Averaging
                     const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
                     const newTotal = Math.abs(Number(order.quantity)) * execPrice;
-                    const newQty = existingPos.quantity + qtyChange;
+                    const newQty = roundQty(existingPos.quantity + qtyChange);
                     const newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
                     
                     await trx('positions').where({ id: existingPos.id }).update({
