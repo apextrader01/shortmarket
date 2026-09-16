@@ -488,7 +488,9 @@ export default function OrderModal() {
       return;
     }
     if (!isAmo && !marketSession.open) {
-      alert("Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
+      const hoursText = isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM";
+      const marketName = isCommodity ? "MCX Commodity Market" : "Market";
+      alert(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
       return;
     }
     if (isIntradayBlocked && !isAmo) {
@@ -799,7 +801,7 @@ export default function OrderModal() {
                 fontSize: '12.5px', fontWeight: '600',
                 transition: 'all 0.15s ease'
               }}
-              title={!marketSession.open ? "Market is closed. Regular orders can only be placed between 09:15 AM and 03:30 PM" : "Regular Order"}
+              title={!marketSession.open ? `Market is closed. Regular orders can only be placed during trading hours (${isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM"})` : "Regular Order"}
             >
               Regular
             </button>

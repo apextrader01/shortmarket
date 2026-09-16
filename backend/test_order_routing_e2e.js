@@ -48,9 +48,11 @@ function simulateOrderPlacement(orderPayload, simulatedSession) {
                 isAmo = true;
             } else {
                 if (marketCheck.isAmoWindow) {
+                    const hoursDesc = isCommodity ? '09:00 AM - 11:30 PM' : '09:15 AM - 03:30 PM';
+                    const marketName = isCommodity ? 'MCX Commodity Market' : 'Market';
                     return {
                         status: 400,
-                        error: 'Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.'
+                        error: `${marketName} is closed. Regular orders can only be placed during trading hours (${hoursDesc}). Please select AMO to place an After Market Order.`
                     };
                 }
                 return { status: 400, error: marketCheck.reason };

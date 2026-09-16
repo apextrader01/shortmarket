@@ -4430,8 +4430,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       } else {
         // Market is closed, and user did NOT select AMO (they placed as Regular)
         if (marketCheck.isAmoWindow) {
+          const hoursDesc = isCommodity ? '09:00 AM - 11:30 PM' : '09:15 AM - 03:30 PM';
+          const marketName = isCommodity ? 'MCX Commodity Market' : 'Market';
           return res.status(400).json({
-            error: 'Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.'
+            error: `${marketName} is closed. Regular orders can only be placed during trading hours (${hoursDesc}). Please select AMO to place an After Market Order.`
           });
         }
         // Specific session cutoff (e.g. Intraday cutoff, Pre-market freeze, Settlement buffer)
