@@ -163,7 +163,9 @@ assert(
     'OrdersView detects CANCELLED orders that have filled_quantity > 0'
 );
 assert(
-    ordersViewFile.includes('CANCELLED (${Number(order.filled_quantity)} filled)') || ordersViewFile.includes('CANCELLED (${Number(order.filled_quantity).toLocaleString'),
+    ordersViewFile.includes('CANCELLED (${Number(order.filled_quantity)} filled)') || 
+    ordersViewFile.includes('CANCELLED (${Number(order.filled_quantity).toLocaleString') ||
+    ordersViewFile.includes('CANCELLED (${formatOrderQty(order, order.filled_quantity)} filled)'),
     'OrdersView displays badge with filled quantity for partially filled cancelled orders'
 );
 
