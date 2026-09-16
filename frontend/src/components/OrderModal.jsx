@@ -343,32 +343,7 @@ export default function OrderModal() {
 
     // --- Segment 1: Equity Cash (F&O Eligible Stocks) e.g., RELIANCE, TCS ---
     if (subsegment === 'FNO_EQ') {
-      if (isIntraday) {
-        if (curMins >= 905) { // 3:05 PM
-          return {
-            open: false,
-            mode: 'AUTO',
-            session: 'INTRADAY_CUTOFF',
-            reason: 'Intraday auto square-off cutoff for F&O cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
-          };
-        }
-      }
-      if (curMins < 915) { // before 3:15 PM
-        return { open: true, mode: 'AUTO', session: 'NORMAL' };
-      }
-      // Closing Auction Session (CAS): 3:15 PM - 3:35 PM
-      if (curMins >= 915 && curMins < 935) {
-        if (curMins >= 920 && curMins <= 930 && isDelivery) {
-          return { open: true, mode: 'AUTO', session: 'CLOSING_AUCTION', isCas: true };
-        }
-        return {
-          open: false,
-          mode: 'AUTO',
-          session: 'CLOSING_AUCTION',
-          reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST.'
-        };
-      }
-      // Post-Market Session: 3:50 PM - 4:00 PM
+      // 1. Post-Market Session: 3:50 PM - 4:00 PM
       if (curMins >= 950 && curMins < 960) {
         if (isDelivery) {
           return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
@@ -380,6 +355,41 @@ export default function OrderModal() {
           reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
         };
       }
+
+      // 2. Closing Auction Session (CAS): 3:15 PM - 3:35 PM
+      if (curMins >= 915 && curMins < 935) {
+        if (curMins >= 920 && curMins <= 930 && isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'CLOSING_AUCTION', isCas: true };
+        }
+        if (isIntraday) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'CLOSING_AUCTION',
+            reason: 'Intraday orders are not allowed during Closing Auction Session (03:15 PM - 03:35 PM). Only Delivery orders are accepted between 03:20 PM and 03:30 PM.'
+          };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'CLOSING_AUCTION',
+          reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST.'
+        };
+      }
+
+      // 3. Normal Continuous Trading (09:15 AM - 03:15 PM) with Intraday Cutoff (03:05 PM)
+      if (curMins < 915) {
+        if (isIntraday && curMins >= 905) { // 3:05 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for F&O cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+
       return {
         open: false,
         mode: 'AUTO',
@@ -390,20 +400,7 @@ export default function OrderModal() {
 
     // --- Segment 2: Equity Cash (Non-F&O Stocks) ---
     if (subsegment === 'NON_FNO_EQ') {
-      if (isIntraday) {
-        if (curMins >= 915) { // 3:15 PM
-          return {
-            open: false,
-            mode: 'AUTO',
-            session: 'INTRADAY_CUTOFF',
-            reason: 'Intraday auto square-off cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
-          };
-        }
-      }
-      if (curMins < 930) { // before 3:30 PM
-        return { open: true, mode: 'AUTO', session: 'NORMAL' };
-      }
-      // Post-Market: 3:50 PM - 4:00 PM
+      // 1. Post-Market Session: 3:50 PM - 4:00 PM
       if (curMins >= 950 && curMins < 960) {
         if (isDelivery) {
           return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
@@ -415,6 +412,20 @@ export default function OrderModal() {
           reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
         };
       }
+
+      // 2. Normal Continuous Trading (09:15 AM - 03:30 PM) with Intraday Cutoff (03:15 PM)
+      if (curMins < 930) {
+        if (isIntraday && curMins >= 915) { // 3:15 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+
       return {
         open: false,
         mode: 'AUTO',
@@ -425,8 +436,9 @@ export default function OrderModal() {
 
     // --- Segment 3: Futures & Options (Derivatives) ---
     if (subsegment === 'DERIVATIVE') {
-      if (isIntraday) {
-        if (curMins >= 925) { // 3:25 PM
+      // Continuous trading until 3:40 PM
+      if (curMins < 940) {
+        if (isIntraday && curMins >= 925) { // 3:25 PM
           return {
             open: false,
             mode: 'AUTO',
@@ -434,8 +446,6 @@ export default function OrderModal() {
             reason: 'Intraday auto square-off cutoff for Futures & Options is 03:25 PM IST. Auto square-off executes between 03:25 PM and 03:30 PM.'
           };
         }
-      }
-      if (curMins < 940) { // before 3:40 PM!
         return { open: true, mode: 'AUTO', session: 'NORMAL' };
       }
       return {

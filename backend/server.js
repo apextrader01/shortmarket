@@ -348,38 +348,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
   // --- Segment 1: Equity Cash (F&O Eligible Stocks) ---
   if (subsegment === 'FNO_EQ') {
-    if (isIntraday) {
-      if (currentMinutes >= 905) { // 3:05 PM
-        if (isClosingOrder && currentMinutes <= 910) {
-          return { open: true, session: 'INTRADAY_CLOSING' };
-        }
-        return {
-          open: false,
-          isTotalBlock: false,
-          session: 'INTRADAY_CUTOFF',
-          reason: 'Intraday (MIS/BO/CO) cutoff for F&O eligible cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
-        };
-      }
-    }
-
-    if (currentMinutes < 915) { // before 3:15 PM
-      return { open: true, session: 'NORMAL' };
-    }
-
-    // Special Closing Auction Session (CAS): 3:15 PM - 3:35 PM (915m - 935m)
-    if (currentMinutes >= 915 && currentMinutes < 935) {
-      if (currentMinutes >= 920 && currentMinutes <= 930 && isDelivery) {
-        return { open: true, session: 'CLOSING_AUCTION', isCas: true };
-      }
-      return {
-        open: false,
-        isTotalBlock: false,
-        session: 'CLOSING_AUCTION',
-        reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST. Matching occurs 03:30 PM - 03:35 PM.'
-      };
-    }
-
-    // Post-Market Session: 3:50 PM - 4:00 PM (950m - 960m)
+    // 1. Post-Market Session: 3:50 PM - 4:00 PM (950m - 960m)
     if (currentMinutes >= 950 && currentMinutes < 960) {
       if (isDelivery) {
         return { open: true, session: 'POST_MARKET', isPostMarket: true };
@@ -390,6 +359,43 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
         session: 'POST_MARKET',
         reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
       };
+    }
+
+    // 2. Closing Auction Session (CAS): 3:15 PM - 3:35 PM (915m - 935m)
+    if (currentMinutes >= 915 && currentMinutes < 935) {
+      if (currentMinutes >= 920 && currentMinutes <= 930 && isDelivery) {
+        return { open: true, session: 'CLOSING_AUCTION', isCas: true };
+      }
+      if (isIntraday) {
+        return {
+          open: false,
+          isTotalBlock: false,
+          session: 'CLOSING_AUCTION',
+          reason: 'Intraday orders are not allowed during Closing Auction Session (03:15 PM - 03:35 PM). Only Delivery orders are accepted between 03:20 PM and 03:30 PM.'
+        };
+      }
+      return {
+        open: false,
+        isTotalBlock: false,
+        session: 'CLOSING_AUCTION',
+        reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST. Matching occurs 03:30 PM - 03:35 PM.'
+      };
+    }
+
+    // 3. Normal Continuous Trading (09:15 AM - 03:15 PM) with Intraday Cutoff (03:05 PM)
+    if (currentMinutes < 915) {
+      if (isIntraday && currentMinutes >= 905) { // 3:05 PM
+        if (isClosingOrder && currentMinutes <= 910) {
+          return { open: true, session: 'INTRADAY_CLOSING' };
+        }
+        return {
+          open: false,
+          isTotalBlock: false,
+          session: 'INTRADAY_CUTOFF',
+          reason: 'Intraday (MIS/BO/CO) cutoff for F&O eligible cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
+        };
+      }
+      return { open: true, session: 'NORMAL' };
     }
 
     return {
@@ -402,25 +408,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
   // --- Segment 2: Equity Cash (Non-F&O Stocks) ---
   if (subsegment === 'NON_FNO_EQ') {
-    if (isIntraday) {
-      if (currentMinutes >= 915) { // 3:15 PM
-        if (isClosingOrder && currentMinutes <= 920) {
-          return { open: true, session: 'INTRADAY_CLOSING' };
-        }
-        return {
-          open: false,
-          isTotalBlock: false,
-          session: 'INTRADAY_CUTOFF',
-          reason: 'Intraday (MIS/BO/CO) cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
-        };
-      }
-    }
-
-    if (currentMinutes < 930) { // before 3:30 PM
-      return { open: true, session: 'NORMAL' };
-    }
-
-    // Post-Market Session: 3:50 PM - 4:00 PM (950m - 960m)
+    // 1. Post-Market Session: 3:50 PM - 4:00 PM (950m - 960m)
     if (currentMinutes >= 950 && currentMinutes < 960) {
       if (isDelivery) {
         return { open: true, session: 'POST_MARKET', isPostMarket: true };
@@ -433,6 +421,22 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
       };
     }
 
+    // 2. Normal Continuous Trading (09:15 AM - 03:30 PM) with Intraday Cutoff (03:15 PM)
+    if (currentMinutes < 930) {
+      if (isIntraday && currentMinutes >= 915) { // 3:15 PM
+        if (isClosingOrder && currentMinutes <= 920) {
+          return { open: true, session: 'INTRADAY_CLOSING' };
+        }
+        return {
+          open: false,
+          isTotalBlock: false,
+          session: 'INTRADAY_CUTOFF',
+          reason: 'Intraday (MIS/BO/CO) cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
+        };
+      }
+      return { open: true, session: 'NORMAL' };
+    }
+
     return {
       open: false,
       isTotalBlock: false,
@@ -443,8 +447,9 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
   // --- Segment 3: Futures & Options (Derivatives) ---
   if (subsegment === 'DERIVATIVE') {
-    if (isIntraday) {
-      if (currentMinutes >= 925) { // 3:25 PM
+    // Continuous trading ends at 3:40 PM
+    if (currentMinutes < 940) {
+      if (isIntraday && currentMinutes >= 925) { // 3:25 PM
         if (isClosingOrder && currentMinutes <= 930) {
           return { open: true, session: 'INTRADAY_CLOSING' };
         }
@@ -455,10 +460,6 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
           reason: 'Intraday (MIS/BO/CO) cutoff for Futures & Options is 03:25 PM IST. Auto square-off executes between 03:25 PM and 03:30 PM.'
         };
       }
-    }
-
-    // Normal continuous trading ends at 3:40 PM!
-    if (currentMinutes < 940) {
       return { open: true, session: 'NORMAL' };
     }
 
