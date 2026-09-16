@@ -215,19 +215,69 @@ class VolumeMatchingEngine {
       }
     }
 
+    // Option B: Calculate realistic market impact slippage for illiquid cash equities
+    const calculateMarketSlippage = (order, basePrice) => {
+      if (!basePrice || basePrice <= 0) return basePrice;
+      const qty = Number(order.pending_quantity || order.quantity || 0);
+      if (qty <= 100) return basePrice; // Retail micro-order: zero slippage
+
+      const { isDerivativeContract, isCommodityContract, isFnoEligibleStock } = require('./instrumentsCache');
+      const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol) || isFnoEligibleStock(order.symbol);
+      if (isHighLiquiditySegment) return basePrice; // High-liquidity F&O / Commodities / Index: zero slippage
+
+      const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
+      const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
+      const marketTotalQty = Number(order.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
+
+      // Dynamic effective liquidity: incorporates today's volume, total market quotes, and orderbook depth
+      const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
+
+      // Liquid stock or 5x-10x volume surge today (effective volume >= 100,000)
+      if (effectiveVolume >= 100000) return basePrice;
+
+      // Order is very small relative to daily volume (< 5% of daily volume)
+      if (effectiveVolume > 0 && (qty / effectiveVolume) <= 0.05) return basePrice;
+
+      // Thinly traded / illiquid stock bulk market order: calculate realistic market impact
+      let slippageRatio = 0.01;
+      if (effectiveVolume > 0) {
+        const impactRatio = qty / effectiveVolume;
+        // Realistic scaling: 1.5% per 1.0x daily volume, capped at 5% (standard exchange circuit band)
+        slippageRatio = Math.min(0.05, Math.max(0.005, impactRatio * 0.015));
+      } else {
+        slippageRatio = 0.02; // Default 2% for unquoted dead scrips
+      }
+
+      if (order.side === 'BUY') {
+        return Number((basePrice * (1 + slippageRatio)).toFixed(2));
+      } else {
+        return Number((basePrice * (1 - slippageRatio)).toFixed(2));
+      }
+    };
+
     if (depthFilled > 0) {
       const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
 
-      // For MARKET orders: any remaining quantity after depth matching must execute immediately at baseLtp!
+      // For MARKET orders: any remaining quantity after depth matching executes immediately with Option B realism
       if ((ordObj.type === 'MARKET' || ordObj.isMarket) && ordObj.pending_quantity > 0 && baseLtp > 0) {
-        await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+        const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
+        if (sweepPrice === baseLtp) {
+          await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+        } else {
+          await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
+        }
       }
     } else {
       if (ordObj.type === 'MARKET' || ordObj.isMarket) {
-        // Market orders execute 100% of pending quantity immediately at market price (baseLtp)
+        // Market orders execute 100% of pending quantity immediately at market price (baseLtp) with Option B realism
         if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
-          await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+          const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
+          if (sweepPrice === baseLtp) {
+            await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+          } else {
+            await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
+          }
         }
       } else {
         // For LIMIT orders: check if marketable against baseLtp
