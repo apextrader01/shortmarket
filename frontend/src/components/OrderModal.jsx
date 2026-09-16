@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
 import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
-import { getInstantLotsize, isDerivativeContract } from '../utils/lotsizeHelper';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
 
@@ -188,17 +188,16 @@ export default function OrderModal() {
     : marginCalc.leverageText;
 
   const isRestricted = restrictedStocks.includes(symbol);
-  
-  const cleanSymbolName = (symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-  const isCommodity = (symbol || '').includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSymbolName.startsWith(c));
+  const isCommodity = isCommodityContract(symbol);
   
   const getMarketSession = () => {
     const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
-    if (status === 'OPEN') return { open: true, mode: 'OPEN' };
+    if (status === 'OPEN') return { open: true, mode: 'OPEN', session: 'OPEN' };
     if (status === 'CLOSED') {
       return { 
         open: false, 
         mode: 'CLOSED', 
+        session: 'ADMIN_CLOSED',
         reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked as CLOSED / Holiday by Administrator.` 
       };
     }
@@ -220,6 +219,7 @@ export default function OrderModal() {
         return {
           open: false,
           mode: 'CLOSED',
+          session: 'HOLIDAY',
           reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`
         };
       }
@@ -237,10 +237,11 @@ export default function OrderModal() {
           return {
             open: false,
             mode: 'AUTO',
+            session: 'SPECIAL_CLOSED',
             reason: `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`
           };
         }
-        return { open: true, mode: 'OPEN' };
+        return { open: true, mode: 'OPEN', session: 'SPECIAL_OPEN' };
       }
     }
 
@@ -248,37 +249,214 @@ export default function OrderModal() {
     const day = istTime.getDay(); // 0 = Sun, 6 = Sat
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
+    const curMins = hours * 60 + minutes;
 
     if (day === 0 || day === 6) {
-      return { open: false, mode: 'AUTO', reason: 'Markets are closed on weekends (Saturday & Sunday).' };
+      return { 
+        open: false, 
+        mode: 'AUTO', 
+        session: 'WEEKEND', 
+        isAmoWindow: true, 
+        reason: 'Markets are closed on weekends (Saturday & Sunday). You can place After Market Orders (AMO) for Monday 09:15 AM.' 
+      };
     }
 
-    if (productType === 'INT' || isBO || isCO) {
-      if (isCommodity) {
-        const isBeforeOpen = hours < 9;
-        const isAfterClose = hours > 22 || (hours === 22 && minutes >= 50);
-        if (isBeforeOpen || isAfterClose) {
-          return { open: false, mode: 'AUTO', reason: 'Intraday/BO/CO trading for Commodities is allowed only between 9:00 AM and 10:50 PM IST.' };
+    const subsegment = getAssetSubsegment(symbol);
+    const isIntraday = (productType === 'INT' || isBO || isCO);
+    const isDelivery = (productType === 'DEL' || productType === 'CNC' || !productType);
+
+    // 3. Commodity Segment (MCX)
+    if (subsegment === 'COMMODITY' || isCommodity) {
+      if (hours < 9 || hours > 23 || (hours === 23 && minutes >= 30)) {
+        return { 
+          open: false, 
+          mode: 'AUTO', 
+          session: 'AMO', 
+          isAmoWindow: true, 
+          reason: 'MCX Commodity Market is closed. Orders placed now will queue as AMO for 09:00 AM market open.' 
+        };
+      }
+      if (isIntraday && (hours > 22 || (hours === 22 && minutes >= 50))) {
+        return { 
+          open: false, 
+          mode: 'AUTO', 
+          session: 'INTRADAY_CUTOFF', 
+          reason: 'Intraday (MIS/BO/CO) trading for MCX closes at 10:50 PM IST. Auto square-off executes between 10:50 PM and 11:00 PM.' 
+        };
+      }
+      return { open: true, mode: 'AUTO', session: 'NORMAL' };
+    }
+
+    // 4. Equity & Derivatives Timing Schedule
+
+    // 4A. AMO Window: 4:00 PM (16:00 / 960m) until 8:57 AM (537m)
+    if (curMins >= 960 || curMins < 537) {
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'AMO',
+        isAmoWindow: true,
+        reason: 'Equity & Derivatives markets are closed. The AMO window is active (4:00 PM - 8:57 AM). Orders will be executed at 09:15 AM market open.'
+      };
+    }
+
+    // 4B. Buffer between AMO and Pre-Market: 8:57 AM to 9:00 AM (537m - 540m)
+    if (curMins >= 537 && curMins < 540) {
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'PRE_MARKET_BUFFER',
+        reason: 'AMO window closed at 08:57 AM. Pre-Market order session opens at 09:00 AM IST.'
+      };
+    }
+
+    // 4C. Pre-Market Session: 9:00 AM to 9:15 AM (540m - 555m)
+    if (curMins >= 540 && curMins < 555) {
+      if (subsegment === 'DERIVATIVE') {
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'BEFORE_OPEN',
+          reason: 'Pre-market session is for Cash Equities only. Futures & Options trading begins at 09:15 AM IST.'
+        };
+      }
+      if (curMins < 548) {
+        if (isIntraday) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'PRE_MARKET_INTRADAY_BLOCKED',
+            reason: 'Intraday (MIS/BO/CO) orders are not allowed during the Pre-Market session (09:00 AM - 09:08 AM). Only Delivery orders are permitted.'
+          };
         }
-      } else {
-        const isBeforeOpen = hours < 9 || (hours === 9 && minutes < 15);
-        const isAfterClose = hours > 15 || (hours === 15 && minutes >= 15);
-        if (isBeforeOpen || isAfterClose) {
-          return { open: false, mode: 'AUTO', reason: 'Intraday/BO/CO trading for Equities is allowed only between 9:15 AM and 3:15 PM IST.' };
+        return { open: true, mode: 'AUTO', session: 'PRE_MARKET', isCas: true };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'PRE_MARKET_FREEZE',
+        reason: 'Pre-Market order collection is closed (09:08 AM - 09:15 AM). Exchange is matching opening orders. Normal continuous trading begins at 09:15 AM.'
+      };
+    }
+
+    // 4D. Normal Trading & Cutoffs
+
+    // --- Segment 1: Equity Cash (F&O Eligible Stocks) e.g., RELIANCE, TCS ---
+    if (subsegment === 'FNO_EQ') {
+      if (isIntraday) {
+        if (curMins >= 905) { // 3:05 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for F&O cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
+          };
         }
       }
+      if (curMins < 915) { // before 3:15 PM
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+      // Closing Auction Session (CAS): 3:15 PM - 3:35 PM
+      if (curMins >= 915 && curMins < 935) {
+        if (curMins >= 920 && curMins <= 930 && isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'CLOSING_AUCTION', isCas: true };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'CLOSING_AUCTION',
+          reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST.'
+        };
+      }
+      // Post-Market Session: 3:50 PM - 4:00 PM
+      if (curMins >= 950 && curMins < 960) {
+        if (isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'POST_MARKET',
+          reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
+        };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+      };
     }
-    return { open: true, mode: 'AUTO' };
+
+    // --- Segment 2: Equity Cash (Non-F&O Stocks) ---
+    if (subsegment === 'NON_FNO_EQ') {
+      if (isIntraday) {
+        if (curMins >= 915) { // 3:15 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
+          };
+        }
+      }
+      if (curMins < 930) { // before 3:30 PM
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+      // Post-Market: 3:50 PM - 4:00 PM
+      if (curMins >= 950 && curMins < 960) {
+        if (isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'POST_MARKET',
+          reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
+        };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 04:00 PM IST.'
+      };
+    }
+
+    // --- Segment 3: Futures & Options (Derivatives) ---
+    if (subsegment === 'DERIVATIVE') {
+      if (isIntraday) {
+        if (curMins >= 925) { // 3:25 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for Futures & Options is 03:25 PM IST. Auto square-off executes between 03:25 PM and 03:30 PM.'
+          };
+        }
+      }
+      if (curMins < 940) { // before 3:40 PM!
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 04:00 PM IST.'
+      };
+    }
+
+    return { open: true, mode: 'AUTO', session: 'NORMAL' };
   };
 
   const marketSession = getMarketSession();
   const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
-  const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
+  const isIntradayBlocked = (isRestricted || isTimeBlocked || marketSession.session === 'INTRADAY_CUTOFF' || marketSession.session === 'PRE_MARKET_INTRADAY_BLOCKED') && productType === 'INT';
 
-  // Auto-select AMO if market is closed outside trading hours
+  // Auto-select AMO if market is closed outside trading hours and in AMO window
   useEffect(() => {
     if (orderModal.isOpen) {
-      if (!marketSession.open && marketSession.mode !== 'CLOSED') {
+      if (!marketSession.open && (marketSession.isAmoWindow || marketSession.mode === 'AUTO')) {
         setIsAmo(true);
         setIsBO(false);
         setIsCO(false);
@@ -288,7 +466,7 @@ export default function OrderModal() {
         setIsAmo(false);
       }
     }
-  }, [orderModal.isOpen, marketSession.open, marketSession.mode]);
+  }, [orderModal.isOpen, marketSession.open, marketSession.isAmoWindow, marketSession.mode]);
 
   const handlePlaceOrder = async (bypassCaution = false) => {
     if (marketSession.mode === 'CLOSED') {
@@ -296,7 +474,7 @@ export default function OrderModal() {
       return;
     }
     if (isIntradayBlocked && !isAmo) {
-       setShowIntradayBlockedPopup(true);
+       alert(marketSession.reason || "Intraday trading is closed for this segment. Please place a Delivery order or an After Market Order (AMO).");
        return;
     }
     if (isRestricted && !bypassCaution && !showCautionPopup) {
@@ -651,7 +829,67 @@ export default function OrderModal() {
             }}>
               <span>🌙</span>
               <span>
-                <strong>After Market Order (AMO):</strong> Market is currently closed or off-hours. This order will be safely queued and executed via realistic volume matching at market open (09:15 AM).
+                <strong>After Market Order (AMO):</strong> Window active (04:00 PM - 08:57 AM). Order will be safely queued and executed at market open ({isCommodity ? '09:00 AM' : '09:15 AM'}).
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'PRE_MARKET' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#93c5fd', 
+              background: 'rgba(59, 130, 246, 0.12)', 
+              border: '1px solid rgba(59, 130, 246, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌅</span>
+              <span>
+                <strong>Pre-Market Call Auction (09:00 AM - 09:08 AM):</strong> Cash equity delivery orders placed now will be matched at the discovered opening equilibrium price at 09:08 AM. Intraday orders are blocked.
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'CLOSING_AUCTION' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#c4b5fd', 
+              background: 'rgba(168, 85, 247, 0.12)', 
+              border: '1px solid rgba(168, 85, 247, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🏛️</span>
+              <span>
+                <strong>Closing Auction Session (3:15 PM - 3:35 PM):</strong> F&O cash stock auction pool. Order entry is active from 3:20 PM - 3:30 PM. Matching occurs at 3:30 PM - 3:35 PM.
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'POST_MARKET' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#86efac', 
+              background: 'rgba(34, 197, 94, 0.12)', 
+              border: '1px solid rgba(34, 197, 94, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌆</span>
+              <span>
+                <strong>Post-Market Session (3:50 PM - 4:00 PM):</strong> Delivery orders placed during this session execute at the exact finalized closing price.
               </span>
             </div>
           )}

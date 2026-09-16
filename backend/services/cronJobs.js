@@ -7,8 +7,14 @@ const { parseExpiryDate, formatDate } = require('./autoSquareOff');
 const TZ = { timezone: "Asia/Kolkata" };
 
 // Global system block flags
-let isEquityIntradayBlocked = false;
+const { getAssetSubsegment } = require('./instrumentsCache');
+
+// Global segment-specific intraday block flags
+let isFnoEquityIntradayBlocked = false;
+let isNonFnoEquityIntradayBlocked = false;
+let isDerivativesIntradayBlocked = false;
 let isCommodityIntradayBlocked = false;
+let isEquityIntradayBlocked = false;
 
 // Helper: Check if a symbol is a commodity
 const isCommoditySymbol = (symbol) => {
@@ -19,8 +25,12 @@ const isCommoditySymbol = (symbol) => {
 };
 
 function isIntradayBlocked(symbol) {
-    if (!symbol) return isEquityIntradayBlocked || isCommodityIntradayBlocked;
-    return isCommoditySymbol(symbol) ? isCommodityIntradayBlocked : isEquityIntradayBlocked;
+    if (!symbol) return isFnoEquityIntradayBlocked || isNonFnoEquityIntradayBlocked || isDerivativesIntradayBlocked || isCommodityIntradayBlocked || isEquityIntradayBlocked;
+    const sub = getAssetSubsegment(symbol);
+    if (sub === 'COMMODITY') return isCommodityIntradayBlocked;
+    if (sub === 'DERIVATIVE') return isDerivativesIntradayBlocked;
+    if (sub === 'FNO_EQ') return isFnoEquityIntradayBlocked;
+    return isNonFnoEquityIntradayBlocked;
 }
 
 async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine = null) {
@@ -129,6 +139,42 @@ async function executeCasOpeningMatch(priceCache = {}, triggerEngine = null) {
     }
 }
 
+async function executeClosingAuctionMatch(priceCache = {}, triggerEngine = null) {
+    const volumeMatchingEngine = require('./volumeMatchingEngine');
+    console.log(`⏰ [CRON 03:35 PM] Matching Closing Auction Session (CAS) orders for F&O Cash stocks...`);
+    try {
+        const casOrders = await db('orders')
+            .where({ status: 'AMO_PENDING', order_variety: 'CAS' })
+            .orderBy('created_at', 'asc');
+
+        if (casOrders.length === 0) return;
+
+        for (const ord of casOrders) {
+            const clean = ord.symbol ? ord.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '') : '';
+            const closePrice = priceCache[ord.symbol]?.close || (clean ? (priceCache[clean]?.close || priceCache[`NSE:${clean}`]?.close) : null) || priceCache[ord.symbol]?.ltp || Number(ord.price || 0);
+
+            if (ord.type === 'LIMIT' && ord.price) {
+                const limitPrice = Number(ord.price);
+                const isCrossed = (ord.side === 'BUY' && closePrice <= limitPrice) || (ord.side === 'SELL' && closePrice >= limitPrice);
+                if (!isCrossed) {
+                    await db('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                    if (parseFloat(ord.margin) > 0) {
+                        await LedgerService.releaseMargin(db, ord.user_id, ord.margin, `CAS Unmatched Cancelled: ${ord.symbol}`);
+                    }
+                    continue;
+                }
+            }
+
+            await db('orders').where({ id: ord.id }).update({ status: 'PENDING', order_variety: 'REGULAR', updated_at: new Date() });
+            ord.status = 'PENDING';
+            ord.order_variety = 'REGULAR';
+            await volumeMatchingEngine.submitOrder(ord, closePrice);
+        }
+    } catch (err) {
+        console.error(`[CRON] executeClosingAuctionMatch error:`, err.message);
+    }
+}
+
 async function updateWeeklyCasStocksList(priceCache = {}) {
     console.log(`🔄 [CRON SUNDAY] Running Weekly CAS & Illiquid Securities Liquidity Review...`);
     try {
@@ -179,10 +225,24 @@ function initCronJobs(priceCache, triggerEngine) {
         updateWeeklyCasStocksList(priceCache);
     }, TZ);
 
-    // ─── PHASE 1: Intraday Block (15:15 Eq / 22:50 Com) ──────────────────────
-    cron.schedule('15 15 * * *', () => {
-        console.log('[CRON] Phase 1 (Equities): Blocking new Intraday placements.');
+    // ─── PHASE 1: Segment-Wise Intraday Entry Blocks ────────────────────────
+    // 1A. Equity Cash (F&O Eligible Stocks): 03:05 PM IST
+    cron.schedule('5 15 * * 1-5', () => {
+        console.log('[CRON 03:05 PM] Phase 1A: Blocking new Intraday placements for F&O Cash Stocks.');
+        isFnoEquityIntradayBlocked = true;
+    }, TZ);
+
+    // 1B. Equity Cash (Non-F&O Stocks): 03:15 PM IST
+    cron.schedule('15 15 * * 1-5', () => {
+        console.log('[CRON 03:15 PM] Phase 1B: Blocking new Intraday placements for Non-F&O Cash Stocks.');
+        isNonFnoEquityIntradayBlocked = true;
         isEquityIntradayBlocked = true;
+    }, TZ);
+
+    // 1C. Futures & Options (Derivatives): 03:25 PM IST
+    cron.schedule('25 15 * * 1-5', () => {
+        console.log('[CRON 03:25 PM] Phase 1C: Blocking new Intraday placements for Futures & Options.');
+        isDerivativesIntradayBlocked = true;
     }, TZ);
 
     /**
@@ -224,10 +284,13 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     }, TZ);
 
-    // Reset the block next day
+    // Reset all blocks next day at midnight
     cron.schedule('0 0 * * *', () => {
-        isEquityIntradayBlocked = false;
+        isFnoEquityIntradayBlocked = false;
+        isNonFnoEquityIntradayBlocked = false;
+        isDerivativesIntradayBlocked = false;
         isCommodityIntradayBlocked = false;
+        isEquityIntradayBlocked = false;
     }, TZ);
 
     // Helper: Check if a symbol is an expiring derivative
@@ -274,8 +337,12 @@ function initCronJobs(priceCache, triggerEngine) {
                 
                 for (const order of pendingOrders) {
                     const isCom = isCommoditySymbol(order.symbol);
-                    if (assetType === 'EQ' && isCom) continue;  // Skip commodities during EQ sweep
-                    if (assetType === 'COM' && !isCom) continue; // Skip equities during COM sweep
+                    const sub = getAssetSubsegment(order.symbol);
+                    if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
+                    if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
+                    if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
+                    if (assetType === 'COM' && !isCom) continue;
+                    if (assetType === 'EQ' && isCom) continue;
                     
                     // User Rule: Delivery (DEL/CNC) orders for regular cash equities stay open until 15:30.
                     // Only cancel DEL/CNC orders if the contract is an expiring derivative that expires TODAY.
@@ -305,8 +372,12 @@ function initCronJobs(priceCache, triggerEngine) {
                 const pendingTriggers = await trx('orders').whereIn('status', ['PENDING_TRIGGER']);
                 for (const trigger of pendingTriggers) {
                     const isCom = isCommoditySymbol(trigger.symbol);
-                    if (assetType === 'EQ' && isCom) continue;
+                    const sub = getAssetSubsegment(trigger.symbol);
+                    if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
+                    if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
+                    if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
                     if (assetType === 'COM' && !isCom) continue;
+                    if (assetType === 'EQ' && isCom) continue;
 
                     // If trigger order is DEL/CNC, do not cancel unless expiring today
                     if (trigger.product_type === 'DEL' || trigger.product_type === 'CNC' || trigger.product_type === 'DELIVERY') {
@@ -355,7 +426,15 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     };
 
-    cron.schedule('19 15 * * *', () => phase2Sweep('EQ'), TZ);
+    // Phase 2A: 03:09 PM - Sweep F&O Cash Stocks pending intraday
+    cron.schedule('9 15 * * 1-5', () => phase2Sweep('FNO_EQ'), TZ);
+
+    // Phase 2B: 03:19 PM - Sweep Non-F&O Cash Stocks pending intraday
+    cron.schedule('19 15 * * 1-5', () => phase2Sweep('NON_FNO_EQ'), TZ);
+
+    // Phase 2C: 03:29 PM - Sweep Derivatives pending intraday
+    cron.schedule('29 15 * * 1-5', () => phase2Sweep('DERIVATIVE'), TZ);
+
     cron.schedule('59 22 * * *', () => {
         if (!isMCXWinterSession()) phase2Sweep('COM');
     }, TZ);
@@ -363,7 +442,7 @@ function initCronJobs(priceCache, triggerEngine) {
         if (isMCXWinterSession()) phase2Sweep('COM');
     }, TZ);
 
-    // ─── PHASE 3: Auto Square-Off (15:20 Eq / 23:00 Com) ──────────────────────
+    // ─── PHASE 3: Auto Square-Off ─────────────────────────────────────────────
     const phase3SquareOff = async (assetType) => {
         let connection = null;
         let isLocked = false;
@@ -391,6 +470,11 @@ function initCronJobs(priceCache, triggerEngine) {
 
                     for (const pos of positions) {
                         const isCom = isCommoditySymbol(pos.symbol);
+                        const sub = getAssetSubsegment(pos.symbol);
+                        if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
+                        if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
+                        if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
+                        if (assetType === 'COM' && !isCom) continue;
                         if (assetType === 'EQ' && isCom) continue;
                         if (assetType === 'COM' && !isCom) continue;
 
@@ -510,7 +594,20 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     };
 
-    cron.schedule('20 15 * * *', () => phase3SquareOff('EQ'), TZ);
+    // Phase 3A: 03:10 PM - Auto Square-Off F&O Cash Stocks open intraday positions
+    cron.schedule('10 15 * * 1-5', () => phase3SquareOff('FNO_EQ'), TZ);
+
+    // Phase 3B: 03:20 PM - Auto Square-Off Non-F&O Cash Stocks open intraday positions
+    cron.schedule('20 15 * * 1-5', () => phase3SquareOff('NON_FNO_EQ'), TZ);
+
+    // Phase 3C: 03:30 PM - Auto Square-Off Derivatives open intraday positions
+    cron.schedule('30 15 * * 1-5', () => phase3SquareOff('DERIVATIVE'), TZ);
+
+    // 03:35 PM: Closing Auction Session (CAS) matching for F&O Cash stocks
+    cron.schedule('35 15 * * 1-5', () => {
+        executeClosingAuctionMatch(priceCache, triggerEngine);
+    }, TZ);
+
     cron.schedule('0 23 * * *', () => {
         if (!isMCXWinterSession()) phase3SquareOff('COM');
     }, TZ);

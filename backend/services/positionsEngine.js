@@ -61,9 +61,9 @@ class PositionsEngine {
             this.runHoldingsMigration();
         }, { timezone: 'Asia/Kolkata' });
 
-        // EQUITIES
-        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:30 PM IST (Market Close)
-        cron.schedule('30 15 * * *', () => {
+        // EQUITIES & DERIVATIVES
+        // Condition 10: Expiry Day Settlement (Equities/Derivatives) - 03:40 PM IST (F&O Market Close)
+        cron.schedule('40 15 * * *', () => {
             this.settleExpiries(false); // false = Not Commodity
         }, { timezone: 'Asia/Kolkata' });
 
