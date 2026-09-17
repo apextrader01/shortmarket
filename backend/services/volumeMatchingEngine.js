@@ -196,16 +196,23 @@ class VolumeMatchingEngine {
     const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
 
     const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-    // High-liquidity segment applies ONLY to actual derivative/commodity contracts (e.g. NIFTY26SEPFUT, CRUDEOILM).
+    // High-liquidity segment applies ONLY to actual derivative/commodity contracts (e.g. NIFTY26SEPFUT, CRUDEOILM)
+    // AND only when there is real exchange volume. Zero-volume contracts must queue for real volume.
     // Cash equity stocks (e.g. NSE:VMM, NSE:KITEX, NSE:RELIANCE) are NEVER treated as high liquidity derivatives,
     // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
     const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
     const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
     const isRetailOrder = totalOrderQty <= 500;
-    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
+
+    // Check if this derivative/commodity actually has real exchange volume before allowing instant sweep
+    const derivLiveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
+    const hasRealVolume = derivLiveDailyVol > 0;
+    // Only instant-sweep derivatives if there's real exchange volume; zero-volume contracts must queue
+    const canInstantSweep = (isHighLiquiditySegment && hasRealVolume) || (!isHighLiquiditySegment && isRetailOrder);
 
     // Cash equities > 500 shares: skip depth sweep entirely. Queue for real volume ticks only.
-    // Derivatives, commodities, and small retail orders: use full depth for instant fill.
+    // Derivatives/commodities with volume: use full depth for instant fill.
+    // Derivatives/commodities with ZERO volume: queue for real volume ticks only.
     const depthCap = canInstantSweep ? ordObj.pending_quantity : 0;
 
     let depthFilled = 0;
@@ -405,21 +412,9 @@ class VolumeMatchingEngine {
 
       const now = Date.now();
 
-      // If deltaVol is 0 (e.g. quote tick without new traded volume):
-      // - Derivatives/Commodities: use heartbeat micro-flow (5-20 shares every 3.5s) since exchange depth is deep
-      // - Cash Equities: NEVER fabricate fake volume. Only fill on real exchange volume deltas.
-      if (deltaVol <= 0) {
-        const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-        const isDerivQueue = queue.some(o => isDerivativeContract(o.symbol) || isCommodityContract(o.symbol));
-        if (isDerivQueue) {
-          const hasRestingOrdersNeedingHeartbeat = queue.some(o => !o._lastFillTime || (now - o._lastFillTime >= 3500));
-          if (hasRestingOrdersNeedingHeartbeat) {
-            deltaVol = Math.floor(Math.random() * 20) + 5; // Natural micro-flow for derivatives only
-          }
-        }
-      }
-
-      if (deltaVol <= 0) return; // Cash equities: strictly wait for real exchange volume
+      // ALL instruments (cash equities, derivatives, commodities) must wait for real exchange volume.
+      // Never fabricate fake volume — if deltaVol is 0, the order stays pending until real trades happen.
+      if (deltaVol <= 0) return; // Strictly wait for real exchange volume for ALL instruments
 
       // Distribute available tick volume to active orders in FIFO order
       let availableVol = deltaVol;
@@ -947,11 +942,16 @@ class VolumeMatchingEngine {
 
   /**
    * Background fallback pacing heartbeat running on Master node.
-   * ONLY fills derivatives/commodities orders (deep exchange liquidity).
+   * ONLY fills derivatives/commodities orders — and ONLY when real exchange volume exists.
    * Cash equity orders are NEVER filled by heartbeat — they wait for real exchange volume ticks only.
+   * Derivatives/commodities are also gated by real volume: if the exchange shows zero or no new
+   * traded volume, the order stays PENDING. This prevents filling phantom orders in illiquid contracts.
    */
   startPacingHeartbeat() {
     if (this._heartbeatInterval) return;
+    // Track last cumulative volume seen per symbol in the heartbeat (separate from onTick tracking)
+    if (!this._heartbeatVolTracker) this._heartbeatVolTracker = new Map();
+
     this._heartbeatInterval = setInterval(async () => {
       try {
         if (this.symbolQueues.size === 0) return;
@@ -964,10 +964,34 @@ class VolumeMatchingEngine {
           const ltp = Number(cached.ltp || 0);
           if (ltp <= 0) continue;
 
+          // ── VOLUME GATE: Check real exchange volume before filling ──
+          const currentVol = Number(cached.volume || 0);
+          const prevHBVol = this._heartbeatVolTracker.get(normSym) || 0;
+
+          if (currentVol <= 0) {
+            // No volume at all on this contract — do NOT fill
+            continue;
+          }
+
+          if (prevHBVol === 0) {
+            // First time seeing this symbol in heartbeat — set baseline, don't fill yet
+            this._heartbeatVolTracker.set(normSym, currentVol);
+            continue;
+          }
+
+          const volDelta = currentVol - prevHBVol;
+          if (volDelta <= 0) {
+            // No new real exchange volume since last heartbeat — do NOT fill
+            continue;
+          }
+
+          // Real volume increase detected — update tracker
+          this._heartbeatVolTracker.set(normSym, currentVol);
+
           for (const order of [...queue]) {
             if (!order || order.pending_quantity <= 0) continue;
 
-            // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume
+            // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume via onTick
             const isDerivOrCommodity = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
             if (!isDerivOrCommodity) continue;
 
@@ -980,9 +1004,13 @@ class VolumeMatchingEngine {
 
               let slice = 0;
               if (lotsize > 1) {
-                if (order.pending_quantity >= lotsize) slice = lotsize;
+                // Only fill up to the real volume delta (in lot-aligned increments)
+                const maxFillFromVol = Math.floor(volDelta / lotsize) * lotsize;
+                if (maxFillFromVol >= lotsize && order.pending_quantity >= lotsize) {
+                  slice = Math.min(lotsize, maxFillFromVol, order.pending_quantity);
+                }
               } else {
-                slice = Math.min(order.pending_quantity, Math.floor(Math.random() * 20) + 5);
+                slice = Math.min(order.pending_quantity, volDelta, Math.floor(Math.random() * 20) + 5);
               }
 
               if (slice > 0) {
