@@ -195,12 +195,24 @@ class VolumeMatchingEngine {
     const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
     const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
 
+    const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+    // High-liquidity segment applies ONLY to actual derivative/commodity contracts (e.g. NIFTY26SEPFUT, CRUDEOILM).
+    // Cash equity stocks (e.g. NSE:VMM, NSE:KITEX, NSE:RELIANCE) are NEVER treated as high liquidity derivatives,
+    // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
+    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
+    const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
+    const isRetailOrder = totalOrderQty <= 500;
+    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
+
+    // For bulk / whale cash equity orders (> 500 shares), strictly limit initial depth matching to at most 500 shares
+    const depthCap = canInstantSweep ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 500);
+
     let depthFilled = 0;
     let totalDepthCost = 0;
 
     // Check if Level-2 market depth exists
     if (Array.isArray(book) && book.length > 0) {
-      let remainingToFill = ordObj.pending_quantity;
+      let remainingToFill = depthCap;
 
       for (const level of book) {
         const levelPrice = Number(level.price);
@@ -231,8 +243,6 @@ class VolumeMatchingEngine {
       const qty = Number(order.pending_quantity || order.quantity || 0);
       if (qty <= 100) return basePrice; // Retail micro-order: zero slippage
 
-      const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-      const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
       if (isHighLiquiditySegment) return basePrice; // High-liquidity F&O / Commodities / Index: zero slippage
 
       const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
@@ -265,22 +275,10 @@ class VolumeMatchingEngine {
       }
     };
 
-    const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-    // High-liquidity segment applies ONLY to actual derivative/commodity contracts (e.g. NIFTY26SEPFUT, CRUDEOILM).
-    // Cash equity stocks (e.g. NSE:VMM, NSE:KITEX, NSE:RELIANCE) are NEVER treated as high liquidity derivatives,
-    // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
-    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
     const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
     const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
     const marketTotalQty = Number(ordObj.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
     const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
-
-    // Strict retail order definition: 500 shares or fewer.
-    // Whale / bulk orders (> 500 shares, e.g. 1 Lakh shares) on cash equities are NEVER retail orders.
-    // They must fill available orderbook depth + initial participation slice (<= 500), and pace the rest with exchange volume ticks.
-    const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
-    const isRetailOrder = totalOrderQty <= 500;
-    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
 
     if (depthFilled > 0) {
       const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
@@ -387,8 +385,9 @@ class VolumeMatchingEngine {
     const normSym = normalizeSymbol(symbol);
     const queue = this.symbolQueues.get(normSym);
     if (!queue || queue.length === 0) {
-      if (tick.volume || tick.vol_traded_today) {
-        this.lastSymbolVolume.set(normSym, Number(tick.volume || tick.vol_traded_today));
+      const v = Number(tick.volume || tick.vol_traded_today || tick.vol || tick.v || 0);
+      if (v > 0) {
+        this.lastSymbolVolume.set(normSym, v);
       }
       return;
     }
@@ -398,9 +397,24 @@ class VolumeMatchingEngine {
 
     try {
       const currentVol = Number(tick.volume || tick.vol_traded_today || tick.vol || tick.v || 0);
-      const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
-      let deltaVol = currentVol > prevVol ? (currentVol - prevVol) : 0;
-      this.lastSymbolVolume.set(normSym, currentVol);
+      let deltaVol = 0;
+
+      if (currentVol > 0) {
+        if (!this.lastSymbolVolume.has(normSym)) {
+          // Initialize baseline volume without triggering a false multi-lakh trade spike
+          this.lastSymbolVolume.set(normSym, currentVol);
+        } else {
+          const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
+          if (currentVol > prevVol) {
+            const rawDelta = currentVol - prevVol;
+            // Guard against massive reconnect / cumulative feed jumps (> 5,000 in a single tick on cash equities)
+            const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+            const isDeriv = queue.some(o => isDerivativeContract(o.symbol) || isCommodityContract(o.symbol));
+            deltaVol = (!isDeriv && rawDelta > 5000) ? 500 : rawDelta;
+            this.lastSymbolVolume.set(normSym, currentVol);
+          }
+        }
+      }
 
       const ltp = Number(tick.ltp || 0);
       if (ltp <= 0) return;
@@ -450,11 +464,11 @@ class VolumeMatchingEngine {
         } else {
           // Equities (lot = 1): whole shares
           // If available real exchange volume <= 500, allocate up to 100% of available volume directly
-          // If available volume is larger, participate at 50% POV rate (minimum 500 shares)
+          // If available volume is larger, participate at 50% POV rate (capped at 500 shares per tick for equities)
           if (availableVol <= 500) {
             fillQty = Math.min(order.pending_quantity, availableVol);
           } else {
-            const maxFill = Math.min(order.pending_quantity, Math.max(500, Math.floor(availableVol * 0.5)));
+            const maxFill = Math.min(order.pending_quantity, Math.min(500, Math.floor(availableVol * 0.5)));
             fillQty = Math.min(order.pending_quantity, Math.round(maxFill));
           }
         }
