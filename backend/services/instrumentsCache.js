@@ -197,9 +197,16 @@ function getAssetSubsegment(sym) {
     return 'NON_FNO_EQ';
 }
 
+function getLotSize(symbol) {
+    if (!symbol) return 1;
+    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return lotSizeMap[symbol] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
+}
+
 module.exports = {
     initializeCache,
     getLotSizes,
+    getLotSize,
     getAllStocks,
     searchInstruments,
     isDerivativeContract,

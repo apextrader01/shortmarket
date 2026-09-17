@@ -162,5 +162,12 @@ module.exports = {
     globalNfoOptions,
     globalNfoFutures,
     globalBseSpots,
-    SEARCH_INDEX
+    SEARCH_INDEX,
+    getLotSize: (symbol) => {
+        try {
+            return require('./marginEngine').getLotSize(symbol);
+        } catch (e) {
+            return 1;
+        }
+    }
 };

@@ -6574,7 +6574,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           }
 
           if (quantity !== undefined && quantity !== null) {
-            const { getLotSize } = require('./services/instruments');
+            const { getLotSize } = require('./services/marginEngine');
             const lotSize = getLotSize(order.symbol);
             if (lotSize > 1 && Number(quantity) % lotSize !== 0) {
               throw Object.assign(new Error(`Quantity must be a multiple of lot size (${lotSize})`), { statusCode: 400 });
@@ -6661,6 +6661,9 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
               margin: newMargin,
               updated_at: new Date()
           };
+          if (newPendingQty <= 0 && filledQty > 0) {
+              updateObj.status = 'EXECUTED';
+          }
 
           if (price !== undefined && price !== null && !isNaN(parseFloat(price))) {
               updateObj.price = parseFloat(price);
