@@ -51,6 +51,21 @@ class PositionsEngine {
         setTimeout(() => {
             this.runHoldingsMigration(true);
         }, 15000);
+
+        // Run catchup expiry settlement on startup if past 03:40 PM IST
+        setTimeout(() => {
+            try {
+                const now = new Date();
+                const istParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(now);
+                const hour = parseInt(istParts.find(p => p.type === 'hour').value, 10);
+                const minute = parseInt(istParts.find(p => p.type === 'minute').value, 10);
+                const timeVal = hour * 100 + minute;
+                if (timeVal >= 1540) {
+                    console.log('⏰ [BOOT CATCHUP] Past 03:40 PM IST — running immediate catchup expiry settlement...');
+                    this.settleExpiries(false).catch(e => console.error('Startup catchup expiry error:', e));
+                }
+            } catch(e) {}
+        }, 20000);
     }
 
     initCronJobs() {
