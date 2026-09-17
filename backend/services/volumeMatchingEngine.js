@@ -255,28 +255,47 @@ class VolumeMatchingEngine {
       }
     };
 
+    const { isDerivativeContract, isCommodityContract, isFnoEligibleStock } = require('./instrumentsCache');
+    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol) || isFnoEligibleStock(ordObj.symbol);
+    const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
+    const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
+    const marketTotalQty = Number(ordObj.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
+    const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
+    const isRetailOrder = Number(ordObj.pending_quantity || ordObj.quantity || 0) <= 500 || (effectiveVolume > 0 && (Number(ordObj.pending_quantity) / effectiveVolume) <= 0.05) || effectiveVolume >= 100000;
+    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
+
     if (depthFilled > 0) {
       const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
 
-      // For MARKET orders: any remaining quantity after depth matching executes immediately with Option B realism
+      // For MARKET orders: High-liquidity F&O / indices and retail cash equity orders sweep remaining quantity immediately.
+      // Bulk orders on illiquid equities (e.g. 1 Lakh KITEX) do NOT sweep 100% out of thin air; remaining qty paces via onTick().
       if ((ordObj.type === 'MARKET' || ordObj.isMarket) && ordObj.pending_quantity > 0 && baseLtp > 0) {
-        const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
-        if (sweepPrice === baseLtp) {
-          await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
-        } else {
-          await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
-        }
-      }
-    } else {
-      if (ordObj.type === 'MARKET' || ordObj.isMarket) {
-        // Market orders execute 100% of pending quantity immediately at market price (baseLtp) with Option B realism
-        if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
+        if (canInstantSweep) {
           const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
           if (sweepPrice === baseLtp) {
             await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
           } else {
             await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
+          }
+        }
+      }
+    } else {
+      if (ordObj.type === 'MARKET' || ordObj.isMarket) {
+        if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
+          if (canInstantSweep) {
+            // Liquid F&O / retail cash orders execute 100% immediately at market price (baseLtp) with Option B realism
+            const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
+            if (sweepPrice === baseLtp) {
+              await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+            } else {
+              await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
+            }
+          } else {
+            // Bulk order on illiquid stock with zero depth: execute initial participation slice, queue remaining for onTick
+            const initialSlice = Math.min(ordObj.pending_quantity, Math.max(100, Math.floor(Math.min(effectiveVolume > 0 ? effectiveVolume * 0.01 : 500, 500))));
+            const sweepPrice = calculateMarketSlippage({ ...ordObj, pending_quantity: initialSlice }, baseLtp);
+            await this.processSliceFill(ordObj, initialSlice, sweepPrice);
           }
         }
       } else {
@@ -497,35 +516,45 @@ class VolumeMatchingEngine {
           .whereNot({ quantity: 0 })
           .first();
 
+        // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "-1.0000" + 1 = "-1.00001")
+        if (existingPos) {
+          existingPos.quantity = roundQty(Number(existingPos.quantity));
+          existingPos.average_price = Number(existingPos.average_price);
+          existingPos.margin = Number(existingPos.margin || 0);
+          existingPos.closed_quantity = roundQty(Number(existingPos.closed_quantity || 0));
+          existingPos.realized_pnl = Number(existingPos.realized_pnl || 0);
+        }
+
         const isClosing = existingPos && (
           (existingPos.quantity > 0 && order.side === 'SELL') ||
           (existingPos.quantity < 0 && order.side === 'BUY')
         );
 
         if (isClosing) {
-          const absPosQty = roundQty(Math.abs(Number(existingPos.quantity)));
+          const absPosQty = roundQty(Math.abs(existingPos.quantity));
           const closeQty = Math.min(sliceQtyClean, absPosQty);
           const leftoverQty = roundQty(sliceQtyClean - closeQty);
           let realizedPnl = 0;
 
           if (existingPos.quantity > 0) {
-            realizedPnl = (slicePrice - Number(existingPos.average_price)) * closeQty;
+            realizedPnl = (slicePrice - existingPos.average_price) * closeQty;
           } else {
-            realizedPnl = (Number(existingPos.average_price) - slicePrice) * closeQty;
+            realizedPnl = (existingPos.average_price - slicePrice) * closeQty;
           }
           realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
 
-          const propClosed = closeQty / absPosQty;
-          const marginRefund = Math.round((Number(existingPos.margin || 0) * propClosed) * 100) / 100;
+          const propClosed = absPosQty > 0 ? (closeQty / absPosQty) : 1;
+          const marginRefund = Math.round((existingPos.margin * propClosed) * 100) / 100;
 
           const newPosQty = roundQty(existingPos.quantity > 0 ? (existingPos.quantity - closeQty) : (existingPos.quantity + closeQty));
+          const isFullyClosed = newPosQty === 0 || absPosQty <= closeQty;
 
-          if (newPosQty === 0) {
+          if (isFullyClosed) {
             await trx('positions').where({ id: existingPos.id }).update({
               quantity: 0,
-              closed_quantity: roundQty(Number(existingPos.closed_quantity || 0) + closeQty),
+              closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
               exit_price: slicePrice,
-              realized_pnl: Number(existingPos.realized_pnl || 0) + realizedPnl,
+              realized_pnl: existingPos.realized_pnl + realizedPnl,
               margin: 0,
               updated_at: new Date()
             });
@@ -572,9 +601,9 @@ class VolumeMatchingEngine {
           } else {
             await trx('positions').where({ id: existingPos.id }).update({
               quantity: newPosQty,
-              closed_quantity: Number(existingPos.closed_quantity || 0) + closeQty,
-              realized_pnl: Number(existingPos.realized_pnl || 0) + realizedPnl,
-              margin: Math.max(0, Number(existingPos.margin || 0) - marginRefund),
+              closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
+              realized_pnl: existingPos.realized_pnl + realizedPnl,
+              margin: Math.max(0, existingPos.margin - marginRefund),
               updated_at: new Date()
             });
           }
