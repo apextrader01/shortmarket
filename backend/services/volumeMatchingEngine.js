@@ -124,7 +124,7 @@ class VolumeMatchingEngine {
       trail_amount: order.trail_amount,
       parent_order_id: order.parent_order_id,
       created_at: order.created_at || new Date(),
-      _lastFillTime: Date.now()
+      _lastFillTime: null  // Allow immediate heartbeat fill on enqueue
     };
 
     this.activeOrders.set(ordObj.id.toString(), ordObj);
@@ -425,13 +425,20 @@ class VolumeMatchingEngine {
         let fillQty = 0;
         if (lotsize > 1) {
           // Derivatives and Commodities trade strictly in whole lots. Never fill fractional lots!
-          if (order.pending_quantity <= lotsize) {
+          // CRITICAL: fillQty must NEVER exceed availableVol (real exchange volume delta).
+          // Calculate how many whole lots the real volume can support.
+          const maxLotsFromVol = Math.floor(availableVol / lotsize);
+          if (maxLotsFromVol >= 1) {
+            // Real volume supports at least 1 full lot
+            const maxFillFromVol = maxLotsFromVol * lotsize;
+            fillQty = Math.min(order.pending_quantity, maxFillFromVol);
+            // Ensure lot-aligned
+            fillQty = Math.floor(fillQty / lotsize) * lotsize;
+          } else if (order.pending_quantity <= lotsize && availableVol > 0) {
+            // Last remaining slice is less than or equal to 1 lot — fill it if ANY real volume exists
             fillQty = order.pending_quantity;
-          } else {
-            const rawCap = Math.min(order.pending_quantity, Math.max(lotsize, Math.floor(availableVol * 0.5)));
-            fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-            fillQty = Math.min(order.pending_quantity, fillQty);
           }
+          // else: not enough real volume for even 1 lot — wait for more ticks
         } else {
           // Equities (lot = 1): use 100% of real exchange volume directly.
           // No artificial caps — real Fyers volume is distributed across all resting orders in FIFO.
@@ -934,8 +941,6 @@ class VolumeMatchingEngine {
    */
   startPacingHeartbeat() {
     if (this._heartbeatInterval) return;
-    // Track last cumulative volume seen per symbol in the heartbeat (separate from onTick tracking)
-    if (!this._heartbeatVolTracker) this._heartbeatVolTracker = new Map();
 
     this._heartbeatInterval = setInterval(async () => {
       try {
@@ -949,29 +954,22 @@ class VolumeMatchingEngine {
           const ltp = Number(cached.ltp || 0);
           if (ltp <= 0) continue;
 
-          // ── VOLUME GATE: Check real exchange volume before filling ──
+          // ── VOLUME GATE: Use SHARED volume tracker (same as onTick) to prevent double-counting ──
           const currentVol = Number(cached.volume || 0);
-          const prevHBVol = this._heartbeatVolTracker.get(normSym) || 0;
+          if (currentVol <= 0) continue; // No volume at all — do NOT fill
 
-          if (currentVol <= 0) {
-            // No volume at all on this contract — do NOT fill
+          const prevVol = this.lastSymbolVolume.get(normSym) || 0;
+          if (prevVol === 0) {
+            // First time seeing this symbol — set baseline, don't fill yet
+            this.lastSymbolVolume.set(normSym, currentVol);
             continue;
           }
 
-          if (prevHBVol === 0) {
-            // First time seeing this symbol in heartbeat — set baseline, don't fill yet
-            this._heartbeatVolTracker.set(normSym, currentVol);
-            continue;
-          }
+          const volDelta = currentVol - prevVol;
+          if (volDelta <= 0) continue; // No new real exchange volume — do NOT fill
 
-          const volDelta = currentVol - prevHBVol;
-          if (volDelta <= 0) {
-            // No new real exchange volume since last heartbeat — do NOT fill
-            continue;
-          }
-
-          // Real volume increase detected — update tracker
-          this._heartbeatVolTracker.set(normSym, currentVol);
+          // Update shared tracker so onTick doesn't double-count this volume
+          this.lastSymbolVolume.set(normSym, currentVol);
 
           for (const order of [...queue]) {
             if (!order || order.pending_quantity <= 0) continue;
@@ -989,10 +987,15 @@ class VolumeMatchingEngine {
 
               let slice = 0;
               if (lotsize > 1) {
-                // Only fill up to the real volume delta (in lot-aligned increments)
-                const maxFillFromVol = Math.floor(volDelta / lotsize) * lotsize;
-                if (maxFillFromVol >= lotsize && order.pending_quantity >= lotsize) {
-                  slice = Math.min(lotsize, maxFillFromVol, order.pending_quantity);
+                // Fill proportional to real volume delta (multiple lots allowed)
+                const maxLotsFromVol = Math.floor(volDelta / lotsize);
+                if (maxLotsFromVol >= 1 && order.pending_quantity >= lotsize) {
+                  const maxFillFromVol = maxLotsFromVol * lotsize;
+                  slice = Math.min(order.pending_quantity, maxFillFromVol);
+                  slice = Math.floor(slice / lotsize) * lotsize;
+                } else if (order.pending_quantity <= lotsize && volDelta > 0) {
+                  // Last remaining partial lot — fill if any real volume exists
+                  slice = order.pending_quantity;
                 }
               } else {
                 slice = Math.min(order.pending_quantity, volDelta, Math.floor(Math.random() * 20) + 5);
