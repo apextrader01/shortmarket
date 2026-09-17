@@ -625,11 +625,20 @@ function initCronJobs(priceCache, triggerEngine) {
         executeClosingAuctionMatch(priceCache, triggerEngine);
     }, TZ);
 
+    // Phase 3D: MCX Commodity Auto Square-Off
+    // 11:00 PM IST: Summer Session Primary Square-Off (after 10:50 PM cutoff)
     cron.schedule('0 23 * * *', () => {
         if (!isMCXWinterSession()) phase3SquareOff('COM');
     }, TZ);
+
+    // 11:35 PM IST: MCX Market Close / Expiry Auto Square-Off (ensures zero open intraday positions after 11:30 PM close)
+    cron.schedule('35 23 * * *', () => {
+        phase3SquareOff('COM');
+    }, TZ);
+
+    // 11:40 PM IST: Winter Session Primary Square-Off (after 11:30 PM cutoff) + Summer Safety Sweep
     cron.schedule('40 23 * * *', () => {
-        if (isMCXWinterSession()) phase3SquareOff('COM');
+        phase3SquareOff('COM');
     }, TZ);
 
     // Note: Daily/Weekly/Monthly SIP and Next-Day Mutual Fund settlement are authoritatively handled by sipEngine.js at 09:00 AM, 09:30 AM, 03:30 PM, and 10:30 PM

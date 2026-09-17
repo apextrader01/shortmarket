@@ -204,7 +204,13 @@ loadMarketCalendarFromDb();
 
 function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, isClosingOrder = false) {
   const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
-  if (globalStatus === 'OPEN') return { open: true, session: 'OPEN' };
+  if (globalStatus === 'OPEN') {
+    const isIntraday = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
+    if (!isIntraday || isClosingOrder) {
+      return { open: true, session: 'OPEN' };
+    }
+    // For non-closing intraday orders, proceed down to evaluate segment cutoff rules
+  }
   if (globalStatus === 'CLOSED') {
     return { open: false, isTotalBlock: true, reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} Market is currently marked as CLOSED / Holiday by Administrator.` };
   }
@@ -4437,6 +4443,15 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       if (!isExitOrder) {
         return res.status(400).json({
           error: `Intraday order placement for ${symbol} is closed for today (Auto square-off period active). Please place a Delivery (CNC) or AMO order.`
+        });
+      }
+
+      // CRITICAL: Exit order cannot exceed open position quantity during cutoff!
+      // Otherwise, it creates a brand new open intraday position during the cutoff window!
+      const maxAllowedExitQty = Math.abs(Number(existingPos.quantity));
+      if (Number(quantity) > maxAllowedExitQty) {
+        return res.status(400).json({
+          error: `Intraday cutoff active: You can only exit up to your open position quantity of ${maxAllowedExitQty}. Placing ${quantity} would create a new open intraday position, which is prohibited after cutoff.`
         });
       }
     }
