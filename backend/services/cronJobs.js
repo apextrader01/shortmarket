@@ -634,6 +634,190 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // Note: Daily/Weekly/Monthly SIP and Next-Day Mutual Fund settlement are authoritatively handled by sipEngine.js at 09:00 AM, 09:30 AM, 03:30 PM, and 10:30 PM
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 🌙 NIGHTLY MASTER EOD TRIPLE AUTOMATION SWEEP
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ─── 11:56 PM IST: Step 1 - Cancel ALL Pending & Open Orders in Order Tab ─
+    cron.schedule('56 23 * * *', async () => {
+        console.log('\n🌙 [CRON 11:56 PM] Nightly EOD Sweep Step 1: Cancelling all remaining pending and trigger orders...');
+        const lockKey = 'cron_nightly_cancel_orders';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log('[CRON 11:56 PM] Already running on another cluster instance. Skipping.');
+                    return;
+                }
+            }
+
+            const positionsEngine = require('./positionsEngine');
+            await positionsEngine.sweepPendingOrders('EQUITY').catch(e => console.error('Nightly sweep equity orders error:', e));
+            await positionsEngine.sweepPendingOrders('COMMODITY').catch(e => console.error('Nightly sweep commodity orders error:', e));
+
+            await db.transaction(async (trx) => {
+                const staleOrders = await trx('orders')
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                    .where(function() {
+                        this.whereNot({ status: 'AMO_PENDING' }).andWhere(function() {
+                            this.whereNull('order_variety').orWhereNot({ order_variety: 'AMO' });
+                        });
+                    });
+
+                const affectedUserIds = new Set();
+                for (const ord of staleOrders) {
+                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                    if (parseFloat(ord.margin) > 0) {
+                        await LedgerService.releaseMargin(trx, ord.user_id, ord.margin, `Nightly 11:56 PM Order Cancellation: ${ord.symbol}`);
+                    }
+                    affectedUserIds.add(ord.user_id);
+                    if (triggerEngine) {
+                        triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+                    }
+                }
+
+                if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                    for (const uid of affectedUserIds) {
+                        triggerEngine.io.to(uid.toString()).emit('sync_user_data');
+                    }
+                }
+                console.log(`✅ [CRON 11:56 PM] Cancelled ${staleOrders.length} lingering open/pending orders globally.`);
+            });
+        } catch (err) {
+            console.error('❌ [CRON 11:56 PM] Nightly order cancellation error:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }, TZ);
+
+    // ─── 11:57 PM IST: Step 2 - Force Square-Off ALL Open/Skipped Intraday Positions across NSE, NFO, BFO, BSE, MCX
+    cron.schedule('57 23 * * *', async () => {
+        console.log('\n🌙 [CRON 11:57 PM] Nightly EOD Sweep Step 2: Forcing square-off for all remaining open/skipped intraday positions across NSE, NFO, BFO, BSE, MCX...');
+        const lockKey = 'cron_nightly_squareoff_intraday';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log('[CRON 11:57 PM] Already running on another cluster instance. Skipping.');
+                    return;
+                }
+            }
+
+            const positionsEngine = require('./positionsEngine');
+            await positionsEngine.forceSquareOff('EQUITY').catch(e => console.error('Nightly equity square-off error:', e));
+            await positionsEngine.forceSquareOff('COMMODITY').catch(e => console.error('Nightly commodity square-off error:', e));
+
+            // Comprehensive fallback: scan for any remaining open INT, MIS, BO, CO positions in database
+            await db.transaction(async (trx) => {
+                const openIntraday = await trx('positions')
+                    .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+                    .whereNot({ quantity: 0 });
+
+                if (openIntraday.length === 0) {
+                    console.log('✅ [CRON 11:57 PM] Zero remaining intraday positions across all markets.');
+                    return;
+                }
+
+                const { ensureLivePrices } = require('./autoSquareOff');
+                const priceCache = await ensureLivePrices(openIntraday.map(p => p.symbol));
+                const affectedUserIds = new Set();
+
+                for (const pos of openIntraday) {
+                    let ltp = priceCache[pos.symbol]?.ltp;
+                    if (!ltp || ltp <= 0) {
+                        const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                        const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`BSE:${cleanSym}`] || priceCache[`MCX:${cleanSym}`];
+                        if (cached?.close > 0) ltp = Number(cached.close);
+                        else if (cached?.prev_close_price > 0) ltp = Number(cached.prev_close_price);
+                    }
+                    if (!ltp || ltp <= 0) {
+                        const lastOrder = await trx('orders').where({ symbol: pos.symbol, status: 'EXECUTED' }).orderBy('created_at', 'desc').first();
+                        if (lastOrder && Number(lastOrder.price) > 0) ltp = Number(lastOrder.price);
+                    }
+                    if (!ltp || ltp <= 0) {
+                        ltp = Number(pos.average_price) || 0;
+                    }
+
+                    await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true, 'Nightly 11:57 PM EOD Intraday Square-Off');
+                    affectedUserIds.add(pos.user_id);
+                    console.log(`[Nightly Intraday Square-Off] Closed ${pos.symbol} (${pos.quantity}) for User ${pos.user_id} @ ${ltp}`);
+                }
+
+                if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                    for (const uid of affectedUserIds) {
+                        triggerEngine.io.to(uid.toString()).emit('sync_user_data');
+                        triggerEngine.io.to(uid.toString()).emit('trade_alert', {
+                            event: 'EXECUTED',
+                            symbol: 'PORTFOLIO',
+                            message: 'Nightly EOD auto square-off completed for all open intraday positions.'
+                        });
+                    }
+                }
+                console.log(`✅ [CRON 11:57 PM] Squared off ${openIntraday.length} remaining intraday positions.`);
+            });
+        } catch (err) {
+            console.error('❌ [CRON 11:57 PM] Nightly intraday square-off error:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }, TZ);
+
+    // ─── 11:58 PM IST: Step 3 - Force Settle & Square-Off ALL Contracts Expiring Today (CNC & Intraday across NFO, BFO, Index, MCX)
+    cron.schedule('58 23 * * *', async () => {
+        console.log('\n🌙 [CRON 11:58 PM] Nightly EOD Sweep Step 3: Forcing settlement for ALL contracts expiring today (NSE, NFO, BFO, BSE SENSEX/BANKEX, MCX) whether CNC or Intraday...');
+        const lockKey = 'cron_nightly_expiry_settlement';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log('[CRON 11:58 PM] Already running on another cluster instance. Skipping.');
+                    return;
+                }
+            }
+
+            const positionsEngine = require('./positionsEngine');
+            // Settle Equities, NFO, BFO & Index Options (SENSEX, BANKEX, NIFTY) - settles BOTH positions and CNC holdings
+            await positionsEngine.settleExpiries(false, false).catch(e => console.error('Nightly equity expiry settlement error:', e));
+            // Settle MCX Commodities - settles BOTH positions and CNC holdings
+            await positionsEngine.settleExpiries(true, true).catch(e => console.error('Nightly commodity expiry settlement error:', e));
+            console.log('✅ [CRON 11:58 PM] Nightly EOD Step 3 Complete: All today\'s expiring contracts settled.');
+        } catch (err) {
+            console.error('❌ [CRON 11:58 PM] Nightly expiry settlement error:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }, TZ);
+
     // --- 1:00 AM Expired Watchlist Cleanup ---
     cron.schedule('0 1 * * *', async () => {
         const lockKey = 'cron_watchlist_cleanup';

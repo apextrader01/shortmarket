@@ -315,24 +315,10 @@ class PositionsEngine {
                 .select('unique_symbol');
             const expiringUniqueSymbols = expiringInstruments.map(i => i.unique_symbol);
 
-            // Find all expiring assets in Holdings OR Positions
-            let posQuery = db('positions').whereNot({ quantity: 0 }).where(function() {
-                const b = this;
-                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
-                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
-            });
-            let holdQuery = db('holdings').whereNot({ quantity: 0 }).where(function() {
-                const b = this;
-                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
-                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
-            });
-            
-            // Cancel ALL pending open orders for expiring symbols globally (even if user has no position)
-            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).where(function() {
-                const b = this;
-                expiryTokens.forEach(tok => b.orWhere('symbol', 'like', `%${tok}%`));
-                if (expiringUniqueSymbols.length > 0) b.orWhereIn('symbol', expiringUniqueSymbols);
-            });
+            // Find all active assets in Holdings, Positions, or Orders to evaluate for expiry settlement
+            let posQuery = db('positions').whereNot({ quantity: 0 });
+            let holdQuery = db('holdings').whereNot({ quantity: 0 });
+            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
             
             if (isCommodity) {
                 posQuery = posQuery.where('symbol', 'like', '%MCX%');
