@@ -4407,6 +4407,17 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Block new Intraday / BO / CO orders after segment intraday cutoff time
+  const isAmoOrder = rawVariety === 'AMO' || Boolean(req.body.is_amo);
+  if (!isAmoOrder && (effectiveProductType === 'INT' || effectiveProductType === 'BO' || effectiveProductType === 'CO')) {
+    const { isIntradayBlocked } = require('./services/cronJobs');
+    if (isIntradayBlocked && isIntradayBlocked(symbol)) {
+      return res.status(400).json({
+        error: `Intraday order placement for ${symbol} is closed for today (Auto square-off period active). Please place a Delivery (CNC) or AMO order.`
+      });
+    }
+  }
+
   if (type === 'GTT' && (!trigger_price || parseFloat(trigger_price) <= 0 || isNaN(parseFloat(trigger_price)))) {
     return res.status(400).json({ error: 'GTT orders require a valid trigger price greater than 0.' });
   }

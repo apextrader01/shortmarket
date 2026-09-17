@@ -24,13 +24,55 @@ const isCommoditySymbol = (symbol) => {
     return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 };
 
+/**
+ * Determines whether MCX is operating on Winter Session timings (ends 23:55 IST)
+ * vs Summer Session timings (ends 23:30 IST) dynamically based on US DST.
+ */
+const isMCXWinterSession = (d = new Date()) => {
+    const year = d.getFullYear();
+    const marchFirst = new Date(Date.UTC(year, 2, 1));
+    const marchFirstDay = marchFirst.getUTCDay();
+    const firstSunMarch = marchFirstDay === 0 ? 1 : (7 - marchFirstDay + 1);
+    const secondSunMarch = firstSunMarch + 7;
+    const dstStart = new Date(Date.UTC(year, 2, secondSunMarch, 7, 0, 0));
+
+    const novFirst = new Date(Date.UTC(year, 10, 1));
+    const novFirstDay = novFirst.getUTCDay();
+    const firstSunNov = novFirstDay === 0 ? 1 : (7 - novFirstDay + 1);
+    const dstEnd = new Date(Date.UTC(year, 10, firstSunNov, 6, 0, 0));
+
+    const isDstSummer = d >= dstStart && d < dstEnd;
+    return !isDstSummer;
+};
+
 function isIntradayBlocked(symbol) {
-    if (!symbol) return isFnoEquityIntradayBlocked || isNonFnoEquityIntradayBlocked || isDerivativesIntradayBlocked || isCommodityIntradayBlocked || isEquityIntradayBlocked;
-    const sub = getAssetSubsegment(symbol);
-    if (sub === 'COMMODITY') return isCommodityIntradayBlocked;
-    if (sub === 'DERIVATIVE') return isDerivativesIntradayBlocked;
-    if (sub === 'FNO_EQ') return isFnoEquityIntradayBlocked;
-    return isNonFnoEquityIntradayBlocked;
+    // Check live IST clock time so block is enforced even across PM2 restarts
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+    }).formatToParts(now);
+    const hour = parseInt(istParts.find(p => p.type === 'hour').value, 10);
+    const minute = parseInt(istParts.find(p => p.type === 'minute').value, 10);
+    const timeVal = hour * 100 + minute;
+
+    const sub = symbol ? getAssetSubsegment(symbol) : null;
+
+    if (sub === 'COMMODITY') {
+        const isWinter = isMCXWinterSession(now);
+        const cutoff = isWinter ? 2330 : 2250;
+        return isCommodityIntradayBlocked || (timeVal >= cutoff) || (timeVal < 900);
+    }
+    if (sub === 'DERIVATIVE') {
+        return isDerivativesIntradayBlocked || (timeVal >= 1525) || (timeVal < 915);
+    }
+    if (sub === 'FNO_EQ') {
+        return isFnoEquityIntradayBlocked || (timeVal >= 1505) || (timeVal < 915);
+    }
+    // NON_FNO_EQ or generic equity
+    return isNonFnoEquityIntradayBlocked || isEquityIntradayBlocked || (timeVal >= 1515) || (timeVal < 915);
 }
 
 async function executeAmoOrders(segment = 'ALL', priceCache = {}, triggerEngine = null) {
@@ -245,30 +287,6 @@ function initCronJobs(priceCache, triggerEngine) {
         isDerivativesIntradayBlocked = true;
     }, TZ);
 
-    /**
-     * Determines whether MCX is operating on Winter Session timings (ends 23:55 IST)
-     * vs Summer Session timings (ends 23:30 IST) dynamically based on US DST.
-     * US DST (Summer) runs from the 2nd Sunday of March to the 1st Sunday of November.
-     * Winter session (Standard Time) is active from 1st Sunday of November to 2nd Sunday of March.
-     */
-    const isMCXWinterSession = (d = new Date()) => {
-        const year = d.getFullYear();
-        // Second Sunday of March
-        const marchFirst = new Date(Date.UTC(year, 2, 1));
-        const marchFirstDay = marchFirst.getUTCDay();
-        const firstSunMarch = marchFirstDay === 0 ? 1 : (7 - marchFirstDay + 1);
-        const secondSunMarch = firstSunMarch + 7;
-        const dstStart = new Date(Date.UTC(year, 2, secondSunMarch, 7, 0, 0));
-
-        // First Sunday of November
-        const novFirst = new Date(Date.UTC(year, 10, 1));
-        const novFirstDay = novFirst.getUTCDay();
-        const firstSunNov = novFirstDay === 0 ? 1 : (7 - novFirstDay + 1);
-        const dstEnd = new Date(Date.UTC(year, 10, firstSunNov, 6, 0, 0));
-
-        const isDstSummer = d >= dstStart && d < dstEnd;
-        return !isDstSummer;
-    };
 
     cron.schedule('50 22 * * *', () => {
         if (!isMCXWinterSession()) {
@@ -339,8 +357,8 @@ function initCronJobs(priceCache, triggerEngine) {
                     const isCom = isCommoditySymbol(order.symbol);
                     const sub = getAssetSubsegment(order.symbol);
                     if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
-                    if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
-                    if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
+                    if (assetType === 'NON_FNO_EQ' && (isCom || sub === 'DERIVATIVE')) continue;
+                    if (assetType === 'DERIVATIVE' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
                     if (assetType === 'EQ' && isCom) continue;
                     
@@ -374,8 +392,8 @@ function initCronJobs(priceCache, triggerEngine) {
                     const isCom = isCommoditySymbol(trigger.symbol);
                     const sub = getAssetSubsegment(trigger.symbol);
                     if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
-                    if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
-                    if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
+                    if (assetType === 'NON_FNO_EQ' && (isCom || sub === 'DERIVATIVE')) continue;
+                    if (assetType === 'DERIVATIVE' && isCom) continue;
                     if (assetType === 'COM' && !isCom) continue;
                     if (assetType === 'EQ' && isCom) continue;
 
@@ -472,11 +490,10 @@ function initCronJobs(priceCache, triggerEngine) {
                         const isCom = isCommoditySymbol(pos.symbol);
                         const sub = getAssetSubsegment(pos.symbol);
                         if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
-                        if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
-                        if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
+                        if (assetType === 'NON_FNO_EQ' && (isCom || sub === 'DERIVATIVE')) continue;
+                        if (assetType === 'DERIVATIVE' && isCom) continue;
                         if (assetType === 'COM' && !isCom) continue;
                         if (assetType === 'EQ' && isCom) continue;
-                        if (assetType === 'COM' && !isCom) continue;
 
                         let ltp = priceCache[pos.symbol]?.ltp;
                         if (!ltp || ltp <= 0) {
