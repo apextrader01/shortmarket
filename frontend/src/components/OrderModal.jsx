@@ -484,7 +484,10 @@ export default function OrderModal() {
       return;
     }
     if (isAmo && !marketSession.isAmoWindow) {
-      alert("After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.");
+      const amoTimingMsg = isCommodity
+        ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+        : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
+      alert(amoTimingMsg);
       return;
     }
     if (!isAmo && !marketSession.open) {
@@ -809,7 +812,10 @@ export default function OrderModal() {
               type="button"
               onClick={() => {
                 if (!marketSession.isAmoWindow) {
-                  alert("After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.");
+                  const amoTimingMsg = isCommodity
+                    ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+                    : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.";
+                  alert(amoTimingMsg);
                   return;
                 }
                 setIsAmo(true);
@@ -831,7 +837,7 @@ export default function OrderModal() {
                 transition: 'all 0.15s ease',
                 boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
               }}
-              title={!marketSession.isAmoWindow ? "AMO is only open between 03:45 PM and 08:57 AM" : "After Market Order (Queued for execution at market open)"}
+              title={!marketSession.isAmoWindow ? (isCommodity ? "AMO for MCX is only open between 11:30 PM and 08:57 AM" : "AMO is only open between 03:45 PM and 08:57 AM") : "After Market Order (Queued for execution at market open)"}
             >
               🌙 AMO
             </button>

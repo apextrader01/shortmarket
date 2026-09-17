@@ -4424,7 +4424,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       const userWantsAmo = (rawVariety === 'AMO' || Boolean(req.body.is_amo));
       if (userWantsAmo) {
         if (!marketCheck.isAmoWindow) {
-          return res.status(400).json({ error: marketCheck.reason || 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.' });
+          const amoTimingMsg = isCommodity
+            ? 'After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active.'
+            : 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.';
+          return res.status(400).json({ error: marketCheck.reason || amoTimingMsg });
         }
         isAmo = true;
       } else {
@@ -4442,8 +4445,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     } else {
       // Market session is open: strictly forbid AMO during continuous open session!
       if (isAmo) {
+        const amoTimingMsg = isCommodity
+          ? 'After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active.'
+          : 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.';
         return res.status(400).json({
-          error: 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.'
+          error: amoTimingMsg
         });
       }
       if (marketCheck.isCas || marketCheck.session === 'PRE_MARKET' || marketCheck.session === 'CLOSING_AUCTION') {

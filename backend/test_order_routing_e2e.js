@@ -43,7 +43,10 @@ function simulateOrderPlacement(orderPayload, simulatedSession) {
             const userWantsAmo = (rawVariety === 'AMO' || Boolean(orderPayload.is_amo));
             if (userWantsAmo) {
                 if (!marketCheck.isAmoWindow) {
-                    return { status: 400, error: marketCheck.reason || 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.' };
+                    const amoTimingMsg = isCommodity
+                        ? 'After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active.'
+                        : 'After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.';
+                    return { status: 400, error: marketCheck.reason || amoTimingMsg };
                 }
                 isAmo = true;
             } else {
@@ -147,6 +150,20 @@ const postMarketRes = simulateOrderPlacement(
     { open: true, isPostMarket: true, session: 'POST_MARKET' }
 );
 assert(postMarketRes.status === 200 && postMarketRes.order.price === 2950.50, '03:55 PM: Post-Market Delivery order executes at official closing price (2950.50)');
+
+// 8. MCX Commodity Regular order outside hours displays MCX hours (09:00 AM - 11:30 PM)
+const mcxClosedRes = simulateOrderPlacement(
+    { symbol: 'CRUDEOIL', product_type: 'DEL', type: 'LIMIT', price: 6500, is_amo: false },
+    { open: false, isAmoWindow: true, session: 'AMO', reason: 'AMO Active' }
+);
+assert(mcxClosedRes.status === 400 && mcxClosedRes.error.includes('09:00 AM - 11:30 PM') && mcxClosedRes.error.includes('MCX Commodity Market'), 'MCX Commodity regular order rejected outside trading hours with (09:00 AM - 11:30 PM)');
+
+// 9. MCX Commodity AMO order placed outside AMO window is rejected with MCX-specific hours
+const mcxAmoBlockedRes = simulateOrderPlacement(
+    { symbol: 'CRUDEOIL', product_type: 'DEL', type: 'LIMIT', price: 6500, is_amo: true },
+    { open: false, isAmoWindow: false, session: 'NORMAL', reason: '' }
+);
+assert(mcxAmoBlockedRes.status === 400 && mcxAmoBlockedRes.error.includes('11:30 PM and 08:57 AM'), 'MCX Commodity AMO rejected during regular hours with (11:30 PM and 08:57 AM)');
 
 console.log('\n=============================================================');
 console.log(`TOTAL E2E ROUTING TESTS: ${totalTests} | PASSED: ${passedTests} | FAILED: ${failedTests}`);
