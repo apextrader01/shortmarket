@@ -44,20 +44,24 @@ class LedgerService {
     }
 
     /**
-     * Deducts Brokerage & Taxes when an order becomes EXECUTED.
+     * Deducts Brokerage & Taxes when an order becomes EXECUTED or partially filled.
+     * @param {boolean} includeBrokerage - True on first fill/execution of the order (charges flat brokerage). False on subsequent partial fill slices (charges only statutory turnover taxes).
      */
-    static async chargeExecutionTaxes(trx, userId, symbol, productType, side, quantity, price) {
-        const taxesObj = calculateTaxes(symbol, productType, side, quantity, price);
+    static async chargeExecutionTaxes(trx, userId, symbol, productType, side, quantity, price, includeBrokerage = true) {
+        const taxesObj = calculateTaxes(symbol, productType, side, quantity, price, 0, 0, null, false, includeBrokerage);
         const totalTaxes = taxesObj.totalTaxes;
         
         if (totalTaxes > 0) {
             const user = await trx('users').where({ id: userId }).forUpdate().first();
             await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - totalTaxes });
+            const description = includeBrokerage
+                ? `Taxes & Brokerage for ${side} ${quantity} ${symbol}`
+                : `Exchange Taxes for ${side} ${quantity} ${symbol} (Partial Fill)`;
             await trx('ledger').insert({
                 user_id: userId,
                 amount: -totalTaxes,
                 type: 'TAXES',
-                description: `Taxes & Brokerage for ${side} ${quantity} ${symbol}`
+                description
             });
         }
         return totalTaxes;

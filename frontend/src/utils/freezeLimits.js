@@ -36,7 +36,8 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
 
   // 1. Commodity Check (MCX)
   if (symbol.includes('MCX') || symbol.includes('NCDEX') || isCommodityContract(symbol)) {
-    for (const [key, limit] of Object.entries(COMMODITY_FREEZE_LIMITS)) {
+    const sortedCommodities = Object.entries(COMMODITY_FREEZE_LIMITS).sort((a, b) => b[0].length - a[0].length);
+    for (const [key, limit] of sortedCommodities) {
       if (upper.startsWith(key)) return limit;
     }
     const lot = explicitLotsize || getInstantLotsize(symbol);
