@@ -201,15 +201,18 @@ class VolumeMatchingEngine {
     // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
     const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
     const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
-    // For all orders, use full pending_quantity against real depth (no artificial caps).
-    // Real Level-2 depth from Fyers determines how much fills immediately.
-    const depthCap = ordObj.pending_quantity;
+    const isRetailOrder = totalOrderQty <= 500;
+    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
+
+    // Cash equities > 500 shares: skip depth sweep entirely. Queue for real volume ticks only.
+    // Derivatives, commodities, and small retail orders: use full depth for instant fill.
+    const depthCap = canInstantSweep ? ordObj.pending_quantity : 0;
 
     let depthFilled = 0;
     let totalDepthCost = 0;
 
-    // Check if Level-2 market depth exists
-    if (Array.isArray(book) && book.length > 0) {
+    // Check if Level-2 market depth exists (only if depthCap > 0)
+    if (depthCap > 0 && Array.isArray(book) && book.length > 0) {
       let remainingToFill = depthCap;
 
       for (const level of book) {
@@ -283,34 +286,22 @@ class VolumeMatchingEngine {
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
 
       // For MARKET orders: High-liquidity F&O / indices and retail cash equity orders sweep remaining quantity immediately.
-      // Bulk orders on illiquid equities (e.g. 1 Lakh KITEX, 1 Lakh VMM) do NOT sweep 100% out of thin air; remaining qty paces via onTick().
+      // Large cash equity orders: remaining qty paces via onTick() using real exchange volume only.
       if ((ordObj.type === 'MARKET' || ordObj.isMarket) && ordObj.pending_quantity > 0 && baseLtp > 0) {
         if (canInstantSweep) {
           const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
-          if (sweepPrice === baseLtp) {
-            await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
-          } else {
-            await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
-          }
+          await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
         }
       }
     } else {
       if (ordObj.type === 'MARKET' || ordObj.isMarket) {
         if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
           if (canInstantSweep) {
-            // Liquid F&O / retail cash orders execute 100% immediately at market price (baseLtp) with Option B realism
+            // Liquid F&O / retail cash orders execute 100% immediately at market price
             const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
-            if (sweepPrice === baseLtp) {
-              await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
-            } else {
-              await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
-            }
-          } else {
-            // Bulk order on illiquid stock with zero depth: execute initial participation slice, queue remaining for onTick
-            const initialSlice = Math.min(ordObj.pending_quantity, Math.max(100, Math.floor(Math.min(effectiveVolume > 0 ? effectiveVolume * 0.01 : 500, 500))));
-            const sweepPrice = calculateMarketSlippage({ ...ordObj, pending_quantity: initialSlice }, baseLtp);
-            await this.processSliceFill(ordObj, initialSlice, sweepPrice);
+            await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
           }
+          // else: large cash equity order — do NOT fill anything now. Queue for real volume ticks.
         }
       } else {
         // For LIMIT orders: check if marketable against baseLtp
@@ -324,10 +315,8 @@ class VolumeMatchingEngine {
         if (isMarketable && ordObj.pending_quantity > 0) {
           if (canInstantSweep) {
             await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
-          } else {
-            const initialSlice = Math.min(ordObj.pending_quantity, Math.max(100, Math.floor(Math.min(effectiveVolume > 0 ? effectiveVolume * 0.01 : 500, 500))));
-            await this.processSliceFill(ordObj, initialSlice, baseLtp);
           }
+          // else: large cash equity LIMIT order — queue for real volume ticks
         }
       }
     }
