@@ -3845,6 +3845,104 @@ app.get('/api/mf/enrich', async (req, res) => {
     }
 });
 
+// 2b-2. Get mutual funds by specific IDs (for watchlist & portfolio persistence)
+app.post('/api/mf/by-ids', async (req, res) => {
+    try {
+        if (!allMutualFunds || allMutualFunds.length === 0) {
+            await initMutualFundsList();
+        }
+        const { ids } = req.body;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.json([]);
+        }
+
+        const cleanIds = ids.map(id => {
+            let s = String(id).replace('-MF', '');
+            return LEGACY_MF_CODES[s] || s;
+        }).filter(Boolean);
+        const uniqueIds = [...new Set(cleanIds)];
+        const axios = require('axios');
+
+        const results = await Promise.all(uniqueIds.map(async (schemeCode) => {
+            let fund = allMutualFundsMap.get(String(schemeCode));
+
+            // Check if legacy mapping name exists
+            if (!fund && (LEGACY_MF_NAMES[schemeCode] || LEGACY_MF_NAMES[`${schemeCode}-MF`])) {
+                fund = { 
+                    schemeCode: parseInt(schemeCode) || schemeCode, 
+                    schemeName: LEGACY_MF_NAMES[schemeCode] || LEGACY_MF_NAMES[`${schemeCode}-MF`] 
+                };
+            }
+
+            // If not found in map, attempt mfapi fetch
+            if (!fund && /^\d+$/.test(schemeCode)) {
+                try {
+                    const mfRes = await axios.get(`https://api.mfapi.in/mf/${schemeCode}`, { timeout: 3000 });
+                    if (mfRes.data?.meta?.scheme_name) {
+                        fund = { schemeCode: parseInt(schemeCode), schemeName: mfRes.data.meta.scheme_name };
+                        allMutualFunds.push(fund);
+                        allMutualFundsMap.set(String(schemeCode), fund);
+                        if (mfRes.data.data?.length > 0) {
+                            mfCache[schemeCode] = { timestamp: Date.now(), data: mfRes.data };
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (!fund) return null;
+
+            const nameLower = (fund.schemeName || '').toLowerCase();
+            let category = 'Equity';
+            if (nameLower.includes('debt') || nameLower.includes('liquid') || nameLower.includes('bond') || nameLower.includes('gilt') || nameLower.includes('money market') || nameLower.includes('overnight') || nameLower.includes('floating')) category = 'Debt';
+            if (nameLower.includes('hybrid') || nameLower.includes('balanced') || nameLower.includes('dynamic asset') || nameLower.includes('multi asset') || nameLower.includes('aggressive')) category = 'Hybrid';
+
+            const amc = (fund.schemeName || '').split(' ')[0] || 'Mutual';
+
+            let cached = mfCache[fund.schemeCode] || mfCache[schemeCode];
+            if (!cached && /^\d+$/.test(schemeCode)) {
+                try {
+                    const res = await axios.get(`https://api.mfapi.in/mf/${schemeCode}`, { timeout: 3000 });
+                    if (res.data?.data?.length > 0) {
+                        cached = { timestamp: Date.now(), data: res.data };
+                        mfCache[fund.schemeCode] = cached;
+                        mfCache[schemeCode] = cached;
+                    }
+                } catch (e) {}
+            }
+
+            let nav = 0, return1y = 0, return3y = 0, return5y = 0, returnAllTime = 0, risk = 'Moderate';
+            if (cached?.data?.data?.length > 0) {
+                const historicalData = cached.data.data;
+                nav = parseFloat(historicalData[0].nav) || 0;
+                return1y = calculateReturn(historicalData, 1) || 0;
+                return3y = calculateReturn(historicalData, 3) || 0;
+                return5y = calculateReturn(historicalData, 5) || 0;
+                returnAllTime = calculateReturnAllTime(historicalData) || 0;
+                risk = determineRisk(return1y);
+            }
+
+            return {
+                id: fund.schemeCode,
+                name: fund.schemeName,
+                amc,
+                category,
+                risk,
+                nav,
+                return1y,
+                return3y,
+                return5y,
+                returnAllTime,
+                enriched: !!cached
+            };
+        }));
+
+        res.json(results.filter(Boolean));
+    } catch (err) {
+        console.error('MF By-IDs Error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch mutual funds by IDs' });
+    }
+});
+
 // 2c. Rich Details Endpoint (Proxies Groww API for AUM, Holdings, Ratings, Pros/Cons)
 const mfDetailsCache = {};
 app.get('/api/mf/details', async (req, res) => {

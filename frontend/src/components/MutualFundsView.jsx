@@ -7,9 +7,23 @@ import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { API } from '../store';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds, sips, cancelSip, executeSipNow, holdings, positions, mfWatchlist, toggleMfWatchlist, orders } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, executeSipNow: state.executeSipNow, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist, orders: state.orders })));
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, executeSipNow, holdings, positions, mfWatchlist, toggleMfWatchlist, mfWatchlistFunds, fetchMfWatchlistFunds, orders } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, executeSipNow: state.executeSipNow, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist, mfWatchlistFunds: state.mfWatchlistFunds, fetchMfWatchlistFunds: state.fetchMfWatchlistFunds, orders: state.orders })));
 
-  
+  const isFavorited = useCallback((fundId) => {
+    if (!fundId) return false;
+    const idStr = String(fundId).replace('-MF', '');
+    return (mfWatchlist || []).some(w => {
+      const wStr = String(w).replace('-MF', '');
+      return wStr === idStr;
+    });
+  }, [mfWatchlist]);
+
+  useEffect(() => {
+    if (typeof fetchMfWatchlistFunds === 'function') {
+      fetchMfWatchlistFunds();
+    }
+  }, [fetchMfWatchlistFunds, mfWatchlist]);
+
   const handlePayNow = async (sipId) => {
     if (!window.confirm('Do you want to process this SIP installment right now? Funds will be debited and units credited at latest NAV.')) return;
     const res = await executeSipNow(sipId);
@@ -55,7 +69,8 @@ export default function MutualFundsView() {
       ...(sips || []).map(s => s.symbol),
       ...(holdings || []).filter(h => (h.symbol || '').endsWith('-MF')).map(h => h.symbol),
       ...(positions || []).filter(h => (h.symbol || '').endsWith('-MF')).map(h => h.symbol),
-      ...(orders || []).filter(o => ((o.symbol || '').endsWith('-MF') || (o.symbol || '').includes('MUTUALFUND'))).map(o => o.symbol)
+      ...(orders || []).filter(o => ((o.symbol || '').endsWith('-MF') || (o.symbol || '').includes('MUTUALFUND'))).map(o => o.symbol),
+      ...(mfWatchlist || []).map(w => String(w))
     ];
     const unique = [...new Set(symbols)];
     const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
@@ -101,7 +116,7 @@ export default function MutualFundsView() {
                }).catch(() => {});
           });
       });
-  }, [sips, holdings, positions, orders]);
+  }, [sips, holdings, positions, orders, mfWatchlist]);
 
 
   const ITEMS_PER_PAGE = 50;
@@ -200,6 +215,57 @@ export default function MutualFundsView() {
     );
   }, [orders]);
 
+  const allWatchlistFunds = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    const watchlistIds = mfWatchlist || [];
+
+    for (const id of watchlistIds) {
+      const idStr = String(id);
+      const cleanId = idStr.replace('-MF', '');
+      if (seen.has(cleanId)) continue;
+
+      // 1. Check in cached objects from store
+      let fundData = mfWatchlistFunds?.[cleanId] || mfWatchlistFunds?.[idStr] || mfWatchlistFunds?.[`${cleanId}-MF`];
+
+      // 2. Check in current mutualFunds
+      if (!fundData) {
+        fundData = (mutualFunds || []).find(f => String(f.id) === cleanId || String(f.id) === idStr);
+      }
+
+      if (fundData && fundData.name) {
+        list.push(fundData);
+        seen.add(cleanId);
+      } else if (mfNames[idStr] || mfNames[cleanId]) {
+        list.push({
+          id: cleanId,
+          name: mfNames[idStr] || mfNames[cleanId],
+          amc: (mfNames[idStr] || mfNames[cleanId]).split(' ')[0] || 'Mutual',
+          category: 'Equity',
+          risk: 'Moderate',
+          nav: 0,
+          return1y: 0,
+          return3y: 0,
+          return5y: 0,
+          returnAllTime: 0
+        });
+        seen.add(cleanId);
+      }
+    }
+    return list;
+  }, [mfWatchlist, mfWatchlistFunds, mutualFunds, mfNames]);
+
+  const filteredWatchlistFunds = useMemo(() => {
+    if (!search || !search.trim()) return allWatchlistFunds;
+    const q = search.toLowerCase().trim();
+    return allWatchlistFunds.filter(f => 
+      (f.name || '').toLowerCase().includes(q) ||
+      (f.category || '').toLowerCase().includes(q) ||
+      (f.amc || '').toLowerCase().includes(q) ||
+      String(f.id).includes(q)
+    );
+  }, [allWatchlistFunds, search]);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
       <style>{mobileStyles}</style>
@@ -210,7 +276,9 @@ export default function MutualFundsView() {
             <div className="mobile-scroll" style={{ display: 'flex', gap: isMobile ? '20px' : '32px', width: isMobile ? '100%' : 'auto' }}>
                 {mainTabs.map(tab => {
                   const isDashboard = tab === 'Dashboard';
+                  const isWatchlist = tab === 'Watchlist';
                   const hasQueued = isDashboard && queuedMfOrders.length > 0;
+                  const watchlistCount = isWatchlist ? allWatchlistFunds.length : 0;
                   return (
                     <div
                       key={tab}
@@ -243,6 +311,19 @@ export default function MutualFundsView() {
                           borderRadius: '10px'
                         }}>
                           {queuedMfOrders.length} Queued
+                        </span>
+                      )}
+                      {isWatchlist && watchlistCount > 0 && (
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: 'var(--color-blue)',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          padding: '1px 7px',
+                          borderRadius: '10px'
+                        }}>
+                          {watchlistCount}
                         </span>
                       )}
                     </div>
@@ -319,10 +400,10 @@ export default function MutualFundsView() {
                                         </div>
                                     </div>
                                     <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund.id); }}
-                                        style={{ background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
+                                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund); }}
+                                        style={{ background: 'transparent', color: isFavorited(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
                                     >
-                                        {mfWatchlist.includes(fund.id) ? '★' : '☆'}
+                                        {isFavorited(fund.id) ? '★' : '☆'}
                                     </button>
                                 </div>
                                 <div className="mf-card-stats">
@@ -430,14 +511,14 @@ export default function MutualFundsView() {
                                             Invest <ArrowUpRight size={14} />
                                         </button>
                                         <button
-                                            onClick={() => toggleMfWatchlist(fund.id)}
+                                            onClick={() => toggleMfWatchlist(fund)}
                                             style={{
-                                                background: 'transparent', color: mfWatchlist.includes(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none',
+                                                background: 'transparent', color: isFavorited(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none',
                                                 padding: '6px', cursor: 'pointer', fontSize: '18px', marginLeft: '4px'
                                             }}
-                                            title={mfWatchlist.includes(fund.id) ? "Remove from Watchlist" : "Add to Watchlist"}
+                                            title={isFavorited(fund.id) ? "Remove from Watchlist" : "Add to Watchlist"}
                                         >
-                                            {mfWatchlist.includes(fund.id) ? '★' : '☆'}
+                                            {isFavorited(fund.id) ? '★' : '☆'}
                                         </button>
                                     </td>
                                 </tr>
@@ -764,78 +845,104 @@ export default function MutualFundsView() {
           </div>
         ) : mainTab === 'Watchlist' ? (
           <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
-            {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Watchlist</h3>}
-            {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).length > 0 ? (
-                isMobile ? (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).map(fund => (
-                            <div key={fund.id} className="mf-card" onClick={() => setSelectedFund(fund)}>
-                                <div className="mf-card-header">
-                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
-                                            <TrendingUp size={16} color="var(--text-secondary)" />
-                                        </div>
-                                        <div>
-                                            <div className="mf-card-title">{fund.name}</div>
-                                            <div className="mf-card-subtitle">{fund.category} • {fund.risk}</div>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund.id); }}
-                                        style={{ background: 'transparent', color: 'var(--color-yellow)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
-                                    >
-                                        ★
-                                    </button>
-                                </div>
-                                <div className="mf-card-stats">
-                                    <div>
-                                        <div className="mf-stat-label">Current NAV</div>
-                                        <div className="mf-stat-value">₹{fund.nav.toFixed(2)}</div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div className="mf-stat-label">3Y Return</div>
-                                        <div className="mf-stat-value" style={{ color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
-                                            {fund.return3y >= 0 ? '+' : ''}{fund.return3y}%
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
-                                    <div style={{ color: 'var(--color-blue)', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        Invest <ArrowUpRight size={14} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+            {!isMobile && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>
+                  Watchlist {allWatchlistFunds.length > 0 ? `(${allWatchlistFunds.length})` : ''}
+                </h3>
+                {search && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Filtering for "{search}" ({filteredWatchlistFunds.length} matches)
+                  </span>
+                )}
+              </div>
+            )}
+            {allWatchlistFunds.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>Your watchlist is empty</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  Star your favorite mutual funds from the Explore tab to track them here!
+                </div>
+                <button 
+                  onClick={() => setMainTab('Explore')}
+                  style={{ padding: '8px 18px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Explore Mutual Funds
+                </button>
+              </div>
+            ) : filteredWatchlistFunds.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No favorited funds match "{search}".
+              </div>
+            ) : isMobile ? (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {filteredWatchlistFunds.map(fund => (
+                  <div key={fund.id} className="mf-card" onClick={() => setSelectedFund(fund)}>
+                    <div className="mf-card-header">
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                          <TrendingUp size={16} color="var(--text-secondary)" />
+                        </div>
+                        <div>
+                          <div className="mf-card-title">{fund.name}</div>
+                          <div className="mf-card-subtitle">{fund.category || 'Equity'} • {fund.risk || 'Moderate'}</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); toggleMfWatchlist(fund); }}
+                        style={{ background: 'transparent', color: isFavorited(fund.id) ? 'var(--color-yellow)' : 'var(--text-secondary)', border: 'none', padding: '4px', cursor: 'pointer', fontSize: '20px' }}
+                      >
+                        {isFavorited(fund.id) ? '★' : '☆'}
+                      </button>
                     </div>
-                ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
-                                <th style={{ padding: '16px', textAlign: 'left' }}>Fund Name</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Category</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>NAV</th>
-                                <th style={{ padding: '16px', textAlign: 'right' }}>3Y Return</th>
-                                <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {mutualFunds.filter(f => (mfWatchlist || []).some(w => String(w) === String(f.id) || String(w) === `${f.id}-MF`)).map(fund => (
-                                <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
-                                    <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{fund.nav.toFixed(2)}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right', color: fund.return3y >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>{fund.return3y >= 0 ? '+' : ''}{fund.return3y}%</td>
-                                    <td style={{ padding: '16px', textAlign: 'center' }}>
-                                        <button onClick={() => setSelectedFund(fund)} style={{ padding: '6px 12px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>Invest</button>
-                                        <button onClick={() => toggleMfWatchlist(fund.id)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )
+                    <div className="mf-card-stats">
+                      <div>
+                        <div className="mf-stat-label">Current NAV</div>
+                        <div className="mf-stat-value">{Number(fund.nav || 0) > 0 ? `₹${Number(fund.nav).toFixed(2)}` : '—'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="mf-stat-label">3Y Return</div>
+                        <div className="mf-stat-value" style={{ color: (fund.return3y || 0) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                          {fund.return3y ? `${fund.return3y >= 0 ? '+' : ''}${fund.return3y}%` : '—'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+                      <div style={{ color: 'var(--color-blue)', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        Invest <ArrowUpRight size={14} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Your watchlist is empty. Add funds from the Explore tab!</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                    <th style={{ padding: '16px', textAlign: 'left' }}>Fund Name</th>
+                    <th style={{ padding: '16px', textAlign: 'center' }}>Category</th>
+                    <th style={{ padding: '16px', textAlign: 'right' }}>NAV</th>
+                    <th style={{ padding: '16px', textAlign: 'right' }}>3Y Return</th>
+                    <th style={{ padding: '16px', textAlign: 'center' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredWatchlistFunds.map(fund => (
+                    <tr key={fund.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '16px', fontWeight: '600' }}>{fund.name}</td>
+                      <td style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)' }}>{fund.category || 'Equity'}</td>
+                      <td style={{ padding: '16px', textAlign: 'right' }}>{Number(fund.nav || 0) > 0 ? `₹${Number(fund.nav).toFixed(2)}` : '—'}</td>
+                      <td style={{ padding: '16px', textAlign: 'right', color: (fund.return3y || 0) >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                        {fund.return3y ? `${fund.return3y >= 0 ? '+' : ''}${fund.return3y}%` : '—'}
+                      </td>
+                      <td style={{ padding: '16px', textAlign: 'center' }}>
+                        <button onClick={() => setSelectedFund(fund)} style={{ padding: '6px 12px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' }}>Invest</button>
+                        <button onClick={() => toggleMfWatchlist(fund)} style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}>Remove</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         ) : (

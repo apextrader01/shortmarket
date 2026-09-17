@@ -1868,17 +1868,87 @@ export const useStore = create(persist((set, get) => ({
       return [];
     }
   })(),
-  
-  toggleMfWatchlist: (symbol) => {
-    let current = get().mfWatchlist || [];
-    const symStr = String(symbol);
-    if (current.some(s => String(s) === symStr)) {
-      current = current.filter(s => String(s) !== symStr);
-    } else {
-      current = [...current, symbol];
+
+  mfWatchlistFunds: (() => {
+    try {
+      const saved = localStorage.getItem('mfWatchlistFunds');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
     }
-    set({ mfWatchlist: current });
-    localStorage.setItem('mfWatchlist', JSON.stringify(current));
+  })(),
+
+  fetchMfWatchlistFunds: async () => {
+    const list = get().mfWatchlist || [];
+    if (!Array.isArray(list) || list.length === 0) return;
+    try {
+      const res = await fetch(`${API}/api/mf/by-ids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: list })
+      });
+      if (!res.ok) return;
+      const funds = await res.json();
+      if (Array.isArray(funds) && funds.length > 0) {
+        const updated = { ...(get().mfWatchlistFunds || {}) };
+        funds.forEach(f => {
+          if (f && f.id) {
+            const cleanId = String(f.id).replace('-MF', '');
+            updated[cleanId] = f;
+            updated[`${cleanId}-MF`] = f;
+          }
+        });
+        set({ mfWatchlistFunds: updated });
+        try { localStorage.setItem('mfWatchlistFunds', JSON.stringify(updated)); } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('Failed to fetch mf watchlist funds:', err);
+    }
+  },
+  
+  toggleMfWatchlist: (fundOrSymbol) => {
+    let current = get().mfWatchlist || [];
+    let currentFunds = { ...(get().mfWatchlistFunds || {}) };
+
+    let id = fundOrSymbol;
+    let fundObj = null;
+
+    if (fundOrSymbol && typeof fundOrSymbol === 'object') {
+      id = fundOrSymbol.id;
+      fundObj = fundOrSymbol;
+    }
+
+    const symStr = String(id);
+    const cleanId = symStr.replace('-MF', '');
+
+    if (current.some(s => String(s) === symStr || String(s).replace('-MF', '') === cleanId)) {
+      // Remove from watchlist
+      current = current.filter(s => String(s) !== symStr && String(s).replace('-MF', '') !== cleanId);
+      delete currentFunds[symStr];
+      delete currentFunds[cleanId];
+      delete currentFunds[`${cleanId}-MF`];
+    } else {
+      // Add to watchlist
+      current = [...current, cleanId];
+      if (!fundObj) {
+        fundObj = (get().mutualFunds || []).find(f => String(f.id) === cleanId || String(f.id) === symStr);
+      }
+      if (fundObj) {
+        currentFunds[cleanId] = fundObj;
+        currentFunds[`${cleanId}-MF`] = fundObj;
+      }
+    }
+
+    set({ mfWatchlist: current, mfWatchlistFunds: currentFunds });
+    try {
+      localStorage.setItem('mfWatchlist', JSON.stringify(current));
+      localStorage.setItem('mfWatchlistFunds', JSON.stringify(currentFunds));
+    } catch (e) {}
+
+    // If added without full object, fetch details from backend
+    if (!fundObj && current.some(s => String(s).replace('-MF', '') === cleanId)) {
+      get().fetchMfWatchlistFunds();
+    }
   },
 
   // ── Theme ───────────────────────────────────────────────────────────────────
