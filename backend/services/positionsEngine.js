@@ -345,6 +345,9 @@ class PositionsEngine {
                         yestDate.setDate(yestDate.getDate() - 1);
                         if (formatDate(expDate) === formatDate(yestDate)) return true;
                     }
+                    // Holiday / Preponed fallback: If contract expiry is on or before today, settle it
+                    const istMidnightTonight = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), 23, 59, 59, 999);
+                    if (expDate.getTime() <= istMidnightTonight.getTime()) return true;
                 }
                 return false;
             };
