@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
+import { checkPositionConversionAllowed } from '../utils/lotsizeHelper';
 
 const EMPTY_PRICES = {};
 
@@ -916,31 +917,40 @@ export default function PositionsView() {
                             <Share2 size={12} /> Share
                           </button>
 
-                          {viewMode === 'OPEN' && (
-                            <button
-                              type="button"
-                              title="Convert Position (INT <-> DEL)"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConvertModalPos(pos);
-                              }}
-                              style={{
-                                background: 'rgba(99, 102, 241, 0.1)',
-                                border: '1px solid rgba(99, 102, 241, 0.25)',
-                                color: '#818cf8',
-                                borderRadius: '6px',
-                                padding: '4px 8px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '11px',
-                                fontWeight: '600'
-                              }}
-                            >
-                              <RefreshCw size={11} /> Convert
-                            </button>
-                          )}
+                          {viewMode === 'OPEN' && (() => {
+                            const convCheck = checkPositionConversionAllowed(pos.symbol);
+                            const isConvBlocked = !convCheck.allowed;
+                            return (
+                              <button
+                                type="button"
+                                title={isConvBlocked ? convCheck.reason : "Convert Position (INT <-> DEL)"}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isConvBlocked) {
+                                    alert(convCheck.reason);
+                                    return;
+                                  }
+                                  setConvertModalPos(pos);
+                                }}
+                                style={{
+                                  background: isConvBlocked ? 'rgba(148, 163, 184, 0.08)' : 'rgba(99, 102, 241, 0.1)',
+                                  border: `1px solid ${isConvBlocked ? 'rgba(148, 163, 184, 0.2)' : 'rgba(99, 102, 241, 0.25)'}`,
+                                  color: isConvBlocked ? 'var(--text-secondary)' : '#818cf8',
+                                  borderRadius: '6px',
+                                  padding: '4px 8px',
+                                  cursor: isConvBlocked ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '600',
+                                  opacity: isConvBlocked ? 0.6 : 1
+                                }}
+                              >
+                                <RefreshCw size={11} /> Convert
+                              </button>
+                            );
+                          })()}
 
                           {viewMode === 'OPEN' && (
                             <X 
@@ -1194,27 +1204,37 @@ export default function PositionsView() {
                           >
                             <Share2 size={10} /> Share
                           </button>
-                          {viewMode === 'OPEN' && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConvertModalPos(pos);
-                              }}
-                              style={{
-                                fontSize: '10px',
-                                color: '#818cf8',
-                                background: 'rgba(99,102,241,0.12)',
-                                border: '1px solid rgba(99,102,241,0.3)',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontWeight: '700',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Convert
-                            </button>
-                          )}
+                          {viewMode === 'OPEN' && (() => {
+                            const convCheck = checkPositionConversionAllowed(pos.symbol);
+                            const isConvBlocked = !convCheck.allowed;
+                            return (
+                              <button
+                                type="button"
+                                title={isConvBlocked ? convCheck.reason : "Convert"}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isConvBlocked) {
+                                    alert(convCheck.reason);
+                                    return;
+                                  }
+                                  setConvertModalPos(pos);
+                                }}
+                                style={{
+                                  fontSize: '10px',
+                                  color: isConvBlocked ? 'var(--text-secondary)' : '#818cf8',
+                                  background: isConvBlocked ? 'rgba(148, 163, 184, 0.08)' : 'rgba(99,102,241,0.12)',
+                                  border: `1px solid ${isConvBlocked ? 'rgba(148, 163, 184, 0.2)' : 'rgba(99,102,241,0.3)'}`,
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: '700',
+                                  cursor: isConvBlocked ? 'not-allowed' : 'pointer',
+                                  opacity: isConvBlocked ? 0.6 : 1
+                                }}
+                              >
+                                Convert
+                              </button>
+                            );
+                          })()}
                           {(viewMode === 'OPEN' || viewMode === 'HOLDINGS') && (
                             <span 
                               onClick={(e) => {
@@ -1366,6 +1386,8 @@ export default function PositionsView() {
         const absQty = Math.abs(Number(convertModalPos.qty || convertModalPos.quantity || 1));
         const avgPrice = Number(convertModalPos.avg || convertModalPos.average_price || 0);
         const reqMargin = isCurrentlyInt ? (absQty * avgPrice) : 0;
+        const convCheck = checkPositionConversionAllowed(convertModalPos.symbol);
+        const isConvBlocked = !convCheck.allowed;
 
         return (
           <div style={{
@@ -1407,9 +1429,28 @@ export default function PositionsView() {
                   )}
                 </div>
 
+                {isConvBlocked && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#f87171',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    marginBottom: '16px',
+                    fontSize: '11.5px',
+                    lineHeight: '1.4'
+                  }}>
+                    ⚠️ <strong>Conversion Blocked:</strong> {convCheck.reason}
+                  </div>
+                )}
+
                 <button
-                  disabled={convertLoading}
+                  disabled={convertLoading || isConvBlocked}
                   onClick={async () => {
+                    if (isConvBlocked) {
+                      alert(convCheck.reason);
+                      return;
+                    }
                     setConvertLoading(true);
                     try {
                       const posId = convertModalPos.id;
@@ -1428,18 +1469,18 @@ export default function PositionsView() {
                   }}
                   style={{
                     width: '100%',
-                    background: '#6366f1',
+                    background: isConvBlocked ? '#4b5563' : '#6366f1',
                     color: '#fff',
                     border: 'none',
                     padding: '10px 16px',
                     borderRadius: '6px',
                     fontWeight: '700',
                     fontSize: '13px',
-                    cursor: convertLoading ? 'not-allowed' : 'pointer',
-                    opacity: convertLoading ? 0.7 : 1
+                    cursor: (convertLoading || isConvBlocked) ? 'not-allowed' : 'pointer',
+                    opacity: (convertLoading || isConvBlocked) ? 0.6 : 1
                   }}
                 >
-                  {convertLoading ? 'Converting...' : `Convert to ${targetProd}`}
+                  {convertLoading ? 'Converting...' : isConvBlocked ? 'Conversion Blocked (Near Cutoff)' : `Convert to ${targetProd}`}
                 </button>
               </div>
             </div>

@@ -3281,6 +3281,13 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         throw Object.assign(new Error('Cannot convert a closed position'), { statusCode: 400 });
       }
 
+      // Block position conversion 1 minute before intraday cutoff and during auto square-off / market closed
+      const { checkPositionConversionAllowed } = require('./services/instrumentsCache');
+      const convCheck = checkPositionConversionAllowed(position.symbol);
+      if (!convCheck.allowed) {
+        throw Object.assign(new Error(convCheck.reason), { statusCode: 400 });
+      }
+
       // Prohibit converting short equity positions into Delivery (DEL)
       const isDerivative = isDerivativeContract(position.symbol);
       if (Number(position.quantity) < 0 && newProductType === 'DEL' && !isDerivative) {
