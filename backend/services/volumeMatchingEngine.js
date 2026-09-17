@@ -52,7 +52,7 @@ class VolumeMatchingEngine {
   }
 
   /**
-   * Load any PARTIAL_FILLED or PENDING market orders from DB on server startup.
+   * Load any PARTIAL_FILLED or PENDING market orders from DB on server startup or cluster sync.
    */
   async loadPendingVolumeOrders() {
     try {
@@ -62,32 +62,38 @@ class VolumeMatchingEngine {
           builder.where({ status: 'PENDING', type: 'MARKET' });
         });
 
+      const symbolsToSubscribe = new Set();
       for (const ord of pending) {
         this.enqueueOrder(ord);
-        // If it is a MARKET order, sweep remaining pending quantity immediately if price is available
-        if (ord.type === 'MARKET') {
-          const cached = getCachedPrice(this.priceCache, ord.symbol);
-          const ltp = Number(cached.ltp || ord.price || 0);
-          const rem = ord.pending_quantity !== null && ord.pending_quantity !== undefined
-            ? Number(ord.pending_quantity)
-            : (Number(ord.quantity) - Number(ord.filled_quantity || 0));
-          if (ltp > 0 && rem > 0) {
-            const activeOrd = this.activeOrders.get(ord.id.toString());
-            if (activeOrd) {
-              await this.processSliceFill(activeOrd, rem, ltp);
-              if (activeOrd.pending_quantity <= 0) {
-                this.dequeueOrder(activeOrd.id, activeOrd.symbol);
-              }
-            }
-          }
-        }
+        if (ord.symbol) symbolsToSubscribe.add(ord.symbol);
       }
+
+      // Ensure Fyers WebSocket actively subscribes to all resting volume order symbols
+      if (symbolsToSubscribe.size > 0) {
+        try {
+          const { addSubscriptionBatch } = require('./fyers');
+          if (addSubscriptionBatch) addSubscriptionBatch(Array.from(symbolsToSubscribe));
+        } catch (e) {}
+      }
+
       if (pending.length > 0) {
         console.log(`📊 Loaded ${pending.length} resting volume-matching orders into queue.`);
       }
     } catch (err) {
       console.warn('VolumeMatchingEngine.loadPendingVolumeOrders error:', err.message);
     }
+  }
+
+  getActiveSymbols() {
+    const symbols = [];
+    for (const [normSym, q] of this.symbolQueues.entries()) {
+      if (q && q.length > 0) {
+        q.forEach(ord => {
+          if (ord.symbol && !symbols.includes(ord.symbol)) symbols.push(ord.symbol);
+        });
+      }
+    }
+    return symbols;
   }
 
   enqueueOrder(order) {
@@ -117,7 +123,8 @@ class VolumeMatchingEngine {
       tgt_price: order.tgt_price,
       trail_amount: order.trail_amount,
       parent_order_id: order.parent_order_id,
-      created_at: order.created_at || new Date()
+      created_at: order.created_at || new Date(),
+      _lastFillTime: Date.now()
     };
 
     this.activeOrders.set(ordObj.id.toString(), ordObj);
@@ -126,7 +133,10 @@ class VolumeMatchingEngine {
       this.symbolQueues.set(normSym, []);
     }
     const queue = this.symbolQueues.get(normSym);
-    if (!queue.some(o => o.id === ordObj.id)) {
+    const existingIdx = queue.findIndex(o => o.id === ordObj.id);
+    if (existingIdx !== -1) {
+      queue[existingIdx] = ordObj;
+    } else {
       queue.push(ordObj);
     }
   }
@@ -221,8 +231,8 @@ class VolumeMatchingEngine {
       const qty = Number(order.pending_quantity || order.quantity || 0);
       if (qty <= 100) return basePrice; // Retail micro-order: zero slippage
 
-      const { isDerivativeContract, isCommodityContract, isFnoEligibleStock } = require('./instrumentsCache');
-      const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol) || isFnoEligibleStock(order.symbol);
+      const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+      const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
       if (isHighLiquiditySegment) return basePrice; // High-liquidity F&O / Commodities / Index: zero slippage
 
       const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
@@ -255,8 +265,11 @@ class VolumeMatchingEngine {
       }
     };
 
-    const { isDerivativeContract, isCommodityContract, isFnoEligibleStock } = require('./instrumentsCache');
-    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol) || isFnoEligibleStock(ordObj.symbol);
+    const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+    // High-liquidity segment applies ONLY to actual derivative/commodity contracts (e.g. NIFTY26SEPFUT, CRUDEOILM).
+    // Cash equity stocks (e.g. NSE:VMM, NSE:KITEX, NSE:RELIANCE) are NEVER treated as high liquidity derivatives,
+    // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
+    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
     const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
     const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
     const marketTotalQty = Number(ordObj.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
@@ -316,6 +329,21 @@ class VolumeMatchingEngine {
     // Automatically dequeue order if completely executed
     if (ordObj.pending_quantity <= 0) {
       this.dequeueOrder(ordObj.id, ordObj.symbol);
+    } else {
+      // If order has resting pending quantity: ensure Fyers WebSocket is subscribed to it
+      try {
+        const { addSubscriptionBatch } = require('./fyers');
+        if (addSubscriptionBatch) addSubscriptionBatch([ordObj.symbol]);
+      } catch (e) {}
+
+      // Notify other cluster nodes (specifically Master) via Redis pub/sub
+      try {
+        const { pubClient } = require('./redisClient');
+        if (pubClient && pubClient.isReady) {
+          pubClient.publish('reload_volume_orders', JSON.stringify({ orderId: ordObj.id, symbol: ordObj.symbol })).catch(() => {});
+          pubClient.publish('fyers_subscribe', JSON.stringify([ordObj.symbol])).catch(() => {});
+        }
+      } catch (e) {}
     }
 
     // Sync back to caller's order reference if provided
@@ -367,13 +395,16 @@ class VolumeMatchingEngine {
       const ltp = Number(tick.ltp || 0);
       if (ltp <= 0) return;
 
-      // If deltaVol is 0 (e.g. tick update without volume change), allow a minimum
-      // natural heartbeat volume for active stocks during active market hours
-      if (deltaVol <= 0 && (currentVol > 1000 || currentVol === 0)) {
-        deltaVol = Math.floor(Math.random() * 20) + 1; // Natural micro-flow
+      const now = Date.now();
+
+      // If deltaVol is 0 (e.g. quote tick without new traded volume), check if resting orders need heartbeat
+      // to make steady realistic progress (5-20 shares every 3.5s) during active market hours
+      const hasRestingOrdersNeedingHeartbeat = queue.some(o => !o._lastFillTime || (now - o._lastFillTime >= 3500));
+      if (deltaVol <= 0 && hasRestingOrdersNeedingHeartbeat) {
+        deltaVol = Math.floor(Math.random() * 20) + 5; // Natural micro-flow
       }
 
-      if (deltaVol <= 0) return; // Low volume stock with 0 trades: wait for real volume
+      if (deltaVol <= 0) return; // Wait for trades or heartbeat
 
       // Distribute available tick volume to active orders in FIFO order
       let availableVol = deltaVol;
@@ -408,11 +439,18 @@ class VolumeMatchingEngine {
           }
         } else {
           // Equities (lot = 1): whole shares
-          const maxFill = Math.min(order.pending_quantity, Math.max(1, Math.floor(availableVol * 0.5)));
-          fillQty = Math.min(order.pending_quantity, Math.round(maxFill));
+          // If available real exchange volume <= 500, allocate up to 100% of available volume directly
+          // If available volume is larger, participate at 50% POV rate (minimum 500 shares)
+          if (availableVol <= 500) {
+            fillQty = Math.min(order.pending_quantity, availableVol);
+          } else {
+            const maxFill = Math.min(order.pending_quantity, Math.max(500, Math.floor(availableVol * 0.5)));
+            fillQty = Math.min(order.pending_quantity, Math.round(maxFill));
+          }
         }
 
         if (fillQty > 0) {
+          order._lastFillTime = now;
           availableVol -= fillQty;
           await this.processSliceFill(order, fillQty, ltp);
           if (order.pending_quantity <= 0) {
@@ -887,7 +925,64 @@ class VolumeMatchingEngine {
     if (this.io) {
       this.io.emit('sync_user_data', { userId });
     }
+
+    try {
+      const { pubClient } = require('./redisClient');
+      if (pubClient && pubClient.isReady) {
+        pubClient.publish('reload_volume_orders', JSON.stringify({ cancelledOrderId: orderId })).catch(() => {});
+      }
+    } catch (e) {}
+
     return { success: true, refundAmount };
+  }
+
+  /**
+   * Background fallback pacing heartbeat running on Master node.
+   * Ensures resting orders steadily fill (5-20 shares every 4-5 seconds)
+   * even during quiet market periods or when ticks are quote-only.
+   */
+  startPacingHeartbeat() {
+    if (this._heartbeatInterval) return;
+    this._heartbeatInterval = setInterval(async () => {
+      try {
+        if (this.symbolQueues.size === 0) return;
+        const now = Date.now();
+        for (const [normSym, queue] of this.symbolQueues.entries()) {
+          if (!queue || queue.length === 0) continue;
+          const cached = getCachedPrice(this.priceCache, normSym) || {};
+          const ltp = Number(cached.ltp || 0);
+          if (ltp <= 0) continue;
+
+          for (const order of [...queue]) {
+            if (!order || order.pending_quantity <= 0) continue;
+            if (!order._lastFillTime || (now - order._lastFillTime >= 4500)) {
+              order._lastFillTime = now;
+              const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+              const { getLotSizes } = require('./instrumentsCache');
+              const lotSizes = getLotSizes([order.symbol, cleanSym]);
+              const lotsize = lotSizes[order.symbol] || lotSizes[cleanSym] || 1;
+
+              let slice = 0;
+              if (lotsize > 1) {
+                if (order.pending_quantity >= lotsize) slice = lotsize;
+              } else {
+                slice = Math.min(order.pending_quantity, Math.floor(Math.random() * 20) + 5);
+              }
+
+              if (slice > 0) {
+                await this.processSliceFill(order, slice, ltp);
+                if (order.pending_quantity <= 0) {
+                  this.dequeueOrder(order.id, order.symbol);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('VolumeMatchingEngine heartbeat error:', err.message);
+      }
+    }, 4000);
+    if (this._heartbeatInterval.unref) this._heartbeatInterval.unref();
   }
 }
 

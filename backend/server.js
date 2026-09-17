@@ -528,6 +528,12 @@ if (isMaster) {
         console.log('[Master] Reloading triggers from DB');
         triggerEngine.loadPendingOrders();
     }).catch(err => console.error(err));
+
+    cacheSubClient.subscribe('reload_volume_orders', async (message) => {
+        console.log('[Master] Reloading resting volume orders from DB');
+        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+        await volumeMatchingEngine.loadPendingVolumeOrders();
+    }).catch(err => console.error(err));
   };
   if (cacheSubClient.isReady) setupMasterSync();
   else cacheSubClient.on('ready', setupMasterSync);
@@ -553,6 +559,11 @@ if (!isMaster) {
     cacheSubClient.subscribe('reload_triggers', () => {
         const triggerEngine = require('./services/triggerEngine');
         triggerEngine.loadPendingOrders();
+    }).catch(err => console.error(err));
+
+    cacheSubClient.subscribe('reload_volume_orders', async () => {
+        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+        await volumeMatchingEngine.loadPendingVolumeOrders();
     }).catch(err => console.error(err));
   };
   
@@ -4909,9 +4920,13 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     setTimeout(() => {
         try {
             const { pubClient } = require('./services/redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
+            if (pubClient) {
+                pubClient.publish('reload_triggers', '1').catch(e=>{});
+                pubClient.publish('reload_volume_orders', '1').catch(e=>{});
+                pubClient.publish('fyers_subscribe', JSON.stringify([ord.symbol])).catch(e=>{});
+            }
         } catch(e) {}
-    }, 500);
+    }, 300);
     
     // Execute Market orders via Realistic Volume & Market Depth Matching Engine
     if (ord.isMarket) {
@@ -6173,9 +6188,12 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     setTimeout(() => {
         try {
             const { pubClient } = require('./services/redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
+            if (pubClient) {
+                pubClient.publish('reload_triggers', '1').catch(e=>{});
+                pubClient.publish('reload_volume_orders', '1').catch(e=>{});
+            }
         } catch(e) {}
-    }, 500);
+    }, 300);
 
     const hasErrors = finalResponseOrders.some(o => o.error);
     res.json({ success: !hasErrors, orders: finalResponseOrders });
@@ -6348,7 +6366,10 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
 
     try {
         const { pubClient } = require('./services/redisClient');
-        if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
+        if (pubClient) {
+            pubClient.publish('reload_triggers', '1').catch(e=>{});
+            pubClient.publish('reload_volume_orders', '1').catch(e=>{});
+        }
     } catch(e) {}
     
     res.json({ success: true });
@@ -6709,7 +6730,10 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
 
         try {
             const { pubClient } = require('./services/redisClient');
-            if (pubClient) pubClient.publish('reload_triggers', '1').catch(e=>{});
+            if (pubClient) {
+                pubClient.publish('reload_triggers', '1').catch(e=>{});
+                pubClient.publish('reload_volume_orders', '1').catch(e=>{});
+            }
         } catch(e) {}
         
         res.json({ success: true });
@@ -8455,7 +8479,7 @@ server.listen(PORT, async () => {
 
           const posRows = await db('positions').where('quantity', '!=', 0).select('symbol').catch(() => []);
           posRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
-          const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).select('symbol').catch(() => []);
+          const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED']).select('symbol').catch(() => []);
           ordRows.forEach(r => { if (r.symbol) allSymbols.add(r.symbol); });
           const list = Array.from(allSymbols);
           if (list.length > 0) {
@@ -8568,7 +8592,8 @@ server.listen(PORT, async () => {
     // Initialize Volume & Market Depth Matching Engine
     const volumeMatchingEngine = require('./services/volumeMatchingEngine');
     volumeMatchingEngine.init(priceCache, io);
-    console.log('📊 VolumeMatchingEngine active (Depth + POV tick-by-tick matching)');
+    volumeMatchingEngine.startPacingHeartbeat();
+    console.log('📊 VolumeMatchingEngine active on Master (Depth + POV tick-by-tick matching + Pacing Heartbeat)');
 
     // Initialize EOD Positions Engine (Cron Automations)
     require('./services/positionsEngine');
@@ -8587,7 +8612,10 @@ server.listen(PORT, async () => {
     initOrderExecutor(priceCache);
     SIPEngine.init(priceCache);
   } else {
-    console.log(`👷 Worker Instance: Listening for API requests and WS connections...`);
+    // Worker instances also initialize volumeMatchingEngine with local priceCache & io
+    const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+    volumeMatchingEngine.init(priceCache, io);
+    console.log(`👷 Worker Instance: Listening for API requests and WS connections (volumeMatchingEngine initialized)...`);
   }
 });
 

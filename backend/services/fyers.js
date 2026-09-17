@@ -667,15 +667,18 @@ async function garbageCollectSubscriptions() {
         // 1. Protect Indices
         ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'].forEach(protectSymbol);
         
-        // 2. Protect Pending Orders (use in-memory Set from triggerEngine if available)
+        // 2. Protect Pending Orders & Resting Volume Orders
         try {
             const triggerEngine = require('./triggerEngine');
             if (triggerEngine && triggerEngine.activeTriggerSymbols && triggerEngine.activeTriggerSymbols.size > 0) {
                 triggerEngine.activeTriggerSymbols.forEach(protectSymbol);
-            } else {
-                const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']).distinct('symbol').catch(()=>[]);
-                ordRows.forEach(r => protectSymbol(r.symbol));
             }
+            const volumeMatchingEngine = require('./volumeMatchingEngine');
+            if (volumeMatchingEngine && typeof volumeMatchingEngine.getActiveSymbols === 'function') {
+                volumeMatchingEngine.getActiveSymbols().forEach(protectSymbol);
+            }
+            const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED']).distinct('symbol').catch(()=>[]);
+            ordRows.forEach(r => protectSymbol(r.symbol));
         } catch (_) {}
             
         // 3. Protect Open Positions

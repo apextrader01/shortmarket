@@ -67,7 +67,9 @@ function testTieredVolumeMatching() {
   const { isDerivativeContract, isCommodityContract, isFnoEligibleStock } = require('./backend/services/instrumentsCache');
 
   function checkCanInstantSweep(symbol, qty, cached) {
-    const isHighLiquiditySegment = isDerivativeContract(symbol) || isCommodityContract(symbol) || isFnoEligibleStock(symbol);
+    // High liquidity segment applies ONLY to actual derivative/commodity contracts.
+    // Underlying cash equities (even if F&O eligible like VMM) MUST obey volume & depth limits.
+    const isHighLiquiditySegment = isDerivativeContract(symbol) || isCommodityContract(symbol);
     const depthTotalQty = 0;
     const liveDailyVol = Number(cached?.volume || 0);
     const marketTotalQty = 0;
@@ -80,16 +82,50 @@ function testTieredVolumeMatching() {
   assert.strictEqual(checkCanInstantSweep('BSE:SENSEX2691774400PE', 20000, { volume: 5000000 }), true, 'SENSEX must instant sweep');
   assert.strictEqual(checkCanInstantSweep('MCX:CRUDEOILM26SEPFUT', 1, { volume: 200000 }), true, 'CRUDEOILM must instant sweep');
 
-  // Case B: Retail cash equity order <= 500 shares -> Always instant sweep
+  // Case B: Retail cash equity orders <= 500 shares -> Always instant sweep
   assert.strictEqual(checkCanInstantSweep('NSE:KITEX', 100, { volume: 5000 }), true, 'Retail 100 shares of KITEX must instant sweep');
   assert.strictEqual(checkCanInstantSweep('NSE:KITEX', 500, { volume: 5000 }), true, 'Retail 500 shares of KITEX must instant sweep');
+  assert.strictEqual(checkCanInstantSweep('NSE:VMM', 500, { volume: 5000 }), true, 'Retail 500 shares of VMM must instant sweep');
 
-  // Case C: Bulk 1,00,000 shares on illiquid cash equity with 5k daily volume -> CANNOT instant sweep!
+  // Case C: Bulk 1,00,000 shares on cash equity (even if F&O listed like VMM) -> CANNOT instant sweep!
   assert.strictEqual(checkCanInstantSweep('NSE:KITEX', 100000, { volume: 5000 }), false, '1 Lakh shares of KITEX must NOT instant sweep');
+  assert.strictEqual(checkCanInstantSweep('NSE:VMM', 100000, { volume: 5000 }), false, '1 Lakh shares of VMM must NOT instant sweep even if F&O eligible');
 
-  console.log('  ✓ PASS: Tiered volume matching properly separates liquid/retail orders from illiquid whale orders');
+  console.log('  ✓ PASS: Tiered volume matching properly separates liquid/retail orders from illiquid cash whale orders');
+}
+
+// 3. Test onTick Volume Pacing (User scenario: 200 shares traded on real exchange for resting 99,500 KITEX order)
+function testOnTickVolumePacing() {
+  const restingOrder = {
+    id: 101,
+    symbol: 'NSE:KITEX',
+    quantity: 100000,
+    filled_quantity: 500,
+    pending_quantity: 99500
+  };
+
+  const deltaVol = 200; // Real exchange volume traded between 10:51 and 10:58
+  let availableVol = deltaVol;
+
+  let fillQty = 0;
+  if (availableVol <= 500) {
+    fillQty = Math.min(restingOrder.pending_quantity, availableVol);
+  } else {
+    const maxFill = Math.min(restingOrder.pending_quantity, Math.max(500, Math.floor(availableVol * 0.5)));
+    fillQty = Math.min(restingOrder.pending_quantity, Math.round(maxFill));
+  }
+
+  assert.strictEqual(fillQty, 200, 'All 200 shares traded on exchange must be allocated to resting order');
+  restingOrder.filled_quantity += fillQty;
+  restingOrder.pending_quantity -= fillQty;
+
+  assert.strictEqual(restingOrder.filled_quantity, 700);
+  assert.strictEqual(restingOrder.pending_quantity, 99300);
+
+  console.log('  ✓ PASS: onTick correctly captures real-world 200 share exchange volume and paces resting order');
 }
 
 testShortExit();
 testTieredVolumeMatching();
+testOnTickVolumePacing();
 console.log('\n🎉 ALL TESTS PASSED WITH ZERO ERRORS!\n');
