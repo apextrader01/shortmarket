@@ -117,6 +117,12 @@ assert(mfModalCode.includes("Pay Now (Today's NAV)"), "MutualFundDetailsModal ha
 assert(mfModalCode.includes("Place Order (Next Day NAV)"), "MutualFundDetailsModal has Place Order (Next Day NAV) action button");
 assert(mfModalCode.includes("Order Queued for Next Business Day NAV!"), "MutualFundDetailsModal notifies user when order is queued");
 
+const mfViewCode = fs.readFileSync(path.join(__dirname, '../frontend/src/components/MutualFundsView.jsx'), 'utf8');
+assert(mfViewCode.includes("orders: state.orders"), 'MutualFundsView pulls orders from useStore');
+assert(mfViewCode.includes("queuedMfOrders"), 'MutualFundsView filters queuedMfOrders for pending orders');
+assert(mfViewCode.includes("Queued Orders (Next Business Day NAV)"), 'MutualFundsView renders Queued Orders section in Dashboard');
+assert(mfViewCode.includes("Queued"), 'MutualFundsView shows Queued count badge on Dashboard tab');
+
 
 // ─────────────────────────────────────────────────────────────────────────
 // MODULE 4: SETTLEMENT LOGIC & HOLDINGS ALLOCATION

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight } from 'lucide-react';
+import { Search, Filter, ArrowUpRight, TrendingUp, Loader2, ChevronRight, Clock, Lock } from 'lucide-react';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 import { API } from '../store';
 
 export default function MutualFundsView() {
-  const { mutualFunds, searchMutualFunds, sips, cancelSip, executeSipNow, holdings, positions, mfWatchlist, toggleMfWatchlist } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, executeSipNow: state.executeSipNow, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist })));
+  const { mutualFunds, searchMutualFunds, sips, cancelSip, executeSipNow, holdings, positions, mfWatchlist, toggleMfWatchlist, orders } = useStore(useShallow(state => ({ mutualFunds: state.mutualFunds, searchMutualFunds: state.searchMutualFunds, sips: state.sips, cancelSip: state.cancelSip, executeSipNow: state.executeSipNow, holdings: state.holdings, positions: state.positions, mfWatchlist: state.mfWatchlist, toggleMfWatchlist: state.toggleMfWatchlist, orders: state.orders })));
 
   
   const handlePayNow = async (sipId) => {
@@ -53,8 +53,9 @@ export default function MutualFundsView() {
   useEffect(() => {
     const symbols = [
       ...(sips || []).map(s => s.symbol),
-      ...(holdings || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol),
-      ...(positions || []).filter(h => h.symbol.endsWith('-MF')).map(h => h.symbol)
+      ...(holdings || []).filter(h => (h.symbol || '').endsWith('-MF')).map(h => h.symbol),
+      ...(positions || []).filter(h => (h.symbol || '').endsWith('-MF')).map(h => h.symbol),
+      ...(orders || []).filter(o => ((o.symbol || '').endsWith('-MF') || (o.symbol || '').includes('MUTUALFUND'))).map(o => o.symbol)
     ];
     const unique = [...new Set(symbols)];
     const needed = unique.filter(s => !mfNames[s] && !mfNames[s.replace('-MF', '')]);
@@ -100,7 +101,7 @@ export default function MutualFundsView() {
                }).catch(() => {});
           });
       });
-  }, [sips, holdings, positions]);
+  }, [sips, holdings, positions, orders]);
 
 
   const ITEMS_PER_PAGE = 50;
@@ -192,6 +193,13 @@ export default function MutualFundsView() {
       average_price: inv.totalCost / inv.quantity,
   })).filter(inv => inv.quantity > 0);
 
+  const queuedMfOrders = useMemo(() => {
+    return (orders || []).filter(o => 
+      ((o.symbol || '').endsWith('-MF') || (o.symbol || '').includes('MUTUALFUND')) &&
+      (o.status === 'AMO_PENDING' || o.status === 'PENDING')
+    );
+  }, [orders]);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)', minHeight: 0, minWidth: 0 }}>
       <style>{mobileStyles}</style>
@@ -199,27 +207,47 @@ export default function MutualFundsView() {
       {/* Main Navigation (Explore, Dashboard, etc) */}
       <div style={{ padding: isMobile ? '16px' : '24px 24px 0 24px', overflowY: 'auto', flex: 1 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-color)', marginBottom: '16px', gap: '16px' }}>
-            <div className="mobile-scroll" style={{ display: 'flex', gap: '32px', width: isMobile ? '100%' : 'auto' }}>
-                {mainTabs.map(tab => (
-                  <div
-                    key={tab}
-                    onClick={() => setMainTab(tab)}
-                    style={{
-                      padding: '0 4px 16px 4px',
-                      fontSize: isMobile ? '16px' : '18px',
-                      fontWeight: mainTab === tab ? '700' : '600',
-                      color: mainTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
-                      borderBottom: mainTab === tab ? '3px solid var(--color-blue)' : '3px solid transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      position: 'relative',
-                      top: '1px',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {tab}
-                  </div>
-                ))}
+            <div className="mobile-scroll" style={{ display: 'flex', gap: isMobile ? '20px' : '32px', width: isMobile ? '100%' : 'auto' }}>
+                {mainTabs.map(tab => {
+                  const isDashboard = tab === 'Dashboard';
+                  const hasQueued = isDashboard && queuedMfOrders.length > 0;
+                  return (
+                    <div
+                      key={tab}
+                      onClick={() => setMainTab(tab)}
+                      style={{
+                        padding: '0 4px 16px 4px',
+                        fontSize: isMobile ? '16px' : '18px',
+                        fontWeight: mainTab === tab ? '700' : '600',
+                        color: mainTab === tab ? 'var(--color-blue)' : 'var(--text-secondary)',
+                        borderBottom: mainTab === tab ? '3px solid var(--color-blue)' : '3px solid transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                        top: '1px',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {tab}
+                      {hasQueued && (
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          background: 'rgba(234, 179, 8, 0.15)',
+                          color: 'var(--color-yellow)',
+                          border: '1px solid rgba(234, 179, 8, 0.3)',
+                          padding: '1px 7px',
+                          borderRadius: '10px'
+                        }}>
+                          {queuedMfOrders.length} Queued
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : 'auto', marginBottom: isMobile ? '12px' : 0 }}>
                 <form onSubmit={handleSearch} style={{ width: '100%', display: 'flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 12px' }}>
@@ -531,56 +559,208 @@ export default function MutualFundsView() {
             )}
           </div>
         ) : mainTab === 'Dashboard' ? (
-          <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
-            {!isMobile && <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>Your Mutual Fund Investments</h3>}
-            {finalInvestments.length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>You have no mutual fund investments.</div>
-            ) : isMobile ? (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {finalInvestments.map(h => (
-                        <div key={h.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                            <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                                {mfNames[h.symbol] || h.symbol.replace('-MF', '')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* 1. Queued Orders Section (Orders placed after 2:00 PM awaiting next-day NAV) */}
+            {queuedMfOrders.length > 0 && (
+              <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '20px 24px', border: '1px solid rgba(234, 179, 8, 0.3)', background: 'rgba(234, 179, 8, 0.03)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(234, 179, 8, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-yellow)', flexShrink: 0, marginTop: '2px' }}>
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, fontSize: isMobile ? '16px' : '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                          Queued Orders (Next Business Day NAV)
+                        </h3>
+                        <span style={{ fontSize: '11px', background: 'rgba(234, 179, 8, 0.2)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>
+                          {queuedMfOrders.length} AWAITING SETTLEMENT
+                        </span>
+                      </div>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                        These orders were placed after the 2:00 PM cut-off. Funds are debited/blocked, and units will be allocated at the next business day's official NAV during automated settlement (10:30 PM / 09:00 AM IST).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {isMobile ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {queuedMfOrders.map(order => {
+                      const fundName = mfNames[order.symbol] || order.symbol.replace('-MF', '');
+                      const orderAmt = Number(order.margin || (order.quantity * order.price) || 0);
+                      const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Today';
+                      return (
+                        <div key={order.id} className="mf-card" style={{ marginBottom: 0, padding: '14px', background: 'var(--bg-panel)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: '10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                            <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)', flex: 1, paddingRight: '8px' }}>
+                              {fundName}
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>Units</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{Number(h.quantity || 0).toFixed(4)}</span>
+                            <span style={{ fontSize: '10.5px', background: 'rgba(234, 179, 8, 0.15)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                              QUEUED (AMO)
+                            </span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px' }}>
+                            <div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Amount Debited</div>
+                              <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{orderAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{Number(h.average_price || 0).toFixed(2)}</span>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Order Placed</div>
+                              <div style={{ fontWeight: '500', color: 'var(--text-secondary)', fontSize: '12px' }}>{orderDate}</div>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
-                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</span>
-                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Lock size={12} color="var(--color-yellow)" /> Non-cancellable AMC order
+                            </span>
+                            <span style={{ color: 'var(--color-yellow)', fontWeight: '600' }}>
+                              Settles Next Working Day
+                            </span>
+                          </div>
                         </div>
-                    ))}
-                </div>
-            ) : (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-primary)' }}>
-                        <thead>
-                            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'left' }}>
-                                <th style={{ padding: '16px', fontWeight: '500' }}>Fund Symbol</th>
-                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Units</th>
-                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg NAV</th>
-                                <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Invested Amount</th>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-primary)', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(234, 179, 8, 0.2)', color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'left' }}>
+                          <th style={{ padding: '12px 16px', fontWeight: '600' }}>Fund Name</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Investment Amount</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'right' }}>Approx NAV</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Placed Time</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Status</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '600', textAlign: 'center' }}>Settlement Timing</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {queuedMfOrders.map(order => {
+                          const fundName = mfNames[order.symbol] || order.symbol.replace('-MF', '');
+                          const orderAmt = Number(order.margin || (order.quantity * order.price) || 0);
+                          const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Today';
+                          return (
+                            <tr key={order.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                              <td style={{ padding: '14px 16px', fontWeight: '600' }}>
+                                <div style={{ color: 'var(--text-primary)' }}>{fundName}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Lock size={11} color="var(--color-yellow)" /> Order #{order.id} • Non-cancellable
+                                </div>
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                ₹{orderAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'right', color: 'var(--text-secondary)' }}>
+                                ₹{Number(order.price || 0).toFixed(2)}
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                                {orderDate}
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(234, 179, 8, 0.15)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
+                                  🌙 AMO PENDING
+                                </span>
+                              </td>
+                              <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                <span style={{ fontSize: '11.5px', color: 'var(--color-yellow)', fontWeight: '600' }}>
+                                  Next Working Day NAV (10:30 PM / 09:00 AM IST)
+                                </span>
+                              </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {finalInvestments.map(h => (
-                                <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[h.symbol] || h.symbol.replace('-MF', '')}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>{Number(h.quantity || 0).toFixed(4)}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(h.average_price || 0).toFixed(2)}</td>
-                                    <td style={{ padding: '16px', textAlign: 'right' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
+                          );
+                        })}
+                      </tbody>
                     </table>
-                </div>
+                  </div>
+                )}
+              </div>
             )}
+
+            {/* 2. Settled Holdings Section */}
+            <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
+              {!isMobile && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Settled Mutual Fund Holdings</h3>
+                  {finalInvestments.length > 0 && (
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      {finalInvestments.length} Active {finalInvestments.length === 1 ? 'Holding' : 'Holdings'}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {finalInvestments.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  {queuedMfOrders.length > 0 ? (
+                    <div>
+                      <Clock size={32} color="var(--color-yellow)" style={{ margin: '0 auto 12px', opacity: 0.8 }} />
+                      <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                        No settled holdings yet
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto', lineHeight: '1.5' }}>
+                        Your queued order(s) above are currently awaiting next business day NAV settlement. Once the automated settlement completes, your units will be credited and appear right here.
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ marginBottom: '12px' }}>You have no mutual fund investments.</div>
+                      <button 
+                        onClick={() => setMainTab('Explore')}
+                        style={{ padding: '8px 18px', background: 'var(--color-blue)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        Explore Mutual Funds
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {finalInvestments.map(h => (
+                    <div key={h.id} className="mf-card" style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-panel)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div style={{ fontWeight: '600', fontSize: '16px', marginBottom: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                        {mfNames[h.symbol] || h.symbol.replace('-MF', '')}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Units</span>
+                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{Number(h.quantity || 0).toFixed(4)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Avg NAV</span>
+                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{Number(h.average_price || 0).toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Invested</span>
+                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text-primary)' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '14px', textAlign: 'left' }}>
+                        <th style={{ padding: '16px', fontWeight: '500' }}>Fund Symbol</th>
+                        <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Units</th>
+                        <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Avg NAV</th>
+                        <th style={{ padding: '16px', fontWeight: '500', textAlign: 'right' }}>Invested Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finalInvestments.map(h => (
+                        <tr key={h.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '16px', fontWeight: '600' }}>{mfNames[h.symbol] || h.symbol.replace('-MF', '')}</td>
+                          <td style={{ padding: '16px', textAlign: 'right' }}>{Number(h.quantity || 0).toFixed(4)}</td>
+                          <td style={{ padding: '16px', textAlign: 'right' }}>₹{Number(h.average_price || 0).toFixed(2)}</td>
+                          <td style={{ padding: '16px', textAlign: 'right' }}>₹{(Number(h.quantity || 0) * Number(h.average_price || 0)).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         ) : mainTab === 'Watchlist' ? (
           <div className={isMobile ? "" : "glass-panel"} style={{ padding: isMobile ? '0' : '24px' }}>
