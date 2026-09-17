@@ -65,8 +65,7 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
 
     // 1. Commodity Check (MCX)
     if (symbol.includes('MCX') || symbol.includes('NCDEX') || isCommodityContract(symbol)) {
-        const sortedCommodities = Object.entries(COMMODITY_FREEZE_LIMITS).sort((a, b) => b[0].length - a[0].length);
-        for (const [key, limit] of sortedCommodities) {
+        for (const [key, limit] of Object.entries(COMMODITY_FREEZE_LIMITS)) {
             if (upper.startsWith(key)) return limit;
         }
         const lot = explicitLotsize || getInstantLotsize(symbol);
@@ -124,14 +123,9 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
  * @param {string} side - 'BUY' or 'SELL'
  * @param {number} quantity - Number of shares/lots
  * @param {number} price - Execution price
- * @param {number} entryPrice - Purchase price for P&L tax
- * @param {number} holdingDays - Holding period
- * @param {number|null} slicesOverride - Explicit slices count
- * @param {boolean} isExercise - Expiry ITM exercise flag
- * @param {boolean} includeBrokerage - True to charge order brokerage (charged once per order), false for partial fills
  * @returns {object} { brokerage, stt, exchangeCharge, gst, sebiCharge, stampDuty, dpCharge, totalTaxes }
  */
-function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null, isExercise = false, includeBrokerage = true) {
+function calculateTaxes(symbol, productType, side, quantity, price, entryPrice = 0, holdingDays = 0, slicesOverride = null, isExercise = false) {
     const turnover = (quantity || 0) * (price || 0);
     
     const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
@@ -156,7 +150,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
         if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
     } else if (isOption) {
-        brokerage = isExercise ? 0 : (includeBrokerage ? 20 * slicesCount : 0); // Flat ₹20 per executed order/slice for Options; ₹0 on expiry exercise or partial fill
+        brokerage = isExercise ? 0 : 20 * slicesCount; // Flat ₹20 per executed order/slice for Options; ₹0 on expiry exercise
         if (isExercise) {
             // Statutory 0.125% STT on exercised ITM options at expiry (Finance Act Section 98)
             stt = turnover * 0.00125;
@@ -167,7 +161,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY' && !isExercise) stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        if (includeBrokerage && slicesCount > 0) {
+        if (slicesCount > 0) {
             const sliceTurnover = turnover / slicesCount;
             brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
         } else {
@@ -188,7 +182,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
             // Intraday Equity (INT, BO, CO, MIS)
-            if (includeBrokerage && slicesCount > 0) {
+            if (slicesCount > 0) {
                 const sliceTurnover = turnover / slicesCount;
                 brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
             } else {

@@ -481,8 +481,7 @@ class VolumeMatchingEngine {
         const prevAvg = Number(currentOrder.average_price || slicePrice);
         const totalQty = roundQty(Number(currentOrder.quantity));
 
-        const isFirstSlice = (prevFilled === 0);
-        // Deduct Brokerage & Regulatory Taxes for this executed slice (brokerage charged ONLY on first fill)
+        // Deduct Brokerage & Regulatory Taxes for this executed slice
         const sliceTaxes = await LedgerService.chargeExecutionTaxes(
           trx,
           order.user_id,
@@ -490,8 +489,7 @@ class VolumeMatchingEngine {
           order.product_type,
           order.side,
           sliceQtyClean,
-          slicePrice,
-          isFirstSlice
+          slicePrice
         );
         const currentTaxes = Number(currentOrder.taxes || 0);
         const accumulatedTaxes = Math.round((currentTaxes + sliceTaxes + Number.EPSILON) * 100) / 100;
