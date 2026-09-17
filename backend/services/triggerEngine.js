@@ -335,13 +335,11 @@ class TriggerEngine {
 
 
     async executeOrder(order, execPrice, options = {}) {
-        // Safe guard: Bulk cash equity orders (>500 shares) must always flow through realistic volume matching
+        // ALL orders must flow through realistic volume matching engine
+        // to respect real exchange volume. Only mutual funds and explicit bypasses skip this.
         if (!options || !options.bypassVolumeMatching) {
-            const { isDerivativeContract, isCommodityContract } = require('./taxCalculator');
-            const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
-            const totalQty = Number(order.pending_quantity !== undefined && order.pending_quantity !== null ? order.pending_quantity : (order.quantity || 0));
-            const isBulkCashEquity = !isHighLiquiditySegment && totalQty > 500;
-            if (isBulkCashEquity) {
+            const isMutualFund = order.symbol && (order.symbol.endsWith('-MF') || order.symbol.includes('MUTUALFUND'));
+            if (!isMutualFund) {
                 const volumeMatchingEngine = require('./volumeMatchingEngine');
                 return volumeMatchingEngine.submitOrder(order, execPrice);
             }
