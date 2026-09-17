@@ -201,11 +201,9 @@ class VolumeMatchingEngine {
     // even if F&O contracts exist for the company. Cash equity orders must respect actual volume & depth.
     const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
     const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
-    const isRetailOrder = totalOrderQty <= 500;
-    const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
-
-    // For bulk / whale cash equity orders (> 500 shares), strictly limit initial depth matching to at most 500 shares
-    const depthCap = canInstantSweep ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 500);
+    // For all orders, use full pending_quantity against real depth (no artificial caps).
+    // Real Level-2 depth from Fyers determines how much fills immediately.
+    const depthCap = ordObj.pending_quantity;
 
     let depthFilled = 0;
     let totalDepthCost = 0;
@@ -407,11 +405,7 @@ class VolumeMatchingEngine {
           const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
           if (currentVol > prevVol) {
             const rawDelta = currentVol - prevVol;
-            // Guard against massive reconnect / cumulative feed jumps (> 50,000 in a single tick on cash equities)
-            // Real volume on liquid stocks like VMM can be 24K/min, so threshold must be high enough
-            const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-            const isDeriv = queue.some(o => isDerivativeContract(o.symbol) || isCommodityContract(o.symbol));
-            deltaVol = (!isDeriv && rawDelta > 50000) ? Math.floor(rawDelta * 0.30) : rawDelta;
+            deltaVol = rawDelta;
             this.lastSymbolVolume.set(normSym, currentVol);
           }
         }
@@ -470,14 +464,9 @@ class VolumeMatchingEngine {
             fillQty = Math.min(order.pending_quantity, fillQty);
           }
         } else {
-          // Equities (lot = 1): whole shares
-          // POV (Percentage of Volume) approach: participate at 30% of real exchange volume per tick.
-          // This scales naturally:
-          //   - KITEX (deltaVol=200):  fill = 60 shares   (realistic for illiquid stock)
-          //   - VMM   (deltaVol=24K):  fill = 7,200 shares (realistic for liquid stock)
-          //   - RELIANCE (deltaVol=500K): fill = capped by pending_quantity
-          const povRate = 0.30; // 30% participation rate
-          fillQty = Math.min(order.pending_quantity, Math.max(1, Math.floor(availableVol * povRate)));
+          // Equities (lot = 1): use 100% of real exchange volume directly.
+          // No artificial caps — real Fyers volume is distributed across all resting orders in FIFO.
+          fillQty = Math.min(order.pending_quantity, availableVol);
         }
 
         if (fillQty > 0) {
