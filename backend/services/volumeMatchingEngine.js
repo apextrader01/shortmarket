@@ -421,14 +421,21 @@ class VolumeMatchingEngine {
 
       const now = Date.now();
 
-      // If deltaVol is 0 (e.g. quote tick without new traded volume), check if resting orders need heartbeat
-      // to make steady realistic progress (5-20 shares every 3.5s) during active market hours
-      const hasRestingOrdersNeedingHeartbeat = queue.some(o => !o._lastFillTime || (now - o._lastFillTime >= 3500));
-      if (deltaVol <= 0 && hasRestingOrdersNeedingHeartbeat) {
-        deltaVol = Math.floor(Math.random() * 20) + 5; // Natural micro-flow
+      // If deltaVol is 0 (e.g. quote tick without new traded volume):
+      // - Derivatives/Commodities: use heartbeat micro-flow (5-20 shares every 3.5s) since exchange depth is deep
+      // - Cash Equities: NEVER fabricate fake volume. Only fill on real exchange volume deltas.
+      if (deltaVol <= 0) {
+        const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+        const isDerivQueue = queue.some(o => isDerivativeContract(o.symbol) || isCommodityContract(o.symbol));
+        if (isDerivQueue) {
+          const hasRestingOrdersNeedingHeartbeat = queue.some(o => !o._lastFillTime || (now - o._lastFillTime >= 3500));
+          if (hasRestingOrdersNeedingHeartbeat) {
+            deltaVol = Math.floor(Math.random() * 20) + 5; // Natural micro-flow for derivatives only
+          }
+        }
       }
 
-      if (deltaVol <= 0) return; // Wait for trades or heartbeat
+      if (deltaVol <= 0) return; // Cash equities: strictly wait for real exchange volume
 
       // Distribute available tick volume to active orders in FIFO order
       let availableVol = deltaVol;
@@ -962,8 +969,8 @@ class VolumeMatchingEngine {
 
   /**
    * Background fallback pacing heartbeat running on Master node.
-   * Ensures resting orders steadily fill (5-20 shares every 4-5 seconds)
-   * even during quiet market periods or when ticks are quote-only.
+   * ONLY fills derivatives/commodities orders (deep exchange liquidity).
+   * Cash equity orders are NEVER filled by heartbeat — they wait for real exchange volume ticks only.
    */
   startPacingHeartbeat() {
     if (this._heartbeatInterval) return;
@@ -971,6 +978,8 @@ class VolumeMatchingEngine {
       try {
         if (this.symbolQueues.size === 0) return;
         const now = Date.now();
+        const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+
         for (const [normSym, queue] of this.symbolQueues.entries()) {
           if (!queue || queue.length === 0) continue;
           const cached = getCachedPrice(this.priceCache, normSym) || {};
@@ -979,6 +988,11 @@ class VolumeMatchingEngine {
 
           for (const order of [...queue]) {
             if (!order || order.pending_quantity <= 0) continue;
+
+            // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume
+            const isDerivOrCommodity = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
+            if (!isDerivOrCommodity) continue;
+
             if (!order._lastFillTime || (now - order._lastFillTime >= 4500)) {
               order._lastFillTime = now;
               const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
