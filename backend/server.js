@@ -4848,7 +4848,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       if (requiresMargin && finalMargin > 0) {
         const user = await trx('users').where({ id: req.user.id }).first();
         if (Number(user.balance) < finalMargin) {
-           throw new Error('Insufficient Funds.');
+           throw Object.assign(new Error(`Insufficient Funds. Required: ₹${finalMargin.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}, Available: ₹${Number(user.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`), { statusCode: 400 });
         }
         const newBalance = Number(user.balance) - finalMargin;
         await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
@@ -6599,7 +6599,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           // Check if user has enough balance if margin increases
           const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
           if (marginDifference > 0 && parseFloat(user.balance) < marginDifference) {
-             throw Object.assign(new Error('Insufficient Funds.'), { statusCode: 400 });
+             throw Object.assign(new Error(`Insufficient Funds. Required: ₹${marginDifference.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}, Available: ₹${Number(user.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`), { statusCode: 400 });
           }
 
           // Mathematical Price Validation for PENDING_TRIGGER

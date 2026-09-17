@@ -38,49 +38,34 @@ function lookupDerivativeBySymbol(symbol) {
  * @returns {number} The required margin in INR.
  */
 function calculateRequiredMargin(symbol, product_type, side, quantity, price, assetDetails = {}) {
-    const cleanSym = String(symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
-    const isOptions = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
-    const isFutures = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
-    const contractValue = quantity * price;
-    
-    // 1. Equity Margin Rules
-    if (!isOptions && !isFutures) {
-        if (product_type === 'DEL' || product_type === 'DELIVERY' || product_type === 'CNC') {
-            return contractValue; // 1x
-        }
-        if (['INT', 'INTRADAY', 'CO', 'BO'].includes(product_type)) {
-            // 5x Leverage
-            let margin = contractValue * 0.20;
-            if (assetDetails.stopLoss) {
+    const { calculateOrderMargin } = require('./marginCalculator');
+    const lotsize = assetDetails.lotsize || getLotSize(symbol);
+    const result = calculateOrderMargin({
+        symbol,
+        side,
+        quantity,
+        price,
+        productType: product_type,
+        lotsize,
+        optionStrike: assetDetails.optionStrike || 0
+    });
+
+    if (result && typeof result.requiredMargin === 'number') {
+        // Support stopLoss reduction if specified for intraday equities
+        if (assetDetails.stopLoss && ['INT', 'INTRADAY', 'CO', 'BO'].includes(product_type)) {
+            const cleanSym = String(symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+            const isOptions = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+            const isFutures = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT');
+            if (!isOptions && !isFutures) {
+                const contractValue = quantity * price;
                 const risk = Math.abs(price - assetDetails.stopLoss) * quantity;
-                margin = (contractValue * 0.10) + risk; // Lower upfront if SL is tight
+                return Math.min(result.requiredMargin, (contractValue * 0.10) + risk);
             }
-            return margin;
         }
+        return result.requiredMargin;
     }
-    
-    // 2. Options Margin Rules
-    if (isOptions) {
-        if (side === 'BUY') return contractValue; // 100% Premium
-        if (side === 'SELL') {
-            // SPAN + Exposure margin mocked as 15% of the underlying contract value. 
-            // For options, we use the premium value as a fallback mock (15% of notional).
-            // Since we don't have underlying price here, we'll mock it realistically at a flat ₹1,00,000 per lot fallback,
-            // or 15% of the option notional if it exceeds 1L.
-            const lotsize = getLotSize(symbol);
-            const numLots = quantity / lotsize;
-            return Math.max(numLots * 100000, contractValue * 0.15);
-        }
-    }
-    
-    // 3. Futures Margin Rules
-    if (isFutures) {
-        const lotsize = getLotSize(symbol);
-        const numLots = quantity / lotsize;
-        return Math.max(numLots * 100000, contractValue * 0.15);
-    }
-    
-    return contractValue;
+
+    return Number(quantity || 0) * Number(price || 0);
 }
 
 let lotsizeMap = {};
