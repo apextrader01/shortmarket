@@ -74,7 +74,7 @@ function testTieredVolumeMatching() {
     const liveDailyVol = Number(cached?.volume || 0);
     const marketTotalQty = 0;
     const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
-    const isRetailOrder = Number(qty) <= 500 || (effectiveVolume > 0 && (Number(qty) / effectiveVolume) <= 0.05) || effectiveVolume >= 100000;
+    const isRetailOrder = Number(qty) <= 500;
     return isHighLiquiditySegment || isRetailOrder;
   }
 

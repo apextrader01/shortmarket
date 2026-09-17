@@ -4963,7 +4963,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         if (isMarketableBuy || isMarketableSell) {
           try {
             await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
-            await triggerEngine.executeOrder(ord, currentLtp);
+            const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+            await volumeMatchingEngine.submitOrder(ord, currentLtp);
           } catch (err) {
             console.error('Immediate marketable limit execution error:', err);
           }
@@ -6171,7 +6172,8 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
             if (isMarketableBuy || isMarketableSell) {
               try {
                 await triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
-                await triggerEngine.executeOrder(ord, realLtp);
+                const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+                await volumeMatchingEngine.submitOrder(ord, realLtp);
                 const freshOrder = await db('orders').where({ id: ord.id }).select('status').first();
                 if (freshOrder) execStatus = freshOrder.status;
               } catch (err) {

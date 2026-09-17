@@ -274,7 +274,12 @@ class VolumeMatchingEngine {
     const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
     const marketTotalQty = Number(ordObj.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
     const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
-    const isRetailOrder = Number(ordObj.pending_quantity || ordObj.quantity || 0) <= 500 || (effectiveVolume > 0 && (Number(ordObj.pending_quantity) / effectiveVolume) <= 0.05) || effectiveVolume >= 100000;
+
+    // Strict retail order definition: 500 shares or fewer.
+    // Whale / bulk orders (> 500 shares, e.g. 1 Lakh shares) on cash equities are NEVER retail orders.
+    // They must fill available orderbook depth + initial participation slice (<= 500), and pace the rest with exchange volume ticks.
+    const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
+    const isRetailOrder = totalOrderQty <= 500;
     const canInstantSweep = isHighLiquiditySegment || isRetailOrder;
 
     if (depthFilled > 0) {
@@ -282,7 +287,7 @@ class VolumeMatchingEngine {
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
 
       // For MARKET orders: High-liquidity F&O / indices and retail cash equity orders sweep remaining quantity immediately.
-      // Bulk orders on illiquid equities (e.g. 1 Lakh KITEX) do NOT sweep 100% out of thin air; remaining qty paces via onTick().
+      // Bulk orders on illiquid equities (e.g. 1 Lakh KITEX, 1 Lakh VMM) do NOT sweep 100% out of thin air; remaining qty paces via onTick().
       if ((ordObj.type === 'MARKET' || ordObj.isMarket) && ordObj.pending_quantity > 0 && baseLtp > 0) {
         if (canInstantSweep) {
           const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
@@ -321,7 +326,12 @@ class VolumeMatchingEngine {
         }
 
         if (isMarketable && ordObj.pending_quantity > 0) {
-          await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+          if (canInstantSweep) {
+            await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+          } else {
+            const initialSlice = Math.min(ordObj.pending_quantity, Math.max(100, Math.floor(Math.min(effectiveVolume > 0 ? effectiveVolume * 0.01 : 500, 500))));
+            await this.processSliceFill(ordObj, initialSlice, baseLtp);
+          }
         }
       }
     }
