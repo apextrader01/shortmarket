@@ -4407,14 +4407,31 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  // Block new Intraday / BO / CO orders after segment intraday cutoff time
+  // Block new Intraday / BO / CO orders after segment intraday cutoff time (EXCEPT exit/closing orders)
   const isAmoOrder = rawVariety === 'AMO' || Boolean(req.body.is_amo);
   if (!isAmoOrder && (effectiveProductType === 'INT' || effectiveProductType === 'BO' || effectiveProductType === 'CO')) {
     const { isIntradayBlocked } = require('./services/cronJobs');
     if (isIntradayBlocked && isIntradayBlocked(symbol)) {
-      return res.status(400).json({
-        error: `Intraday order placement for ${symbol} is closed for today (Auto square-off period active). Please place a Delivery (CNC) or AMO order.`
-      });
+      // Allow users to EXIT/reduce an existing open position
+      const clean = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+      const existingPos = await db('positions')
+        .where({ user_id: req.user.id })
+        .where(function() {
+          this.where({ symbol }).orWhere({ symbol: clean }).orWhere('symbol', 'like', `%${clean}%`);
+        })
+        .where('quantity', '!=', 0)
+        .first();
+
+      const isExitOrder = existingPos && (
+        (Number(existingPos.quantity) < 0 && side === 'BUY') ||
+        (Number(existingPos.quantity) > 0 && side === 'SELL')
+      );
+
+      if (!isExitOrder) {
+        return res.status(400).json({
+          error: `Intraday order placement for ${symbol} is closed for today (Auto square-off period active). Please place a Delivery (CNC) or AMO order.`
+        });
+      }
     }
   }
 

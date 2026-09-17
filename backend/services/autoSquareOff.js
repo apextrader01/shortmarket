@@ -95,30 +95,74 @@ function getSymbolToExpiryMap() {
 
 function parseExpiryDate(symbol) {
     if (!symbol) return null;
-    const map = getSymbolToExpiryMap();
-    const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
-    const expiryStr = map[symbol] || map[cleanSym] || map[`NSE:${cleanSym}`] || map[`BSE:${cleanSym}`] || map[`MCX:${cleanSym}`];
-    if (!expiryStr) return null;
-    
-    // Fyers expiryStr format is "YYYY-MM-DD"
-    const match = expiryStr.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
-    if (match) {
-        const year = parseInt(match[1], 10);
-        const month = parseInt(match[2], 10) - 1; // 0-indexed month
-        const day = parseInt(match[3], 10);
-        return new Date(year, month, day);
+    const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+
+    // 1. Direct algorithmic regex parsing from symbol name:
+    // 1A. Weekly options format (e.g. SENSEX2691774300CE, BANKEX2691756000PE, NIFTY2691723450PE, BANKNIFTY2691751000CE)
+    const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+    if (weeklyMatch) {
+        const yr = 2000 + parseInt(weeklyMatch[2], 10);
+        const mChar = weeklyMatch[3].toUpperCase();
+        const monthCharMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, 'O': 9, 'N': 10, 'D': 11 };
+        const m = monthCharMap[mChar];
+        const d = parseInt(weeklyMatch[4], 10);
+        if (m !== undefined && !isNaN(d)) {
+            return new Date(yr, m, d);
+        }
     }
 
-    // Fallback for legacy Angel One format "28JUL2026" (just in case)
-    const matchLegacy = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
-    if (matchLegacy) {
-        const day = parseInt(matchLegacy[1], 10);
-        const monthStr = matchLegacy[2].toUpperCase();
-        const year = parseInt(matchLegacy[3], 10); 
-        const month = MONTH_MAP[monthStr];
-        return new Date(year, month, day);
+    // 1B. Standard 2-digit month weekly format (e.g. SENSEX26091774300CE)
+    const weekly2DigitMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(0[1-9]|1[0-2])(\d{2})(\d+)(CE|PE)$/i);
+    if (weekly2DigitMatch) {
+        const yr = 2000 + parseInt(weekly2DigitMatch[2], 10);
+        const m = parseInt(weekly2DigitMatch[3], 10) - 1;
+        const d = parseInt(weekly2DigitMatch[4], 10);
+        return new Date(yr, m, d);
     }
-    
+
+    // 2. Dictionary lookup from options.json & futures.json
+    const map = getSymbolToExpiryMap();
+    const expiryStr = map[symbol] || map[cleanSym] || map[`NSE:${cleanSym}`] || map[`BSE:${cleanSym}`] || map[`MCX:${cleanSym}`];
+    if (expiryStr) {
+        // Fyers expiryStr format is "YYYY-MM-DD"
+        const match = expiryStr.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+        if (match) {
+            const year = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) - 1; // 0-indexed month
+            const day = parseInt(match[3], 10);
+            return new Date(year, month, day);
+        }
+
+        // Fallback for legacy Angel One format "28JUL2026"
+        const matchLegacy = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
+        if (matchLegacy) {
+            const day = parseInt(matchLegacy[1], 10);
+            const monthStr = matchLegacy[2].toUpperCase();
+            const year = parseInt(matchLegacy[3], 10); 
+            const month = MONTH_MAP[monthStr];
+            return new Date(year, month, day);
+        }
+    }
+
+    // 3. Monthly contracts format for all NFO stocks & indices (e.g. RELIANCE26SEPFUT, TCS26OCT4100PE, SENSEX26OCTFUT, NIFTY26SEPFUT)
+    const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+    if (monthlyMatch) {
+        const yr = 2000 + parseInt(monthlyMatch[2], 10);
+        const mStr = monthlyMatch[3].toUpperCase();
+        const m = MONTH_MAP[mStr];
+        if (m !== undefined) {
+            const underlying = monthlyMatch[1].toUpperCase();
+            const isBseIndex = (underlying === 'SENSEX' || underlying === 'BANKEX');
+            const targetDayOfWeek = isBseIndex ? 5 : 4; // 5 = Friday for BSE, 4 = Thursday for NSE/MCX
+            const lastDay = new Date(yr, m + 1, 0);
+            let day = lastDay.getDate();
+            const dayOfWeek = lastDay.getDay();
+            const diff = (dayOfWeek >= targetDayOfWeek) ? (dayOfWeek - targetDayOfWeek) : (dayOfWeek + (7 - targetDayOfWeek));
+            day -= diff;
+            return new Date(yr, m, day);
+        }
+    }
+
     return null;
 }
 
