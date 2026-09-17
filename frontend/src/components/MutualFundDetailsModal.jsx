@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { X, TrendingUp, CheckCircle, XCircle, ChevronRight, Activity, PieChart, Shield, Calculator, Wallet, ArrowDownRight, ArrowUpRight, Check } from 'lucide-react';
+import { X, TrendingUp, CheckCircle, XCircle, ChevronRight, Activity, PieChart, Shield, Calculator, Wallet, ArrowDownRight, ArrowUpRight, Check, Clock } from 'lucide-react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
@@ -162,8 +162,11 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
 
             if (res && res.success) {
                 setOrderStatus('success');
-                setStatusMsg(`Successfully ${actionMode === 'INVEST' ? (investType.includes('SIP') ? 'set up SIP' : 'invested') : 'redeemed'}!`);
-                setTimeout(() => onClose(), 2000);
+                const successNotice = res.queued 
+                    ? "Order Queued for Next Business Day NAV! Units will be credited upon settlement." 
+                    : `Successfully ${actionMode === 'INVEST' ? (investType.includes('SIP') ? 'set up SIP' : 'invested with Today\'s NAV') : 'redeemed'}!`;
+                setStatusMsg(res.message || successNotice);
+                setTimeout(() => onClose(), 2500);
             } else {
                 setOrderStatus('error');
                 setStatusMsg(res?.error || "Transaction failed. Please try again.");
@@ -177,6 +180,30 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
             setIsInvesting(false);
         }
     };
+
+    const mfCutoff = useMemo(() => {
+        try {
+            const istStr = new Intl.DateTimeFormat('en-CA', { 
+                timeZone: 'Asia/Kolkata', 
+                year: 'numeric', month: '2-digit', day: '2-digit', 
+                hour: '2-digit', minute: '2-digit', hour12: false 
+            }).format(new Date());
+            const [datePart, timePart] = istStr.split(', ');
+            const [y, m, d] = datePart.split('-').map(Number);
+            const [h, min] = timePart.split(':').map(Number);
+            const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+            const curMins = h * 60 + min;
+            const isWorkingDay = day >= 1 && day <= 5;
+            const isSameDay = isWorkingDay && curMins >= 540 && curMins < 840;
+            return {
+                isSameDay,
+                label: isSameDay ? "Today's NAV" : "Next Business Day's NAV",
+                cutoffTime: "02:00 PM IST"
+            };
+        } catch (e) {
+            return { isSameDay: false, label: "Next Business Day's NAV", cutoffTime: "02:00 PM IST" };
+        }
+    }, []);
 
     const rawNav = Number(fund.nav || details?.nav || 0);
     const hasValidNav = rawNav > 0 && !isNaN(rawNav);
@@ -657,6 +684,27 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             <span style={{ color: 'var(--color-green-light)' }}>₹{calcResult.wealth.toLocaleString()}</span>
                                         </div>
                                     </div>
+
+                                    {/* Applicable NAV Cut-off Banner */}
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '12px 14px',
+                                        borderRadius: '10px',
+                                        background: mfCutoff.isSameDay ? 'rgba(16, 185, 129, 0.08)' : 'rgba(234, 179, 8, 0.08)',
+                                        border: `1px solid ${mfCutoff.isSameDay ? 'rgba(16, 185, 129, 0.25)' : 'rgba(234, 179, 8, 0.25)'}`,
+                                        fontSize: '12.5px',
+                                        lineHeight: '1.5'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: mfCutoff.isSameDay ? '#10b981' : '#eab308', marginBottom: '3px' }}>
+                                            <Clock size={14} />
+                                            <span>Applicable NAV: {mfCutoff.label}</span>
+                                        </div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px' }}>
+                                            {mfCutoff.isSameDay 
+                                                ? "Orders placed before 2:00 PM IST qualify for Today's NAV and are credited today." 
+                                                : "Orders placed after 2:00 PM IST (or weekends/holidays) will be allotted Next Business Day's NAV. Orders are non-cancellable once placed."}
+                                        </div>
+                                    </div>
                                 </>
                             ) : (
                                 <>
@@ -748,7 +796,7 @@ export default function MutualFundDetailsModal({ fund, onClose }) {
                                             }}
                                         >
                                             {isInvesting ? <Activity size={20} className="spin" /> : null}
-                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : 'Pay Now') : 'Confirm Redeem')}
+                                            {!hasValidNav ? 'Awaiting Latest NAV...' : (isInvesting ? 'Processing...' : actionMode === 'INVEST' ? (investType.includes('SIP') ? 'Start SIP' : (mfCutoff.isSameDay ? "Pay Now (Today's NAV)" : "Place Order (Next Day NAV)")) : 'Confirm Redeem')}
                                         </button>
                                     )}
                                 </div>

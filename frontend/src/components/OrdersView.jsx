@@ -245,8 +245,16 @@ export default function OrdersView() {
               {activeTab === 'Open Orders' && displayOrders.length > 0 && (
                 <button
                   onClick={async () => {
-                    if (window.confirm(`Are you sure you want to cancel all ${displayOrders.length} open orders?`)) {
-                      const cancelPromises = displayOrders.map(order => 
+                    const cancellableOrders = displayOrders.filter(order => {
+                      const sym = order.symbol || '';
+                      return !sym.endsWith('-MF') && !sym.includes('MUTUALFUND');
+                    });
+                    if (cancellableOrders.length === 0) {
+                      alert('Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.');
+                      return;
+                    }
+                    if (window.confirm(`Are you sure you want to cancel all ${cancellableOrders.length} cancellable open orders? (Mutual Fund orders cannot be cancelled)`)) {
+                      const cancelPromises = cancellableOrders.map(order => 
                         useStore.getState().cancelOrder(order.id)
                       );
                       const results = await Promise.allSettled(cancelPromises);
@@ -444,14 +452,26 @@ export default function OrdersView() {
                               )
                             )}
                             {activeTab === 'Open Orders' && (
-                              <div style={{ display: 'flex', gap: '4px' }}>
-                                <button onClick={(e) => { e.stopPropagation(); useStore.getState().openEditOrderModal(order); }} style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
-                                  EDIT
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Cancel order?')) useStore.getState().cancelOrder(order.id); }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
-                                  CANCEL
-                                </button>
-                              </div>
+                              (() => {
+                                const isMfOrder = (order.symbol || '').endsWith('-MF') || (order.symbol || '').includes('MUTUALFUND');
+                                if (isMfOrder) {
+                                  return (
+                                    <span style={{ fontSize: '10px', background: 'rgba(234, 179, 8, 0.15)', color: 'var(--color-yellow)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '2px 6px', borderRadius: '3px', fontWeight: '700' }} title="Mutual fund orders cannot be cancelled once placed">
+                                      QUEUED (NEXT DAY NAV)
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button onClick={(e) => { e.stopPropagation(); useStore.getState().openEditOrderModal(order); }} style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-blue)', border: '1px solid rgba(59,130,246,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                                      EDIT
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Cancel order?')) useStore.getState().cancelOrder(order.id); }} style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '2px 6px', borderRadius: '3px', fontSize: '10px', fontWeight: '700', cursor: 'pointer' }}>
+                                      CANCEL
+                                    </button>
+                                  </div>
+                                );
+                              })()
                             )}
                           </div>
                         </div>
@@ -671,24 +691,36 @@ export default function OrdersView() {
                     </td>
                     {activeTab === 'Open Orders' && (
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button 
-                            onClick={() => useStore.getState().openEditOrderModal(order)}
-                            style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-                          >
-                            EDIT
-                          </button>
-                          <button 
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to cancel this order?')) {
-                                useStore.getState().cancelOrder(order.id);
-                              }
-                            }}
-                            style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-                          >
-                            CANCEL
-                          </button>
-                        </div>
+                        {(() => {
+                          const isMfOrder = (order.symbol || '').endsWith('-MF') || (order.symbol || '').includes('MUTUALFUND');
+                          if (isMfOrder) {
+                            return (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(234, 179, 8, 0.12)', color: '#eab308', padding: '3px 10px', borderRadius: '4px', border: '1px solid rgba(234, 179, 8, 0.3)', fontSize: '11px', fontWeight: '700' }} title="Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.">
+                                QUEUED (NEXT DAY NAV)
+                              </span>
+                            );
+                          }
+                          return (
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              <button 
+                                onClick={() => useStore.getState().openEditOrderModal(order)}
+                                style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-blue)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                EDIT
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm('Are you sure you want to cancel this order?')) {
+                                    useStore.getState().cancelOrder(order.id);
+                                  }
+                                }}
+                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                CANCEL
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     </tr>

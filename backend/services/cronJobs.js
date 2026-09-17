@@ -615,7 +615,7 @@ function initCronJobs(priceCache, triggerEngine) {
         if (isMCXWinterSession()) phase3SquareOff('COM');
     }, TZ);
 
-    // Note: Daily/Weekly/Monthly SIP execution is authoritatively handled by sipEngine.js at 09:30 AM & 03:30 PM
+    // Note: Daily/Weekly/Monthly SIP and Next-Day Mutual Fund settlement are authoritatively handled by sipEngine.js at 09:00 AM, 09:30 AM, 03:30 PM, and 10:30 PM
 
     // --- 1:00 AM Expired Watchlist Cleanup ---
     cron.schedule('0 1 * * *', async () => {

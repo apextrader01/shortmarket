@@ -3908,6 +3908,34 @@ app.get('/api/mf/:schemeCode', async (req, res) => {
     }
 });
 
+// Helper: Determine if mutual fund order qualifies for Same-Day (Today's) NAV (09:00 AM - 02:00 PM IST on Mon-Fri)
+function isMutualFundSameDayCutoffOpen() {
+  try {
+    const istDateStr = new Intl.DateTimeFormat('en-CA', { 
+      timeZone: 'Asia/Kolkata', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: false 
+    }).format(new Date());
+    const [datePart, timePart] = istDateStr.split(', ');
+    const [year, month, date] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+
+    const istDate = new Date(Date.UTC(year, month - 1, date, hours, minutes));
+    const day = istDate.getUTCDay(); // 0 = Sun, 6 = Sat
+    if (day === 0 || day === 6) return false;
+
+    const curMinutes = hours * 60 + minutes;
+    // 09:00 AM (540m) to 02:00 PM (840m)
+    return curMinutes >= 540 && curMinutes < 840;
+  } catch (e) {
+    return false;
+  }
+}
+
 // 3. Lumpsum Mutual Fund Purchase Endpoint (Defect 41)
 const handleMutualFundBuy = async (req, res) => {
   const { scheme_code, schemeCode, amount } = req.body;
@@ -3937,6 +3965,8 @@ const handleMutualFundBuy = async (req, res) => {
       return res.status(400).json({ error: 'Calculated units are zero. Please increase investment amount.' });
     }
 
+    const isSameDayNav = isMutualFundSameDayCutoffOpen();
+
     await db.transaction(async (trx) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
@@ -3950,65 +3980,116 @@ const handleMutualFundBuy = async (req, res) => {
       const newBal = Math.round((Number(user.balance) - parsedAmount) * 100) / 100;
       await trx('users').where({ id: req.user.id }).update({ balance: newBal });
 
-      // Ledger entry
-      await trx('ledger').insert({
-        user_id: req.user.id,
-        amount: -parsedAmount,
-        type: 'MARGIN_BLOCK',
-        description: `Mutual Fund Purchase: ${units} units of ${symbol} @ NAV ₹${nav.toFixed(2)}`
-      });
-
-      // Order record
-      await trx('orders').insert({
-        user_id: req.user.id,
-        symbol,
-        type: 'MARKET',
-        side: 'BUY',
-        quantity: units,
-        filled_quantity: units,
-        pending_quantity: 0,
-        price: nav,
-        average_price: nav,
-        status: 'EXECUTED',
-        order_variety: 'REGULAR',
-        product_type: 'DEL',
-        margin: parsedAmount,
-        remarks: 'Lumpsum Mutual Fund Purchase',
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-
-      // Holdings
-      const existingHolding = await trx('holdings')
-        .where({ user_id: req.user.id, symbol })
-        .first();
-
-      if (existingHolding) {
-        const curQty = parseFloat(existingHolding.quantity) || 0;
-        const curAvg = parseFloat(existingHolding.average_price) || nav;
-        const newQty = parseFloat((curQty + units).toFixed(4));
-        const newAvg = parseFloat((((curQty * curAvg) + parsedAmount) / newQty).toFixed(4));
-
-        await trx('holdings').where({ id: existingHolding.id }).update({
-          quantity: newQty,
-          average_price: newAvg,
-          asset_class: 'MUTUAL_FUND',
-          updated_at: new Date()
+      if (isSameDayNav) {
+        // --- 1. Same-Day NAV Execution (09:00 AM - 02:00 PM Cut-off) ---
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: -parsedAmount,
+          type: 'MARGIN_BLOCK',
+          description: `Mutual Fund Purchase: ${units} units of ${symbol} @ NAV ₹${nav.toFixed(2)}`
         });
-      } else {
-        await trx('holdings').insert({
+
+        // Order record
+        await trx('orders').insert({
           user_id: req.user.id,
           symbol,
+          type: 'MARKET',
+          side: 'BUY',
           quantity: units,
+          filled_quantity: units,
+          pending_quantity: 0,
+          price: nav,
           average_price: nav,
-          asset_class: 'MUTUAL_FUND',
+          status: 'EXECUTED',
+          order_variety: 'REGULAR',
+          product_type: 'DEL',
+          margin: parsedAmount,
+          remarks: "Mutual Fund Purchase: Today's NAV (Before 2:00 PM Cut-off)",
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        // Credit to holdings immediately
+        const existingHolding = await trx('holdings')
+          .where({ user_id: req.user.id, symbol })
+          .first();
+
+        if (existingHolding) {
+          const curQty = parseFloat(existingHolding.quantity) || 0;
+          const curAvg = parseFloat(existingHolding.average_price) || nav;
+          const newQty = parseFloat((curQty + units).toFixed(4));
+          const newAvg = parseFloat((((curQty * curAvg) + parsedAmount) / newQty).toFixed(4));
+
+          await trx('holdings').where({ id: existingHolding.id }).update({
+            quantity: newQty,
+            average_price: newAvg,
+            asset_class: 'MUTUAL_FUND',
+            updated_at: new Date()
+          });
+        } else {
+          await trx('holdings').insert({
+            user_id: req.user.id,
+            symbol,
+            quantity: units,
+            average_price: nav,
+            asset_class: 'MUTUAL_FUND',
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+        }
+      } else {
+        // --- 2. Next Business Day NAV Queued Order (After 2:00 PM / Weekend) ---
+        await trx('ledger').insert({
+          user_id: req.user.id,
+          amount: -parsedAmount,
+          type: 'MARGIN_BLOCK',
+          description: `Mutual Fund Order Queued: ₹${parsedAmount.toFixed(2)} for ${symbol} (Next Business Day NAV)`
+        });
+
+        // Order queued as AMO_PENDING without crediting holdings yet
+        await trx('orders').insert({
+          user_id: req.user.id,
+          symbol,
+          type: 'MARKET',
+          side: 'BUY',
+          quantity: units,
+          filled_quantity: 0,
+          pending_quantity: units,
+          price: nav,
+          average_price: null,
+          status: 'AMO_PENDING',
+          order_variety: 'AMO',
+          product_type: 'DEL',
+          margin: parsedAmount,
+          remarks: "Mutual Fund Order: Queued for Next Business Day NAV (After 2:00 PM Cut-off)",
           created_at: new Date(),
           updated_at: new Date()
         });
       }
     });
 
-    return res.json({ success: true, units, nav, amount: parsedAmount, symbol });
+    if (isSameDayNav) {
+      return res.json({ 
+        success: true, 
+        queued: false, 
+        units, 
+        nav, 
+        amount: parsedAmount, 
+        symbol,
+        message: `Investment successful! ${units} units allocated with Today's NAV.` 
+      });
+    } else {
+      return res.json({ 
+        success: true, 
+        queued: true, 
+        units: 0, 
+        estUnits: units, 
+        nav, 
+        amount: parsedAmount, 
+        symbol,
+        message: 'Order placed after 2:00 PM cut-off. Queued for Next Business Day NAV (Non-cancellable). Units will be credited upon settlement.' 
+      });
+    }
   } catch (err) {
     console.error('[MF BUY ERROR]', err);
     return res.status(err.statusCode || 500).json({ error: err.message || 'Failed to purchase mutual fund' });
@@ -4972,6 +5053,18 @@ app.post('/api/admin/sips/process-all', authenticateToken, async (req, res) => {
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
     const result = await SIPEngine.processDueSips(priceCache);
     res.json({ success: true, message: `Processed ${result?.total || 0} due SIPs: ${result?.success || 0} succeeded, ${result?.failed || 0} failed/skipped.`, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message, success: false });
+  }
+});
+
+// ⚡ Admin: Process all queued After-Cutoff Mutual Fund orders
+app.post('/api/admin/mf/settle-pending', authenticateToken, async (req, res) => {
+  try {
+    const caller = await db('users').where({ id: req.user.id }).first();
+    if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    const result = await SIPEngine.processPendingMutualFundOrders(priceCache);
+    res.json({ success: true, message: `Settled ${result?.settled || 0} queued mutual fund orders (${result?.total || 0} evaluated).`, result });
   } catch (error) {
     res.status(500).json({ error: error.message, success: false });
   }
@@ -6007,6 +6100,13 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // BUG FIX: Use throw instead of return res.status() inside a transaction.
       // 'return' only exits the callback arrow function, NOT the transaction — throw aborts it properly.
       if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
+
+      // Disallow cancelling Mutual Fund purchase orders
+      const isMf = Boolean((order.symbol || '').endsWith('-MF') || (order.symbol || '').includes('MUTUALFUND'));
+      if (isMf) {
+        throw Object.assign(new Error('Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.'), { statusCode: 400 });
+      }
+
       if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'PARTIAL_FILLED' && order.status !== 'AMO_PENDING')
         throw Object.assign(new Error('Only pending, partially filled, or AMO orders can be cancelled'), { statusCode: 400 });
       
