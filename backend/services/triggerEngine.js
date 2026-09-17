@@ -318,7 +318,8 @@ class TriggerEngine {
                 for (const orderId of triggeredOrderIds) {
                     const order = await db('orders').where({ id: orderId }).first();
                     if (order) {
-                        this.executeOrder(order, ltp).catch(err => {
+                        const volumeMatchingEngine = require('./volumeMatchingEngine');
+                        volumeMatchingEngine.submitOrder(order, ltp).catch(err => {
                             console.error('Execution Error:', err);
                             // On failure, re-add to Redis to try again on next tick
                             this.addOrderToMemory(order);
@@ -333,7 +334,19 @@ class TriggerEngine {
 
 
 
-    async executeOrder(order, execPrice) {
+    async executeOrder(order, execPrice, options = {}) {
+        // Safe guard: Bulk cash equity orders (>500 shares) must always flow through realistic volume matching
+        if (!options || !options.bypassVolumeMatching) {
+            const { isDerivativeContract, isCommodityContract } = require('./taxCalculator');
+            const isHighLiquiditySegment = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
+            const totalQty = Number(order.pending_quantity !== undefined && order.pending_quantity !== null ? order.pending_quantity : (order.quantity || 0));
+            const isBulkCashEquity = !isHighLiquiditySegment && totalQty > 500;
+            if (isBulkCashEquity) {
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                return volumeMatchingEngine.submitOrder(order, execPrice);
+            }
+        }
+
         await db.transaction(async (trx) => {
             // Serialize order executions on a per-user basis to prevent position/ledger race conditions
             await trx.raw('SELECT pg_advisory_xact_lock(?)', [order.user_id]);
