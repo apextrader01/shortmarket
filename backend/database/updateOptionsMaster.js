@@ -27,6 +27,7 @@ async function updateOptionsMaster() {
     const options = {};
     const futures = {};
     const stocks = [];
+    const mcxUnderlyings = new Set();
     
     let count = 0;
     let futCount = 0;
@@ -50,7 +51,17 @@ async function updateOptionsMaster() {
                 const underlying = cols[13] ? cols[13].trim() : '';
 
                 if (url.includes('MCX_COM')) {
-                    const mcxLotSizes = { 'NATURALGAS': 1250, 'CRUDEOIL': 100, 'GOLD': 100, 'GOLDM': 10, 'SILVER': 30, 'SILVERM': 5, 'SILVERMIC': 1, 'COPPER': 2500, 'ZINC': 5000, 'LEAD': 5000, 'ALUMINIUM': 5000, 'MENTHAOIL': 360, 'COTTON': 25 };
+                    if (underlying) mcxUnderlyings.add(underlying);
+                    const mcxLotSizes = { 
+                        'NATURALGAS': 1250, 'NATGASMINI': 250, 
+                        'CRUDEOIL': 100, 'CRUDEOILM': 10, 
+                        'GOLD': 100, 'GOLDM': 10, 'GOLDPETAL': 1, 'GOLDGUINEA': 1, 'GOLDTEN': 1,
+                        'SILVER': 30, 'SILVERM': 5, 'SILVERMIC': 1, 'SILVER100': 100, 
+                        'COPPER': 2500, 'ZINC': 5000, 'ZINCMINI': 1000, 
+                        'LEAD': 5000, 'LEADMINI': 1000, 
+                        'ALUMINIUM': 5000, 'ALUMINI': 1000, 
+                        'MENTHAOIL': 360, 'COTTON': 25, 'COTTONCNDL': 25 
+                    };
                     if (mcxLotSizes[underlying]) lotsize = mcxLotSizes[underlying];
                 }
 
@@ -138,7 +149,7 @@ async function updateOptionsMaster() {
     }
 
     // ⚡ Slim options data: keep active expiries & ATM ± strikes (slims from 16MB to ~2.6MB)
-    const { slim: slimmedOptions, keptCount } = slimOptionsData(options);
+    const { slim: slimmedOptions, keptCount } = slimOptionsData(options, mcxUnderlyings);
     fs.writeFileSync(path.join(__dirname, 'options.json'), JSON.stringify(slimmedOptions));
     console.log(`Saved ${keptCount} Option contracts to options.json (Slimmed from ${count} contracts)!`);
 
@@ -164,11 +175,18 @@ async function updateOptionsMaster() {
     }
 }
 
-function slimOptionsData(rawOptions) {
+function slimOptionsData(rawOptions, mcxUnderlyings = new Set()) {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const indices = new Set(['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX']);
-    const mcx = new Set(['CRUDEOIL', 'NATURALGAS', 'GOLD', 'GOLDM', 'SILVER', 'SILVERM', 'COPPER', 'ZINC', 'ALUMINIUM', 'LEAD', 'COTTONCNDL', 'MENTHAOIL']);
+    const indices = new Set(['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX', 'NIFTYNXT50', 'NIFTYFPI']);
+    const mcx = new Set([
+        'CRUDEOIL', 'CRUDEOILM', 'NATURALGAS', 'NATGASMINI', 'GOLD', 'GOLDM', 'GOLDPETAL', 'GOLDGUINEA', 'GOLDTEN',
+        'SILVER', 'SILVERM', 'SILVERMIC', 'SILVER100', 'COPPER', 'ZINC', 'ZINCMINI', 'ALUMINIUM', 'ALUMINI',
+        'LEAD', 'LEADMINI', 'COTTON', 'COTTONCNDL', 'COTTONOIL', 'MENTHAOIL', 'NICKEL', 'CARDAMOM', 'KAPAS', 'STEELREBAR'
+    ]);
+    if (mcxUnderlyings && mcxUnderlyings.size > 0) {
+        for (const u of mcxUnderlyings) mcx.add(u);
+    }
 
     const slim = {};
     let keptCount = 0;
@@ -176,7 +194,7 @@ function slimOptionsData(rawOptions) {
     for (const [u, expMap] of Object.entries(rawOptions)) {
         const isIndex = indices.has(u);
         const isMcx = mcx.has(u);
-        const maxExps = isIndex ? 4 : (isMcx ? 2 : 2);
+        const maxExps = isIndex ? 4 : (isMcx ? 3 : 2);
 
         const activeExps = Object.keys(expMap)
             .filter(e => e >= todayStr)
@@ -188,18 +206,17 @@ function slimOptionsData(rawOptions) {
 
         for (const exp of activeExps) {
             slim[u][exp] = {};
-            if (isIndex) {
-                // ⚡ Indices (SENSEX, NIFTY, BANKNIFTY, etc.): Keep ALL strikes for active expiries.
-                // Ensures all ATM/ITM/OTM strikes (e.g. SENSEX 74800) are always available.
-                // Total size for all 6 indices is only ~1.47 MB.
+            if (isIndex || isMcx) {
+                // ⚡ Indices and MCX Commodities: Keep ALL strikes for active expiries.
+                // Ensures all ATM/ITM/OTM strikes (e.g. SENSEX 74800, CRUDEOIL 9600, CRUDEOILM 9600) are always available.
                 for (const [s, contract] of Object.entries(expMap[exp])) {
                     slim[u][exp][s] = contract;
                     if (contract.CE) keptCount++;
                     if (contract.PE) keptCount++;
                 }
             } else {
-                // Equities & MCX: Keep a reasonable strike window around midpoint
-                const strikeRange = isMcx ? 12 : 8;
+                // Equities: Keep a generous strike window (±25 strikes around midpoint)
+                const strikeRange = 25;
                 const strikes = Object.keys(expMap[exp]).map(Number).sort((a, b) => a - b);
                 const midIdx = Math.floor(strikes.length / 2);
                 const start = Math.max(0, midIdx - strikeRange);
