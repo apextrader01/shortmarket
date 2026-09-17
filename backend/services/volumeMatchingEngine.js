@@ -407,10 +407,11 @@ class VolumeMatchingEngine {
           const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
           if (currentVol > prevVol) {
             const rawDelta = currentVol - prevVol;
-            // Guard against massive reconnect / cumulative feed jumps (> 5,000 in a single tick on cash equities)
+            // Guard against massive reconnect / cumulative feed jumps (> 50,000 in a single tick on cash equities)
+            // Real volume on liquid stocks like VMM can be 24K/min, so threshold must be high enough
             const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
             const isDeriv = queue.some(o => isDerivativeContract(o.symbol) || isCommodityContract(o.symbol));
-            deltaVol = (!isDeriv && rawDelta > 5000) ? 500 : rawDelta;
+            deltaVol = (!isDeriv && rawDelta > 50000) ? Math.floor(rawDelta * 0.30) : rawDelta;
             this.lastSymbolVolume.set(normSym, currentVol);
           }
         }
@@ -470,14 +471,13 @@ class VolumeMatchingEngine {
           }
         } else {
           // Equities (lot = 1): whole shares
-          // If available real exchange volume <= 500, allocate up to 100% of available volume directly
-          // If available volume is larger, participate at 50% POV rate (capped at 500 shares per tick for equities)
-          if (availableVol <= 500) {
-            fillQty = Math.min(order.pending_quantity, availableVol);
-          } else {
-            const maxFill = Math.min(order.pending_quantity, Math.min(500, Math.floor(availableVol * 0.5)));
-            fillQty = Math.min(order.pending_quantity, Math.round(maxFill));
-          }
+          // POV (Percentage of Volume) approach: participate at 30% of real exchange volume per tick.
+          // This scales naturally:
+          //   - KITEX (deltaVol=200):  fill = 60 shares   (realistic for illiquid stock)
+          //   - VMM   (deltaVol=24K):  fill = 7,200 shares (realistic for liquid stock)
+          //   - RELIANCE (deltaVol=500K): fill = capped by pending_quantity
+          const povRate = 0.30; // 30% participation rate
+          fillQty = Math.min(order.pending_quantity, Math.max(1, Math.floor(availableVol * povRate)));
         }
 
         if (fillQty > 0) {
