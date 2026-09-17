@@ -3,6 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
+import MutualFundDetailsModal from './MutualFundDetailsModal';
 
 const EMPTY_PRICES = {};
 
@@ -36,6 +37,7 @@ export default function PositionsView() {
   const [shareModalTrade, setShareModalTrade] = useState(null);
   const [convertModalPos, setConvertModalPos] = useState(null);
   const [convertLoading, setConvertLoading] = useState(false);
+  const [selectedMfFund, setSelectedMfFund] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -162,10 +164,11 @@ export default function PositionsView() {
   const [partialExitType, setPartialExitType] = useState('MARKET');
   const [partialExitPrice, setPartialExitPrice] = useState('');
 
-  const isMutualFund = (sym) => {
+  const isMutualFund = (sym, assetClass) => {
+    if (assetClass === 'MUTUAL_FUND') return true;
     if (!sym || typeof sym !== 'string') return false;
     const clean = sym.includes(':') ? sym.split(':')[1] : sym;
-    return clean.endsWith('-MF') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+    return clean.endsWith('-MF') || clean.includes('MUTUALFUND') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
   };
 
   const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
@@ -191,6 +194,20 @@ export default function PositionsView() {
   const getMfName = (sym) => {
     if (!sym) return null;
     return mfNames[sym] || mfNames[sym + '-MF'] || mfNames[sym.replace('-MF', '')] || null;
+  };
+
+  const handleMfAction = (pos, mode = 'REDEEM') => {
+    const rawSym = pos?.symbol || '';
+    const cleanId = rawSym.replace('-MF', '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const fundName = getMfName(rawSym) || pos?.name || cleanId;
+    setSelectedMfFund({
+      id: cleanId,
+      schemeCode: cleanId,
+      name: fundName,
+      nav: pos?.ltp || pos?.avg || pos?.average_price || 0,
+      symbol: rawSym,
+      initialMode: mode
+    });
   };
 
   const [mfNames, setMfNames] = useState({});
@@ -363,7 +380,7 @@ export default function PositionsView() {
 
       flatList.push({ 
         ...pos, unencumberedQty, ltp, avg, qty, pnl, unrealizedPnl, invested, lotSize, isOpen: qty !== 0,
-        segment, exchange, productLabel
+        segment, exchange, productLabel, isMf: isMutualFund(pos.symbol, pos.asset_class)
       });
 
       if (viewMode === 'CLOSED') {
@@ -947,18 +964,38 @@ export default function PositionsView() {
                           )}
 
                           {viewMode === 'HOLDINGS' && (
-                            <X 
-                              size={18} 
-                              style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                              title="Exit Holding"
-                              onClick={() => {
-                                const exitSide = isShort ? 'BUY' : 'SELL';
-                                const exitQty = Math.abs(rawQty || 1);
-                                useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
-                              }}
-                            />
+                            isMf ? (
+                              <button
+                                type="button"
+                                title="Redeem Mutual Fund"
+                                onClick={() => handleMfAction(pos, 'REDEEM')}
+                                style={{
+                                  background: 'rgba(168, 85, 247, 0.1)',
+                                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                                  color: '#a855f7',
+                                  borderRadius: '4px',
+                                  padding: '2px 8px',
+                                  cursor: 'pointer',
+                                  fontSize: '11px',
+                                  fontWeight: '700'
+                                }}
+                              >
+                                REDEEM
+                              </button>
+                            ) : (
+                              <X 
+                                size={18} 
+                                style={{ cursor: 'pointer', color: 'var(--text-secondary)', transition: 'color 0.2s' }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                                title="Exit Holding"
+                                onClick={() => {
+                                  const exitSide = isShort ? 'BUY' : 'SELL';
+                                  const exitQty = Math.abs(rawQty || 1);
+                                  useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                                }}
+                              />
+                            )
                           )}
                         </div>
                       </td>
@@ -1020,6 +1057,9 @@ export default function PositionsView() {
                   const sideText = rawQty > 0 ? 'BUY' : (rawQty < 0 ? 'SELL' : (pos.side || '-'));
                   const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
+                  const isMf = isMutualFund(pos.symbol, pos.asset_class) || Boolean(pos.isMf);
+                  const mfName = isMf ? getMfName(pos.symbol) : null;
+                  const holdingQty = Math.abs(rawQty);
                   const displayPnl = viewMode === 'CLOSED' 
                     ? realizedPnl 
                     : (viewMode === 'HOLDINGS' 
@@ -1047,9 +1087,13 @@ export default function PositionsView() {
                           setPartialExitType('MARKET');
                           setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
                         } else if (viewMode === 'HOLDINGS') {
-                          const exitSide = isShort ? 'BUY' : 'SELL';
-                          const exitQty = Math.abs(rawQty || 1);
-                          useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                          if (isMf) {
+                            handleMfAction(pos, 'REDEEM');
+                          } else {
+                            const exitSide = isShort ? 'BUY' : 'SELL';
+                            const exitQty = Math.abs(rawQty || 1);
+                            useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                          }
                         }
                       }}
                       style={{
@@ -1082,18 +1126,24 @@ export default function PositionsView() {
                         <div style={{ maxWidth: '68%' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0]}
+                              {isMf && mfName ? mfName : (pos.symbol.split(':')[1] ? pos.symbol.split(':')[1].split('-')[0] : pos.symbol.split('-')[0])}
                             </span>
-                            {isMutualFund(pos.symbol) && (
-                              <span style={{ fontSize: '9px', color: 'var(--color-blue-light)', background: 'rgba(59,130,246,0.12)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>
+                            {isMf && (
+                              <span style={{ fontSize: '9px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '1px 4px', borderRadius: '3px', fontWeight: '700' }}>
                                 MF
                               </span>
                             )}
                           </div>
-                          {isMutualFund(pos.symbol) && getMfName(pos.symbol) && (
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={getMfName(pos.symbol)}>
-                              {getMfName(pos.symbol)}
+                          {isMf ? (
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={mfName || pos.symbol}>
+                              Code: {pos.symbol}
                             </div>
+                          ) : (
+                            pos.name && (
+                              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {pos.name}
+                              </div>
+                            )
                           )}
                         </div>
                         <div style={{ fontSize: '11px', fontWeight: '600', color: isDisplayProfit ? 'var(--color-green-light)' : 'var(--color-red-light)', marginTop: '2px' }}>
@@ -1104,12 +1154,14 @@ export default function PositionsView() {
                       {/* Line 3: Qty & Avg Price (Left) | LTP & Actions (Right) */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
                         <div>
-                          Qty: {viewMode === 'CLOSED' 
+                          {isMf ? 'Units' : 'Qty'}: {viewMode === 'CLOSED' 
                             ? (isMf ? Number(pos.closed_quantity || 0).toFixed(4) : Math.round(Math.abs(pos.closed_quantity || 0)).toLocaleString('en-IN')) 
-                            : (isMf ? Number(pos.qty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || 0)).toLocaleString('en-IN'))} • Avg: ₹{pos.avg.toFixed(2)}
+                            : (viewMode === 'HOLDINGS' && isMf 
+                                ? Number(holdingQty).toFixed(4) 
+                                : (isMf ? Number(pos.qty || holdingQty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || holdingQty || 0)).toLocaleString('en-IN')))} • Avg: ₹{pos.avg.toFixed(2)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>LTP: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
+                          <span>{isMf ? 'NAV' : 'LTP'}: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1164,8 +1216,24 @@ export default function PositionsView() {
                             </button>
                           )}
                           {(viewMode === 'OPEN' || viewMode === 'HOLDINGS') && (
-                            <span style={{ fontSize: '10px', color: 'var(--color-red-light)', border: '1px solid rgba(239,68,68,0.3)', padding: '1px 4px', borderRadius: '3px', fontWeight: '600' }}>
-                              Exit ✕
+                            <span 
+                              onClick={(e) => {
+                                if (isMf && viewMode === 'HOLDINGS') {
+                                  e.stopPropagation();
+                                  handleMfAction(pos, 'REDEEM');
+                                }
+                              }}
+                              style={{ 
+                                fontSize: '10px', 
+                                color: isMf ? '#a855f7' : 'var(--color-red-light)', 
+                                border: `1px solid ${isMf ? 'rgba(168,85,247,0.3)' : 'rgba(239,68,68,0.3)'}`, 
+                                background: isMf ? 'rgba(168,85,247,0.08)' : 'transparent',
+                                padding: '1px 5px', 
+                                borderRadius: '3px', 
+                                fontWeight: '600' 
+                              }}
+                            >
+                              {isMf ? 'Redeem ✕' : 'Exit ✕'}
                             </span>
                           )}
                         </div>
@@ -1383,6 +1451,13 @@ export default function PositionsView() {
         <PnLShareCardModal
           trade={shareModalTrade}
           onClose={() => setShareModalTrade(null)}
+        />
+      )}
+
+      {selectedMfFund && (
+        <MutualFundDetailsModal
+          fund={selectedMfFund}
+          onClose={() => setSelectedMfFund(null)}
         />
       )}
     </div>
