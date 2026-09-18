@@ -488,22 +488,6 @@ class VolumeMatchingEngine {
         const prevAvg = Number(currentOrder.average_price || slicePrice);
         const totalQty = roundQty(Number(currentOrder.quantity));
 
-        // Deduct Brokerage & Regulatory Taxes for this executed slice
-        const sliceTaxes = await LedgerService.chargeExecutionTaxes(
-          trx,
-          order.user_id,
-          order.symbol,
-          order.product_type,
-          order.side,
-          sliceQtyClean,
-          slicePrice
-        );
-        const currentTaxes = Number(currentOrder.taxes || 0);
-        const accumulatedTaxes = Math.round((currentTaxes + sliceTaxes + Number.EPSILON) * 100) / 100;
-
-        // Safe definition of proportional slice margin accessible across all branches
-        const sliceMargin = totalQty > 0 ? (sliceQtyClean / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
-
         const newFilled = Math.min(totalQty, roundQty(prevFilled + sliceQtyClean));
         const newPending = Math.max(0, roundQty(totalQty - newFilled));
         const newAvgPrice = prevFilled > 0
@@ -512,6 +496,38 @@ class VolumeMatchingEngine {
 
         const isComplete = newPending <= 0;
         const newStatus = isComplete ? 'EXECUTED' : 'PARTIAL_FILLED';
+
+        // Order-level cumulative taxes (capped at standard broker rates e.g. max ₹20 per order)
+        const totalOrderTaxesObj = calculateTaxes(
+          order.symbol,
+          order.product_type,
+          order.side,
+          newFilled,
+          newAvgPrice
+        );
+        const accumulatedTaxes = Math.round((Number(totalOrderTaxesObj.totalTaxes || 0) + Number.EPSILON) * 100) / 100;
+        const previouslyDebited = Number(currentOrder.taxes || 0);
+        const incrementalTaxes = Math.max(0, Math.round((accumulatedTaxes - previouslyDebited + Number.EPSILON) * 100) / 100);
+
+        if (incrementalTaxes > 0) {
+          const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+          await trx('users').where({ id: order.user_id }).update({
+            balance: Math.round((Number(user.balance) - incrementalTaxes + Number.EPSILON) * 100) / 100
+          });
+        }
+
+        // Write consolidated ledger entry ONLY when order reaches EXECUTED
+        if (isComplete && accumulatedTaxes > 0) {
+          await trx('ledger').insert({
+            user_id: order.user_id,
+            amount: -accumulatedTaxes,
+            type: 'TAXES',
+            description: `Taxes & Brokerage for ${order.side} ${newFilled} ${order.symbol} (Order #${order.id})`
+          });
+        }
+
+        // Safe definition of proportional slice margin accessible across all branches
+        const sliceMargin = totalQty > 0 ? (sliceQtyClean / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
 
         // 1. Update Order record
         await trx('orders').where({ id: order.id }).update({

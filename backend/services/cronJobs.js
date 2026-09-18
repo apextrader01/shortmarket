@@ -611,6 +611,22 @@ function initCronJobs(priceCache, triggerEngine) {
                                 if (remainingMarginToRefund > 0) {
                                     await LedgerService.releaseMargin(trx, pos.user_id, remainingMarginToRefund, `Phase 3 Cancelled: ${o.symbol}`);
                                 }
+
+                                const filledQ = Number(o.filled_quantity) || 0;
+                                if (filledQ > 0 && Number(o.taxes) > 0) {
+                                    const existingTax = await trx('ledger')
+                                        .where({ user_id: pos.user_id, type: 'TAXES' })
+                                        .where('description', 'like', `%Order #${o.id}%`)
+                                        .first();
+                                    if (!existingTax) {
+                                        await trx('ledger').insert({
+                                            user_id: pos.user_id,
+                                            amount: -Number(o.taxes),
+                                            type: 'TAXES',
+                                            description: `Taxes & Brokerage for ${o.side} ${filledQ} ${o.symbol} (Order #${o.id})`
+                                        });
+                                    }
+                                }
                                 ordersToCleanFromRedis.push({ id: o.id, symbol: o.symbol });
                             }
                         }

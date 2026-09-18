@@ -90,6 +90,17 @@ adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Con
         // fail silently
     }
 })();
+
+// --- RETROACTIVE CLEANUP FOR TODAY'S FRAGMENTED MICRO-SLICE TAXES ---
+(async function cleanupTodayFragmentedTaxes() {
+    try {
+        const { consolidateTodaySliceTaxes } = require('./scripts/consolidate_today_slice_taxes');
+        const db = require('./database/db');
+        await consolidateTodaySliceTaxes(db);
+    } catch (e) {
+        // fail silently
+    }
+})();
 // ----------------------------------------------------
 const app = express();
 app.set('trust proxy', true);
@@ -6489,8 +6500,24 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
 
-      // If a partially filled BO/CO order is cancelled, spawn protection legs for the already executed portion
+      // If a partially filled order is cancelled, ensure consolidated tax entry exists for the filled portion
       const filledQty = parseFloat(order.filled_quantity || 0);
+      if (filledQty > 0 && Number(order.taxes) > 0) {
+        const existingTax = await trx('ledger')
+          .where({ user_id: order.user_id, type: 'TAXES' })
+          .where('description', 'like', `%Order #${order.id}%`)
+          .first();
+        if (!existingTax) {
+          await trx('ledger').insert({
+            user_id: order.user_id,
+            amount: -Number(order.taxes),
+            type: 'TAXES',
+            description: `Taxes & Brokerage for ${order.side} ${filledQty} ${order.symbol} (Order #${order.id})`
+          });
+        }
+      }
+
+      // If a partially filled BO/CO order is cancelled, spawn protection legs for the already executed portion
       if (filledQty > 0 && (order.sl_price || order.tgt_price || order.product_type === 'BO' || order.product_type === 'CO')) {
         const existingChild = await trx('orders').where({ parent_order_id: order.id }).first();
         if (!existingChild) {
