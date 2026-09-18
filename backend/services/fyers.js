@@ -468,7 +468,9 @@ function startLiveWebSocket() {
                         bids: bids.length > 0 ? bids : (oldPriceObj.bids || []),
                         asks: asks.length > 0 ? asks : (oldPriceObj.asks || []),
                         totBuyQuan: tick.tot_buy_qty !== undefined ? tick.tot_buy_qty : (oldPriceObj.totBuyQuan || 0),
-                        totSellQuan: tick.tot_sell_qty !== undefined ? tick.tot_sell_qty : (oldPriceObj.totSellQuan || 0)
+                        totSellQuan: tick.tot_sell_qty !== undefined ? tick.tot_sell_qty : (oldPriceObj.totSellQuan || 0),
+                        upper_circuit: tick.upper_ckt !== undefined ? Number(tick.upper_ckt) : (oldPriceObj.upper_circuit || null),
+                        lower_circuit: tick.lower_ckt !== undefined ? Number(tick.lower_ckt) : (oldPriceObj.lower_circuit || null)
                     };
                     
                     sharedPriceCache[uniqueSymbol] = priceObj;
@@ -827,7 +829,9 @@ async function fetchBatchLTPs(symbols) {
                                             close: close,
                                             volume: Number(item.v.volume) || 0,
                                             change: change,
-                                            pct: pct
+                                            pct: pct,
+                                            upper_circuit: Number(item.v.upper_ckt) || Number(item.v.upper_circuit) || null,
+                                            lower_circuit: Number(item.v.lower_ckt) || Number(item.v.lower_circuit) || null
                                         };
                                         results[uniqueSymbol] = priceObj;
                                         sharedPriceCache[uniqueSymbol] = priceObj;

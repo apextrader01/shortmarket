@@ -538,10 +538,36 @@ function initCronJobs(priceCache, triggerEngine) {
                             continue;
                         }
 
-                        // Close position with RMS penalty
-                        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
-                        affectedUserIds.add(pos.user_id);
-                        console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
+                        // Check Circuit Lock / Depth Imbalance for Cash Equities
+                        const upperCircuit = Number(cached?.upper_circuit || cached?.upper_ckt || 0);
+                        const lowerCircuit = Number(cached?.lower_circuit || cached?.lower_ckt || 0);
+                        const totBuyQuan = Number(cached?.totBuyQuan || 0);
+                        const totSellQuan = Number(cached?.totSellQuan || 0);
+                        const hasBook = Boolean(cached?.bids?.length || cached?.asks?.length || totBuyQuan > 0 || totSellQuan > 0);
+
+                        const isLong = Number(pos.quantity) > 0;
+                        const isShort = Number(pos.quantity) < 0;
+                        const isEquityStock = !isCom && sub !== 'DERIVATIVE';
+
+                        const isLockedAtLower = isEquityStock && isLong && ((lowerCircuit > 0 && ltp <= lowerCircuit * 1.002) || (hasBook && totBuyQuan === 0 && (cached?.bids || []).length === 0));
+                        const isLockedAtUpper = isEquityStock && isShort && ((upperCircuit > 0 && ltp >= upperCircuit * 0.998) || (hasBook && totSellQuan === 0 && (cached?.asks || []).length === 0));
+
+                        if (isLockedAtLower) {
+                            // 3:30 PM EOD Handler: Long position locked at Lower Circuit cannot be squared off -> Auto-convert to CNC Delivery
+                            await LedgerService.convertPositionToDelivery(trx, pos.user_id, pos.id, ltp);
+                            affectedUserIds.add(pos.user_id);
+                            console.log(`[CRON] Circuit Lock Fallback: Auto-converted Long position ${pos.id} for ${pos.symbol} to CNC Delivery.`);
+                        } else if (isLockedAtUpper) {
+                            // 3:30 PM EOD Handler: Short position locked at Upper Circuit cannot be bought back -> Short Delivery Auction Settlement
+                            await LedgerService.settleShortDeliveryAuction(trx, pos.user_id, pos.id, upperCircuit || (ltp * 1.05));
+                            affectedUserIds.add(pos.user_id);
+                            console.log(`[CRON] Circuit Lock Fallback: Settled Short position ${pos.id} for ${pos.symbol} via Short Delivery Auction.`);
+                        } else {
+                            // Standard square-off with RMS penalty
+                            await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true);
+                            affectedUserIds.add(pos.user_id);
+                            console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
+                        }
                         
                         // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
                         const triggers = await trx('orders')
@@ -619,6 +645,70 @@ function initCronJobs(priceCache, triggerEngine) {
 
     // Phase 3C: 03:30 PM - Auto Square-Off Derivatives open intraday positions
     cron.schedule('30 15 * * 1-5', () => phase3SquareOff('DERIVATIVE'), TZ);
+
+    // 03:31 PM: The 3:30 PM EOD Handler - Auto-Convert Unclosed Longs to CNC (with debit balance) & Settle Shorts via Auction
+    cron.schedule('31 15 * * 1-5', async () => {
+        console.log('\n🏛️ [CRON 03:31 PM] Running EOD Reconciliation for any remaining open Cash Equity intraday positions...');
+        const lockKey = 'cron_eod_equity_reconciliation_331';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) return;
+            }
+
+            await db.transaction(async (trx) => {
+                const openCashIntraday = await trx('positions')
+                    .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+                    .whereNot({ quantity: 0 });
+
+                const cashEquityPositions = openCashIntraday.filter(p => !isCommoditySymbol(p.symbol) && !isDerivativeSymbol(p.symbol));
+                if (cashEquityPositions.length === 0) return;
+
+                const affectedUserIds = new Set();
+                for (const pos of cashEquityPositions) {
+                    const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                    const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`BSE:${cleanSym}`];
+                    let ltp = Number(cached?.ltp || cached?.close || cached?.prev_close_price || pos.average_price || 0);
+                    const upperCircuit = Number(cached?.upper_circuit || cached?.upper_ckt || 0);
+
+                    if (Number(pos.quantity) > 0) {
+                        // Long: Auto-convert to CNC Delivery
+                        await LedgerService.convertPositionToDelivery(trx, pos.user_id, pos.id, ltp);
+                        affectedUserIds.add(pos.user_id);
+                    } else if (Number(pos.quantity) < 0) {
+                        // Short: Settle via Short Delivery Auction Settlement
+                        await LedgerService.settleShortDeliveryAuction(trx, pos.user_id, pos.id, upperCircuit || (ltp * 1.05));
+                        affectedUserIds.add(pos.user_id);
+                    }
+                }
+
+                if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
+                    for (const uid of affectedUserIds) {
+                        triggerEngine.io.to(uid.toString()).emit('sync_user_data');
+                        triggerEngine.io.to(uid.toString()).emit('trade_alert', {
+                            event: 'EXECUTED',
+                            symbol: 'PORTFOLIO',
+                            message: '3:30 PM EOD reconciliation completed: unclosed positions converted to CNC or settled via Auction.'
+                        });
+                    }
+                }
+            });
+        } catch (err) {
+            console.error('03:31 PM EOD Reconciliation Error:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }, TZ);
 
     // 03:35 PM: Closing Auction Session (CAS) matching for F&O Cash stocks
     cron.schedule('35 15 * * 1-5', () => {

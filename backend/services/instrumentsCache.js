@@ -221,12 +221,33 @@ const isMCXWinterSession = (d = new Date()) => {
 };
 
 /**
- * Checks if position conversion (INT <-> DEL) is allowed for a symbol.
- * Rule: Position conversion is NOT allowed starting 1 minute before the segment's intraday cutoff
- * and throughout the cutoff / auto square-off / market-closed period.
+ * Checks if position conversion is allowed for a symbol based on target product type and timing.
+ * Rule (Segment Timings):
+ * 1. Mutual fund units cannot be converted.
+ * 2. Markets must be open (disabled on weekends and outside market hours).
+ * 3. Converting Intraday to Delivery (INT -> DEL):
+ *    Allowed throughout all active trading hours up to market close (03:30 PM for Equities & F&O, 11:30 PM / 11:55 PM for MCX).
+ * 4. Converting Delivery to Intraday (DEL -> INT):
+ *    Blocked starting 1 minute before intraday cutoff (03:04 PM for F&O Equities, 03:14 PM for Cash Equities, 03:24 PM for F&O Derivatives, 10:49 PM / 11:29 PM for MCX Commodities).
  */
-function checkPositionConversionAllowed(symbol, dateObj = new Date()) {
+function checkPositionConversionAllowed(symbol, targetProductTypeOrDate = 'DEL', maybeDateObj = new Date()) {
     if (!symbol) return { allowed: false, reason: 'Invalid instrument symbol.' };
+
+    let targetProductType = 'DEL';
+    let dateObj = new Date();
+
+    if (targetProductTypeOrDate instanceof Date) {
+        dateObj = targetProductTypeOrDate;
+        targetProductType = 'DEL';
+    } else if (typeof targetProductTypeOrDate === 'string') {
+        const upper = targetProductTypeOrDate.toUpperCase();
+        targetProductType = (upper === 'CNC' || upper === 'NRML') ? 'DEL' : (upper === 'MIS' ? 'INT' : upper);
+        if (maybeDateObj instanceof Date) {
+            dateObj = maybeDateObj;
+        }
+    }
+
+    const isTargetingIntraday = targetProductType === 'INT' || targetProductType === 'MIS';
 
     const sub = getAssetSubsegment(symbol);
     if (sub === 'MUTUAL_FUND') {
@@ -254,65 +275,54 @@ function checkPositionConversionAllowed(symbol, dateObj = new Date()) {
 
     if (sub === 'COMMODITY') {
         const isWinter = isMCXWinterSession(dateObj);
-        // Summer: Cutoff 10:50 PM (1370 mins). 1 min before: 10:49 PM (1369 mins).
-        // Winter: Cutoff 11:30 PM (1410 mins). 1 min before: 11:29 PM (1409 mins).
-        const cutoffMins = isWinter ? (23 * 60 + 30) : (22 * 60 + 50);
-        const cutoffLabel = isWinter ? '11:30 PM' : '10:50 PM';
-        const blockMins = cutoffMins - 1; // 1 min before cutoff
-        const blockLabel = isWinter ? '11:29 PM' : '10:49 PM';
+        // Summer: Market open 09:00 AM (540 mins) to 11:30 PM (1410 mins). Cutoff 10:50 PM. Blocked from 10:49 PM (1369 mins).
+        // Winter: Market open 09:00 AM (540 mins) to 11:55 PM (1435 mins). Cutoff 11:30 PM. Blocked from 11:29 PM (1409 mins).
+        const closeMins = isWinter ? (23 * 60 + 55) : (23 * 60 + 30);
         const openMins = 9 * 60; // 09:00 AM
+        const blockMinsToInt = isWinter ? (23 * 60 + 29) : (22 * 60 + 49);
+        const blockLabel = isWinter ? '11:29 PM' : '10:49 PM';
 
-        if (currentMinutes < openMins) {
-            return { allowed: false, reason: 'Position conversion for MCX Commodities is disabled before market opens at 09:00 AM IST.' };
+        if (currentMinutes < openMins || currentMinutes >= closeMins) {
+            return { allowed: false, reason: 'Position conversion for MCX Commodities is disabled when the commodity market is closed.' };
         }
-        if (currentMinutes >= blockMins) {
-            return { allowed: false, reason: `Position conversion for MCX Commodities is disabled starting 1 minute before the intraday cutoff (${cutoffLabel}, blocked from ${blockLabel}) and during auto square-off.` };
+        if (isTargetingIntraday && currentMinutes >= blockMinsToInt) {
+            return { allowed: false, reason: `Converting Delivery to Intraday for MCX Commodities is disabled starting at ${blockLabel} due to intraday cutoff.` };
         }
         return { allowed: true };
     }
 
-    if (sub === 'DERIVATIVE') {
-        // Cutoff 03:25 PM (925 mins). 1 min before: 03:24 PM (924 mins).
-        const openMins = 9 * 60 + 15; // 09:15 AM
-        const blockMins = 15 * 60 + 24; // 03:24 PM (1 min before 03:25 PM)
+    // For Equities and Derivatives (NSE / BSE): Market hours 09:15 AM (555 mins) to 03:30 PM (930 mins)
+    const openMins = 9 * 60 + 15; // 09:15 AM
+    const closeMins = 15 * 60 + 30; // 03:30 PM
 
-        if (currentMinutes < openMins) {
-            return { allowed: false, reason: 'Position conversion for Futures & Options is disabled before market opens at 09:15 AM IST.' };
-        }
-        if (currentMinutes >= blockMins) {
-            return { allowed: false, reason: 'Position conversion for Futures & Options is disabled starting 1 minute before the intraday cutoff (03:25 PM, blocked from 03:24 PM) and during auto square-off.' };
-        }
-        return { allowed: true };
+    if (currentMinutes < openMins || currentMinutes >= closeMins) {
+        return { allowed: false, reason: 'Position conversion is disabled outside trading hours (09:15 AM - 03:30 PM IST).' };
     }
 
-    if (sub === 'FNO_EQ') {
-        // Cutoff 03:05 PM (905 mins). 1 min before: 03:04 PM (904 mins).
-        const openMins = 9 * 60 + 15; // 09:15 AM
-        const blockMins = 15 * 60 + 4; // 03:04 PM (1 min before 03:05 PM)
-
-        if (currentMinutes < openMins) {
-            return { allowed: false, reason: 'Position conversion for F&O Cash Equities is disabled before market opens at 09:15 AM IST.' };
+    if (isTargetingIntraday) {
+        if (sub === 'DERIVATIVE') {
+            // Cutoff 03:25 PM. Blocked from 03:24 PM (924 mins)
+            const blockMinsToInt = 15 * 60 + 24;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for Futures & Options is disabled after 03:24 PM due to intraday cutoff.' };
+            }
+        } else if (sub === 'FNO_EQ') {
+            // Cutoff 03:05 PM. Blocked from 03:04 PM (904 mins)
+            const blockMinsToInt = 15 * 60 + 4;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for F&O Cash Equities is disabled after 03:04 PM due to intraday cutoff.' };
+            }
+        } else {
+            // NON_FNO_EQ (All other Cash Equities): Cutoff 03:15 PM. Blocked from 03:14 PM (914 mins)
+            const blockMinsToInt = 15 * 60 + 14;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for Cash Equities is disabled after 03:14 PM due to intraday cutoff.' };
+            }
         }
-        if (currentMinutes >= blockMins) {
-            return { allowed: false, reason: 'Position conversion for F&O Cash Equities is disabled starting 1 minute before the intraday cutoff (03:05 PM, blocked from 03:04 PM) and during auto square-off.' };
-        }
-        return { allowed: true };
     }
 
-    // NON_FNO_EQ (All other Cash Equities)
-    {
-        // Cutoff 03:15 PM (915 mins). 1 min before: 03:14 PM (914 mins).
-        const openMins = 9 * 60 + 15; // 09:15 AM
-        const blockMins = 15 * 60 + 14; // 03:14 PM (1 min before 03:15 PM)
-
-        if (currentMinutes < openMins) {
-            return { allowed: false, reason: 'Position conversion for Cash Equities is disabled before market opens at 09:15 AM IST.' };
-        }
-        if (currentMinutes >= blockMins) {
-            return { allowed: false, reason: 'Position conversion for Cash Equities is disabled starting 1 minute before the intraday cutoff (03:15 PM, blocked from 03:14 PM) and during auto square-off.' };
-        }
-        return { allowed: true };
-    }
+    // Intraday to Delivery (INT -> DEL) is permitted throughout all open market hours up to 03:30 PM IST!
+    return { allowed: true };
 }
 
 module.exports = {

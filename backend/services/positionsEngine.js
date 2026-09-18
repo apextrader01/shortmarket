@@ -403,7 +403,16 @@ class PositionsEngine {
                 const m = cleanSym.match(/^([A-Z0-9]+?)(\d{2})/);
                 if (m && m[1]) {
                     const u = m[1];
-                    spotSymbolsToFetch.push(u, `NSE:${u}`, `NSE:${u}-INDEX`, `NSE:${u}-EQ`, `BSE:${u}`);
+                    spotSymbolsToFetch.push(
+                        u, 
+                        `NSE:${u}`, 
+                        `NSE:${u}-INDEX`, 
+                        `NSE:${u}50-INDEX`, 
+                        `NSE:${u}BANK-INDEX`, 
+                        `NSE:${u}-EQ`, 
+                        `BSE:${u}`, 
+                        `BSE:${u}-INDEX`
+                    );
                 }
             }
             const priceCache = await ensureLivePrices([...allSymbols, ...spotSymbolsToFetch]);
@@ -454,8 +463,11 @@ class PositionsEngine {
                             `${underlying}-BSE`,
                             `NSE:${underlying}`,
                             `NSE:${underlying}-INDEX`,
+                            `NSE:${underlying}50-INDEX`,
+                            `NSE:${underlying}BANK-INDEX`,
                             `NSE:${underlying}-EQ`,
-                            `BSE:${underlying}`
+                            `BSE:${underlying}`,
+                            `BSE:${underlying}-INDEX`
                         ];
                         for (const cand of candidates) {
                             if (priceCache[cand]?.ltp > 0) {
@@ -553,7 +565,7 @@ class PositionsEngine {
 
                 const orderRow = await db('orders').where({ id: orderId.id || orderId }).first();
                 orderRow.is_rms = false;
-                await triggerEngine.executeOrder(orderRow, ltp);
+                await triggerEngine.executeOrder(orderRow, ltp, { bypassVolumeMatching: true });
                 console.log(`[EXPIRY SETTLED] ${item.symbol} (${side} ${orderQty} @ ${ltp}) for User ${item.user_id}`);
             };
 

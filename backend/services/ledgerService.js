@@ -176,6 +176,156 @@ class LedgerService {
 
         return { realizedPnl, exitTaxes, rmsPenalty, netRelease };
     }
+
+    /**
+     * Auto-converts an unfilled intraday LONG position to CNC Delivery at 3:30 PM.
+     * Calculates full delivery cash requirement; records debit balance / margin shortfall if cash is insufficient.
+     */
+    static async convertPositionToDelivery(trx, userId, positionId, currentPrice) {
+        const position = await trx('positions').where({ id: positionId }).forUpdate().first();
+        if (!position || Number(position.quantity) <= 0) return null;
+
+        const quantity = Number(position.quantity);
+        const symbol = position.symbol;
+        const entryPrice = parseFloat(position.average_price) || 0;
+        const effectivePrice = (currentPrice && Number(currentPrice) > 0) ? Number(currentPrice) : entryPrice;
+        const deliveryPrincipal = Math.round((quantity * effectivePrice + Number.EPSILON) * 100) / 100;
+        const marginBlocked = parseFloat(position.margin) || 0;
+
+        // Release the intraday margin and debit the full delivery principal
+        const user = await trx('users').where({ id: userId }).forUpdate().first();
+        const prevBalance = parseFloat(user.balance) || 0;
+        const newBalance = Math.round((prevBalance + marginBlocked - deliveryPrincipal + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: userId }).update({ balance: newBalance });
+
+        if (marginBlocked > 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: marginBlocked,
+                type: 'MARGIN_RELEASE',
+                description: `Intraday margin released on delivery conversion: ${quantity} ${symbol}`
+            });
+        }
+
+        await trx('ledger').insert({
+            user_id: userId,
+            amount: -deliveryPrincipal,
+            type: 'MARGIN_SHORTFALL_CONVERSION',
+            description: `CNC Delivery conversion for ${quantity} ${symbol} @ ₹${effectivePrice.toFixed(2)}${newBalance < 0 ? ' (Debit Balance / Margin Shortfall)' : ''}`
+        });
+
+        // Convert product type to CNC/DEL in positions table
+        await trx('positions').where({ id: positionId }).update({
+            product_type: 'CNC',
+            margin: 0,
+            updated_at: new Date()
+        });
+
+        console.log(`[EOD AUTO-CONVERSION] Converted ${quantity} ${symbol} for User ${userId} to CNC Delivery. New Balance: ₹${newBalance}`);
+        return { success: true, quantity, symbol, effectivePrice, deliveryPrincipal, newBalance };
+    }
+
+    /**
+     * Settles an unfilled intraday SHORT position via Exchange Short Delivery Auction.
+     * Liquidates at auction settlement price (Upper Circuit or close + 5% penalty).
+     */
+    static async settleShortDeliveryAuction(trx, userId, positionId, auctionPrice) {
+        const position = await trx('positions').where({ id: positionId }).forUpdate().first();
+        if (!position || Number(position.quantity) >= 0) return null;
+
+        const quantity = Number(position.quantity);
+        const absQty = Math.abs(quantity);
+        const symbol = position.symbol;
+        const entryPrice = parseFloat(position.average_price) || 0;
+        const finalPrice = (auctionPrice && Number(auctionPrice) > 0) ? Number(auctionPrice) : (entryPrice * 1.05);
+
+        // 5% standard exchange auction penalty
+        const auctionPenalty = Math.round((finalPrice * absQty * 0.05 + Number.EPSILON) * 100) / 100;
+        // Realized loss for short: (entryPrice - finalPrice) * qty
+        const realizedPnl = Math.round(((entryPrice - finalPrice) * absQty + Number.EPSILON) * 100) / 100;
+
+        const taxesObj = calculateTaxes(symbol, position.product_type, 'BUY', absQty, finalPrice);
+        const exitTaxes = taxesObj.totalTaxes;
+
+        const marginBlocked = parseFloat(position.margin) || 0;
+        const netRelease = Math.round((marginBlocked + realizedPnl - auctionPenalty - exitTaxes + Number.EPSILON) * 100) / 100;
+
+        const user = await trx('users').where({ id: userId }).forUpdate().first();
+        const prevBalance = parseFloat(user.balance) || 0;
+        const newBalance = Math.round((prevBalance + netRelease + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: userId }).update({ balance: newBalance });
+
+        // Insert historical completed order record
+        await trx('orders').insert({
+            user_id: userId,
+            symbol: symbol,
+            type: 'MARKET',
+            side: 'BUY',
+            quantity: absQty,
+            filled_quantity: absQty,
+            pending_quantity: 0,
+            price: finalPrice,
+            average_price: finalPrice,
+            order_variety: 'REGULAR',
+            status: 'EXECUTED',
+            product_type: position.product_type,
+            margin: 0,
+            realized_pnl: realizedPnl,
+            taxes: exitTaxes,
+            remarks: `Short Delivery Auction Settlement @ ₹${finalPrice.toFixed(2)} (+5% penalty)`,
+            created_at: new Date(),
+            updated_at: new Date()
+        });
+
+        if (marginBlocked > 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: marginBlocked,
+                type: 'MARGIN_RELEASE',
+                description: `Margin released on Short Delivery Auction settlement: ${symbol}`
+            });
+        }
+
+        if (realizedPnl !== 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: realizedPnl,
+                type: 'REALIZED_PNL',
+                description: `Realized loss on Short Delivery Auction: ${absQty} ${symbol}`
+            });
+        }
+
+        if (auctionPenalty > 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: -auctionPenalty,
+                type: 'SHORT_DELIVERY_AUCTION_SETTLEMENT',
+                description: `Exchange Auction Penalty (5%) for Short Delivery on ${absQty} ${symbol}`
+            });
+        }
+
+        if (exitTaxes > 0) {
+            await trx('ledger').insert({
+                user_id: userId,
+                amount: -exitTaxes,
+                type: 'TAXES',
+                description: `Auction Settlement Taxes for ${symbol}`
+            });
+        }
+
+        // Close position
+        await trx('positions').where({ id: positionId }).update({
+            quantity: 0,
+            closed_quantity: trx.raw('COALESCE(closed_quantity, 0) + ?', [absQty]),
+            exit_price: finalPrice,
+            margin: 0,
+            realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl]),
+            updated_at: new Date()
+        });
+
+        console.log(`[EOD AUCTION SETTLEMENT] Settled Short Delivery of ${absQty} ${symbol} for User ${userId} @ ₹${finalPrice} (Penalty: ₹${auctionPenalty})`);
+        return { success: true, absQty, symbol, finalPrice, auctionPenalty, realizedPnl, newBalance };
+    }
 }
 
 module.exports = LedgerService;

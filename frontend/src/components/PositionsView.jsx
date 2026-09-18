@@ -918,12 +918,16 @@ export default function PositionsView() {
                           </button>
 
                           {viewMode === 'OPEN' && (() => {
-                            const convCheck = checkPositionConversionAllowed(pos.symbol);
+                            const currentProd = String(pos.product_type || pos.productLabel || 'INT').toUpperCase();
+                            const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
+                            const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
+
+                            const convCheck = checkPositionConversionAllowed(pos.symbol, targetProd);
                             const isConvBlocked = !convCheck.allowed;
                             return (
                               <button
                                 type="button"
-                                title={isConvBlocked ? convCheck.reason : "Convert Position (INT <-> DEL)"}
+                                title={isConvBlocked ? convCheck.reason : `Convert to ${targetProd === 'DEL' ? 'Delivery (CNC)' : 'Intraday (MIS)'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isConvBlocked) {
@@ -1205,12 +1209,16 @@ export default function PositionsView() {
                             <Share2 size={10} /> Share
                           </button>
                           {viewMode === 'OPEN' && (() => {
-                            const convCheck = checkPositionConversionAllowed(pos.symbol);
+                            const currentProd = String(pos.product_type || pos.productLabel || 'INT').toUpperCase();
+                            const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
+                            const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
+
+                            const convCheck = checkPositionConversionAllowed(pos.symbol, targetProd);
                             const isConvBlocked = !convCheck.allowed;
                             return (
                               <button
                                 type="button"
-                                title={isConvBlocked ? convCheck.reason : "Convert"}
+                                title={isConvBlocked ? convCheck.reason : `Convert to ${targetProd === 'DEL' ? 'Delivery (CNC)' : 'Intraday (MIS)'}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isConvBlocked) {
@@ -1380,14 +1388,15 @@ export default function PositionsView() {
 
       {/* Convert Position Modal */}
       {convertModalPos && (() => {
-        const currentProd = convertModalPos.product_type || convertModalPos.productLabel || 'INT';
+        const currentProd = String(convertModalPos.product_type || convertModalPos.productLabel || 'INT').toUpperCase();
         const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
         const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
         const absQty = Math.abs(Number(convertModalPos.qty || convertModalPos.quantity || 1));
         const avgPrice = Number(convertModalPos.avg || convertModalPos.average_price || 0);
         const reqMargin = isCurrentlyInt ? (absQty * avgPrice) : 0;
-        const convCheck = checkPositionConversionAllowed(convertModalPos.symbol);
+        const convCheck = checkPositionConversionAllowed(convertModalPos.symbol, targetProd);
         const isConvBlocked = !convCheck.allowed;
+        const blockReason = convCheck.reason;
 
         return (
           <div style={{
@@ -1411,7 +1420,7 @@ export default function PositionsView() {
                 <div style={{ background: 'var(--bg-hover)', padding: '12px', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Current Product:</span>
-                    <span style={{ fontWeight: '700' }}>{currentProd}</span>
+                    <span style={{ fontWeight: '700' }}>{currentProd} ({isCurrentlyInt ? 'Intraday / MIS' : 'Delivery / CNC'})</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Target Product:</span>
@@ -1440,7 +1449,7 @@ export default function PositionsView() {
                     fontSize: '11.5px',
                     lineHeight: '1.4'
                   }}>
-                    ⚠️ <strong>Conversion Blocked:</strong> {convCheck.reason}
+                    ⚠️ <strong>Conversion Blocked:</strong> {blockReason}
                   </div>
                 )}
 
@@ -1448,7 +1457,7 @@ export default function PositionsView() {
                   disabled={convertLoading || isConvBlocked}
                   onClick={async () => {
                     if (isConvBlocked) {
-                      alert(convCheck.reason);
+                      alert(blockReason);
                       return;
                     }
                     setConvertLoading(true);
@@ -1480,7 +1489,7 @@ export default function PositionsView() {
                     opacity: (convertLoading || isConvBlocked) ? 0.6 : 1
                   }}
                 >
-                  {convertLoading ? 'Converting...' : isConvBlocked ? 'Conversion Blocked (Near Cutoff)' : `Convert to ${targetProd}`}
+                  {convertLoading ? 'Converting...' : isConvBlocked ? 'Conversion Blocked' : `Convert to ${targetProd}`}
                 </button>
               </div>
             </div>

@@ -189,6 +189,30 @@ export default function OrderModal() {
 
   const isRestricted = restrictedStocks.includes(symbol);
   const isCommodity = isCommodityContract(symbol);
+
+  const cleanU = String(cleanSym || symbol || '').toUpperCase();
+  const rawSymU = String(symbol || '').toUpperCase();
+  const isT2T = cleanU.endsWith('-BE') || cleanU.endsWith('-T') || cleanU.endsWith('-Z') || cleanU.endsWith('-SM') || cleanU.endsWith('-ST')
+    || rawSymU.endsWith('-BE') || rawSymU.endsWith('-T') || rawSymU.endsWith('-Z') || rawSymU.endsWith('-SM') || rawSymU.endsWith('-ST');
+  const upperCircuit = Number(livePriceData?.upper_circuit || livePriceData?.upper_ckt || 0);
+  const lowerCircuit = Number(livePriceData?.lower_circuit || livePriceData?.lower_ckt || 0);
+  const liveLtp = Number(livePriceData?.ltp || 0);
+  const totBuyQuan = Number(livePriceData?.totBuyQuan || 0);
+  const totSellQuan = Number(livePriceData?.totSellQuan || 0);
+  const isCircuitBlockedForSide = !isTrueExit && !isDerivativeContract(symbol) && !isCommodityContract(symbol) && (
+    (side === 'SELL' && ((upperCircuit > 0 && liveLtp >= upperCircuit * 0.995) || (totSellQuan === 0 && (livePriceData?.asks || []).length === 0 && liveLtp > 0))) ||
+    (side === 'BUY' && ((lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005) || (totBuyQuan === 0 && (livePriceData?.bids || []).length === 0 && liveLtp > 0)))
+  );
+  const isIntradayRestricted = isT2T || isCircuitBlockedForSide;
+  const intradayBlockReason = isT2T 
+    ? 'Trade-to-Trade (T2T) stock: Intraday (MIS) is strictly prohibited by SEBI regulations. Delivery (CNC) only.'
+    : (isCircuitBlockedForSide ? (side === 'SELL' ? 'Stock at/near Upper Circuit: Shorting (MIS) blocked to prevent short-delivery risk.' : 'Stock at/near Lower Circuit: Buying (MIS) blocked due to exit lock risk.') : null);
+
+  useEffect(() => {
+    if (isIntradayRestricted && productType === 'INT') {
+      setProductType('DEL');
+    }
+  }, [isIntradayRestricted, productType]);
   
   const getMarketSession = () => {
     const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
@@ -753,17 +777,26 @@ export default function OrderModal() {
           <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
             <button
               type="button"
-              onClick={() => setProductType('INT')} 
+              onClick={() => {
+                if (isIntradayRestricted) {
+                  alert(intradayBlockReason);
+                  return;
+                }
+                setProductType('INT');
+              }} 
               style={{ 
                 padding: '6px 14px', 
                 borderRadius: '4px',
                 border: 'none',
-                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                cursor: isIntradayRestricted ? 'not-allowed' : 'pointer',
+                opacity: isIntradayRestricted ? 0.45 : 1,
                 background: productType === 'INT' ? '#2563eb' : 'transparent',
                 color: productType === 'INT' ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '12.5px', fontWeight: '600',
                 transition: 'all 0.15s ease'
               }}
+              title={isIntradayRestricted ? intradayBlockReason : "Intraday (MIS) Order"}
             >
               Intraday
             </button>
@@ -843,6 +876,25 @@ export default function OrderModal() {
             </button>
           </div>
         </div>
+        )}
+
+        {/* Preventative Filter Warning Badge */}
+        {isIntradayRestricted && !isTrueExit && (
+          <div style={{ 
+            fontSize: '11.5px', 
+            color: '#f87171', 
+            background: 'rgba(239, 68, 68, 0.12)', 
+            border: '1px solid rgba(239, 68, 68, 0.3)', 
+            borderRadius: '6px', 
+            padding: '7px 11px', 
+            margin: '10px 20px 0 20px',
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px' 
+          }}>
+            <span>⚠️</span>
+            <span><strong>Intraday (MIS) Restricted:</strong> {intradayBlockReason}</span>
+          </div>
         )}
 
         {/* Form Body */}

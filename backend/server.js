@@ -172,6 +172,20 @@ function getLtpFromPriceCache(sym) {
   return 0;
 }
 
+function getPriceDataFromCache(sym) {
+  if (!sym || typeof sym !== 'string') return {};
+  if (priceCache[sym]) return priceCache[sym];
+  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+  if (priceCache[clean]) return priceCache[clean];
+  if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
+  if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
+  if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
+  if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
+  if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
+  return {};
+}
+
 // Market Status Cache ('AUTO' | 'OPEN' | 'CLOSED')
 const marketStatusCache = { equity: 'AUTO', commodity: 'AUTO' };
 const marketCalendarCache = new Map();
@@ -3263,11 +3277,11 @@ app.get('/api/cleanup-expired', async (req, res) => {
   }
 });
 
-// ─── Convert Position (INT <-> DEL) ───────────────────────────────────────
+// ─── Convert Position (INT <-> DEL with Segment Cutoffs) ───────────────────
 app.post('/api/position/convert', authenticateToken, async (req, res) => {
   const { positionId } = req.body;
   const rawProductType = String(req.body.newProductType || '').toUpperCase();
-  const newProductType = rawProductType === 'CNC' ? 'DEL' : rawProductType;
+  const newProductType = (rawProductType === 'CNC' || rawProductType === 'NRML') ? 'DEL' : (rawProductType === 'MIS' ? 'INT' : rawProductType);
   if (!positionId || !newProductType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -3280,6 +3294,7 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
       const position = await trx('positions').where({ id: positionId, user_id: req.user.id }).first();
       if (!position) throw Object.assign(new Error('Position not found'), { statusCode: 404 });
+
       if (position.product_type === newProductType) {
         throw Object.assign(new Error('Position is already in the requested product type'), { statusCode: 400 });
       }
@@ -3287,11 +3302,19 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         throw Object.assign(new Error('Cannot convert a closed position'), { statusCode: 400 });
       }
 
-      // Block position conversion 1 minute before intraday cutoff and during auto square-off / market closed
+      // Check conversion timing against segment cutoffs
       const { checkPositionConversionAllowed } = require('./services/instrumentsCache');
-      const convCheck = checkPositionConversionAllowed(position.symbol);
+      const convCheck = checkPositionConversionAllowed(position.symbol, newProductType);
       if (!convCheck.allowed) {
         throw Object.assign(new Error(convCheck.reason), { statusCode: 400 });
+      }
+
+      // Preventative check: Prohibit converting to Intraday for T2T surveillance stocks
+      if (newProductType === 'INT') {
+        const isT2TSeries = /-(BE|T|Z|SM|ST)$/i.test(position.symbol.trim());
+        if (isT2TSeries) {
+          throw Object.assign(new Error(`Intraday (MIS) is not permitted for Trade-to-Trade (T2T) surveillance series (${position.symbol}).`), { statusCode: 400 });
+        }
       }
 
       // Prohibit converting short equity positions into Delivery (DEL)
@@ -4583,6 +4606,67 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   // Safety net: If this is an automated system square-off order, ensure it does not open a reverse/new position
   if (req.body && req.body.is_system_close && !isClosingOrder) {
     return res.json({ success: true, message: 'Position already closed or not found.' });
+  }
+
+  // 🛡️ PREVENTATIVE INTRADAY (MIS) RISK FILTER 🛡️
+  // Never applies to closing/square-off orders of existing positions.
+  if (!isClosingOrder && isIntradayProduct) {
+    const cleanU = String(cleanSym).toUpperCase();
+    const rawSymU = String(symbol).toUpperCase();
+    
+    // 1. Trade-to-Trade (T2T) & Surveillance Series Check (SEBI Compulsory Delivery Mandate)
+    const isT2TSeries = cleanU.endsWith('-BE') || cleanU.endsWith('-T') || cleanU.endsWith('-Z') || cleanU.endsWith('-SM') || cleanU.endsWith('-ST')
+      || rawSymU.endsWith('-BE') || rawSymU.endsWith('-T') || rawSymU.endsWith('-Z') || rawSymU.endsWith('-SM') || rawSymU.endsWith('-ST');
+    if (isT2TSeries) {
+      return res.status(400).json({
+        error: `Trade-to-Trade / Surveillance stock: Intraday (MIS) is strictly prohibited by SEBI regulations for ${cleanSym}. Only Delivery (CNC) is permitted.`
+      });
+    }
+
+    const isDeriv = isDerivativeContract(symbol);
+    const isCom = isCommodityContract(symbol);
+
+    // 2. Cash Equity Minimum Liquidity / Volume Threshold Check
+    if (!isDeriv && !isCom) {
+      const cachedPriceData = getPriceDataFromCache(symbol);
+      const dayVolume = Number(cachedPriceData.volume || cachedPriceData.vol_traded_today || 0);
+      const MIN_INTRADAY_VOLUME = 25000;
+      if (dayVolume > 0 && dayVolume < MIN_INTRADAY_VOLUME) {
+        return res.status(400).json({
+          error: `Intraday (MIS) is disabled for ${cleanSym} due to low market liquidity (${dayVolume.toLocaleString()} shares traded today). Minimum volume required is ${MIN_INTRADAY_VOLUME.toLocaleString()}. Please select Delivery (CNC).`
+        });
+      }
+
+      // 3. Intraday Dynamic Circuit Toggles (Circuit Proximity & Depth Lock Protection)
+      const liveLtp = getLtpFromPriceCache(symbol) || parseFloat(price) || 0;
+      const upperCircuit = Number(cachedPriceData.upper_circuit || cachedPriceData.upper_ckt || 0);
+      const lowerCircuit = Number(cachedPriceData.lower_circuit || cachedPriceData.lower_ckt || 0);
+      const totBuyQuan = Number(cachedPriceData.totBuyQuan || 0);
+      const totSellQuan = Number(cachedPriceData.totSellQuan || 0);
+      const hasDepthData = (cachedPriceData.bids && cachedPriceData.bids.length > 0) || (cachedPriceData.asks && cachedPriceData.asks.length > 0) || totBuyQuan > 0 || totSellQuan > 0;
+
+      // Upper Circuit Lock / Proximity check for SELL MIS (Short Selling)
+      if (side === 'SELL') {
+        const isNearUpperCircuit = (upperCircuit > 0 && liveLtp >= upperCircuit * 0.995);
+        const isLockedAtUpper = hasDepthData && totSellQuan === 0 && (cachedPriceData.asks || []).length === 0;
+        if (isNearUpperCircuit || isLockedAtUpper) {
+          return res.status(400).json({
+            error: `Intraday shorting (MIS) blocked: ${cleanSym} is at/near Upper Circuit limit (₹${upperCircuit || liveLtp}). Short selling is prohibited to prevent short-delivery auction risk. Only CNC allowed.`
+          });
+        }
+      }
+
+      // Lower Circuit Lock / Proximity check for BUY MIS (Long Buying)
+      if (side === 'BUY') {
+        const isNearLowerCircuit = (lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005);
+        const isLockedAtLower = hasDepthData && totBuyQuan === 0 && (cachedPriceData.bids || []).length === 0;
+        if (isNearLowerCircuit || isLockedAtLower) {
+          return res.status(400).json({
+            error: `Intraday buying (MIS) blocked: ${cleanSym} is at/near Lower Circuit limit (₹${lowerCircuit || liveLtp}). Buying is prohibited due to square-off exit lock risk. Only CNC allowed.`
+          });
+        }
+      }
+    }
   }
 
   // 🛡️ RISK GUARDIAN ENFORCEMENT 🛡️
