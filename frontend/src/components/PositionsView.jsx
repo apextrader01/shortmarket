@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
-import { checkPositionConversionAllowed } from '../utils/lotsizeHelper';
+import { checkPositionConversionAllowed, isDerivativeContract } from '../utils/lotsizeHelper';
 
 const EMPTY_PRICES = {};
 
@@ -921,8 +921,11 @@ export default function PositionsView() {
                             const currentProd = String(pos.product_type || pos.productLabel || 'INT').toUpperCase();
                             const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
                             const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
+                            const isShortCashEquity = Number(pos.quantity) < 0 && targetProd === 'DEL' && !isDerivativeContract(pos.symbol);
 
-                            const convCheck = checkPositionConversionAllowed(pos.symbol, targetProd);
+                            const convCheck = isShortCashEquity 
+                              ? { allowed: false, reason: 'Short cash equity positions cannot be converted to Delivery (CNC). Only intraday shorting is permitted.' }
+                              : checkPositionConversionAllowed(pos.symbol, targetProd);
                             const isConvBlocked = !convCheck.allowed;
                             return (
                               <button
@@ -1212,8 +1215,11 @@ export default function PositionsView() {
                             const currentProd = String(pos.product_type || pos.productLabel || 'INT').toUpperCase();
                             const isCurrentlyInt = (currentProd === 'INT' || currentProd === 'MIS');
                             const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
+                            const isShortCashEquity = Number(pos.quantity) < 0 && targetProd === 'DEL' && !isDerivativeContract(pos.symbol);
 
-                            const convCheck = checkPositionConversionAllowed(pos.symbol, targetProd);
+                            const convCheck = isShortCashEquity 
+                              ? { allowed: false, reason: 'Short cash equity positions cannot be converted to Delivery (CNC). Only intraday shorting is permitted.' }
+                              : checkPositionConversionAllowed(pos.symbol, targetProd);
                             const isConvBlocked = !convCheck.allowed;
                             return (
                               <button
@@ -1393,8 +1399,14 @@ export default function PositionsView() {
         const targetProd = isCurrentlyInt ? 'DEL' : 'INT';
         const absQty = Math.abs(Number(convertModalPos.qty || convertModalPos.quantity || 1));
         const avgPrice = Number(convertModalPos.avg || convertModalPos.average_price || 0);
-        const reqMargin = isCurrentlyInt ? (absQty * avgPrice) : 0;
-        const convCheck = checkPositionConversionAllowed(convertModalPos.symbol, targetProd);
+        const existingMargin = Number(convertModalPos.margin || 0);
+        const totalGrossValue = absQty * avgPrice;
+        const netAddlCashRequired = isCurrentlyInt ? Math.max(0, totalGrossValue - existingMargin) : 0;
+
+        const isShortCashEquity = Number(convertModalPos.quantity || convertModalPos.qty || 0) < 0 && targetProd === 'DEL' && !isDerivativeContract(convertModalPos.symbol);
+        const convCheck = isShortCashEquity 
+          ? { allowed: false, reason: 'Short cash equity positions cannot be converted to Delivery (CNC). Only intraday shorting is permitted.' }
+          : checkPositionConversionAllowed(convertModalPos.symbol, targetProd);
         const isConvBlocked = !convCheck.allowed;
         const blockReason = convCheck.reason;
 
@@ -1431,10 +1443,20 @@ export default function PositionsView() {
                     <span style={{ fontWeight: '700' }}>{absQty}</span>
                   </div>
                   {isCurrentlyInt && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Est. Cash Required:</span>
-                      <span style={{ fontWeight: '700', color: 'var(--color-green-light)' }}>₹{reqMargin.toFixed(2)}</span>
-                    </div>
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Total Delivery Value:</span>
+                        <span style={{ fontWeight: '600' }}>₹{totalGrossValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Intraday Margin Blocked:</span>
+                        <span style={{ fontWeight: '600', color: 'var(--color-blue-light)' }}>₹{existingMargin.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed var(--border-color)', paddingTop: '4px' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Additional Cash Required:</span>
+                        <span style={{ fontWeight: '700', color: 'var(--color-green-light)' }}>₹{netAddlCashRequired.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -1463,7 +1485,7 @@ export default function PositionsView() {
                     setConvertLoading(true);
                     try {
                       const posId = convertModalPos.id;
-                      const res = await useStore.getState().convertPosition(posId, targetProd, reqMargin);
+                      const res = await useStore.getState().convertPosition(posId, targetProd, netAddlCashRequired);
                       if (res && res.success) {
                         alert(`Position successfully converted to ${targetProd}!`);
                         setConvertModalPos(null);

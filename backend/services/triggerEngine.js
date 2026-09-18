@@ -389,9 +389,16 @@ class TriggerEngine {
             order.taxes = totalTaxes;
 
             // 2. Position Logic
-            const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+            const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+            const isDeliveryProduct = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
             const existingPos = await trx('positions')
-                .where({ user_id: order.user_id, product_type: order.product_type })
+                .where({ user_id: order.user_id })
+                .where(builder => {
+                    if (isIntradayProduct) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                    else if (isDeliveryProduct) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                    else builder.where({ product_type: order.product_type });
+                })
                 .where(builder => {
                     builder.where({ symbol: order.symbol })
                            .orWhere({ symbol: cleanSym })
@@ -573,8 +580,16 @@ class TriggerEngine {
                            updated_at: new Date()
                         });
                         // Cancel dangling linked pending and trigger orders (SL/Target child legs or linked brackets)
+                        const isIntOrder = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+                        const isDelOrder = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
                         const danglingOrders = await trx('orders')
-                            .where({ user_id: order.user_id, product_type: order.product_type })
+                            .where({ user_id: order.user_id })
+                            .where(builder => {
+                                if (isIntOrder) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                                else if (isDelOrder) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                                else builder.where({ product_type: order.product_type });
+                            })
                             .where(builder => {
                                 builder.where({ symbol: order.symbol })
                                        .orWhere({ symbol: cleanSym })
@@ -616,8 +631,16 @@ class TriggerEngine {
                         });
 
                         // Proportionally reduce child OCO legs if existing position was partially closed
+                        const isIntOrder = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+                        const isDelOrder = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
                         const childOrders = await trx('orders')
-                            .where({ user_id: order.user_id, product_type: order.product_type })
+                            .where({ user_id: order.user_id })
+                            .where(builder => {
+                                if (isIntOrder) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                                else if (isDelOrder) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                                else builder.where({ product_type: order.product_type });
+                            })
                             .where(builder => {
                                 builder.where({ symbol: order.symbol })
                                        .orWhere({ symbol: cleanSym });

@@ -63,9 +63,10 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
         low: rawData[6],
         close: rawData[7],
         vol: rawData[8],
-        volume: rawData[8],
         totBuyQuan: rawData[9],
-        totSellQuan: rawData[10]
+        totSellQuan: rawData[10],
+        upper_circuit: rawData[11] || 0,
+        lower_circuit: rawData[12] || 0
       };
     }
 

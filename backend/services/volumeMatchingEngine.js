@@ -526,14 +526,14 @@ class VolumeMatchingEngine {
 
         // 2. Incremental Position Update
         const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
-        const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'BO' || order.product_type === 'CO');
+        const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
         const isDeliveryProduct = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
 
         const existingPos = await trx('positions')
           .where({ user_id: order.user_id })
           .where(builder => {
             if (isIntradayProduct) {
-              builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+              builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
             } else if (isDeliveryProduct) {
               builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
             } else {

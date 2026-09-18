@@ -219,7 +219,7 @@ loadMarketCalendarFromDb();
 function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, isClosingOrder = false) {
   const globalStatus = isCommodity ? marketStatusCache.commodity : marketStatusCache.equity;
   if (globalStatus === 'OPEN') {
-    const isIntraday = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
+    const isIntraday = (product_type === 'INT' || product_type === 'MIS' || product_type === 'INTRADAY' || product_type === 'BO' || product_type === 'CO');
     if (!isIntraday || isClosingOrder) {
       return { open: true, session: 'OPEN' };
     }
@@ -288,7 +288,7 @@ function isSegmentMarketOpen(isCommodity, symbol = null, product_type = null, is
 
   const { getAssetSubsegment } = require('./services/instrumentsCache');
   const subsegment = symbol ? getAssetSubsegment(symbol) : (isCommodity ? 'COMMODITY' : 'NON_FNO_EQ');
-  const isIntraday = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
+  const isIntraday = (product_type === 'INT' || product_type === 'MIS' || product_type === 'INTRADAY' || product_type === 'BO' || product_type === 'CO');
   const isDelivery = (product_type === 'DEL' || product_type === 'CNC' || product_type === 'DELIVERY' || !product_type);
 
   // 3. Commodity Segment (MCX)
@@ -3310,10 +3310,11 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       }
 
       // Preventative check: Prohibit converting to Intraday for T2T surveillance stocks
-      if (newProductType === 'INT') {
-        const isT2TSeries = /-(BE|T|Z|SM|ST)$/i.test(position.symbol.trim());
+      if (newProductType === 'INT' || newProductType === 'MIS') {
+        const cleanSym = position.symbol.includes(':') ? position.symbol.split(':')[1] : position.symbol;
+        const isT2TSeries = /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(position.symbol.trim()) || /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(cleanSym.trim());
         if (isT2TSeries) {
-          throw Object.assign(new Error(`Intraday (MIS) is not permitted for Trade-to-Trade (T2T) surveillance series (${position.symbol}).`), { statusCode: 400 });
+          throw Object.assign(new Error(`Intraday (MIS) is not permitted for Trade-to-Trade (T2T) surveillance series (${cleanSym}).`), { statusCode: 400 });
         }
       }
 
@@ -3370,8 +3371,16 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       });
       
       // Try to merge positions if there's already an existing position for the same symbol + product_type
+      const cleanSym = position.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
       const existingPos = await trx('positions')
-        .where({ user_id: req.user.id, symbol: position.symbol, product_type: newProductType })
+        .where({ user_id: req.user.id })
+        .whereIn('product_type', newProductType === 'DEL' ? ['DEL', 'CNC'] : [newProductType, 'MIS'])
+        .where(builder => {
+          builder.where({ symbol: position.symbol })
+                 .orWhere({ symbol: cleanSym })
+                 .orWhere({ symbol: `NSE:${cleanSym}` })
+                 .orWhere({ symbol: `BSE:${cleanSym}` });
+        })
         .whereNot('id', positionId)
         .whereNot('quantity', 0)
         .first();
@@ -4436,7 +4445,11 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   const trail_amount = req.body.trail_amount ?? req.body.trailAmount;
   const margin = req.body.margin;
   const product_type = req.body.product_type || req.body.productType || 'INT';
-  const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL') ? 'DEL' : product_type;
+  const effectiveProductType = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL')
+    ? 'DEL'
+    : (product_type === 'MIS' || product_type === 'INTRADAY')
+      ? 'INT'
+      : product_type;
   const rawVariety = req.body.order_variety || req.body.variety || (req.body.is_amo ? 'AMO' : null);
 
   if (!symbol || !type || !side || !quantity) {
@@ -4445,7 +4458,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
   // Block new Intraday / BO / CO orders after segment intraday cutoff time (EXCEPT exit/closing orders)
   const isAmoOrder = rawVariety === 'AMO' || Boolean(req.body.is_amo);
-  if (!isAmoOrder && (effectiveProductType === 'INT' || effectiveProductType === 'BO' || effectiveProductType === 'CO')) {
+  if (!isAmoOrder && (effectiveProductType === 'INT' || effectiveProductType === 'MIS' || effectiveProductType === 'BO' || effectiveProductType === 'CO')) {
     const { isIntradayBlocked } = require('./services/cronJobs');
     if (isIntradayBlocked && isIntradayBlocked(symbol)) {
       // Allow users to EXIT/reduce an existing open position
@@ -4538,7 +4551,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
   }
 
   // Determine if this order is strictly closing/reducing an existing open position or holding
-  const isIntradayProduct = (product_type === 'INT' || product_type === 'BO' || product_type === 'CO');
+  const isIntradayProduct = (product_type === 'INT' || product_type === 'MIS' || product_type === 'BO' || product_type === 'CO');
   const isDeliveryProduct = (product_type === 'CNC' || product_type === 'DELIVERY' || product_type === 'DEL' || !product_type);
   const cleanSym = symbol.includes(':') ? symbol.split(':')[1] : symbol;
   let isClosingOrder = false;
@@ -4551,7 +4564,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       .where({ user_id: req.user.id })
       .where(builder => {
         if (isIntradayProduct) {
-          builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+          builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         } else if (isDeliveryProduct) {
           builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
         } else {
@@ -4585,7 +4598,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       .where({ user_id: req.user.id })
       .where(builder => {
         if (isIntradayProduct) {
-          builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+          builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         } else if (isDeliveryProduct) {
           builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
         } else {
@@ -4615,8 +4628,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const rawSymU = String(symbol).toUpperCase();
     
     // 1. Trade-to-Trade (T2T) & Surveillance Series Check (SEBI Compulsory Delivery Mandate)
-    const isT2TSeries = cleanU.endsWith('-BE') || cleanU.endsWith('-T') || cleanU.endsWith('-Z') || cleanU.endsWith('-SM') || cleanU.endsWith('-ST')
-      || rawSymU.endsWith('-BE') || rawSymU.endsWith('-T') || rawSymU.endsWith('-Z') || rawSymU.endsWith('-SM') || rawSymU.endsWith('-ST');
+    // Covers NSE: -BE, -BZ (ESM Stage II), -SM, -ST, and BSE: -T, -Z, -XT, -P
+    const isT2TSeries = /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(cleanU) || /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(rawSymU);
     if (isT2TSeries) {
       return res.status(400).json({
         error: `Trade-to-Trade / Surveillance stock: Intraday (MIS) is strictly prohibited by SEBI regulations for ${cleanSym}. Only Delivery (CNC) is permitted.`
@@ -4628,28 +4641,38 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
     // 2. Cash Equity Minimum Liquidity / Volume Threshold Check
     if (!isDeriv && !isCom) {
+      const { isFnoEligibleStock } = require('./services/instrumentsCache');
+      const isFno = isFnoEligibleStock(symbol);
       const cachedPriceData = getPriceDataFromCache(symbol);
       const dayVolume = Number(cachedPriceData.volume || cachedPriceData.vol_traded_today || 0);
       const MIN_INTRADAY_VOLUME = 25000;
-      if (dayVolume > 0 && dayVolume < MIN_INTRADAY_VOLUME) {
+
+      // Enforce liquidity threshold for non-F&O cash equities after initial morning burst (past 09:30 AM IST)
+      const istParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+      }).formatToParts(new Date());
+      const curHour = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+      const curMin = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+      const isPastOpening = (curHour * 60 + curMin) >= (9 * 60 + 30);
+
+      if (!isFno && isPastOpening && dayVolume < MIN_INTRADAY_VOLUME) {
         return res.status(400).json({
           error: `Intraday (MIS) is disabled for ${cleanSym} due to low market liquidity (${dayVolume.toLocaleString()} shares traded today). Minimum volume required is ${MIN_INTRADAY_VOLUME.toLocaleString()}. Please select Delivery (CNC).`
         });
       }
 
-      // 3. Intraday Dynamic Circuit Toggles (Circuit Proximity & Depth Lock Protection)
+      // 3. Intraday Dynamic Circuit Toggles (Circuit Proximity Protection)
       const liveLtp = getLtpFromPriceCache(symbol) || parseFloat(price) || 0;
       const upperCircuit = Number(cachedPriceData.upper_circuit || cachedPriceData.upper_ckt || 0);
       const lowerCircuit = Number(cachedPriceData.lower_circuit || cachedPriceData.lower_ckt || 0);
-      const totBuyQuan = Number(cachedPriceData.totBuyQuan || 0);
-      const totSellQuan = Number(cachedPriceData.totSellQuan || 0);
-      const hasDepthData = (cachedPriceData.bids && cachedPriceData.bids.length > 0) || (cachedPriceData.asks && cachedPriceData.asks.length > 0) || totBuyQuan > 0 || totSellQuan > 0;
 
       // Upper Circuit Lock / Proximity check for SELL MIS (Short Selling)
       if (side === 'SELL') {
         const isNearUpperCircuit = (upperCircuit > 0 && liveLtp >= upperCircuit * 0.995);
-        const isLockedAtUpper = hasDepthData && totSellQuan === 0 && (cachedPriceData.asks || []).length === 0;
-        if (isNearUpperCircuit || isLockedAtUpper) {
+        if (isNearUpperCircuit) {
           return res.status(400).json({
             error: `Intraday shorting (MIS) blocked: ${cleanSym} is at/near Upper Circuit limit (₹${upperCircuit || liveLtp}). Short selling is prohibited to prevent short-delivery auction risk. Only CNC allowed.`
           });
@@ -4659,8 +4682,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       // Lower Circuit Lock / Proximity check for BUY MIS (Long Buying)
       if (side === 'BUY') {
         const isNearLowerCircuit = (lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005);
-        const isLockedAtLower = hasDepthData && totBuyQuan === 0 && (cachedPriceData.bids || []).length === 0;
-        if (isNearLowerCircuit || isLockedAtLower) {
+        if (isNearLowerCircuit) {
           return res.status(400).json({
             error: `Intraday buying (MIS) blocked: ${cleanSym} is at/near Lower Circuit limit (₹${lowerCircuit || liveLtp}). Buying is prohibited due to square-off exit lock risk. Only CNC allowed.`
           });
@@ -4900,7 +4922,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
               const txLongPos = await trx('positions')
                   .where({ user_id: req.user.id })
                   .where(builder => {
-                      if (isIntradayProduct) builder.whereIn('product_type', ['INT', 'BO', 'CO']);
+                      if (isIntradayProduct) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
                       else if (isDeliveryProduct) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
                       else builder.where({ product_type });
                   })
@@ -4936,7 +4958,12 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
       } else if (side === 'BUY') {
           // Re-evaluate closing short position inside transaction with advisory lock
           const txShortPos = await trx('positions')
-              .where({ user_id: req.user.id, product_type: effectiveProductType })
+              .where({ user_id: req.user.id })
+              .where(builder => {
+                if (isIntradayProduct) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                else if (isDeliveryProduct) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                else builder.where({ product_type: effectiveProductType });
+              })
               .where(builder => {
                 builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
               })
@@ -6027,12 +6054,101 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
   // Block new orders when market is closed
   for (const item of items) {
     const isCommodity = isCommodityContract(item.symbol);
-    const isIntradayProduct = (item.product_type === 'INT' || item.product_type === 'BO' || item.product_type === 'CO');
+    const isIntradayProduct = (item.product_type === 'INT' || item.product_type === 'MIS' || item.product_type === 'BO' || item.product_type === 'CO');
     
     const marketCheck = isSegmentMarketOpen(isCommodity, item.symbol, item.product_type, false);
     if (!marketCheck.open) {
       if (marketCheck.isTotalBlock || (isIntradayProduct && !marketCheck.isAmoWindow)) {
         return res.status(400).json({ error: marketCheck.reason });
+      }
+    }
+
+    // 🛡️ PREVENTATIVE INTRADAY (MIS) RISK FILTER FOR BASKET ORDERS 🛡️
+    if (isIntradayProduct) {
+      const cleanSym = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
+      const cleanU = cleanSym.toUpperCase();
+      const rawSymU = String(item.symbol).toUpperCase();
+
+      // Check if this item is strictly closing an existing intraday position
+      let isClosing = false;
+      if (item.side === 'SELL') {
+        const pos = await db('positions')
+          .where({ user_id: req.user.id })
+          .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+          .where(b => b.where({ symbol: item.symbol }).orWhere({ symbol: cleanSym }))
+          .where('quantity', '>', 0)
+          .first();
+        if (pos && Number(pos.quantity) >= Number(item.quantity) - 0.0001) {
+          isClosing = true;
+        }
+      } else if (item.side === 'BUY') {
+        const pos = await db('positions')
+          .where({ user_id: req.user.id })
+          .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+          .where(b => b.where({ symbol: item.symbol }).orWhere({ symbol: cleanSym }))
+          .where('quantity', '<', 0)
+          .first();
+        if (pos && Math.abs(Number(pos.quantity)) >= Number(item.quantity) - 0.0001) {
+          isClosing = true;
+        }
+      }
+
+      if (!isClosing) {
+        // 1. Trade-to-Trade (T2T) & Surveillance Series Check
+        const isT2TSeries = /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(cleanU) || /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(rawSymU);
+        if (isT2TSeries) {
+          return res.status(400).json({
+            error: `Trade-to-Trade / Surveillance stock: Intraday (MIS) is strictly prohibited by SEBI regulations for ${cleanSym}. Only Delivery (CNC) is permitted.`
+          });
+        }
+
+        // 2. Cash Equity Minimum Liquidity & Circuit Proximity Checks
+        const isDeriv = isDerivativeContract(item.symbol);
+        if (!isDeriv && !isCommodity) {
+          const { isFnoEligibleStock } = require('./services/instrumentsCache');
+          const isFno = isFnoEligibleStock(item.symbol);
+          const cachedPriceData = getPriceDataFromCache(item.symbol);
+          const dayVolume = Number(cachedPriceData.volume || cachedPriceData.vol_traded_today || 0);
+          const MIN_INTRADAY_VOLUME = 25000;
+
+          const istParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+          }).formatToParts(new Date());
+          const curHour = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+          const curMin = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+          const isPastOpening = (curHour * 60 + curMin) >= (9 * 60 + 30);
+
+          if (!isFno && isPastOpening && dayVolume < MIN_INTRADAY_VOLUME) {
+            return res.status(400).json({
+              error: `Intraday (MIS) is disabled for ${cleanSym} due to low market liquidity (${dayVolume.toLocaleString()} shares traded today). Minimum volume required is ${MIN_INTRADAY_VOLUME.toLocaleString()}. Please select Delivery (CNC).`
+            });
+          }
+
+          // 3. Intraday Dynamic Circuit Toggles (Circuit Proximity Protection)
+          const liveLtp = getLtpFromPriceCache(item.symbol) || parseFloat(item.price) || 0;
+          const upperCircuit = Number(cachedPriceData.upper_circuit || cachedPriceData.upper_ckt || 0);
+          const lowerCircuit = Number(cachedPriceData.lower_circuit || cachedPriceData.lower_ckt || 0);
+
+          if (item.side === 'SELL') {
+            const isNearUpperCircuit = (upperCircuit > 0 && liveLtp >= upperCircuit * 0.995);
+            if (isNearUpperCircuit) {
+              return res.status(400).json({
+                error: `Intraday shorting (MIS) blocked: ${cleanSym} is at/near Upper Circuit limit (₹${upperCircuit || liveLtp}). Short selling is prohibited to prevent short-delivery auction risk. Only CNC allowed.`
+              });
+            }
+          }
+          if (item.side === 'BUY') {
+            const isNearLowerCircuit = (lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005);
+            if (isNearLowerCircuit) {
+              return res.status(400).json({
+                error: `Intraday buying (MIS) blocked: ${cleanSym} is at/near Lower Circuit limit (₹${lowerCircuit || liveLtp}). Buying is prohibited due to square-off exit lock risk. Only CNC allowed.`
+              });
+            }
+          }
+        }
       }
     }
 
@@ -7228,7 +7344,9 @@ io.on('connection', (socket) => {
               p.close,
               p.volume !== undefined ? p.volume : (p.vol !== undefined ? p.vol : 0),
               p.totBuyQuan || 0,
-              p.totSellQuan || 0
+              p.totSellQuan || 0,
+              p.upper_circuit || p.upper_ckt || 0,
+              p.lower_circuit || p.lower_ckt || 0
             ];
           }
         }

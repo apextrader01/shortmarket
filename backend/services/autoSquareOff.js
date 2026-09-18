@@ -306,7 +306,7 @@ async function runIntradaySquareOff(exchangeFilter) {
     try {
         const openPositions = await db('positions')
             .whereNot({ quantity: 0 })
-            .whereIn('product_type', ['INT', 'BO', 'CO']);
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         
         console.log(`Found ${openPositions.length} open INTRADAY/BO/CO positions total.`);
 

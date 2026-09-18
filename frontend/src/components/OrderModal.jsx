@@ -60,7 +60,9 @@ export default function OrderModal() {
   useEffect(() => {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
-      setProductType(orderModal.productType || 'INT');
+      const incomingProd = String(orderModal.productType || 'INT').toUpperCase();
+      const initialProd = (incomingProd === 'MIS' || incomingProd === 'INTRADAY') ? 'INT' : (incomingProd === 'CNC' || incomingProd === 'DELIVERY') ? 'DEL' : (orderModal.productType || 'INT');
+      setProductType(initialProd);
       
       const effectiveLotsize = (orderModal.lotsize && Number(orderModal.lotsize) > 1) 
         ? Number(orderModal.lotsize) 
@@ -169,7 +171,10 @@ export default function OrderModal() {
     if (!symMatch) return false;
     const pQty = Number(p.quantity || 0);
     if (pQty === 0) return false;
-    if (p.product_type !== productType && !(productType === 'DEL' && p.product_type === 'CNC')) return false;
+    const isProductMatch = p.product_type === productType || 
+      (['DEL', 'CNC', 'DELIVERY'].includes(productType) && ['DEL', 'CNC', 'DELIVERY'].includes(p.product_type)) ||
+      (['INT', 'MIS'].includes(productType) && ['INT', 'MIS'].includes(p.product_type));
+    if (!isProductMatch) return false;
     if (side === 'BUY' && pQty < 0) return true;
     if (side === 'SELL' && pQty > 0) return true;
     return false;
@@ -192,16 +197,15 @@ export default function OrderModal() {
 
   const cleanU = String(cleanSym || symbol || '').toUpperCase();
   const rawSymU = String(symbol || '').toUpperCase();
-  const isT2T = cleanU.endsWith('-BE') || cleanU.endsWith('-T') || cleanU.endsWith('-Z') || cleanU.endsWith('-SM') || cleanU.endsWith('-ST')
-    || rawSymU.endsWith('-BE') || rawSymU.endsWith('-T') || rawSymU.endsWith('-Z') || rawSymU.endsWith('-SM') || rawSymU.endsWith('-ST');
+  const isT2T = /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(cleanU) || /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(rawSymU);
   const upperCircuit = Number(livePriceData?.upper_circuit || livePriceData?.upper_ckt || 0);
   const lowerCircuit = Number(livePriceData?.lower_circuit || livePriceData?.lower_ckt || 0);
   const liveLtp = Number(livePriceData?.ltp || 0);
-  const totBuyQuan = Number(livePriceData?.totBuyQuan || 0);
-  const totSellQuan = Number(livePriceData?.totSellQuan || 0);
+  const isNearUpperCircuit = (upperCircuit > 0 && liveLtp >= upperCircuit * 0.995);
+  const isNearLowerCircuit = (lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005);
   const isCircuitBlockedForSide = !isTrueExit && !isDerivativeContract(symbol) && !isCommodityContract(symbol) && (
-    (side === 'SELL' && ((upperCircuit > 0 && liveLtp >= upperCircuit * 0.995) || (totSellQuan === 0 && (livePriceData?.asks || []).length === 0 && liveLtp > 0))) ||
-    (side === 'BUY' && ((lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005) || (totBuyQuan === 0 && (livePriceData?.bids || []).length === 0 && liveLtp > 0)))
+    (side === 'SELL' && isNearUpperCircuit) ||
+    (side === 'BUY' && isNearLowerCircuit)
   );
   const isIntradayRestricted = isT2T || isCircuitBlockedForSide;
   const intradayBlockReason = isT2T 
@@ -209,7 +213,7 @@ export default function OrderModal() {
     : (isCircuitBlockedForSide ? (side === 'SELL' ? 'Stock at/near Upper Circuit: Shorting (MIS) blocked to prevent short-delivery risk.' : 'Stock at/near Lower Circuit: Buying (MIS) blocked due to exit lock risk.') : null);
 
   useEffect(() => {
-    if (isIntradayRestricted && productType === 'INT') {
+    if (isIntradayRestricted && (productType === 'INT' || productType === 'MIS')) {
       setProductType('DEL');
     }
   }, [isIntradayRestricted, productType]);
@@ -286,7 +290,7 @@ export default function OrderModal() {
     }
 
     const subsegment = getAssetSubsegment(symbol);
-    const isIntraday = (productType === 'INT' || isBO || isCO);
+    const isIntraday = (productType === 'INT' || productType === 'MIS' || isBO || isCO);
     const isDelivery = (productType === 'DEL' || productType === 'CNC' || !productType);
 
     // 3. Commodity Segment (MCX)
@@ -485,7 +489,7 @@ export default function OrderModal() {
 
   const marketSession = getMarketSession();
   const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
-  const isIntradayBlocked = (isRestricted || isTimeBlocked || marketSession.session === 'INTRADAY_CUTOFF' || marketSession.session === 'PRE_MARKET_INTRADAY_BLOCKED') && productType === 'INT';
+  const isIntradayBlocked = (isRestricted || isTimeBlocked || marketSession.session === 'INTRADAY_CUTOFF' || marketSession.session === 'PRE_MARKET_INTRADAY_BLOCKED') && (productType === 'INT' || productType === 'MIS');
 
   // Variety selection: default to Regular unless explicitly opened with variety 'AMO'
   useEffect(() => {
@@ -791,8 +795,8 @@ export default function OrderModal() {
                 display: 'flex', alignItems: 'center', gap: '5px',
                 cursor: isIntradayRestricted ? 'not-allowed' : 'pointer',
                 opacity: isIntradayRestricted ? 0.45 : 1,
-                background: productType === 'INT' ? '#2563eb' : 'transparent',
-                color: productType === 'INT' ? '#ffffff' : 'var(--text-secondary)',
+                background: (productType === 'INT' || productType === 'MIS') ? '#2563eb' : 'transparent',
+                color: (productType === 'INT' || productType === 'MIS') ? '#ffffff' : 'var(--text-secondary)',
                 fontSize: '12.5px', fontWeight: '600',
                 transition: 'all 0.15s ease'
               }}
@@ -981,7 +985,7 @@ export default function OrderModal() {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '600', letterSpacing: '0.2px' }}>
-              {productType === 'INT' ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'} {isAmo ? '• 🌙 AMO' : ''}
+              {(productType === 'INT' || productType === 'MIS') ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'} {isAmo ? '• 🌙 AMO' : ''}
             </div>
           </div>
 
@@ -1070,7 +1074,7 @@ export default function OrderModal() {
           </div>
 
           {/* Intraday Stoploss & Take Profit (CO & BO) - Regular Market Hours Only */}
-          {productType === 'INT' && !isAmo && (
+          {(productType === 'INT' || productType === 'MIS') && !isAmo && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
               <div></div>
               <div>

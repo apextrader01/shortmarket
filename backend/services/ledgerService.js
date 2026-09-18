@@ -188,41 +188,36 @@ class LedgerService {
         const quantity = Number(position.quantity);
         const symbol = position.symbol;
         const entryPrice = parseFloat(position.average_price) || 0;
-        const effectivePrice = (currentPrice && Number(currentPrice) > 0) ? Number(currentPrice) : entryPrice;
-        const deliveryPrincipal = Math.round((quantity * effectivePrice + Number.EPSILON) * 100) / 100;
+        // Delivery principal is based on actual cost basis of purchase
+        const deliveryPrincipal = Math.round((quantity * entryPrice + Number.EPSILON) * 100) / 100;
         const marginBlocked = parseFloat(position.margin) || 0;
+        const additionalDebit = Math.round((deliveryPrincipal - marginBlocked + Number.EPSILON) * 100) / 100;
 
-        // Release the intraday margin and debit the full delivery principal
+        // Debit the additional required cash from user balance (allows debit balance / shortfall)
         const user = await trx('users').where({ id: userId }).forUpdate().first();
         const prevBalance = parseFloat(user.balance) || 0;
-        const newBalance = Math.round((prevBalance + marginBlocked - deliveryPrincipal + Number.EPSILON) * 100) / 100;
+        const newBalance = Math.round((prevBalance - additionalDebit + Number.EPSILON) * 100) / 100;
         await trx('users').where({ id: userId }).update({ balance: newBalance });
 
-        if (marginBlocked > 0) {
+        if (additionalDebit > 0) {
             await trx('ledger').insert({
                 user_id: userId,
-                amount: marginBlocked,
-                type: 'MARGIN_RELEASE',
-                description: `Intraday margin released on delivery conversion: ${quantity} ${symbol}`
+                amount: -additionalDebit,
+                type: 'MARGIN_SHORTFALL_CONVERSION',
+                description: `Additional cash debited for delivery conversion of ${quantity} ${symbol} @ ₹${entryPrice.toFixed(2)}${newBalance < 0 ? ' (Debit Balance / Margin Shortfall)' : ''}`
             });
         }
 
-        await trx('ledger').insert({
-            user_id: userId,
-            amount: -deliveryPrincipal,
-            type: 'MARGIN_SHORTFALL_CONVERSION',
-            description: `CNC Delivery conversion for ${quantity} ${symbol} @ ₹${effectivePrice.toFixed(2)}${newBalance < 0 ? ' (Debit Balance / Margin Shortfall)' : ''}`
-        });
-
-        // Convert product type to CNC/DEL in positions table
+        // Convert product type to canonical 'DEL' in positions table and store full principal as margin
+        // This ensures the user's capital is 100% refunded when the delivery position is sold later!
         await trx('positions').where({ id: positionId }).update({
-            product_type: 'CNC',
-            margin: 0,
+            product_type: 'DEL',
+            margin: deliveryPrincipal,
             updated_at: new Date()
         });
 
-        console.log(`[EOD AUTO-CONVERSION] Converted ${quantity} ${symbol} for User ${userId} to CNC Delivery. New Balance: ₹${newBalance}`);
-        return { success: true, quantity, symbol, effectivePrice, deliveryPrincipal, newBalance };
+        console.log(`[EOD AUTO-CONVERSION] Converted ${quantity} ${symbol} for User ${userId} to DEL Delivery. Margin: ₹${deliveryPrincipal}, New Balance: ₹${newBalance}`);
+        return { success: true, quantity, symbol, entryPrice, deliveryPrincipal, newBalance };
     }
 
     /**

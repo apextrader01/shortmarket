@@ -124,7 +124,7 @@ class PositionsEngine {
             // Step A: Cancel PENDING entry orders for INT/BO/CO
             const pendingEntryOrders = await db('orders')
                 .where('status', 'PENDING')
-                .whereIn('product_type', ['INT', 'BO', 'CO']);
+                .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
             for (const order of pendingEntryOrders) {
                 const isCommodity = isCommoditySymbol(order.symbol);
@@ -148,7 +148,7 @@ class PositionsEngine {
             // Step B: Cancel PENDING_TRIGGER legs (BO/CO SL & Target orders)
             const pendingTriggerOrders = await db('orders')
                 .where('status', 'PENDING_TRIGGER')
-                .whereIn('product_type', ['INT', 'BO', 'CO']);
+                .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
             for (const order of pendingTriggerOrders) {
                 const isCommodity = isCommoditySymbol(order.symbol);
@@ -203,7 +203,7 @@ class PositionsEngine {
                 // 1. Force Market Exit for Open Positions
                 const positions = await trx('positions')
                     .whereNot('quantity', 0)
-                    .whereIn('product_type', ['INT', 'BO', 'CO']);
+                    .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
                     
                 const positionsToExit = positions.filter(pos => {
                     const isCommodity = isCommoditySymbol(pos.symbol);
@@ -243,7 +243,7 @@ class PositionsEngine {
                 // 2. Safety net: cancel any remaining PENDING_TRIGGER legs
                 const pendingTriggers = await trx('orders')
                     .where('status', 'PENDING_TRIGGER')
-                    .whereIn('product_type', ['INT', 'BO', 'CO']);
+                    .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
                 for (const leg of pendingTriggers) {
                     const isCommodity = isCommoditySymbol(leg.symbol);
@@ -514,24 +514,29 @@ class PositionsEngine {
                                 updated_at: new Date()
                             });
 
+                            // Net credit formula: Original blocked margin + realized P&L
+                            // For buyers: margin (e.g. 2500) + realizedPnl (-2500) = 0 (₹0 refund on worthless expiry)
+                            // For sellers: margin (e.g. 100,000) + realizedPnl (+2500) = 102,500 (full margin + premium profit)
+                            const netCredit = Math.round((marginBlocked + realizedPnl + Number.EPSILON) * 100) / 100;
+                            const u = await trx('users').where({ id: item.user_id }).forUpdate().first();
+                            if (u && netCredit !== 0) {
+                                await trx('users').where({ id: item.user_id }).update({ balance: Math.round((parseFloat(u.balance) + netCredit + Number.EPSILON) * 100) / 100 });
+                            }
+
                             if (marginBlocked > 0) {
-                                const u = await trx('users').where({ id: item.user_id }).forUpdate().first();
-                                if (u) {
-                                    await trx('users').where({ id: item.user_id }).update({ balance: Math.round((parseFloat(u.balance) + marginBlocked + Number.EPSILON) * 100) / 100 });
-                                    await trx('ledger').insert({
-                                        user_id: item.user_id,
-                                        amount: marginBlocked,
-                                        type: 'MARGIN_RELEASE',
-                                        description: `Margin released on expired worthless contract: ${item.symbol}`
-                                    });
-                                }
+                                await trx('ledger').insert({
+                                    user_id: item.user_id,
+                                    amount: marginBlocked,
+                                    type: 'MARGIN_RELEASE',
+                                    description: `Margin released on expired worthless contract: ${item.symbol}`
+                                });
                             }
                             if (realizedPnl !== 0) {
                                 await trx('ledger').insert({
                                     user_id: item.user_id,
                                     amount: realizedPnl,
                                     type: 'REALIZED_PNL',
-                                    description: `Realized loss on expired worthless contract: ${item.symbol}`
+                                    description: `${realizedPnl >= 0 ? 'Realized profit' : 'Realized loss'} on expired worthless contract: ${item.symbol}`
                                 });
                             }
                         }

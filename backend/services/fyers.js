@@ -272,8 +272,7 @@ async function initFyers(io, pc, isMaster = true) {
                     const hasActiveViewers = (now - lastPingTime <= 60000) || (room && room.size > 0);
                     if (hasActiveViewers) {
                         const p = batchUpdate[sym];
-                        // Emit compact 11-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
-                        // Slashes live tick egress bandwidth by >65% across all connected clients
+                        // Emit compact 13-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan, upper_circuit, lower_circuit]
                         global_io.to(sym).emit('price_snapshot', {
                             [sym]: [
                                 p.ltp,
@@ -286,7 +285,9 @@ async function initFyers(io, pc, isMaster = true) {
                                 p.close,
                                 p.volume,
                                 p.totBuyQuan,
-                                p.totSellQuan
+                                p.totSellQuan,
+                                p.upper_circuit || 0,
+                                p.lower_circuit || 0
                             ]
                         });
                     }

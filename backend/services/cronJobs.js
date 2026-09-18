@@ -24,6 +24,15 @@ const isCommoditySymbol = (symbol) => {
     return ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => clean.startsWith(c));
 };
 
+// Helper: Check if a symbol is a derivative contract (Futures / Options)
+const isDerivativeSymbol = (symbol) => {
+    if (!symbol || typeof symbol !== 'string') return false;
+    const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || 
+           /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || 
+           clean.endsWith('-FUT') || symbol.includes('-MCX');
+};
+
 /**
  * Determines whether MCX is operating on Winter Session timings (ends 23:55 IST)
  * vs Summer Session timings (ends 23:30 IST) dynamically based on US DST.
@@ -199,10 +208,12 @@ async function executeClosingAuctionMatch(priceCache = {}, triggerEngine = null)
                 const limitPrice = Number(ord.price);
                 const isCrossed = (ord.side === 'BUY' && closePrice <= limitPrice) || (ord.side === 'SELL' && closePrice >= limitPrice);
                 if (!isCrossed) {
-                    await db('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                    if (parseFloat(ord.margin) > 0) {
-                        await LedgerService.releaseMargin(db, ord.user_id, ord.margin, `CAS Unmatched Cancelled: ${ord.symbol}`);
-                    }
+                    await db.transaction(async (trx) => {
+                        await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                        if (parseFloat(ord.margin) > 0) {
+                            await LedgerService.releaseMargin(trx, ord.user_id, ord.margin, `CAS Unmatched Cancelled: ${ord.symbol}`);
+                        }
+                    });
                     continue;
                 }
             }
@@ -481,19 +492,22 @@ function initCronJobs(priceCache, triggerEngine) {
             const ordersToCleanFromRedis = [];
             try {
                 await db.transaction(async (trx) => {
-                    // Get ALL intraday-type positions (INT, BO, CO) that are still open
+                    // Get ALL intraday-type positions (INT, MIS, BO, CO) that are still open
                     const positions = await trx('positions')
-                        .whereIn('product_type', ['INT', 'BO', 'CO'])
+                        .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
                         .whereNot({ quantity: 0 });
 
                     for (const pos of positions) {
                         const isCom = isCommoditySymbol(pos.symbol);
                         const sub = getAssetSubsegment(pos.symbol);
                         if (assetType === 'FNO_EQ' && sub !== 'FNO_EQ') continue;
-                        if (assetType === 'NON_FNO_EQ' && (isCom || sub === 'DERIVATIVE')) continue;
-                        if (assetType === 'DERIVATIVE' && isCom) continue;
+                        if (assetType === 'NON_FNO_EQ' && sub !== 'NON_FNO_EQ') continue;
+                        if (assetType === 'DERIVATIVE' && sub !== 'DERIVATIVE') continue;
                         if (assetType === 'COM' && !isCom) continue;
                         if (assetType === 'EQ' && isCom) continue;
+
+                        const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
+                        const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`MCX:${cleanSym}`] || {};
 
                         let ltp = priceCache[pos.symbol]?.ltp;
                         if (!ltp || ltp <= 0) {
@@ -510,8 +524,6 @@ function initCronJobs(priceCache, triggerEngine) {
                         }
                         if (!ltp || ltp <= 0) {
                             // 1. Check cached close or previous settlement price
-                            const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
-                            const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`MCX:${cleanSym}`];
                             if (cached?.close > 0) {
                                 ltp = Number(cached.close);
                             } else if (cached?.prev_close_price > 0) {
@@ -538,25 +550,22 @@ function initCronJobs(priceCache, triggerEngine) {
                             continue;
                         }
 
-                        // Check Circuit Lock / Depth Imbalance for Cash Equities
+                        // Check Circuit Lock for Cash Equities (requires price proximity to official circuit limits)
                         const upperCircuit = Number(cached?.upper_circuit || cached?.upper_ckt || 0);
                         const lowerCircuit = Number(cached?.lower_circuit || cached?.lower_ckt || 0);
-                        const totBuyQuan = Number(cached?.totBuyQuan || 0);
-                        const totSellQuan = Number(cached?.totSellQuan || 0);
-                        const hasBook = Boolean(cached?.bids?.length || cached?.asks?.length || totBuyQuan > 0 || totSellQuan > 0);
 
                         const isLong = Number(pos.quantity) > 0;
                         const isShort = Number(pos.quantity) < 0;
                         const isEquityStock = !isCom && sub !== 'DERIVATIVE';
 
-                        const isLockedAtLower = isEquityStock && isLong && ((lowerCircuit > 0 && ltp <= lowerCircuit * 1.002) || (hasBook && totBuyQuan === 0 && (cached?.bids || []).length === 0));
-                        const isLockedAtUpper = isEquityStock && isShort && ((upperCircuit > 0 && ltp >= upperCircuit * 0.998) || (hasBook && totSellQuan === 0 && (cached?.asks || []).length === 0));
+                        const isLockedAtLower = isEquityStock && isLong && lowerCircuit > 0 && ltp <= (lowerCircuit * 1.002);
+                        const isLockedAtUpper = isEquityStock && isShort && upperCircuit > 0 && ltp >= (upperCircuit * 0.998);
 
                         if (isLockedAtLower) {
-                            // 3:30 PM EOD Handler: Long position locked at Lower Circuit cannot be squared off -> Auto-convert to CNC Delivery
+                            // 3:30 PM EOD Handler: Long position locked at Lower Circuit cannot be squared off -> Auto-convert to DEL Delivery
                             await LedgerService.convertPositionToDelivery(trx, pos.user_id, pos.id, ltp);
                             affectedUserIds.add(pos.user_id);
-                            console.log(`[CRON] Circuit Lock Fallback: Auto-converted Long position ${pos.id} for ${pos.symbol} to CNC Delivery.`);
+                            console.log(`[CRON] Circuit Lock Fallback: Auto-converted Long position ${pos.id} for ${pos.symbol} to DEL Delivery.`);
                         } else if (isLockedAtUpper) {
                             // 3:30 PM EOD Handler: Short position locked at Upper Circuit cannot be bought back -> Short Delivery Auction Settlement
                             await LedgerService.settleShortDeliveryAuction(trx, pos.user_id, pos.id, upperCircuit || (ltp * 1.05));
@@ -569,10 +578,10 @@ function initCronJobs(priceCache, triggerEngine) {
                             console.log(`[CRON] Phase 3: Squared off ${pos.product_type} position ${pos.id} for ${pos.symbol} at LTP ${ltp}`);
                         }
                         
-                        // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
+                        // Cancel all PENDING_TRIGGER brackets for this user+symbol (all intraday types)
                         const triggers = await trx('orders')
                             .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' })
-                            .whereIn('product_type', ['INT', 'BO', 'CO']);
+                            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
                         for (const t of triggers) {
                             const updated = await trx('orders')
                                 .where({ id: t.id, status: 'PENDING_TRIGGER' })
@@ -585,17 +594,22 @@ function initCronJobs(priceCache, triggerEngine) {
                             }
                         }
                         
-                        // Also cancel any remaining PENDING orders for this user+symbol (only intraday types)
+                        // Also cancel any remaining PENDING or PARTIAL_FILLED orders for this user+symbol (all intraday types)
                         const pendingOrders = await trx('orders')
-                            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' })
-                            .whereIn('product_type', ['INT', 'BO', 'CO']);
+                            .where({ user_id: pos.user_id, symbol: pos.symbol })
+                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED'])
+                            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
                         for (const o of pendingOrders) {
                             const updated = await trx('orders')
-                                .where({ id: o.id, status: 'PENDING' })
-                                .update({ status: 'CANCELLED', updated_at: new Date() });
+                                .where({ id: o.id })
+                                .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
                             if (updated > 0) {
-                                if (parseFloat(o.margin) > 0) {
-                                    await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Phase 3 Cancelled: ${o.symbol}`);
+                                const totalQ = Number(o.quantity) || 1;
+                                const pendingQ = (o.pending_quantity !== null && o.pending_quantity !== undefined) ? Number(o.pending_quantity) : totalQ;
+                                const cancelFraction = totalQ > 0 ? (pendingQ / totalQ) : 1;
+                                const remainingMarginToRefund = Math.round((parseFloat(o.margin || 0) * cancelFraction + Number.EPSILON) * 100) / 100;
+                                if (remainingMarginToRefund > 0) {
+                                    await LedgerService.releaseMargin(trx, pos.user_id, remainingMarginToRefund, `Phase 3 Cancelled: ${o.symbol}`);
                                 }
                                 ordersToCleanFromRedis.push({ id: o.id, symbol: o.symbol });
                             }
