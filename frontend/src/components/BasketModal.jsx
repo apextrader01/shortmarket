@@ -5,6 +5,7 @@ import { X, Trash2, ShoppingBag, Search, Calendar, FileText } from 'lucide-react
 import { getInstantLotsize, isCommodityContract } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { getFuturesMarginRate, calculateOrderMargin } from '../utils/marginCalculator';
+import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 
 function extractOptionStrike(symbol) {
   if (!symbol) return 0;
@@ -124,7 +125,7 @@ const STRATEGY_PRESETS = [
 ];
 
 export default function BasketModal() {
-  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, user, orders, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, user: state.user, orders: state.orders, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
+  const { basketModalOpen, setBasketModalOpen, basketItems, addToBasket, removeFromBasket, updateBasketItem, placeBasketOrder, user, orders, positions, restrictedStocks, marketStatus, marketCalendar } = useStore(useShallow(state => ({ basketModalOpen: state.basketModalOpen, setBasketModalOpen: state.setBasketModalOpen, basketItems: state.basketItems, addToBasket: state.addToBasket, removeFromBasket: state.removeFromBasket, updateBasketItem: state.updateBasketItem, placeBasketOrder: state.placeBasketOrder, user: state.user, orders: state.orders, positions: state.positions, restrictedStocks: state.restrictedStocks, marketStatus: state.marketStatus, marketCalendar: state.marketCalendar })));
 
   // Scoped price subscription: Only re-render when prices of symbols inside the basket change!
   const basketSymbols = useMemo(() => basketItems.map(i => i.symbol).filter(Boolean), [basketItems]);
@@ -692,12 +693,7 @@ export default function BasketModal() {
         return oDate === todayIST;
       });
       const todayTradesCount = todayOrders.length;
-      let todayRealizedPnl = 0;
-      todayOrders.forEach(o => {
-        if (o.realized_pnl !== null && o.realized_pnl !== undefined && !isNaN(parseFloat(o.realized_pnl))) {
-          todayRealizedPnl += parseFloat(o.realized_pnl);
-        }
-      });
+      const { todayRealizedPnl } = getTodayRealizedMetrics(positions, orders);
       const maxTrades = Number(user.max_daily_trades) || 0;
       const maxLoss = Number(user.max_daily_loss) || 0;
       const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;

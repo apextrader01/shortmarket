@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 const AnalyticsView = lazy(() => import('./AnalyticsView'));
 const TradingJournalView = lazy(() => import('./TradingJournalView'));
 import MutualFundDetailsModal from './MutualFundDetailsModal';
+import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 import { 
   Briefcase, 
   BarChart3, 
@@ -302,28 +303,9 @@ export default function PortfolioView() {
   allMergedHoldings.forEach(h => calculatePnL(h, true));
   (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC' && p.product_type !== 'DELIVERY').forEach(p => calculatePnL(p, false));
 
-  const getISTDate = (date) => {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  };
-
-  const isToday = (dateString) => {
-    if (!dateString) return false;
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return false;
-    return getISTDate(d) === getISTDate(new Date());
-  };
-
-  let todayRealizedPnl = 0;
-  let todayTradesCount = 0;
-  if (orders) {
-    orders.forEach(o => {
-      const isExecuted = o.status === 'EXECUTED' || o.status === 'COMPLETED' || o.status === 'COMPLETE';
-      if (isExecuted && o.realized_pnl !== null && o.realized_pnl !== undefined && isToday(o.updated_at || o.created_at)) {
-        todayRealizedPnl += parseFloat(o.realized_pnl);
-        todayTradesCount++;
-      }
-    });
-  }
+  const { todayRealizedPnl, todayTradesCount } = useMemo(() => {
+    return getTodayRealizedMetrics(positions, orders);
+  }, [positions, orders]);
 
   const overallGain = totalCurrent - totalInvested;
   const overallPct = totalInvested > 0 ? (overallGain / totalInvested) * 100 : 0;

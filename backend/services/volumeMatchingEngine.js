@@ -642,6 +642,13 @@ class VolumeMatchingEngine {
             });
           }
 
+          // Persist realized_pnl on the closing order
+          if (realizedPnl !== 0) {
+            await trx('orders').where({ id: order.id }).update({
+              realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl])
+            });
+          }
+
           // Balance & Ledger updates
           const user = await trx('users').where({ id: order.user_id }).first();
           const netCredit = marginRefund + realizedPnl;
@@ -728,6 +735,13 @@ class VolumeMatchingEngine {
                 realized_pnl: realizedPnl,
                 product_type: order.product_type || 'DEL',
                 updated_at: new Date()
+              });
+            }
+
+            // Persist realized_pnl on the delivery holding sale order
+            if (realizedPnl !== 0) {
+              await trx('orders').where({ id: order.id }).update({
+                realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl])
               });
             }
 

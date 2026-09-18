@@ -43,40 +43,48 @@ adapterPubClient.connect().catch((err) => console.error('[Redis Adapter Pub] Con
 adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Connect failed:', err.message));
 
 
-// --- TEMPORARY HOTFIX FOR TODAY'S ZERO PNL ORDERS ---
-// (This script automatically patches today's missing P&L on startup)
+// --- RETROACTIVE REALIZED P&L PATCH FOR TODAY'S CLOSING ORDERS ---
 (async function patchTodayRealizedPnl() {
     try {
-        const db = require('./database/db'); // assuming db export
+        const db = require('./database/db');
         if (!db || typeof db !== 'function') return;
         
         const todayStart = new Date();
         todayStart.setHours(0,0,0,0);
         
-        const ordersWithZeroPnl = await db('orders')
-            .where('status', 'EXECUTED')
-            .where('is_rms', true)
-            .where('created_at', '>=', todayStart);
+        const executedOrders = await db('orders')
+            .whereIn('status', ['EXECUTED', 'COMPLETED', 'COMPLETE'])
+            .where('created_at', '>=', todayStart)
+            .where(function() {
+                this.whereNull('realized_pnl').orWhere('realized_pnl', 0);
+            });
             
         let patched = 0;
-        for (const o of ordersWithZeroPnl) {
-            if (!o.realized_pnl || Number(o.realized_pnl) === 0) {
-                const ledger = await db('ledger')
-                    .where('user_id', o.user_id)
-                    .where('type', 'REALIZED_PNL')
-                    .where('description', 'like', '%' + o.symbol)
-                    .where('created_at', '>=', todayStart)
-                    .orderBy('created_at', 'desc')
+        for (const o of executedOrders) {
+            const ledger = await db('ledger')
+                .where('user_id', o.user_id)
+                .whereIn('type', ['REALIZED_PNL', 'TRADE_PROFIT', 'TRADE_LOSS'])
+                .where('description', 'like', '%' + o.symbol + '%')
+                .where('created_at', '>=', todayStart)
+                .orderBy('created_at', 'desc')
+                .first();
+                
+            if (ledger && Number(ledger.amount) !== 0) {
+                await db('orders').where({ id: o.id }).update({ realized_pnl: ledger.amount });
+                patched++;
+            } else {
+                const closedPos = await db('positions')
+                    .where({ user_id: o.user_id, symbol: o.symbol, quantity: 0 })
+                    .where('updated_at', '>=', todayStart)
                     .first();
-                    
-                if (ledger && Number(ledger.amount) !== 0) {
-                    await db('orders').where({ id: o.id }).update({ realized_pnl: ledger.amount });
+                if (closedPos && Number(closedPos.realized_pnl) !== 0) {
+                    await db('orders').where({ id: o.id }).update({ realized_pnl: closedPos.realized_pnl });
                     patched++;
                 }
             }
         }
         if (patched > 0) {
-            console.log(`[HOTFIX] Successfully retroactively patched ${patched} orders with their correct Realized P&L from the Ledger.`);
+            console.log(`[HOTFIX] Successfully retroactively patched ${patched} executed orders with their correct Realized P&L.`);
         }
     } catch (e) {
         // fail silently

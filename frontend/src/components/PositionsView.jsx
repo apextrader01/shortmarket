@@ -5,6 +5,7 @@ import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { checkPositionConversionAllowed, isDerivativeContract } from '../utils/lotsizeHelper';
+import { getTodayClosedPositions } from '../utils/pnlHelper';
 
 const EMPTY_PRICES = {};
 
@@ -100,62 +101,7 @@ export default function PositionsView() {
     } else if (viewMode === 'OPEN') {
       return (positions || []).filter(p => Number(p.quantity) !== 0 && !isOvernightDelivery(p));
     } else if (viewMode === 'CLOSED') {
-      const normalizeSym = (sym) => (sym ? String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '').trim() : '');
-
-      // 1. Include explicit closed positions updated/closed today from database
-      const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
-      const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`));
-      
-      // Track all actively OPEN position keys so open positions are NEVER duplicated into the CLOSED tab
-      const openPositionsKeys = new Set(
-        (positions || [])
-          .filter(p => Number(p.quantity) !== 0)
-          .map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`)
-      );
-
-      // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed AND NOT currently open
-      const closedOrdersMap = {};
-      (orders || []).forEach(o => {
-        const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
-        const orderPnl = Number(o.realized_pnl || 0);
-        // Consider exit orders that realized P&L, are tagged as exits, or have closed quantity
-        const isExitOrder = (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off') || o.remarks.includes('Auto-Square-Off'))) 
-          || (o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0)
-          || (o.closed_quantity && Number(o.closed_quantity) > 0);
-        const normSym = normalizeSym(o.symbol);
-        const key = `${normSym}-${o.product_type || 'INT'}`;
-
-        // Include closed trades from orders ONLY if this symbol+product is NOT open and NOT in dbClosed
-        if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
-          const orderQty = Number(o.quantity || 1);
-          const exitPrice = Number(o.average_price || o.price || 0);
-          const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
-          const entryPrice = orderQty > 0 
-            ? (entrySide === 'BUY' ? (exitPrice - (orderPnl / orderQty)) : (exitPrice + (orderPnl / orderQty)))
-            : exitPrice;
-
-          if (!closedOrdersMap[key]) {
-            closedOrdersMap[key] = {
-              id: `closed-ord-${o.id}`,
-              symbol: o.symbol,
-              product_type: o.product_type || 'INT',
-              quantity: 0,
-              closed_quantity: 0,
-              side: entrySide,
-              average_price: Math.max(0, entryPrice),
-              exit_price: exitPrice,
-              realized_pnl: 0,
-              created_at: o.created_at,
-              updated_at: o.updated_at || o.created_at
-            };
-          }
-          closedOrdersMap[key].closed_quantity += Number(o.quantity || 0);
-          closedOrdersMap[key].realized_pnl += Number(o.realized_pnl);
-          closedOrdersMap[key].exit_price = exitPrice;
-        }
-      });
-
-      return [...dbClosed, ...Object.values(closedOrdersMap)];
+      return getTodayClosedPositions(positions, orders);
     }
     return [];
   }, [viewMode, positions, holdings, orders]);

@@ -5,6 +5,7 @@ import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 
 import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
+import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 
 export default function OrderModal() {
   const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
@@ -546,12 +547,7 @@ export default function OrderModal() {
         return oDate === todayIST;
       });
       const todayTradesCount = todayOrders.length;
-      let todayRealizedPnl = 0;
-      todayOrders.forEach(o => {
-        if (o.realized_pnl !== null && o.realized_pnl !== undefined && !isNaN(parseFloat(o.realized_pnl))) {
-          todayRealizedPnl += parseFloat(o.realized_pnl);
-        }
-      });
+      const { todayRealizedPnl } = getTodayRealizedMetrics(positions, orders);
       const maxTrades = Number(user.max_daily_trades) || 0;
       const maxLoss = Number(user.max_daily_loss) || 0;
       const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;
