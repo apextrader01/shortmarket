@@ -542,7 +542,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         }
                         if (!ltp || ltp <= 0) {
                             // 3. Safe fallback so intraday positions are not abandoned overnight
-                            ltp = Number(pos.average_price) || 0;
+                            ltp = Math.abs(Number(pos.average_price) || 0);
                         }
 
                         if (ltp <= 0) {
@@ -702,7 +702,7 @@ function initCronJobs(priceCache, triggerEngine) {
                 for (const pos of cashEquityPositions) {
                     const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
                     const cached = priceCache[pos.symbol] || priceCache[cleanSym] || priceCache[`NSE:${cleanSym}`] || priceCache[`BSE:${cleanSym}`];
-                    let ltp = Number(cached?.ltp || cached?.close || cached?.prev_close_price || pos.average_price || 0);
+                    let ltp = Math.abs(Number(cached?.ltp || cached?.close || cached?.prev_close_price || pos.average_price || 0));
                     const upperCircuit = Number(cached?.upper_circuit || cached?.upper_ckt || 0);
 
                     if (Number(pos.quantity) > 0) {
@@ -878,7 +878,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         if (lastOrder && Number(lastOrder.price) > 0) ltp = Number(lastOrder.price);
                     }
                     if (!ltp || ltp <= 0) {
-                        ltp = Number(pos.average_price) || 0;
+                        ltp = Math.abs(Number(pos.average_price) || 0);
                     }
 
                     await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, true, 'Nightly 11:57 PM EOD Intraday Square-Off');

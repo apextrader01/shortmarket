@@ -171,7 +171,8 @@ export function calculateOrderMargin({
 
       if (strikeVal > 0) {
         const grossMargin = strikeVal * totalQty * sellMarginRate;
-        requiredMargin = Math.max(grossMargin, totalValue, totalQty * (isIndex ? 40 : 80));
+        const premiumCollected = totalValue;
+        requiredMargin = Math.max(grossMargin - premiumCollected, totalQty * (isIndex ? 40 : 80));
       } else {
         const effectiveLots = Math.max(1, Math.ceil(totalQty / (isIndex ? 25 : 500)));
         requiredMargin = effectiveLots * (isIndex ? 4500 : 9000);

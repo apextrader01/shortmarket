@@ -140,7 +140,7 @@ function isDerivativeFuture(sym) {
  */
 export function calculateIndianCharges(order) {
   const qty = Math.abs(Number(order.quantity) || 0);
-  const price = Number(order.average_price || order.price || order.execution_price || 0);
+  const price = Math.abs(Number(order.average_price || order.price || order.execution_price || 0));
   const tradeValue = qty * price;
   const isDelivery = (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY');
   const isOption = isDerivativeOption(order.symbol || '');
@@ -424,8 +424,8 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
         charges: 0
       };
     }
-    const qty = Number(o.quantity) || 0;
-    const price = Number(o.average_price || o.price || 0);
+    const qty = Math.abs(Number(o.quantity) || 0);
+    const price = Math.abs(Number(o.average_price || o.price || 0));
     const val = qty * price;
     const isBuy = (o.side === 'BUY' || o.type === 'BUY');
 
@@ -756,8 +756,8 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',
       product: o.product_type || 'INTRADAY',
-      qty: Number(o.quantity) || 0,
-      price: Number(o.average_price || o.price || 0),
+      qty: Math.abs(Number(o.quantity) || 0),
+      price: Math.abs(Number(o.average_price || o.price || 0)),
       tradeValue: ch.tradeValue,
       ...ch
     };
@@ -1065,11 +1065,11 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
       tradeTime: safeFormatTime(o.created_at),
       symbol: o.symbol,
       side: o.side || o.type || 'BUY',
-      qty: Number(o.quantity) || 0,
-      price: Number(o.average_price || o.price || 0),
+      qty: Math.abs(Number(o.quantity) || 0),
+      price: Math.abs(Number(o.average_price || o.price || 0)),
       tradeValue: ch.tradeValue,
       brokerage: ch.brokerage,
-      netRate: isBuy ? (Number(o.average_price || o.price || 0) + ch.brokerage / (Number(o.quantity) || 1)) : (Number(o.average_price || o.price || 0) - ch.brokerage / (Number(o.quantity) || 1)),
+      netRate: isBuy ? (Math.abs(Number(o.average_price || o.price || 0)) + ch.brokerage / (Math.abs(Number(o.quantity)) || 1)) : (Math.abs(Number(o.average_price || o.price || 0)) - ch.brokerage / (Math.abs(Number(o.quantity)) || 1)),
       netTotal: isBuy ? (ch.tradeValue + ch.totalCharges) : (ch.tradeValue - ch.totalCharges)
     };
   });
@@ -1229,8 +1229,8 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
   let totalCurrentVal = 0;
 
   const holdingRows = (holdings || []).map((h, idx) => {
-    const qty = Number(h.quantity) || 0;
-    const avgPrice = Number(h.average_price || 0);
+    const qty = Math.abs(Number(h.quantity) || 0);
+    const avgPrice = Math.abs(Number(h.average_price || 0));
     const invested = qty * avgPrice;
     
     const livePriceObj = prices[h.symbol];

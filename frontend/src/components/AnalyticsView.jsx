@@ -611,7 +611,7 @@ export default function AnalyticsView() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
                       <div>{new Date(trade.created_at).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                      <div>Qty: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{trade.quantity}</span></div>
+                      <div>Qty: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{Math.abs(trade.quantity)}</span></div>
                     </div>
                   </div>
                 );
@@ -656,7 +656,7 @@ export default function AnalyticsView() {
                           {trade.side}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--text-primary)' }}>{trade.quantity}</td>
+                      <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--text-primary)' }}>{Math.abs(trade.quantity)}</td>
                       <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: '700', color: isWin ? '#00E676' : '#FF3B30' }}>
                         {isWin ? '+' : ''}{formatCurrency(pnl)}
                       </td>

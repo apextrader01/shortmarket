@@ -128,12 +128,12 @@ class MTMRiskManager {
                 let totalMarginBlocked = 0;
 
                 for (const pos of positions) {
-                    const ltp = this.priceCache[pos.symbol]?.ltp || parseFloat(pos.average_price) || 0;
+                    const ltp = this.priceCache[pos.symbol]?.ltp || Math.abs(parseFloat(pos.average_price)) || 0;
                     totalMarginBlocked += (parseFloat(pos.margin) || 0);
                     if (ltp <= 0) continue;
 
                     const qty = parseFloat(pos.quantity) || 0;
-                    const avg = parseFloat(pos.average_price) || 0;
+                    const avg = Math.abs(parseFloat(pos.average_price) || 0);
                     let pnl = 0;
                     if (qty > 0) {
                         pnl = (ltp - avg) * qty;

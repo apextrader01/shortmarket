@@ -1402,7 +1402,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       ...p,
       quantity: Number(p.quantity),
       closed_quantity: Number(p.closed_quantity || 0),
-      average_price: Number(p.average_price || 0),
+      average_price: Math.abs(Number(p.average_price || 0)),
       exit_price: p.exit_price !== null && p.exit_price !== undefined ? Number(p.exit_price) : null,
       margin: Number(p.margin || 0),
       realized_pnl: Number(p.realized_pnl || 0)
@@ -1629,7 +1629,7 @@ app.get('/api/analytics', authenticateToken, async (req, res) => {
           totalLoss += Math.abs(pnl);
        }
        
-       const date = new Date(o.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD local
+       const date = new Date(o.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD IST
        if (!dailyPnL[date]) dailyPnL[date] = 0;
        dailyPnL[date] += pnl;
     });
@@ -2560,7 +2560,7 @@ app.get('/api/admin/analytics', authenticateToken, async (req, res) => {
     const symbolVolume = {};
 
     todayOrders.forEach(o => {
-      const vol = Math.abs(parseFloat(o.quantity)) * parseFloat(o.average_price || o.price);
+      const vol = Math.abs(parseFloat(o.quantity)) * Math.abs(parseFloat(o.average_price || o.price || 0));
       todayVolume += vol;
       
       const pnl = parseFloat(o.realized_pnl || 0);
@@ -3201,7 +3201,7 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
       ...p,
       quantity: Number(p.quantity),
       closed_quantity: Number(p.closed_quantity || 0),
-      average_price: Number(p.average_price || 0),
+      average_price: Math.abs(Number(p.average_price || 0)),
       exit_price: p.exit_price !== null && p.exit_price !== undefined ? Number(p.exit_price) : null,
       margin: Number(p.margin || 0),
       realized_pnl: Number(p.realized_pnl || 0)
@@ -3273,7 +3273,7 @@ app.get('/api/cleanup-expired', async (req, res) => {
         for (const pos of stuckPositions) {
             const user = await db('users').where({ id: pos.user_id }).first();
             if (user) {
-                const refundAmt = Math.abs(pos.quantity) * (parseFloat(pos.average_price) || 0);
+                const refundAmt = Math.abs(pos.quantity) * Math.abs(parseFloat(pos.average_price) || 0);
                 await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
             }
         }
@@ -3344,7 +3344,7 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       }
 
       const { calculateRequiredMargin } = require('./services/marginEngine');
-      const avgPrice = Number(position.average_price) || 0;
+      const avgPrice = Math.abs(Number(position.average_price) || 0);
       const ltp = getLtpFromPriceCache(position.symbol) || avgPrice;
       // Delivery conversion requires 100% of the cost basis (average_price) to prevent cash extraction during market drops
       const priceBasis = (newProductType === 'DEL' && avgPrice > 0) ? avgPrice : (ltp > 0 ? ltp : avgPrice);
@@ -3407,8 +3407,8 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       if (existingPos) {
         const qtyA = Number(existingPos.quantity);
         const qtyB = Number(position.quantity);
-        const priceA = parseFloat(existingPos.average_price) || 0;
-        const priceB = parseFloat(position.average_price) || 0;
+        const priceA = Math.abs(parseFloat(existingPos.average_price) || 0);
+        const priceB = Math.abs(parseFloat(position.average_price) || 0);
         const marginA = parseFloat(existingPos.margin || 0);
         const marginB = newMargin;
 
@@ -5801,15 +5801,16 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
       const LedgerService = require('./services/ledgerService');
       for (const holding of activeHoldings) {
         const qty = parseFloat(holding.quantity);
-        const ltp = getLtpFromPriceCache(holding.symbol) || parseFloat(holding.average_price) || 0;
+        const holdingAvg = Math.abs(parseFloat(holding.average_price) || 0);
+        const ltp = getLtpFromPriceCache(holding.symbol) || holdingAvg || 0;
         if (ltp <= 0) {
           throw Object.assign(new Error(`Live price unavailable for ${holding.symbol}. Cannot exit holdings.`), { statusCode: 400 });
         }
         const totalValue = qty * ltp;
         totalSoldAmount += totalValue;
 
-        const principalAmount = qty * parseFloat(holding.average_price);
-        const realizedPnl = (ltp - parseFloat(holding.average_price)) * qty;
+        const principalAmount = qty * holdingAvg;
+        const realizedPnl = (ltp - holdingAvg) * qty;
         const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, req.user.id, holding.symbol, 'DEL', 'SELL', qty, ltp);
 
         // 1. Create executed sell order
@@ -5886,15 +5887,16 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
         const posQty = Number(pos.quantity);
         const isShort = posQty < 0;
         const qty = Math.abs(posQty);
-        const ltp = getLtpFromPriceCache(pos.symbol) || parseFloat(pos.average_price) || 0;
+        const posAvg = Math.abs(parseFloat(pos.average_price) || 0);
+        const ltp = getLtpFromPriceCache(pos.symbol) || posAvg || 0;
         if (ltp <= 0) {
           throw Object.assign(new Error(`Live price unavailable for ${pos.symbol}. Cannot exit holdings.`), { statusCode: 400 });
         }
         const exitSide = isShort ? 'BUY' : 'SELL';
-        const principalAmount = qty * parseFloat(pos.average_price);
+        const principalAmount = qty * posAvg;
         const realizedPnl = isShort 
-          ? (parseFloat(pos.average_price) - ltp) * qty
-          : (ltp - parseFloat(pos.average_price)) * qty;
+          ? (posAvg - ltp) * qty
+          : (ltp - posAvg) * qty;
 
         const totalTaxes = await LedgerService.chargeExecutionTaxes(trx, req.user.id, pos.symbol, 'DEL', exitSide, qty, ltp);
 
@@ -5907,7 +5909,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
               user_id: req.user.id,
               amount: principalAmount,
               type: 'MARGIN_RELEASE',
-              description: `Holding principal released: SELL ${qty} ${pos.symbol} @ avg ₹${parseFloat(pos.average_price).toFixed(2)}`,
+              description: `Holding principal released: SELL ${qty} ${pos.symbol} @ avg ₹${posAvg.toFixed(2)}`,
               created_at: new Date()
             });
           }
@@ -6573,7 +6575,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
                  const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';
                  
                  if (exitQty > 0) {
-                   autoExitLtp = getLtpFromPriceCache(pos.symbol) || Number(pos.average_price) || 0;
+                   autoExitLtp = getLtpFromPriceCache(pos.symbol) || Math.abs(Number(pos.average_price)) || 0;
                    if (autoExitLtp <= 0) {
                      throw Object.assign(new Error('Live market price unavailable for auto-exit. Cannot cancel bracket protection without a valid price.'), { statusCode: 400 });
                    }
@@ -6695,7 +6697,7 @@ app.get('/api/admin/cleanup', authenticateToken, async (req, res) => {
          for (const pos of stuckPositions) {
              const user = await db('users').where({ id: pos.user_id }).first();
              if (user) {
-                 const refundAmt = Math.abs(pos.quantity) * parseFloat(pos.average_price);
+                 const refundAmt = Math.abs(pos.quantity) * Math.abs(parseFloat(pos.average_price) || 0);
                  await db('users').where({ id: pos.user_id }).update({ balance: parseFloat(user.balance) + refundAmt });
                  pResults.marginRefunded += refundAmt;
              }

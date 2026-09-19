@@ -192,8 +192,8 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
           product_type: p.product_type || 'INT',
           side: entrySide,
           qty: Math.abs(p.closed_quantity || 1),
-          avg: Number(p.average_price || 0),
-          exit_price: Number(p.exit_price || p.average_price || 0),
+          avg: Math.abs(Number(p.average_price || 0)),
+          exit_price: Math.abs(Number(p.exit_price || p.average_price || 0)),
           pnl: pnl,
           date: p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-IN') : 'Today',
           rawDate: p.updated_at || p.created_at || new Date().toISOString()
@@ -215,7 +215,7 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
       if (!seen.has(key)) {
         seen.add(key);
         const originalEntrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
-        const exitPrice = Number(o.average_price || o.price || 0);
+        const exitPrice = Math.abs(Number(o.average_price || o.price || 0));
         const qty = Math.abs(Number(o.closed_quantity || o.quantity || 1));
         let entryPrice = exitPrice;
         if (qty > 0 && pnl !== null && !isNaN(pnl)) {

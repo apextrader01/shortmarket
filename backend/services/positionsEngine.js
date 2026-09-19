@@ -501,7 +501,7 @@ class PositionsEngine {
                         if (isHolding) {
                             await trx('holdings').where({ id: item.id }).del();
                         } else {
-                            const entryPrice = parseFloat(item.average_price) || 0;
+                            const entryPrice = Math.abs(parseFloat(item.average_price) || 0);
                             const realizedPnl = item.quantity > 0 ? -entryPrice * orderQty : entryPrice * orderQty;
                             const marginBlocked = parseFloat(item.margin) || 0;
 
@@ -652,8 +652,8 @@ class PositionsEngine {
                         // Average the price
                         const existingQty = Number(existingHolding.quantity);
                         const posQty = Number(pos.quantity);
-                        const existingAvgPrice = Number(existingHolding.average_price);
-                        const posAvgPrice = Number(pos.average_price);
+                        const existingAvgPrice = Math.abs(Number(existingHolding.average_price));
+                        const posAvgPrice = Math.abs(Number(pos.average_price));
 
                         const newTotalQty = existingQty + posQty;
                         const totalCost = (existingQty * existingAvgPrice) + (posQty * posAvgPrice);
@@ -668,7 +668,7 @@ class PositionsEngine {
                             user_id: pos.user_id,
                             symbol: pos.symbol,
                             quantity: Number(pos.quantity),
-                            average_price: Number(pos.average_price),
+                            average_price: Math.abs(Number(pos.average_price)),
                             asset_class: assetClass
                         });
                     }

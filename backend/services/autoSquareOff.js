@@ -329,7 +329,7 @@ async function runIntradaySquareOff(exchangeFilter) {
             for (const pos of batch) {
                 let ltp = priceCache[pos.symbol]?.ltp;
                 if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
-                    ltp = Number(pos.average_price) || 0;
+                    ltp = Math.abs(Number(pos.average_price) || 0);
                 } else {
                     ltp = Math.max(0, Number(ltp));
                 }
@@ -464,7 +464,7 @@ async function runMasterSquareOff() {
             for (const pos of batch) {
                 let ltp = priceCache[pos.symbol]?.ltp;
                 if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
-                    ltp = Number(pos.average_price) || 0;
+                    ltp = Math.abs(Number(pos.average_price) || 0);
                 } else {
                     ltp = Math.max(0, Number(ltp));
                 }

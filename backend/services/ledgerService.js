@@ -72,7 +72,7 @@ class LedgerService {
         if (!position || Number(position.quantity) === 0) return;
 
         const quantity = Number(position.quantity);
-        const entryPrice = parseFloat(position.average_price) || 0;
+        const entryPrice = Math.abs(parseFloat(position.average_price) || 0);
         const symbol = position.symbol;
         const productType = position.product_type;
         const side = quantity > 0 ? 'SELL' : 'BUY'; // To close long, you sell. To close short, you buy.
@@ -187,7 +187,7 @@ class LedgerService {
 
         const quantity = Number(position.quantity);
         const symbol = position.symbol;
-        const entryPrice = parseFloat(position.average_price) || 0;
+        const entryPrice = Math.abs(parseFloat(position.average_price) || 0);
         // Delivery principal is based on actual cost basis of purchase
         const deliveryPrincipal = Math.round((quantity * entryPrice + Number.EPSILON) * 100) / 100;
         const marginBlocked = parseFloat(position.margin) || 0;
@@ -231,7 +231,7 @@ class LedgerService {
         const quantity = Number(position.quantity);
         const absQty = Math.abs(quantity);
         const symbol = position.symbol;
-        const entryPrice = parseFloat(position.average_price) || 0;
+        const entryPrice = Math.abs(parseFloat(position.average_price) || 0);
         const finalPrice = (auctionPrice && Number(auctionPrice) > 0) ? Number(auctionPrice) : (entryPrice * 1.05);
 
         // 5% standard exchange auction penalty

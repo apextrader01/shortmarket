@@ -485,7 +485,7 @@ class VolumeMatchingEngine {
         const sliceQtyClean = roundQty(sliceQty);
 
         const prevFilled = roundQty(Number(currentOrder.filled_quantity || 0));
-        const prevAvg = Number(currentOrder.average_price || slicePrice);
+        const prevAvg = Math.abs(Number(currentOrder.average_price || slicePrice));
         const totalQty = roundQty(Number(currentOrder.quantity));
 
         const newFilled = Math.min(totalQty, roundQty(prevFilled + sliceQtyClean));
@@ -569,7 +569,7 @@ class VolumeMatchingEngine {
         // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "-1.0000" + 1 = "-1.00001")
         if (existingPos) {
           existingPos.quantity = roundQty(Number(existingPos.quantity));
-          existingPos.average_price = Number(existingPos.average_price);
+          existingPos.average_price = Math.abs(Number(existingPos.average_price));
           existingPos.margin = Number(existingPos.margin || 0);
           existingPos.closed_quantity = roundQty(Number(existingPos.closed_quantity || 0));
           existingPos.realized_pnl = Number(existingPos.realized_pnl || 0);
@@ -704,7 +704,7 @@ class VolumeMatchingEngine {
 
           if (holding && Number(holding.quantity) > 0) {
             const hQty = roundQty(Number(holding.quantity));
-            const hAvg = Number(holding.average_price || slicePrice);
+            const hAvg = Math.abs(Number(holding.average_price || slicePrice));
             const closeQty = Math.min(sliceQtyClean, hQty);
             const newHQty = roundQty(hQty - closeQty);
 
@@ -794,7 +794,7 @@ class VolumeMatchingEngine {
           // Opening or adding to position
           if (existingPos) {
             const prevPosQty = roundQty(Number(existingPos.quantity));
-            const prevPosAvg = Number(existingPos.average_price);
+            const prevPosAvg = Math.abs(Number(existingPos.average_price));
             const addQty = order.side === 'BUY' ? sliceQtyClean : -sliceQtyClean;
             const newPosQty = roundQty(prevPosQty + addQty);
             const newPosAvg = Number((((Math.abs(prevPosQty) * prevPosAvg) + (sliceQtyClean * slicePrice)) / Math.abs(newPosQty)).toFixed(2));
