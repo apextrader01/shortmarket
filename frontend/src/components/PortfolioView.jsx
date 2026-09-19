@@ -329,7 +329,7 @@ export default function PortfolioView() {
     return getTodayRealizedMetrics(positions, orders);
   }, [positions, orders]);
 
-  const overallGain = totalCurrent - totalInvested;
+  const overallGain = unrealizedPnl;
   const overallPct = totalInvested > 0 ? (overallGain / totalInvested) * 100 : 0;
   const isGain = overallGain >= 0;
 
