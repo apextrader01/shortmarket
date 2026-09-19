@@ -51,6 +51,7 @@ export default defineConfig({
     emptyOutDir: false,
     chunkSizeWarningLimit: 800,
     rollupOptions: {
+      external: ['@capacitor/push-notifications'],
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {

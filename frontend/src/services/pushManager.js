@@ -1,6 +1,20 @@
 import { API } from '../store';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+
+let _pushPlugin = null;
+async function getPushPlugin() {
+  if (_pushPlugin) return _pushPlugin;
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const mod = await import('@capacitor/push-notifications');
+      _pushPlugin = mod.PushNotifications || mod.default?.PushNotifications || mod.default;
+      return _pushPlugin;
+    }
+  } catch (e) {
+    console.warn('[PUSH] @capacitor/push-notifications not available:', e);
+  }
+  return null;
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -39,6 +53,8 @@ export async function getPushSubscriptionStatus(token) {
   // 1. Native Mobile App (Android APK / iOS)
   if (Capacitor.isNativePlatform()) {
     try {
+      const PushNotifications = await getPushPlugin();
+      if (!PushNotifications) return false;
       const perm = await PushNotifications.checkPermissions();
       const hasStoredToken = !!localStorage.getItem('fcm_device_token');
       return perm.receive === 'granted' && hasStoredToken;
@@ -132,6 +148,10 @@ export async function subscribeUserToPush(token) {
 
   // 1. Native Mobile App Flow (Capacitor APK)
   if (Capacitor.isNativePlatform()) {
+    const PushNotifications = await getPushPlugin();
+    if (!PushNotifications) {
+      throw new Error('Push notifications plugin not available on this device.');
+    }
     // Request permission from Android / iOS
     let perm = await PushNotifications.checkPermissions();
     if (perm.receive === 'prompt') {
@@ -304,7 +324,10 @@ export async function unsubscribeUserFromPush(token) {
         }).catch(() => {});
         localStorage.removeItem('fcm_device_token');
       }
-      await PushNotifications.removeAllListeners().catch(() => {});
+      const PushNotifications = await getPushPlugin();
+      if (PushNotifications) {
+        await PushNotifications.removeAllListeners().catch(() => {});
+      }
       return true;
     } catch (err) {
       console.warn('FCM unsubscribe error:', err);
