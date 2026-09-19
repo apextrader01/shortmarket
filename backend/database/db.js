@@ -18,8 +18,8 @@ const dbConfig = {
     max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 25,
     idleTimeoutMillis: 30000,
     createTimeoutMillis: 5000,
-    acquireTimeoutMillis: 30000,
-    propagateCreateError: false
+    acquireTimeoutMillis: 10000,
+    propagateCreateError: true
   }
 };
 

@@ -2,11 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+console.log('====================================================');
+console.log('🔧 PostgreSQL Credentials & Database Self-Healing');
+console.log('====================================================\n');
+
 // 1. Locate .env
 const possiblePaths = [
   path.resolve(__dirname, '../.env'),
   '/opt/shortmarket-staging/backend/.env',
-  path.resolve(__dirname, '../../.env')
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), 'backend/.env')
 ];
 
 let envPath = null;
@@ -22,7 +28,7 @@ if (!envPath) {
   process.exit(1);
 }
 
-console.log(`📁 Found .env at: ${envPath}`);
+console.log(`📁 Using .env file: ${envPath}`);
 require('dotenv').config({ path: envPath });
 
 const dbUrl = process.env.DATABASE_URL;
@@ -46,65 +52,74 @@ const dbName = u.pathname.replace(/^\//, '');
 
 console.log(`👤 Database User:     ${dbUser}`);
 console.log(`🗄️  Database Name:     ${dbName}`);
-console.log(`🔑 Database Password: ${'*'.repeat(Math.min(dbPass.length, 12))}`);
+console.log(`🔑 Database Password: ${'*'.repeat(Math.min(dbPass.length, 16))}\n`);
 
-// 3. Execute SQL via sudo -u postgres psql
-console.log('\n⚙️  Applying user credentials and permissions to PostgreSQL...');
-
-const sqlCommands = `
-DO \\$\\$
-BEGIN
-   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '${dbUser}') THEN
-      CREATE USER "${dbUser}" WITH PASSWORD '${dbPass}';
-   ELSE
-      ALTER USER "${dbUser}" WITH PASSWORD '${dbPass}';
-   END IF;
-END
-\\$\\$;
-
-SELECT 'CREATE DATABASE "${dbName}" OWNER "${dbUser}"'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${dbName}')\\gexec
-
-GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";
-ALTER DATABASE "${dbName}" OWNER TO "${dbUser}";
-`;
-
-try {
-  execSync('sudo -u postgres psql', {
-    input: sqlCommands,
-    stdio: ['pipe', 'inherit', 'inherit']
-  });
-  console.log('\n✅ PostgreSQL credentials synchronized successfully!');
-} catch (err) {
-  console.error('\n❌ Failed to execute psql commands: ' + err.message);
-  console.log('\nYou can manually set the password in PostgreSQL by running:');
-  console.log(`sudo -u postgres psql -c "ALTER USER \\"${dbUser}\\" WITH PASSWORD '${dbPass}';"`);
-  process.exit(1);
+function runPsql(sql, desc) {
+  try {
+    console.log(`⏳ ${desc}...`);
+    execSync(`sudo -u postgres psql -c "${sql.replace(/"/g, '\\"')}"`, { stdio: 'inherit' });
+    console.log(`   ✔ Success`);
+    return true;
+  } catch (err) {
+    console.warn(`   ⚠️ Notice: ${err.message}`);
+    return false;
+  }
 }
 
-// 4. Verify connection using knex
+// 3. Make sure PostgreSQL service is running
+try {
+  execSync('sudo systemctl start postgresql', { stdio: 'ignore' });
+} catch (e) {}
+
+// 4. Create or Alter User
+const alterOk = runPsql(`ALTER USER "${dbUser}" WITH PASSWORD '${dbPass}';`, `Setting password for user "${dbUser}"`);
+if (!alterOk) {
+  runPsql(`CREATE USER "${dbUser}" WITH PASSWORD '${dbPass}';`, `Creating user "${dbUser}" with password`);
+}
+
+// 5. Create Database if not exists
+try {
+  const checkDb = execSync(`sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${dbName}';"`, { encoding: 'utf8' }).trim();
+  if (checkDb !== '1') {
+    runPsql(`CREATE DATABASE "${dbName}" OWNER "${dbUser}";`, `Creating database "${dbName}"`);
+  } else {
+    console.log(`🗄️  Database "${dbName}" already exists.`);
+  }
+} catch (e) {
+  runPsql(`CREATE DATABASE "${dbName}" OWNER "${dbUser}";`, `Attempting to create database "${dbName}"`);
+}
+
+// 6. Grant Permissions
+runPsql(`GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";`, `Granting privileges on "${dbName}" to "${dbUser}"`);
+runPsql(`ALTER DATABASE "${dbName}" OWNER TO "${dbUser}";`, `Setting owner of "${dbName}" to "${dbUser}"`);
+
+// 7. Test connection with knex
 console.log('\n🧪 Testing connection using Knex...');
 const knex = require('knex');
-const db = knex({
+const testDb = knex({
   client: 'pg',
   connection: dbUrl,
-  pool: { min: 1, max: 2, acquireTimeoutMillis: 5000 }
+  pool: { min: 1, max: 2, acquireTimeoutMillis: 5000, propagateCreateError: true }
 });
 
-db.raw('SELECT current_user, current_database();')
+testDb.raw('SELECT current_user, current_database(), version();')
   .then(res => {
     const row = res.rows ? res.rows[0] : res[0];
-    console.log(`🎉 Connection VERIFIED! Connected as: ${JSON.stringify(row)}`);
-    return db.destroy();
+    console.log('\n====================================================');
+    console.log(`🎉 CONNECTION VERIFIED!`);
+    console.log(`   Connected user: ${row.current_user}`);
+    console.log(`   Database:       ${row.current_database}`);
+    console.log('====================================================\n');
+    return testDb.destroy();
   })
   .then(() => {
-    console.log('\n🚀 Now you can safely run:');
-    console.log('   node backend/scripts/migrate_columns.js');
-    console.log('   pm2 restart all');
+    console.log('🚀 Next Steps:');
+    console.log('   1. node backend/scripts/migrate_columns.js');
+    console.log('   2. pm2 restart all\n');
     process.exit(0);
   })
   .catch(err => {
-    console.error('❌ Connection verification test failed: ' + err.message);
-    db.destroy();
+    console.error('\n❌ Connection test failed: ' + err.message);
+    testDb.destroy();
     process.exit(1);
   });
