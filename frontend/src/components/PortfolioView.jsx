@@ -162,18 +162,26 @@ export default function PortfolioView() {
     const sym = h.symbol;
     const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const key = cleanSym || sym;
+    const hQty = Number(h.quantity) || 0;
+    const hPrice = Math.abs(Number(h.average_price) || 0);
     if (!allMergedHoldingsMap[key]) {
-      allMergedHoldingsMap[key] = { ...h, quantity: Number(h.quantity) || 0, average_price: Number(h.average_price) || 0 };
+      allMergedHoldingsMap[key] = { 
+        ...h, 
+        quantity: hQty, 
+        average_price: hPrice,
+        side: h.side || (hQty < 0 ? 'SELL' : 'BUY')
+      };
     } else {
       const existing = allMergedHoldingsMap[key];
       const prevQty = Number(existing.quantity) || 0;
-      const prevPrice = Number(existing.average_price) || 0;
-      const addQty = Number(h.quantity) || 0;
-      const addPrice = Number(h.average_price) || 0;
-      const totalQty = prevQty + addQty;
-      const weightedAvg = totalQty > 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / totalQty : 0;
+      const prevPrice = Math.abs(Number(existing.average_price) || 0);
+      const totalQty = prevQty + hQty;
+      const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
+      const absTotalQty = Math.abs(totalQty);
+      const weightedAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
       existing.quantity = totalQty;
-      existing.average_price = weightedAvg;
+      existing.average_price = Math.abs(weightedAvg);
+      existing.side = totalQty < 0 ? 'SELL' : 'BUY';
     }
   });
 
@@ -184,18 +192,27 @@ export default function PortfolioView() {
       const sym = p.symbol;
       const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
       const key = cleanSym || sym;
+      const pQty = Number(p.quantity) || 0;
+      const pPrice = Math.abs(Number(p.average_price) || 0);
       if (!allMergedHoldingsMap[key]) {
-        allMergedHoldingsMap[key] = { ...p, quantity: Number(p.quantity) || 0, average_price: Number(p.average_price) || 0, isT0: true };
+        allMergedHoldingsMap[key] = { 
+          ...p, 
+          quantity: pQty, 
+          average_price: pPrice, 
+          side: p.side || (pQty < 0 ? 'SELL' : 'BUY'),
+          isT0: true 
+        };
       } else {
         const existing = allMergedHoldingsMap[key];
         const prevQty = Number(existing.quantity) || 0;
-        const prevPrice = Number(existing.average_price) || 0;
-        const addQty = Number(p.quantity) || 0;
-        const addPrice = Number(p.average_price) || 0;
-        const totalQty = prevQty + addQty;
-        const weightedAvg = totalQty !== 0 ? ((prevQty * prevPrice) + (addQty * addPrice)) / Math.abs(totalQty) : 0;
+        const prevPrice = Math.abs(Number(existing.average_price) || 0);
+        const totalQty = prevQty + pQty;
+        const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(pQty) * pPrice);
+        const absTotalQty = Math.abs(totalQty);
+        const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
         existing.quantity = totalQty;
-        existing.average_price = weightedAvg;
+        existing.average_price = Math.abs(weightedAvg);
+        existing.side = totalQty < 0 ? 'SELL' : 'BUY';
       }
     }
   });
@@ -261,15 +278,20 @@ export default function PortfolioView() {
       || portfolioPrices[`BSE:${cleanSym}`] 
       || portfolioPrices[`MCX:${cleanSym}`] 
       || {};
-    const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
+    const avg = Math.abs(parseFloat(pos.average_price) || 0);
+    const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
     const qty = Math.abs(Number(pos.quantity) || 0);
+    const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
     
-    const invested = parseFloat(pos.average_price) * qty;
+    const invested = avg * qty;
     const current = ltp * qty;
     
     let pnl = 0;
-    if (Number(pos.quantity) > 0) pnl = current - invested;
-    else if (Number(pos.quantity) < 0) pnl = invested - current;
+    if (isShort) {
+      pnl = invested - current;
+    } else {
+      pnl = current - invested;
+    }
     unrealizedPnl += pnl;
 
     // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)
@@ -330,22 +352,24 @@ export default function PortfolioView() {
   const processedHoldings = useMemo(() => {
     let list = deliveryPositions.map(pos => {
       const priceData = portfolioPrices[pos.symbol] || {};
-      const ltp = priceData.ltp || parseFloat(pos.average_price) || 0;
+      const avg = Math.abs(parseFloat(pos.average_price) || 0);
+      const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
       const chg = priceData.chg !== undefined && priceData.chg !== null ? priceData.chg : 0;
       const chgp = priceData.chgp !== undefined && priceData.chgp !== null ? priceData.chgp : 0;
       const qty = Math.abs(pos.quantity);
       const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
-      const invested = parseFloat(pos.average_price) * qty;
+      const invested = avg * qty;
       const current = ltp * qty;
       const pnl = isShort ? (invested - current) : (current - invested);
       const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-      const dayChangeVal = chg * qty;
+      const dayChangeVal = (isShort ? -chg : chg) * qty;
       const isMf = isMutualFund(pos.symbol, pos.asset_class);
       const displayName = isMf 
         ? (getMfName(pos.symbol) || (pos.symbol || '').replace('-MF', ''))
         : (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').split('-')[0];
       return {
         ...pos,
+        average_price: avg,
         ltp,
         chg,
         chgp,
@@ -356,6 +380,7 @@ export default function PortfolioView() {
         pnl,
         pnlPct,
         isProfit: pnl >= 0,
+        isShort,
         isMf,
         displayName
       };
@@ -1176,7 +1201,7 @@ export default function PortfolioView() {
                     <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
                       <th style={{ padding: '12px 14px', fontWeight: '600' }}>Symbol / Scheme</th>
                       <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Qty / Units</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Avg Buy Price</th>
+                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Avg Price</th>
                       <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Live LTP / NAV</th>
                       <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
                       <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>

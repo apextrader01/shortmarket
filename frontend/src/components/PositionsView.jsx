@@ -79,11 +79,14 @@ export default function PositionsView() {
         if (matchedKey && mergedHoldingsMap[matchedKey].isDbHolding) {
           const existing = mergedHoldingsMap[matchedKey];
           const prevQty = Number(existing.quantity) || 0;
-          const prevPrice = Number(existing.average_price) || 0;
+          const prevPrice = Math.abs(Number(existing.average_price) || 0);
           const totalQty = prevQty + qty;
-          const weightedAvg = totalQty !== 0 ? ((prevQty * prevPrice) + (qty * avg)) / totalQty : 0;
+          const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(qty) * avg);
+          const absTotalQty = Math.abs(totalQty);
+          const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
           existing.quantity = totalQty;
-          existing.average_price = weightedAvg;
+          existing.average_price = Math.abs(weightedAvg);
+          existing.side = totalQty < 0 ? 'SELL' : 'BUY';
         } else {
           const key = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;
           mergedHoldingsMap[key] = {
@@ -91,8 +94,8 @@ export default function PositionsView() {
             id: p.id || key,
             isOvernightPos: true,
             quantity: qty,
-            average_price: avg,
-            side: p.side || (qty > 0 ? 'BUY' : 'SELL')
+            average_price: Math.abs(avg),
+            side: p.side || (qty < 0 ? 'SELL' : 'BUY')
           };
         }
       });
