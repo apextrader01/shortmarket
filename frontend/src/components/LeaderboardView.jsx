@@ -255,7 +255,7 @@ export default function LeaderboardView() {
       </div>
 
       {/* Multi-Tournament Pill Switcher (If multiple active or past events exist) */}
-      {((activeTab === 'ACTIVE' && activeContests.length > 1) || (activeTab === 'PAST' && pastContests.length > 1)) && (
+      {((activeTab === 'ACTIVE' && activeContests.length > 1) || (activeTab === 'PAST' && pastContests.length > 0)) && (
         <div style={{
           display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px',
           scrollbarWidth: 'none', msOverflowStyle: 'none'

@@ -8089,6 +8089,7 @@ async function autoExpireContests() {
     const now = new Date();
     await db('contests')
       .where('status', 'ACTIVE')
+      .whereNotNull('end_date')
       .where('end_date', '<', now)
       .update({ status: 'ENDED', updated_at: now });
   } catch (e) {
@@ -8102,7 +8103,9 @@ app.get('/api/contests/active', async (req, res) => {
 
     let contests = await db('contests')
       .where('status', 'ACTIVE')
-      .where('end_date', '>=', new Date())
+      .where(builder => {
+        builder.whereNull('end_date').orWhere('end_date', '>=', new Date());
+      })
       .orderBy('id', 'desc');
 
     // If no active contest exists, auto-seed one for the current month
