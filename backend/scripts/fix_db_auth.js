@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 
 console.log('====================================================');
 console.log('🔧 PostgreSQL Credentials & Database Self-Healing');
@@ -56,12 +56,12 @@ console.log(`🔑 Database Password: ${'*'.repeat(Math.min(dbPass.length, 16))}\
 
 function runPsql(sql, desc) {
   try {
-    console.log(`⏳ ${desc}...`);
-    execSync(`sudo -u postgres psql -c "${sql.replace(/"/g, '\\"')}"`, { stdio: 'inherit' });
-    console.log(`   ✔ Success`);
+    if (desc) console.log(`⏳ ${desc}...`);
+    execFileSync('sudo', ['-u', 'postgres', 'psql', '-c', sql], { stdio: 'inherit' });
+    if (desc) console.log(`   ✔ Success`);
     return true;
   } catch (err) {
-    console.warn(`   ⚠️ Notice: ${err.message}`);
+    if (desc) console.warn(`   ⚠️ Notice: ${err.message}`);
     return false;
   }
 }
@@ -71,15 +71,18 @@ try {
   execSync('sudo systemctl start postgresql', { stdio: 'ignore' });
 } catch (e) {}
 
-// 4. Create or Alter User
+// 4. Create or Alter User with full permissions
 const alterOk = runPsql(`ALTER USER "${dbUser}" WITH PASSWORD '${dbPass}';`, `Setting password for user "${dbUser}"`);
 if (!alterOk) {
   runPsql(`CREATE USER "${dbUser}" WITH PASSWORD '${dbPass}';`, `Creating user "${dbUser}" with password`);
 }
 
+// Grant superuser so migrations and tables never have permission issues
+runPsql(`ALTER USER "${dbUser}" WITH SUPERUSER;`, `Granting superuser permissions to "${dbUser}"`);
+
 // 5. Create Database if not exists
 try {
-  const checkDb = execSync(`sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${dbName}';"`, { encoding: 'utf8' }).trim();
+  const checkDb = execFileSync('sudo', ['-u', 'postgres', 'psql', '-tAc', `SELECT 1 FROM pg_database WHERE datname = '${dbName}';`], { encoding: 'utf8' }).trim();
   if (checkDb !== '1') {
     runPsql(`CREATE DATABASE "${dbName}" OWNER "${dbUser}";`, `Creating database "${dbName}"`);
   } else {
