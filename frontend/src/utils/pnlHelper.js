@@ -55,12 +55,13 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
     const key = `${normSym}-${o.product_type || 'INT'}`;
 
     if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
-      const orderQty = Number(o.quantity || 1);
-      const exitPrice = Number(o.average_price || o.price || 0);
+      const orderQty = Math.abs(Number(o.quantity || 1));
+      const exitPrice = Math.abs(Number(o.average_price || o.price || 0));
       const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
-      const entryPrice = orderQty > 0 
+      const rawEntryPrice = orderQty > 0 
         ? (entrySide === 'BUY' ? (exitPrice - (orderPnl / orderQty)) : (exitPrice + (orderPnl / orderQty)))
         : exitPrice;
+      const entryPrice = Math.abs(rawEntryPrice);
 
       if (!closedOrdersMap[key]) {
         closedOrdersMap[key] = {
@@ -70,7 +71,7 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
           quantity: 0,
           closed_quantity: 0,
           side: entrySide,
-          average_price: Math.max(0, entryPrice),
+          average_price: entryPrice,
           exit_price: exitPrice,
           realized_pnl: 0,
           created_at: o.created_at,
@@ -99,8 +100,8 @@ export const getTodayRealizedMetrics = (positions = [], orders = [], options = {
     const key = `${pos.symbol}-${normProd}`;
     const pnl = parseFloat(pos.realized_pnl) || 0;
     const closedQty = parseFloat(pos.closed_quantity) || 0;
-    const entryPrice = parseFloat(pos.average_price) || 0;
-    const exitPrice = parseFloat(pos.exit_price) || 0;
+    const entryPrice = Math.abs(parseFloat(pos.average_price) || 0);
+    const exitPrice = Math.abs(parseFloat(pos.exit_price) || 0);
 
     if (!symbolAgg[key]) {
       symbolAgg[key] = { 

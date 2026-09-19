@@ -58,7 +58,8 @@ export default function PositionsView() {
           mergedHoldingsMap[h.symbol] = {
             ...h,
             quantity: Number(h.quantity) || 0,
-            average_price: Number(h.average_price) || 0,
+            average_price: Math.abs(Number(h.average_price) || 0),
+            side: h.side || (Number(h.quantity) < 0 ? 'SELL' : 'BUY'),
             isDbHolding: true
           };
         }
@@ -67,7 +68,7 @@ export default function PositionsView() {
       // 2. Overnight delivery positions (bought yesterday or earlier)
       (positions || []).filter(p => Number(p.quantity) !== 0 && isOvernightDelivery(p)).forEach(p => {
         const qty = Number(p.quantity) || 0;
-        const avg = Number(p.average_price) || 0;
+        const avg = Math.abs(Number(p.average_price) || 0);
         const cleanSym = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
 
         // Check if an existing DB holding exists for this symbol
@@ -239,8 +240,8 @@ export default function PositionsView() {
             const prevNum = Number(agg.quantity);
             const isAdding = (prevNum >= 0 && posQty >= 0) || (prevNum <= 0 && posQty <= 0);
             if (isAdding) {
-              const currentTotal = Math.abs(prevNum) * parseFloat(agg.average_price || 0);
-              const newTotal = Math.abs(posQty) * parseFloat(pos.average_price || 0);
+              const currentTotal = Math.abs(prevNum) * Math.abs(parseFloat(agg.average_price || 0));
+              const newTotal = Math.abs(posQty) * Math.abs(parseFloat(pos.average_price || 0));
               agg.quantity = prevNum + posQty;
               agg.average_price = Math.abs(agg.quantity) > 0 ? (currentTotal + newTotal) / Math.abs(agg.quantity) : agg.average_price;
             } else {
@@ -252,17 +253,17 @@ export default function PositionsView() {
               } else {
                 // Reversal: position flipped side, new average price applies to remaining net
                 agg.quantity = netQty;
-                agg.average_price = parseFloat(pos.average_price || 0);
+                agg.average_price = Math.abs(parseFloat(pos.average_price || 0));
               }
             }
           } else {
-           if (parseFloat(pos.average_price) > 0 && parseFloat(agg.average_price) === 0) {
-             agg.average_price = pos.average_price;
+           if (Math.abs(parseFloat(pos.average_price)) > 0 && Math.abs(parseFloat(agg.average_price)) === 0) {
+             agg.average_price = Math.abs(parseFloat(pos.average_price));
            }
-           const prevClosed = parseFloat(agg.closed_quantity) - (parseFloat(pos.closed_quantity) || 0);
-           const prevExitTotal = prevClosed * parseFloat(agg.exit_price || 0);
-           const newExitTotal = (parseFloat(pos.closed_quantity) || 0) * parseFloat(pos.exit_price || 0);
-           const totalClosed = parseFloat(agg.closed_quantity) || 1;
+           const prevClosed = Math.abs(parseFloat(agg.closed_quantity) || 0) - Math.abs(parseFloat(pos.closed_quantity) || 0);
+           const prevExitTotal = Math.abs(prevClosed) * Math.abs(parseFloat(agg.exit_price || 0));
+           const newExitTotal = Math.abs(parseFloat(pos.closed_quantity) || 0) * Math.abs(parseFloat(pos.exit_price || 0));
+           const totalClosed = Math.abs(parseFloat(agg.closed_quantity)) || 1;
            agg.exit_price = (prevExitTotal + newExitTotal) / totalClosed;
          }
          
@@ -284,15 +285,16 @@ export default function PositionsView() {
       if (posQty === 0 && viewMode === 'OPEN') return;
 
       const priceData = relevantPrices[pos.symbol] || {};
-      const avg = parseFloat(pos.average_price) || 0;
+      const avg = Math.abs(parseFloat(pos.average_price) || 0);
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : (avg || 0);
       const qty = posQty;
       
       const invested = avg * Math.abs(qty);
       const currentValue = ltp * Math.abs(qty);
       
+      const isShort = Number(qty) < 0 || pos.side === 'SELL';
       const unrealizedPnl = (qty !== 0) 
-          ? (qty > 0 ? (currentValue - invested) : (invested - currentValue))
+          ? (isShort ? (invested - currentValue) : (currentValue - invested))
           : 0;
       const realizedPnl = parseFloat(pos.realized_pnl || 0);
       const pnl = unrealizedPnl + realizedPnl;
@@ -335,19 +337,19 @@ export default function PositionsView() {
 
       if (viewMode === 'CLOSED') {
         const closedQty = Math.abs(parseFloat(pos.closed_quantity) || 1);
-        const entryPrice = parseFloat(pos.average_price) || 0;
-        const exitPrice = parseFloat(pos.exit_price || ltp) || 0;
+        const entryPrice = Math.abs(parseFloat(pos.average_price) || 0);
+        const exitPrice = Math.abs(parseFloat(pos.exit_price || ltp) || 0);
         totalInvested += closedQty * entryPrice;
         totalCurrent += closedQty * exitPrice;
         globalMTM += realizedPnl;
       } else if (viewMode === 'HOLDINGS') {
         const hQty = Math.abs(pos.quantity !== undefined ? pos.quantity : qty);
-        const isShort = Number(pos.quantity !== undefined ? pos.quantity : qty) < 0 || pos.side === 'SELL';
+        const isShortHolding = Number(pos.quantity !== undefined ? pos.quantity : qty) < 0 || pos.side === 'SELL';
         const inv = avg * hQty;
         const cur = (ltp || avg) * hQty;
         totalInvested += inv;
         totalCurrent += cur;
-        const hPnl = isShort ? (inv - cur) : (cur - inv);
+        const hPnl = isShortHolding ? (inv - cur) : (cur - inv);
         globalMTM += hPnl;
       } else {
         // OPEN
@@ -687,7 +689,7 @@ export default function PositionsView() {
                   const cleanSym = safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0];
                   const exchange = (safeSymbol.includes(':') ? safeSymbol.split(':')[0] : pos.exchange) || 'NSE';
                   const holdingQty = Math.abs(rawQty);
-                  const investedVal = (pos.avg || 0) * holdingQty;
+                  const investedVal = Math.abs(pos.avg || 0) * holdingQty;
                   const currentVal = ((pos.ltp || pos.avg) || 0) * holdingQty;
                   const holdingPnl = isShort ? (investedVal - currentVal) : (currentVal - investedVal);
                   const holdingPnlPct = investedVal > 0 ? (holdingPnl / investedVal) * 100 : 0;
@@ -775,13 +777,13 @@ export default function PositionsView() {
 
                       {/* Column 4: Avg Price */}
                       <td data-label="Avg Price" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '500', color: 'var(--text-secondary)' }}>
-                        ₹{(parseFloat(pos.avg) || 0).toFixed(2)}
+                        ₹{Math.abs(parseFloat(pos.avg) || 0).toFixed(2)}
                       </td>
 
                       {/* Column 5: Last Price (LTP) / Exit Price */}
                       <td data-label="LTP" style={{ padding: '12px 12px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>
                         {viewMode === 'CLOSED' 
-                          ? (pos.exit_price ? `₹${parseFloat(pos.exit_price).toFixed(2)}` : '—') 
+                          ? (pos.exit_price ? `₹${Math.abs(parseFloat(pos.exit_price)).toFixed(2)}` : '—') 
                           : (pos.ltp > 0 ? `₹${parseFloat(pos.ltp).toFixed(2)}` : '—')}
                       </td>
 
@@ -1020,21 +1022,22 @@ export default function PositionsView() {
                   const rawQty = Number(pos.quantity !== undefined ? pos.quantity : pos.qty);
                   const isShort = rawQty < 0 || pos.side === 'SELL';
                   const isBuy = !isShort;
-                  const sideText = rawQty > 0 ? 'BUY' : (rawQty < 0 ? 'SELL' : (pos.side || '-'));
+                  const sideText = isShort ? 'SELL' : 'BUY';
                   const isProfit = pos.pnl >= 0;
                   const realizedPnl = parseFloat(pos.realized_pnl) || 0;
                   const isMf = isMutualFund(pos.symbol, pos.asset_class) || Boolean(pos.isMf);
                   const mfName = isMf ? getMfName(pos.symbol) : null;
                   const holdingQty = Math.abs(rawQty);
+                  const posAvg = Math.abs(pos.avg || parseFloat(pos.average_price) || 0);
                   const displayPnl = viewMode === 'CLOSED' 
                     ? realizedPnl 
                     : (viewMode === 'HOLDINGS' 
-                      ? (isShort ? (((pos.avg || 0) - (pos.ltp || pos.avg || 0)) * Math.abs(rawQty)) : (((pos.ltp || pos.avg || 0) - (pos.avg || 0)) * Math.abs(rawQty))) 
-                      : pos.pnl);
+                      ? (isShort ? ((posAvg - (pos.ltp || posAvg)) * Math.abs(rawQty)) : (((pos.ltp || posAvg) - posAvg) * Math.abs(rawQty))) 
+                      : (pos.pnl !== undefined ? pos.pnl : (isShort ? ((posAvg - (pos.ltp || posAvg)) * Math.abs(rawQty)) : (((pos.ltp || posAvg) - posAvg) * Math.abs(rawQty)))));
                   const isDisplayProfit = displayPnl >= 0;
                   const investedBase = pos.invested > 0 
                     ? pos.invested 
-                    : ((parseFloat(pos.closed_quantity) || 1) * (pos.avg || parseFloat(pos.average_price) || 1));
+                    : (Math.abs(parseFloat(pos.closed_quantity) || 1) * Math.max(1, posAvg));
                   const pnlPercent = investedBase > 0 ? (displayPnl / investedBase) * 100 : 0;
 
                   return (
@@ -1124,10 +1127,10 @@ export default function PositionsView() {
                             ? (isMf ? Number(pos.closed_quantity || 0).toFixed(4) : Math.round(Math.abs(pos.closed_quantity || 0)).toLocaleString('en-IN')) 
                             : (viewMode === 'HOLDINGS' && isMf 
                                 ? Number(holdingQty).toFixed(4) 
-                                : (isMf ? Number(pos.qty || holdingQty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || holdingQty || 0)).toLocaleString('en-IN')))} • Avg: ₹{pos.avg.toFixed(2)}
+                                : (isMf ? Number(pos.qty || holdingQty || 0).toFixed(4) : Math.round(Math.abs(pos.qty || holdingQty || 0)).toLocaleString('en-IN')))} • Avg: ₹{Math.abs(pos.avg || 0).toFixed(2)}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{isMf ? 'NAV' : 'LTP'}: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? parseFloat(pos.exit_price).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
+                          <span>{isMf ? 'NAV' : 'LTP'}: ₹{viewMode === 'CLOSED' ? (pos.exit_price ? Math.abs(parseFloat(pos.exit_price)).toFixed(2) : '—') : (pos.ltp > 0 ? pos.ltp.toFixed(2) : '—')}</span>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1308,7 +1311,8 @@ export default function PositionsView() {
                     alert('Please enter a valid limit price greater than 0.');
                     return;
                   }
-                  const exitSide = partialExitPos.qty > 0 ? 'SELL' : 'BUY';
+                  const isExitShort = Number(partialExitPos.qty) < 0 || partialExitPos.side === 'SELL';
+                  const exitSide = isExitShort ? 'BUY' : 'SELL';
                   const ok = await useStore.getState().placeOrder({
                     symbol: partialExitPos.symbol,
                     type: partialExitType,
@@ -1329,12 +1333,12 @@ export default function PositionsView() {
                   }
                 }}
                 style={{
-                  width: '100%', background: partialExitPos.qty > 0 ? 'var(--color-red)' : 'var(--color-blue)',
+                  width: '100%', background: isExitShort ? 'var(--color-blue)' : 'var(--color-red)',
                   color: 'var(--text-primary)', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
                   fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
                 }}
               >
-                {partialExitPos.qty > 0 ? 'SELL' : 'BUY'} {partialExitQty} {partialExitPos.lotSize > 1 ? 'LOTS' : 'QTY'}
+                {isExitShort ? 'BUY' : 'SELL'} {partialExitQty} {partialExitPos.lotSize > 1 ? 'LOTS' : 'QTY'}
               </button>
             </div>
           </div>
