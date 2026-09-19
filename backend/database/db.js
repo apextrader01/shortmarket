@@ -808,6 +808,7 @@ async function ensureCriticalColumns() {
         prize_2nd VARCHAR(255) DEFAULT '₹250 Cash + 1-Month Free PRO',
         prize_3rd VARCHAR(255) DEFAULT '₹100 Cash + Free PRO',
         status VARCHAR(50) DEFAULT 'ACTIVE',
+        segment VARCHAR(50) DEFAULT 'ALL',
         winner_1st_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         winner_2nd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         winner_3rd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -816,6 +817,10 @@ async function ensureCriticalColumns() {
       )
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_contests_status ON contests(status)');
+    await db.raw("ALTER TABLE contests ADD COLUMN IF NOT EXISTS segment VARCHAR(50) DEFAULT 'ALL'").catch(() => {});
+    await db.raw("UPDATE contests SET segment = 'ALL' WHERE segment IS NULL").catch(() => {});
+    // Auto-expire past contests where end_date has passed
+    await db.raw("UPDATE contests SET status = 'ENDED', updated_at = CURRENT_TIMESTAMP WHERE status = 'ACTIVE' AND end_date < CURRENT_TIMESTAMP").catch(() => {});
 
     // Seed default monthly contest if table empty
     const contestCount = await db('contests').count('id as count').first();
@@ -832,7 +837,8 @@ async function ensureCriticalColumns() {
         prize_1st: '₹500 Cash + 1-Month Free PRO',
         prize_2nd: '₹250 Cash + 1-Month Free PRO',
         prize_3rd: '₹100 Cash + Free PRO',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        segment: 'ALL'
       });
       console.log('Seeded initial monthly trading contest');
     }

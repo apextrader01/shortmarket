@@ -1249,14 +1249,16 @@ function MarketCalendarTab({ isMobile }) {
 }
 
 export default function AdminDashboard() {
-  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, adminUpdateUserDetails, toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, adminUpdateUserDetails: state.adminUpdateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
+  const { fetchAdminTelemetry, resetAdminTelemetry, adminTelemetry, fetchAdminUsers, updateUserBalance, fetchDepositRequests, processDeposit, fetchAdminAnalytics, fetchAdminOrders, fetchAdminPositions, fetchAdminLedger, forceCloseUserPosition, adminResetUser, adminDeleteUser, adminUpdateUserDetails, toggleUserBan, announcement, setAdminAnnouncement, bannedEntities, fetchBannedEntities, banEntity, unbanEntity, marketStatus, fetchMarketStatus, updateMarketStatus, fetchFyersStatus, fetchAdminWithdrawals, processAdminWithdrawal, adminContests, fetchAdminContests, saveContest, deleteContest, awardContest, telegramAdminConfig, fetchTelegramAdminConfig, updateTelegramAdminConfig, broadcastTelegramMessage } = useStore(useShallow(state => ({ fetchAdminTelemetry: state.fetchAdminTelemetry, resetAdminTelemetry: state.resetAdminTelemetry, adminTelemetry: state.adminTelemetry, toggleUserBan: state.toggleUserBan, fetchAdminUsers: state.fetchAdminUsers, updateUserBalance: state.updateUserBalance, fetchDepositRequests: state.fetchDepositRequests, processDeposit: state.processDeposit, fetchAdminAnalytics: state.fetchAdminAnalytics, fetchAdminOrders: state.fetchAdminOrders, fetchAdminPositions: state.fetchAdminPositions, fetchAdminLedger: state.fetchAdminLedger, forceCloseUserPosition: state.forceCloseUserPosition, adminResetUser: state.adminResetUser, adminDeleteUser: state.adminDeleteUser, adminUpdateUserDetails: state.adminUpdateUserDetails, announcement: state.announcement, setAdminAnnouncement: state.setAdminAnnouncement, bannedEntities: state.bannedEntities, fetchBannedEntities: state.fetchBannedEntities, banEntity: state.banEntity, unbanEntity: state.unbanEntity, marketStatus: state.marketStatus, fetchMarketStatus: state.fetchMarketStatus, updateMarketStatus: state.updateMarketStatus, fetchFyersStatus: state.fetchFyersStatus, fetchAdminWithdrawals: state.fetchAdminWithdrawals, processAdminWithdrawal: state.processAdminWithdrawal, adminContests: state.adminContests, fetchAdminContests: state.fetchAdminContests, saveContest: state.saveContest, deleteContest: state.deleteContest, awardContest: state.awardContest, telegramAdminConfig: state.telegramAdminConfig, fetchTelegramAdminConfig: state.fetchTelegramAdminConfig, updateTelegramAdminConfig: state.updateTelegramAdminConfig, broadcastTelegramMessage: state.broadcastTelegramMessage })));
 
   const [tgConfigForm, setTgConfigForm] = useState({
     global_enabled: true,
-    peak_protection_active: true,
-    peak_start_time: '09:15',
-    peak_end_time: '10:15',
-    peak_mode: 'BATCH_DELAY',
+    alert_account_balance: true,
+    alert_position_close: true,
+    alert_position_open: true,
+    alert_sl_triggered: true,
+    alert_target_reached: true,
+    alert_daily_summary: true,
     batch_delay_seconds: 10,
     bot_token: '',
     bot_username: 'ShortEdgeAlerts_bot'
@@ -1284,7 +1286,8 @@ export default function AdminDashboard() {
     prize_1st: '₹500 Cash + 1-Month Free PRO',
     prize_2nd: '₹250 Cash + 1-Month Free PRO',
     prize_3rd: '₹100 Cash + Free PRO',
-    status: 'ACTIVE'
+    status: 'ACTIVE',
+    segment: 'ALL'
   });
   const [showContestModal, setShowContestModal] = useState(false);
   const [contestSaving, setContestSaving] = useState(false);
@@ -3011,7 +3014,8 @@ export default function AdminDashboard() {
                       prize_1st: '₹500 Cash + 1-Month Free PRO',
                       prize_2nd: '₹250 Cash + 1-Month Free PRO',
                       prize_3rd: '₹100 Cash + Free PRO',
-                      status: 'ACTIVE'
+                      status: 'ACTIVE',
+                      segment: 'ALL'
                     });
                     setShowContestModal(true);
                   }}
@@ -3040,13 +3044,17 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {adminContests && adminContests.length > 0 ? (
                 adminContests.map(c => {
-                  const isActive = c.status === 'ACTIVE';
+                  const isEnded = c.status === 'ENDED' || c.status === 'COMPLETED' || (c.end_date && new Date(c.end_date).getTime() <= Date.now());
+                  const isActive = !isEnded && c.status === 'ACTIVE';
+                  const isUpcoming = !isEnded && c.status === 'UPCOMING';
+                  const seg = (c.segment || 'ALL').toUpperCase();
+                  const segBadge = seg === 'EQUITY' ? '📈 Equity' : seg === 'FNO' ? '⚡ F&O' : seg === 'COMMODITY' ? '🛢️ Commodities' : '🌐 All Markets';
                   return (
                     <div
                       key={c.id}
                       style={{
-                        background: isActive ? 'rgba(234, 179, 8, 0.05)' : 'rgba(255, 255, 255, 0.02)',
-                        border: isActive ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid var(--border-color)',
+                        background: isActive ? 'rgba(234, 179, 8, 0.05)' : isEnded ? 'rgba(255, 255, 255, 0.015)' : 'rgba(59, 130, 246, 0.03)',
+                        border: isActive ? '1px solid rgba(234, 179, 8, 0.4)' : isEnded ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(59, 130, 246, 0.3)',
                         borderRadius: '10px',
                         padding: '16px 20px',
                         display: 'flex',
@@ -3061,15 +3069,26 @@ export default function AdminDashboard() {
                               {c.title}
                             </h4>
                             <span style={{
-                              background: isActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                              border: isActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid var(--border-color)',
-                              color: isActive ? '#4ade80' : 'var(--text-secondary)',
+                              background: isActive ? 'rgba(34, 197, 94, 0.15)' : isEnded ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                              border: isActive ? '1px solid rgba(34, 197, 94, 0.4)' : isEnded ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(59, 130, 246, 0.4)',
+                              color: isActive ? '#4ade80' : isEnded ? '#f59e0b' : '#60a5fa',
                               fontSize: '10.5px',
                               fontWeight: '800',
                               padding: '2px 8px',
                               borderRadius: '12px'
                             }}>
-                              {c.status}
+                              {isEnded ? 'ENDED' : (c.status || 'ACTIVE')}
+                            </span>
+                            <span style={{
+                              background: 'rgba(59, 130, 246, 0.12)',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              color: '#93c5fd',
+                              fontSize: '10.5px',
+                              fontWeight: '700',
+                              padding: '2px 8px',
+                              borderRadius: '12px'
+                            }}>
+                              {segBadge}
                             </span>
                           </div>
                           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -3077,7 +3096,7 @@ export default function AdminDashboard() {
                           </p>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             onClick={() => {
@@ -3090,7 +3109,8 @@ export default function AdminDashboard() {
                                 prize_1st: c.prize_1st || '',
                                 prize_2nd: c.prize_2nd || '',
                                 prize_3rd: c.prize_3rd || '',
-                                status: c.status || 'ACTIVE'
+                                status: c.status || 'ACTIVE',
+                                segment: c.segment || 'ALL'
                               });
                               setShowContestModal(true);
                             }}
@@ -3098,6 +3118,24 @@ export default function AdminDashboard() {
                             style={{ padding: '6px 12px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px' }}
                           >
                             <Edit size={12} /> Edit Rewards
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm(`Are you sure you want to delete tournament "${c.title}"? This cannot be undone.`)) {
+                                const res = await deleteContest(c.id);
+                                if (res?.success) {
+                                  alert('Tournament deleted successfully!');
+                                } else {
+                                  alert(res?.error || 'Failed to delete tournament');
+                                }
+                              }
+                            }}
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '11.5px', display: 'flex', alignItems: 'center', gap: '4px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                          >
+                            <Trash2 size={12} /> Delete
                           </button>
 
                           {isActive && (
@@ -3241,6 +3279,40 @@ export default function AdminDashboard() {
                           onChange={e => setContestForm({ ...contestForm, end_date: e.target.value })}
                           style={{ width: '100%' }}
                         />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          Market / Segment
+                        </label>
+                        <select
+                          className="input-field"
+                          value={contestForm.segment || 'ALL'}
+                          onChange={e => setContestForm({ ...contestForm, segment: e.target.value })}
+                          style={{ width: '100%', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="ALL">🌐 All Markets (Equity + F&O + Commodities)</option>
+                          <option value="EQUITY">📈 Equity (Cash Only)</option>
+                          <option value="FNO">⚡ F&O (Derivatives Only)</option>
+                          <option value="COMMODITY">🛢️ Commodities (MCX Only)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          Tournament Status
+                        </label>
+                        <select
+                          className="input-field"
+                          value={contestForm.status || 'ACTIVE'}
+                          onChange={e => setContestForm({ ...contestForm, status: e.target.value })}
+                          style={{ width: '100%', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="ACTIVE">🟢 Active</option>
+                          <option value="UPCOMING">🔵 Upcoming</option>
+                          <option value="ENDED">🏁 Concluded / Ended</option>
+                        </select>
                       </div>
                     </div>
 

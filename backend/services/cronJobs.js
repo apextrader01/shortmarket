@@ -1001,6 +1001,18 @@ function initCronJobs(priceCache, triggerEngine) {
                     console.log(`[CRON] Purged ${purgedSessions} stale user session(s) older than 30 days.`);
                 }
             } catch (sessErr) {}
+
+            // Auto-expire past tournaments whose end_date has passed
+            try {
+                const now = new Date();
+                const expiredContests = await db('contests')
+                    .where('status', 'ACTIVE')
+                    .where('end_date', '<', now)
+                    .update({ status: 'ENDED', updated_at: now });
+                if (expiredContests > 0) {
+                    console.log(`[CRON] Auto-expired ${expiredContests} tournament(s) whose end date has passed.`);
+                }
+            } catch (cErr) {}
         } catch (err) {
             console.error('[CRON] Watchlist cleanup error:', err);
         } finally {

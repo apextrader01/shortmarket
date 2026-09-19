@@ -7835,11 +7835,55 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
   }
 });
 
+// ─── Segment Filter Helper for Leaderboards & Contests ─────────────────────
+function applySegmentFilterToQuery(query, segment) {
+  if (!segment || segment === 'ALL') return query;
+  const seg = String(segment).toUpperCase();
+  const commList = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+  const digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  
+  if (seg === 'EQUITY') {
+    query.whereNot('positions.symbol', 'like', 'MCX:%')
+         .whereNot('positions.symbol', 'like', '%-MF')
+         .whereNot('positions.symbol', 'like', '%:MF')
+         .whereNot('positions.symbol', 'like', '%FUT')
+         .whereNot('positions.symbol', 'like', '%-FUT');
+    digits.forEach(d => {
+      query.whereNot('positions.symbol', 'like', `%${d}CE`)
+           .whereNot('positions.symbol', 'like', `%${d}PE`);
+    });
+    commList.forEach(c => {
+      query.whereNot('positions.symbol', 'like', `%${c}%`);
+    });
+  } else if (seg === 'FNO' || seg === 'DERIVATIVES') {
+    query.where(builder => {
+      builder.where('positions.symbol', 'like', '%FUT')
+             .orWhere('positions.symbol', 'like', '%-FUT')
+             .orWhere('positions.symbol', 'like', 'MCX:%');
+      digits.forEach(d => {
+        builder.orWhere('positions.symbol', 'like', `%${d}CE`)
+               .orWhere('positions.symbol', 'like', `%${d}PE`);
+      });
+    });
+  } else if (seg === 'COMMODITY' || seg === 'COMMODITIES') {
+    query.where(builder => {
+      builder.where('positions.symbol', 'like', 'MCX:%');
+      commList.forEach(c => {
+        builder.orWhere('positions.symbol', 'like', `%${c}%`);
+      });
+    });
+  }
+  return query;
+}
+
 // ─── Live Leaderboard (Cached in Redis for 60s) ───────────────────────────
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    const { contest_id, segment, timeframe } = req.query;
     const { generalClient } = require('./services/redisClient');
-    const cacheKey = 'leaderboard:daily:top50';
+    const segKey = (segment || 'ALL').toUpperCase();
+    const contestKey = contest_id ? `contest_${contest_id}` : (timeframe === 'all_time' ? 'all_time' : 'daily');
+    const cacheKey = `leaderboard:${contestKey}:${segKey}:top50`;
 
     if (generalClient && generalClient.isReady) {
       const cached = await generalClient.get(cacheKey);
@@ -7848,19 +7892,42 @@ app.get('/api/leaderboard', async (req, res) => {
       }
     }
 
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const parts = formatter.formatToParts(new Date());
-    const year = parts.find(p => p.type === 'year').value;
-    const month = parts.find(p => p.type === 'month').value;
-    const day = parts.find(p => p.type === 'day').value;
-    const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
-
-    const topTraders = await db('positions')
+    let query = db('positions')
       .join('users', 'positions.user_id', 'users.id')
-      .where('users.is_admin', false)
-      .where(builder => {
+      .where('users.is_admin', false);
+
+    let effectiveSegment = segKey;
+
+    if (contest_id) {
+      const contest = await db('contests').where({ id: contest_id }).first();
+      if (contest) {
+        if (contest.start_date) {
+          query.where('positions.created_at', '>=', new Date(contest.start_date));
+        }
+        if (contest.end_date) {
+          query.where('positions.created_at', '<=', new Date(contest.end_date));
+        }
+        if (contest.segment && contest.segment !== 'ALL') {
+          effectiveSegment = contest.segment.toUpperCase();
+        }
+      }
+    } else if (timeframe !== 'all_time') {
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+      const parts = formatter.formatToParts(new Date());
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      const todayStart = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+
+      query.where(builder => {
         builder.where('positions.created_at', '>=', todayStart).orWhere('positions.updated_at', '>=', todayStart);
-      })
+      });
+    }
+
+    // Apply segment filter
+    applySegmentFilterToQuery(query, effectiveSegment);
+
+    const topTraders = await query
       .groupBy('users.id', 'users.username', 'users.profile_picture_url')
       .select(
         'users.id as user_id',
@@ -7888,7 +7955,7 @@ app.get('/api/leaderboard', async (req, res) => {
       };
     });
 
-    const result = { success: true, leaderboard: formatted, lastUpdated: Date.now() };
+    const result = { success: true, leaderboard: formatted, segment: effectiveSegment, lastUpdated: Date.now() };
 
     if (generalClient && generalClient.isReady) {
       await generalClient.setEx(cacheKey, 60, JSON.stringify(result)).catch(() => null);
@@ -8017,15 +8084,29 @@ app.delete('/api/user/sessions/:id', authenticateToken, async (req, res) => {
 });
 
 // ─── Contests & Tournaments Endpoints ─────────────────────────────────────
+async function autoExpireContests() {
+  try {
+    const now = new Date();
+    await db('contests')
+      .where('status', 'ACTIVE')
+      .where('end_date', '<', now)
+      .update({ status: 'ENDED', updated_at: now });
+  } catch (e) {
+    // fail silently
+  }
+}
+
 app.get('/api/contests/active', async (req, res) => {
   try {
-    let contest = await db('contests')
-      .where({ status: 'ACTIVE' })
-      .orderBy('id', 'desc')
-      .first();
+    await autoExpireContests();
+
+    let contests = await db('contests')
+      .where('status', 'ACTIVE')
+      .where('end_date', '>=', new Date())
+      .orderBy('id', 'desc');
 
     // If no active contest exists, auto-seed one for the current month
-    if (!contest) {
+    if (!contests || contests.length === 0) {
       const now = new Date();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -8038,18 +8119,27 @@ app.get('/api/contests/active', async (req, res) => {
         prize_1st: '₹500 Cash + 1-Month Free PRO',
         prize_2nd: '₹250 Cash + 1-Month Free PRO',
         prize_3rd: '₹100 Cash + Free PRO',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        segment: 'ALL'
       }).returning('id');
       const cid = typeof newId === 'object' ? newId.id : newId;
-      contest = await db('contests').where({ id: cid }).first();
+      const createdContest = await db('contests').where({ id: cid }).first();
+      contests = [createdContest];
     }
 
-    // Also fetch the top 3 leaderboard contenders for the contest period
-    const startDate = contest?.start_date || new Date(0);
-    const topContenders = await db('positions')
+    const primaryContest = contests[0];
+    const startDate = primaryContest?.start_date || new Date(0);
+    let topQuery = db('positions')
       .join('users', 'positions.user_id', 'users.id')
       .where('users.is_admin', false)
-      .where('positions.created_at', '>=', startDate)
+      .where('positions.created_at', '>=', startDate);
+
+    if (primaryContest?.end_date) {
+      topQuery.where('positions.created_at', '<=', new Date(primaryContest.end_date));
+    }
+    applySegmentFilterToQuery(topQuery, primaryContest?.segment || 'ALL');
+
+    const topContenders = await topQuery
       .groupBy('users.id', 'users.username', 'users.profile_picture_url')
       .select(
         'users.id as user_id',
@@ -8079,12 +8169,28 @@ app.get('/api/contests/active', async (req, res) => {
 
     res.json({
       success: true,
-      contest,
+      contests,
+      contest: primaryContest,
       topContenders: formattedContenders
     });
   } catch (err) {
-    console.error('Error fetching active contest:', err);
-    res.status(500).json({ error: 'Failed to fetch contest' });
+    console.error('Error fetching active contests:', err);
+    res.status(500).json({ error: 'Failed to fetch contests' });
+  }
+});
+
+// Past / Concluded Tournaments
+app.get('/api/contests/past', async (req, res) => {
+  try {
+    await autoExpireContests();
+    const pastContests = await db('contests')
+      .whereIn('status', ['ENDED', 'COMPLETED'])
+      .orderBy('end_date', 'desc')
+      .limit(20);
+    res.json({ success: true, contests: pastContests });
+  } catch (err) {
+    console.error('Error fetching past contests:', err);
+    res.status(500).json({ error: 'Failed to fetch past contests' });
   }
 });
 
@@ -8094,6 +8200,7 @@ app.get('/api/admin/contests', authenticateToken, async (req, res) => {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
+    await autoExpireContests();
     const contests = await db('contests').orderBy('id', 'desc');
     res.json({ success: true, contests });
   } catch (err) {
@@ -8108,7 +8215,7 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
     const user = await db('users').where({ id: req.user.id }).first();
     if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
-    const { id, title, description, start_date, end_date, prize_1st, prize_2nd, prize_3rd, status } = req.body;
+    const { id, title, description, start_date, end_date, prize_1st, prize_2nd, prize_3rd, status, segment } = req.body;
 
     if (!title) return res.status(400).json({ error: 'Title is required' });
 
@@ -8122,6 +8229,7 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
         prize_2nd: prize_2nd || '₹250 Cash + Free PRO',
         prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
         status: status || 'ACTIVE',
+        segment: segment || 'ALL',
         updated_at: new Date()
       });
       return res.json({ success: true, message: 'Contest updated successfully' });
@@ -8134,13 +8242,29 @@ app.post('/api/admin/contests', authenticateToken, async (req, res) => {
         prize_1st: prize_1st || '₹500 Cash + Free PRO',
         prize_2nd: prize_2nd || '₹250 Cash + Free PRO',
         prize_3rd: prize_3rd || '₹100 Cash + Free PRO',
-        status: status || 'ACTIVE'
+        status: status || 'ACTIVE',
+        segment: segment || 'ALL'
       }).returning('id');
       return res.json({ success: true, message: 'Contest created successfully', id: typeof newId === 'object' ? newId.id : newId });
     }
   } catch (err) {
     console.error('Error saving contest:', err);
     res.status(500).json({ error: 'Failed to save contest' });
+  }
+});
+
+// Admin: Delete contest
+app.delete('/api/admin/contests/:id', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user || !user.is_admin) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
+
+    const contestId = req.params.id;
+    await db('contests').where({ id: contestId }).del();
+    res.json({ success: true, message: 'Contest deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting contest:', err);
+    res.status(500).json({ error: 'Failed to delete contest' });
   }
 });
 

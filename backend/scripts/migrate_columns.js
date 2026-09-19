@@ -216,6 +216,9 @@ async function runMigration() {
     await db.raw('UPDATE positions SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
     await db.raw('UPDATE positions SET closed_quantity = 0 WHERE closed_quantity IS NULL').catch(() => {});
     await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
+    await db.raw("ALTER TABLE contests ADD COLUMN IF NOT EXISTS segment VARCHAR(50) DEFAULT 'ALL'").catch(() => {});
+    await db.raw("UPDATE contests SET segment = 'ALL' WHERE segment IS NULL").catch(() => {});
+    await db.raw("UPDATE contests SET status = 'ENDED', updated_at = CURRENT_TIMESTAMP WHERE status = 'ACTIVE' AND end_date < CURRENT_TIMESTAMP").catch(() => {});
     console.log('  ✅ Historical records backfilled with valid defaults');
 
     // 7B. Round fractional decimal quantities for non-MF symbols in orders, positions, and holdings

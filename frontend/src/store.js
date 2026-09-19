@@ -2011,13 +2011,24 @@ export const useStore = create(persist((set, get) => ({
   // ── Leaderboard ─────────────────────────────────────────────────────────────
   leaderboard: [],
   leaderboardLoading: false,
-  fetchLeaderboard: async () => {
+  leaderboardSegment: 'ALL',
+  fetchLeaderboard: async (params = {}) => {
     try {
       set({ leaderboardLoading: true });
-      const res = await fetch(`${API}/api/leaderboard`, { credentials: 'omit' });
+      const queryParams = new URLSearchParams();
+      if (params.contest_id) queryParams.set('contest_id', params.contest_id);
+      if (params.segment && params.segment !== 'ALL') queryParams.set('segment', params.segment);
+      if (params.timeframe) queryParams.set('timeframe', params.timeframe);
+
+      const url = `${API}/api/leaderboard${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const res = await fetch(url, { credentials: 'omit' });
       const data = await res.json();
       if (data?.success) {
-        set({ leaderboard: data.leaderboard || [], leaderboardLoading: false });
+        set({
+          leaderboard: data.leaderboard || [],
+          leaderboardSegment: data.segment || 'ALL',
+          leaderboardLoading: false
+        });
       } else {
         set({ leaderboardLoading: false });
       }
@@ -2269,6 +2280,8 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Contests & Tournaments ────────────────────────────────────────────────
   activeContest: null,
+  activeContests: [],
+  pastContests: [],
   activeContestLoading: false,
   adminContests: [],
 
@@ -2278,7 +2291,12 @@ export const useStore = create(persist((set, get) => ({
       const res = await fetch(`${API}/api/contests/active`);
       const data = await res.json();
       if (data && data.success) {
-        set({ activeContest: data.contest, activeContestTop: data.topContenders || [] });
+        const contests = data.contests || (data.contest ? [data.contest] : []);
+        set({
+          activeContests: contests,
+          activeContest: data.contest || contests[0] || null,
+          activeContestTop: data.topContenders || []
+        });
         return data;
       }
     } catch (e) {
@@ -2287,6 +2305,24 @@ export const useStore = create(persist((set, get) => ({
       set({ activeContestLoading: false });
     }
     return null;
+  },
+
+  fetchPastContests: async () => {
+    try {
+      const res = await fetch(`${API}/api/contests/past`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ pastContests: data.contests || [] });
+        return data.contests || [];
+      }
+    } catch (e) {
+      console.error('fetchPastContests error:', e);
+    }
+    return [];
+  },
+
+  selectActiveContest: (contest) => {
+    set({ activeContest: contest });
   },
 
   fetchAdminContests: async () => {
@@ -2321,9 +2357,30 @@ export const useStore = create(persist((set, get) => ({
       if (data && data.success) {
         get().fetchActiveContest();
         get().fetchAdminContests();
+        get().fetchPastContests();
         return { success: true };
       }
       return { success: false, error: data?.error || 'Failed to save contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  deleteContest: async (contestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests/${contestId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        get().fetchPastContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to delete contest' };
     } catch (e) {
       return { success: false, error: e.message };
     }
@@ -2344,6 +2401,7 @@ export const useStore = create(persist((set, get) => ({
       if (data && data.success) {
         get().fetchActiveContest();
         get().fetchAdminContests();
+        get().fetchPastContests();
         return { success: true };
       }
       return { success: false, error: data?.error || 'Failed to award contest' };

@@ -1,19 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { Trophy, RefreshCw, Users, ShieldCheck, Flame, Gift, Calendar, Award, Sparkles, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  Trophy, RefreshCw, Users, ShieldCheck, Calendar, Award, 
+  CheckCircle2, ChevronDown, ChevronUp, Layers, TrendingUp, Zap, Clock, History
+} from 'lucide-react';
 
 export default function LeaderboardView() {
-  const { leaderboard, leaderboardLoading, fetchLeaderboard, activeContest, activeContestLoading, fetchActiveContest } = useStore(useShallow(state => ({
+  const { 
+    leaderboard, 
+    leaderboardLoading, 
+    fetchLeaderboard, 
+    activeContest, 
+    activeContests,
+    pastContests,
+    activeContestLoading, 
+    fetchActiveContest,
+    fetchPastContests,
+    selectActiveContest 
+  } = useStore(useShallow(state => ({
     leaderboard: state.leaderboard,
     leaderboardLoading: state.leaderboardLoading,
     fetchLeaderboard: state.fetchLeaderboard,
     activeContest: state.activeContest,
+    activeContests: state.activeContests,
+    pastContests: state.pastContests,
     activeContestLoading: state.activeContestLoading,
-    fetchActiveContest: state.fetchActiveContest
+    fetchActiveContest: state.fetchActiveContest,
+    fetchPastContests: state.fetchPastContests,
+    selectActiveContest: state.selectActiveContest
   })));
+
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showRules, setShowRules] = useState(false);
+  const [selectedSegment, setSelectedSegment] = useState('ALL');
+  const [scope, setScope] = useState('TOURNAMENT'); // 'TOURNAMENT' | 'TODAY'
+  const [activeTab, setActiveTab] = useState('ACTIVE'); // 'ACTIVE' | 'PAST'
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -21,13 +43,55 @@ export default function LeaderboardView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Initial load
   useEffect(() => {
-    fetchLeaderboard();
-    fetchActiveContest();
+    Promise.all([
+      fetchActiveContest(),
+      fetchPastContests()
+    ]).then(([activeData]) => {
+      const primary = activeData?.contest || (activeData?.contests && activeData.contests[0]);
+      if (primary) {
+        fetchLeaderboard({ contest_id: primary.id, segment: selectedSegment });
+      } else {
+        fetchLeaderboard({ segment: selectedSegment });
+      }
+    });
   }, []);
 
+  // Whenever active contest, segment, or scope changes, refresh leaderboard
+  const reloadLeaderboard = async (contestId = activeContest?.id, seg = selectedSegment, sc = scope) => {
+    if (sc === 'TODAY') {
+      await fetchLeaderboard({ segment: seg, timeframe: 'today' });
+    } else if (contestId) {
+      await fetchLeaderboard({ contest_id: contestId, segment: seg });
+    } else {
+      await fetchLeaderboard({ segment: seg });
+    }
+  };
+
+  const handleContestSelect = (contest) => {
+    selectActiveContest(contest);
+    const contestSegment = contest.segment && contest.segment !== 'ALL' ? contest.segment : selectedSegment;
+    setSelectedSegment(contestSegment);
+    reloadLeaderboard(contest.id, contestSegment, scope);
+  };
+
+  const handleSegmentChange = (seg) => {
+    setSelectedSegment(seg);
+    reloadLeaderboard(activeContest?.id, seg, scope);
+  };
+
+  const handleScopeChange = (newScope) => {
+    setScope(newScope);
+    reloadLeaderboard(activeContest?.id, selectedSegment, newScope);
+  };
+
   const handleRefresh = async () => {
-    await Promise.all([fetchLeaderboard(), fetchActiveContest()]);
+    await Promise.all([
+      fetchActiveContest(),
+      fetchPastContests(),
+      reloadLeaderboard()
+    ]);
   };
 
   const calculateTimeLeft = (endDateStr) => {
@@ -39,6 +103,43 @@ export default function LeaderboardView() {
     if (days > 0) return `${days}d ${hours}h remaining`;
     const mins = Math.floor((diff / (1000 * 60)) % 60);
     return `${hours}h ${mins}m remaining`;
+  };
+
+  const isContestEnded = (contest) => {
+    if (!contest) return true;
+    if (contest.status === 'ENDED' || contest.status === 'COMPLETED') return true;
+    if (contest.end_date && new Date(contest.end_date).getTime() <= Date.now()) return true;
+    return false;
+  };
+
+  const getSegmentBadge = (segment) => {
+    const s = (segment || 'ALL').toUpperCase();
+    if (s === 'EQUITY') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#3b82f6', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          <TrendingUp size={11} /> Equity (Cash)
+        </span>
+      );
+    }
+    if (s === 'FNO' || s === 'DERIVATIVES') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.35)', color: '#a855f7', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          <Zap size={11} /> F&O (Derivatives)
+        </span>
+      );
+    }
+    if (s === 'COMMODITY' || s === 'COMMODITIES') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.35)', color: '#eab308', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+          🛢️ Commodities (MCX)
+        </span>
+      );
+    }
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(148, 163, 184, 0.15)', border: '1px solid rgba(148, 163, 184, 0.35)', color: '#94a3b8', padding: '2px 8px', borderRadius: '12px', fontSize: '10.5px', fontWeight: '800' }}>
+        <Layers size={11} /> All Markets
+      </span>
+    );
   };
 
   const top3 = leaderboard.slice(0, 3);
@@ -92,9 +193,114 @@ export default function LeaderboardView() {
     );
   };
 
+  const ended = isContestEnded(activeContest);
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px', padding: isMobile ? '12px 6px' : '16px 8px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: isMobile ? '14px' : '20px', padding: isMobile ? '12px 6px' : '16px 8px' }}>
       
+      {/* Top Header & View Mode Switcher */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('ACTIVE');
+              if (activeContests.length > 0) handleContestSelect(activeContests[0]);
+            }}
+            style={{
+              background: activeTab === 'ACTIVE' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'var(--bg-card)',
+              color: activeTab === 'ACTIVE' ? '#000' : 'var(--text-secondary)',
+              border: activeTab === 'ACTIVE' ? 'none' : '1px solid var(--border-color)',
+              borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: '800', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            <Trophy size={14} /> Active Tournaments ({activeContests.length})
+          </button>
+
+          {pastContests && pastContests.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('PAST');
+                handleContestSelect(pastContests[0]);
+              }}
+              style={{
+                background: activeTab === 'PAST' ? 'linear-gradient(135deg, #475569, #334155)' : 'var(--bg-card)',
+                color: activeTab === 'PAST' ? '#fff' : 'var(--text-secondary)',
+                border: activeTab === 'PAST' ? 'none' : '1px solid var(--border-color)',
+                borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <History size={14} /> Past Events ({pastContests.length})
+            </button>
+          )}
+        </div>
+
+        {/* Live Sync button */}
+        <button
+          onClick={handleRefresh}
+          disabled={leaderboardLoading || activeContestLoading}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            background: 'rgba(37, 99, 235, 0.12)', border: '1px solid rgba(37, 99, 235, 0.3)',
+            color: '#2563eb', padding: '6px 14px', borderRadius: '8px', fontSize: '11.5px',
+            fontWeight: '700', cursor: 'pointer', marginLeft: isMobile ? '0' : 'auto'
+          }}
+        >
+          <RefreshCw size={12} className={(leaderboardLoading || activeContestLoading) ? 'animate-spin' : ''} />
+          {leaderboardLoading ? 'Syncing...' : 'Live Sync'}
+        </button>
+      </div>
+
+      {/* Multi-Tournament Pill Switcher (If multiple active or past events exist) */}
+      {((activeTab === 'ACTIVE' && activeContests.length > 1) || (activeTab === 'PAST' && pastContests.length > 1)) && (
+        <div style={{
+          display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px',
+          scrollbarWidth: 'none', msOverflowStyle: 'none'
+        }}>
+          {(activeTab === 'ACTIVE' ? activeContests : pastContests).map((c) => {
+            const isSelected = activeContest?.id === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handleContestSelect(c)}
+                style={{
+                  background: isSelected 
+                    ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, var(--bg-card) 100%)' 
+                    : 'var(--bg-card)',
+                  border: isSelected ? '1px solid #f59e0b' : '1px solid var(--border-color)',
+                  borderRadius: '10px',
+                  padding: '8px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 0 12px rgba(245, 158, 11, 0.2)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>🏆</span>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '12px', fontWeight: isSelected ? '800' : '600', color: isSelected ? '#fbbf24' : 'var(--text-primary)' }}>
+                    {c.title}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    {getSegmentBadge(c.segment)}
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                      {c.end_date ? new Date(c.end_date).toLocaleDateString('en-IN') : ''}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Active Tournament & Prize Pool Hero Banner */}
       {activeContest && (
         <div className="glass-panel" style={{
@@ -114,23 +320,47 @@ export default function LeaderboardView() {
           {/* Top Bar: Badges & Live Status */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '5px',
-                background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.35)',
-                color: '#16a34a', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800'
-              }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 6px rgba(22, 163, 74, 0.4)' }} />
-                🟢 LIVE TOURNAMENT
-              </span>
+              {ended ? (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  background: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.4)',
+                  color: '#d97706', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800'
+                }}>
+                  🏁 TOURNAMENT CONCLUDED
+                </span>
+              ) : (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.35)',
+                  color: '#16a34a', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 6px rgba(22, 163, 74, 0.4)' }} />
+                  🟢 LIVE TOURNAMENT
+                </span>
+              )}
 
-              {activeContest.end_date && (
+              {/* Segment Badge */}
+              {getSegmentBadge(activeContest.segment)}
+
+              {activeContest.end_date && !ended && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: '5px',
                   background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.3)',
                   color: '#d97706', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700'
                 }}>
-                  <Calendar size={12} />
+                  <Clock size={12} />
                   {calculateTimeLeft(activeContest.end_date)}
+                </span>
+              )}
+
+              {activeContest.start_date && activeContest.end_date && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                  color: 'var(--text-secondary)', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600'
+                }}>
+                  <Calendar size={12} />
+                  {new Date(activeContest.start_date).toLocaleDateString('en-IN')} - {new Date(activeContest.end_date).toLocaleDateString('en-IN')}
                 </span>
               )}
             </div>
@@ -146,20 +376,6 @@ export default function LeaderboardView() {
                 }}
               >
                 Rules & Eligibility {showRules ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              </button>
-
-              <button
-                onClick={handleRefresh}
-                disabled={leaderboardLoading || activeContestLoading}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: 'rgba(37, 99, 235, 0.12)', border: '1px solid rgba(37, 99, 235, 0.3)',
-                  color: '#2563eb', padding: '6px 14px', borderRadius: '8px', fontSize: '11.5px',
-                  fontWeight: '700', cursor: 'pointer', marginLeft: 'auto'
-                }}
-              >
-                <RefreshCw size={12} className={(leaderboardLoading || activeContestLoading) ? 'animate-spin' : ''} />
-                {leaderboardLoading ? 'Syncing...' : 'Live Sync'}
               </button>
             </div>
           </div>
@@ -188,18 +404,21 @@ export default function LeaderboardView() {
               gap: '6px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '700' }}>
-                <CheckCircle2 size={14} color="#16a34a" /> Tournament Rules & Auto-Payout
+                <CheckCircle2 size={14} color="#16a34a" /> Tournament Rules & Eligibility
               </div>
               <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <li>All registered traders are automatically enrolled (₹0 entry fee).</li>
-                <li>Rankings are determined by total verified realized net P&L on closed positions.</li>
-                <li>Prizes are credited to your platform wallet or activated as Free PRO membership immediately upon monthly close.</li>
+                <li>
+                  Eligible Instruments: <strong>{activeContest.segment === 'EQUITY' ? 'Cash Stocks Only' : activeContest.segment === 'FNO' ? 'Futures & Options Only' : activeContest.segment === 'COMMODITY' ? 'MCX Commodities Only' : 'All Traded Instruments'}</strong>.
+                </li>
+                <li>Rankings are determined by total verified realized net P&L on closed positions during the tournament period.</li>
+                <li>Prizes are credited to your platform wallet or activated as Free PRO membership upon tournament finalization.</li>
                 <li>Automated fair-play risk & RMS verification ensures transparent competition.</li>
               </ul>
             </div>
           )}
 
-          {/* Guaranteed Monthly Reward Pool Tiles */}
+          {/* Guaranteed Reward Pool Tiles */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
@@ -251,7 +470,7 @@ export default function LeaderboardView() {
             {/* 3rd Prize */}
             <div style={{
               background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.12) 0%, var(--bg-card) 100%)',
-              border: '1px solid rgba(217, 119, 6, 0.35)',
+              border: '1px solid rgba(217, 119, 6, 0.3)',
               borderRadius: '10px',
               padding: '12px 14px',
               display: 'flex',
@@ -272,31 +491,113 @@ export default function LeaderboardView() {
         </div>
       )}
 
-      {/* Top 3 Podium Cards */}
+      {/* Filter & Scope Control Bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: '12px',
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: isMobile ? '10px 12px' : '10px 16px'
+      }}>
+        {/* Market Segment Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginRight: '4px' }}>
+            SEGMENT:
+          </span>
+          {[
+            { id: 'ALL', label: 'All Markets', icon: Layers },
+            { id: 'EQUITY', label: 'Equity (Cash)', icon: TrendingUp },
+            { id: 'FNO', label: 'F&O Derivatives', icon: Zap },
+            { id: 'COMMODITY', label: 'Commodities', icon: Award }
+          ].map(f => {
+            const isSelected = selectedSegment === f.id;
+            const Icon = f.icon;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => handleSegmentChange(f.id)}
+                style={{
+                  background: isSelected ? 'rgba(37, 99, 235, 0.15)' : 'var(--bg-card)',
+                  border: isSelected ? '1px solid #2563eb' : '1px solid var(--border-color)',
+                  color: isSelected ? '#3b82f6' : 'var(--text-secondary)',
+                  borderRadius: '20px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  fontWeight: isSelected ? '800' : '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Icon size={11} /> {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Standings Scope Toggle (Tournament Overall vs Today Live) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <button
+            type="button"
+            onClick={() => handleScopeChange('TOURNAMENT')}
+            style={{
+              background: scope === 'TOURNAMENT' ? '#2563eb' : 'transparent',
+              color: scope === 'TOURNAMENT' ? '#fff' : 'var(--text-secondary)',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Tournament Standings
+          </button>
+          <button
+            type="button"
+            onClick={() => handleScopeChange('TODAY')}
+            style={{
+              background: scope === 'TODAY' ? '#2563eb' : 'transparent',
+              color: scope === 'TODAY' ? '#fff' : 'var(--text-secondary)',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer'
+            }}
+          >
+            Today's Session
+          </button>
+        </div>
+      </div>
+
+      {/* Top 3 Podium Highlights */}
       {top3.length > 0 && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: isMobile ? '12px' : '20px',
-          alignItems: 'end'
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+          gap: isMobile ? '12px' : '16px',
+          alignItems: 'flex-end'
         }}>
           {/* Rank 1 (Gold) */}
           {top3[0] && (
             <div className="glass-panel" style={{
-              background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.15) 0%, var(--bg-panel) 100%)',
-              border: '2px solid rgba(234, 179, 8, 0.6)',
-              borderRadius: '14px', padding: isMobile ? '18px' : '28px', textAlign: 'center',
-              boxShadow: '0 12px 40px rgba(234, 179, 8, 0.15)', position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(180deg, rgba(234, 179, 8, 0.18) 0%, var(--bg-panel) 100%)',
+              border: '1px solid rgba(234, 179, 8, 0.45)',
+              borderRadius: '14px', padding: isMobile ? '18px' : '28px 24px', textAlign: 'center',
+              boxShadow: '0 0 24px rgba(234, 179, 8, 0.12)', position: 'relative', overflow: 'hidden',
               order: isMobile ? 1 : 2
             }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #eab308, #fef08a, #eab308)' }} />
-              <div style={{
-                display: 'inline-block', background: 'rgba(234, 179, 8, 0.2)', border: '1px solid rgba(234, 179, 8, 0.5)',
-                color: '#d97706', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: '800', marginBottom: '6px'
-              }}>
-                👑 TOP CHAMPION
-              </div>
-              <div style={{ fontSize: isMobile ? '32px' : '42px', marginBottom: '4px' }}>🥇</div>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #f59e0b, #eab308)' }} />
+              <div style={{ fontSize: isMobile ? '32px' : '40px', marginBottom: '6px' }}>👑</div>
               <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: 'var(--text-primary)' }}>{top3[0].username}</div>
               
               <div style={{ fontSize: isMobile ? '24px' : '30px', fontWeight: '900', color: '#16a34a', margin: '10px 0 6px 0' }}>
@@ -378,6 +679,11 @@ export default function LeaderboardView() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: isMobile ? '14px' : '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
             <Users size={16} color="#2563eb" />
             Ranked Traders (Top 50)
+            {selectedSegment !== 'ALL' && (
+              <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>
+                • {selectedSegment}
+              </span>
+            )}
           </div>
           <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
             Auto-cached in Redis
@@ -388,10 +694,12 @@ export default function LeaderboardView() {
           <div style={{ padding: isMobile ? '40px 16px' : '60px 20px', textAlign: 'center' }}>
             <Trophy size={40} color="#94a3b8" style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
-              No Profitable Trades Recorded Yet Today
+              No Profitable Trades Recorded Yet
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '350px', margin: '0 auto' }}>
-              Place and close your profitable positions during live market hours to climb the rankings and claim your spot on the podium!
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 auto' }}>
+              {selectedSegment !== 'ALL'
+                ? `Place and close profitable ${selectedSegment} positions during market hours to rank on the leaderboard!`
+                : 'Place and close your profitable positions during live market hours to climb the rankings and claim your spot on the podium!'}
             </p>
           </div>
         ) : isMobile ? (
