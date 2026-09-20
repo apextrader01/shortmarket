@@ -761,7 +761,7 @@ export default function BasketModal() {
         type: item.orderType,
         side: item.side,
         quantity: item.totalQuantity,
-        price: item.orderType === 'MARKET' ? item.livePrice : parseFloat(item.price),
+        price: item.orderType === 'MARKET' ? (item.livePrice || parseFloat(item.price) || 0) : parseFloat(item.price),
         product_type: productType,
         margin: allocatedMargin
       };

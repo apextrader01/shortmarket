@@ -1500,11 +1500,15 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Wallet / Deposits ───────────────────────────────────────────────────────
   requestDeposit: async (amount) => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/wallet/deposit`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/wallet/deposit`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ amount })
       });
       const data = await res.json();

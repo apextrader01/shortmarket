@@ -224,10 +224,15 @@ class PositionsEngine {
                         const lastOrder = await trx('orders').where({ symbol: pos.symbol, status: 'EXECUTED' }).orderBy('created_at', 'desc').first();
                         if (lastOrder && Number(lastOrder.price) > 0) ltp = Number(lastOrder.price);
                     }
+                    const isOption = isDerivativeSymbol(pos.symbol) && /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(pos.symbol);
                     if (!ltp || ltp <= 0) {
-                        ltp = Number(pos.average_price) || 0;
+                        if (isOption) {
+                            ltp = 0; // Expired out-of-the-money options settle at ₹0, never refunding original purchase price
+                        } else {
+                            ltp = Number(pos.average_price) || 0;
+                        }
                     }
-                    if (ltp <= 0) {
+                    if (ltp < 0 || (ltp === 0 && !isOption)) {
                         console.warn(`[EOD SQUARE-OFF] No valid LTP for ${pos.symbol}, skipping square-off.`);
                         continue;
                     }
@@ -661,7 +666,11 @@ class PositionsEngine {
 
                         await trx('holdings')
                             .where({ id: existingHolding.id })
-                            .update({ quantity: newTotalQty, average_price: newAvgPrice });
+                            .update({ 
+                                quantity: newTotalQty, 
+                                average_price: newAvgPrice,
+                                updated_at: new Date()
+                            });
                     } else {
                         // Insert new holding
                         await trx('holdings').insert({
@@ -669,7 +678,9 @@ class PositionsEngine {
                             symbol: pos.symbol,
                             quantity: Number(pos.quantity),
                             average_price: Math.abs(Number(pos.average_price)),
-                            asset_class: assetClass
+                            asset_class: assetClass,
+                            created_at: new Date(),
+                            updated_at: new Date()
                         });
                     }
                 }

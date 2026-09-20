@@ -17,7 +17,8 @@ class LedgerService {
             throw new Error('Insufficient funds');
         }
         
-        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - parsedAmount });
+        const newBal = Math.round((parseFloat(user.balance) - parsedAmount + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: userId }).update({ balance: newBal });
         await trx('ledger').insert({
             user_id: userId,
             amount: -parsedAmount,
@@ -34,7 +35,8 @@ class LedgerService {
         if (parsedAmount <= 0) return;
         
         const user = await trx('users').where({ id: userId }).forUpdate().first();
-        await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) + parsedAmount });
+        const newBal = Math.round((parseFloat(user.balance) + parsedAmount + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: userId }).update({ balance: newBal });
         await trx('ledger').insert({
             user_id: userId,
             amount: parsedAmount,
@@ -52,7 +54,8 @@ class LedgerService {
         
         if (totalTaxes > 0) {
             const user = await trx('users').where({ id: userId }).forUpdate().first();
-            await trx('users').where({ id: userId }).update({ balance: parseFloat(user.balance) - totalTaxes });
+            const newBal = Math.round((parseFloat(user.balance) - totalTaxes + Number.EPSILON) * 100) / 100;
+            await trx('users').where({ id: userId }).update({ balance: newBal });
             await trx('ledger').insert({
                 user_id: userId,
                 amount: -totalTaxes,
@@ -77,7 +80,7 @@ class LedgerService {
         const productType = position.product_type;
         const side = quantity > 0 ? 'SELL' : 'BUY'; // To close long, you sell. To close short, you buy.
         const absQty = Math.abs(quantity);
-        const validExitPrice = (exitPrice !== undefined && exitPrice !== null && !isNaN(Number(exitPrice)) && Number(exitPrice) > 0) 
+        const validExitPrice = (exitPrice !== undefined && exitPrice !== null && !isNaN(Number(exitPrice)) && Number(exitPrice) >= 0) 
             ? Number(exitPrice) 
             : entryPrice;
 

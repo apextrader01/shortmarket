@@ -1323,7 +1323,7 @@ export default function PositionsView() {
                     sl_price: null,
                     tgt_price: null,
                     margin: 0,
-                    product_type: partialExitPos.product_type || 'DEL'
+                    product_type: (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL')
                   });
                   if (ok && ok.success) {
                     setPartialExitPos(null);

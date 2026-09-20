@@ -1791,10 +1791,22 @@ app.post('/api/wallet/withdraw', authenticateToken, async (req, res) => {
         throw Object.assign(new Error('Please update your Bank or UPI details in Settings before requesting a withdrawal.'), { statusCode: 400 });
       }
 
-      // Check available cash balance
+      // Check available cash balance and compute open unrealized loss
       const currentBalance = parseFloat(user.balance) || 0;
-      if (currentBalance < parsedAmount) {
-        throw Object.assign(new Error(`Insufficient trading balance. Available: ₹${currentBalance.toLocaleString('en-IN')}, Requested: ₹${parsedAmount.toLocaleString('en-IN')}`), { statusCode: 400 });
+      const openPositions = await trx('positions').where({ user_id: req.user.id }).whereNot({ quantity: 0 });
+      let netUnrealizedLoss = 0;
+      for (const pos of openPositions) {
+        const qty = parseFloat(pos.quantity) || 0;
+        const avg = Math.abs(parseFloat(pos.average_price)) || 0;
+        const ltp = getLtpFromPriceCache(pos.symbol) || avg;
+        let posPnl = 0;
+        if (qty > 0) posPnl = (ltp - avg) * qty;
+        else if (qty < 0) posPnl = (avg - ltp) * Math.abs(qty);
+        if (posPnl < 0) netUnrealizedLoss += posPnl;
+      }
+      const withdrawableBalance = Math.max(0, Math.round((currentBalance + netUnrealizedLoss) * 100) / 100);
+      if (withdrawableBalance < parsedAmount) {
+        throw Object.assign(new Error(`Insufficient withdrawable balance. Available: ₹${withdrawableBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${netUnrealizedLoss < 0 ? ` (₹${Math.abs(netUnrealizedLoss).toFixed(2)} withheld for open position losses)` : ''}, Requested: ₹${parsedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`), { statusCode: 400 });
       }
 
       // Cap active pending withdrawal requests to prevent double spending
@@ -1828,6 +1840,11 @@ app.post('/api/wallet/withdraw', authenticateToken, async (req, res) => {
         updated_at: new Date()
       });
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine && triggerEngine.io) {
+      triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+    }
 
     res.json({ success: true, message: `Withdrawal request for ₹${parsedAmount.toLocaleString('en-IN')} submitted successfully.` });
   } catch (err) {
@@ -2503,7 +2520,11 @@ app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) 
       }
 
       const deposit = await trx('deposit_requests').where({ id: req.params.id }).first();
-      await trx('users').where({ id: deposit.user_id }).increment('balance', deposit.amount);
+      const user = await trx('users').where({ id: deposit.user_id }).forUpdate().first();
+      if (user) {
+        const newBal = Math.round((parseFloat(user.balance) + parseFloat(deposit.amount) + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: deposit.user_id }).update({ balance: newBal });
+      }
       
       await trx('ledger').insert({
           user_id: deposit.user_id,
@@ -2511,7 +2532,13 @@ app.post('/api/admin/deposits/:id/approve', authenticateToken, async (req, res) 
           type: 'DEPOSIT',
           description: `Deposit Approved (ID: ${deposit.id})`
       });
+      req.approvedDepositUserId = deposit.user_id;
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine && triggerEngine.io && req.approvedDepositUserId) {
+      triggerEngine.io.to(req.approvedDepositUserId.toString()).emit('sync_user_data');
+    }
     
     res.json({ success: true });
   } catch (err) {
@@ -3358,13 +3385,14 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
       const newMargin = calculateRequiredMargin(position.symbol, newProductType, side, absQty, priceBasis);
       const marginDifference = newMargin - oldMargin;
 
-      const user = await trx('users').where({ id: req.user.id }).first();
+      const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
 
       if (marginDifference > 0) {
         if (parseFloat(user.balance) < marginDifference) {
           throw Object.assign(new Error('Insufficient Funds to convert position.'), { statusCode: 400 });
         }
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) - marginDifference });
+        const newBal = Math.round((parseFloat(user.balance) - marginDifference + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: req.user.id }).update({ balance: newBal });
         await trx('ledger').insert({
           user_id: req.user.id,
           amount: -marginDifference,
@@ -3373,7 +3401,8 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
         });
       } else if (marginDifference < 0) {
         const refund = Math.abs(marginDifference);
-        await trx('users').where({ id: req.user.id }).update({ balance: parseFloat(user.balance) + refund });
+        const newBal = Math.round((parseFloat(user.balance) + refund + Number.EPSILON) * 100) / 100;
+        await trx('users').where({ id: req.user.id }).update({ balance: newBal });
         await trx('ledger').insert({
           user_id: req.user.id,
           amount: refund,
@@ -3398,7 +3427,8 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
           builder.where({ symbol: position.symbol })
                  .orWhere({ symbol: cleanSym })
                  .orWhere({ symbol: `NSE:${cleanSym}` })
-                 .orWhere({ symbol: `BSE:${cleanSym}` });
+                 .orWhere({ symbol: `BSE:${cleanSym}` })
+                 .orWhere({ symbol: `MCX:${cleanSym}` });
         })
         .whereNot('id', positionId)
         .whereNot('quantity', 0)
@@ -3484,6 +3514,42 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
               margin: 0,
               updated_at: new Date()
             });
+
+            // Cancel dangling linked pending and trigger orders (SL/Target child legs or linked brackets)
+            const cleanSymTarget = position.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+            const danglingOrders = await trx('orders')
+              .where({ user_id: req.user.id })
+              .where(builder => {
+                builder.where({ symbol: position.symbol })
+                       .orWhere({ symbol: cleanSymTarget })
+                       .orWhere({ symbol: `NSE:${cleanSymTarget}` })
+                       .orWhere({ symbol: `BSE:${cleanSymTarget}` })
+                       .orWhere({ symbol: `MCX:${cleanSymTarget}` });
+              })
+              .where(builder => {
+                builder.where('status', 'PENDING_TRIGGER')
+                       .orWhereNotNull('parent_order_id');
+              })
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+            for (const dangler of danglingOrders) {
+              await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+              const refundMargin = parseFloat(dangler.margin) || 0;
+              if (refundMargin > 0) {
+                const u = await trx('users').where({ id: req.user.id }).forUpdate().first();
+                if (u) {
+                  const newUbal = Math.round((Number(u.balance) + refundMargin + Number.EPSILON) * 100) / 100;
+                  await trx('users').where({ id: req.user.id }).update({ balance: newUbal });
+                  await trx('ledger').insert({
+                    user_id: req.user.id,
+                    amount: refundMargin,
+                    type: 'MARGIN_RELEASE',
+                    description: `Margin released for cancelled dangling order ${dangler.symbol} on position conversion`
+                  });
+                }
+              }
+            }
+            req.danglingOrdersToClean = danglingOrders;
           } else if (Math.abs(qtyA) > Math.abs(qtyB)) {
             // Existing position partially closed, incoming completely absorbed
             const marginReleaseFromA = marginA * (closedQty / Math.abs(qtyA));
@@ -3567,8 +3633,17 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
             });
           }
         }
-      }
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine && triggerEngine.io) {
+      triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+    }
+    if (req.danglingOrdersToClean && req.danglingOrdersToClean.length > 0) {
+      for (const d of req.danglingOrdersToClean) {
+        triggerEngine.removeOrderFromMemory(d.id, d.symbol);
+      }
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -5975,7 +6050,35 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
 
         exitOrders.push({ symbol: pos.symbol, quantity: qty, price: ltp });
       }
+
+      // Cancel any remaining pending sell orders on these exited holdings to prevent double selling
+      const exitedSymbols = exitOrders.map(o => o.symbol);
+      const cleanExited = exitedSymbols.map(s => s.replace(/^(NSE:|BSE:|MCX:)/i, ''));
+      const pendingSellOrders = await trx('orders')
+        .where({ user_id: req.user.id, side: 'SELL' })
+        .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
+        .where(b => {
+          b.whereIn('symbol', exitedSymbols).orWhereIn('symbol', cleanExited);
+        });
+
+      for (const ord of pendingSellOrders) {
+        await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+      }
+      req.holdingSellOrdersToClean = pendingSellOrders;
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine) {
+      if (triggerEngine.io) {
+        triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+      }
+      if (req.holdingSellOrdersToClean) {
+        for (const ord of req.holdingSellOrdersToClean) {
+          triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+        }
+      }
+    }
 
     res.json({ success: true, message: `Successfully exited ${exitOrders.length} holding(s)`, totalSoldAmount });
   } catch (err) {
@@ -6248,7 +6351,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         requiredMargin = Math.max(requiredMargin, minHedgingFloor);
       }
 
-      const user = await trx('users').where({ id: req.user.id }).first();
+      const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
       if (requiredMargin > 0 && parseFloat(user.balance) < requiredMargin) {
         throw new Error(`Insufficient Funds. Required: ₹${requiredMargin.toLocaleString('en-IN')}, Available: ₹${Number(user.balance).toLocaleString('en-IN')}`);
       }
@@ -6291,21 +6394,22 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
               .where(builder => {
                 builder.where({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
               })
-              .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
-          const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.quantity), 0);
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+          const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== undefined && o.pending_quantity !== null ? o.pending_quantity : o.quantity), 0);
           
           const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
           
           if (qtyRequested > totalAvailable) {
-              throw new Error(`Insufficient holdings for ${cleanSym}. You only have ${totalAvailable} shares available to sell.`);
+              throw new Error(`Insufficient holdings for ${cleanSym}. You only have ${totalAvailable} shares available to sell${pendingSellQty > 0 ? ` (${pendingSellQty} shares reserved in open/AMO orders)` : ''}.`);
           }
       }
 
       // 2. Deduct total margin
       if (requiredMargin > 0) {
+        const newBal = Math.round((parseFloat(user.balance) - requiredMargin + Number.EPSILON) * 100) / 100;
         await trx('users')
           .where({ id: req.user.id })
-          .update({ balance: parseFloat(user.balance) - requiredMargin });
+          .update({ balance: newBal });
         await trx('ledger').insert({
           user_id: req.user.id,
           amount: -requiredMargin,
@@ -6350,7 +6454,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
         const status = 'PENDING';
         const isMarket = type === 'MARKET';
         const effectiveProductType = product_type || 'INT';
-        const execPrice = parseFloat(price) || getLtpFromPriceCache(symbol);
+        const execPrice = parseFloat(price) || getLtpFromPriceCache(symbol) || (priceCache[symbol]?.close ? Number(priceCache[symbol].close) : 0) || (priceCache[symbol]?.prev_close_price ? Number(priceCache[symbol].prev_close_price) : 0);
         const qtyNum = Number(quantity) || 0;
         const slices = calculateOrderSlices(symbol, qtyNum);
         const isSliced = slices.length > 1;
@@ -6870,7 +6974,8 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                     this.where('symbol', order.symbol)
                         .orWhere('symbol', cleanSym)
                         .orWhere('symbol', `NSE:${cleanSym}`)
-                        .orWhere('symbol', `BSE:${cleanSym}`);
+                        .orWhere('symbol', `BSE:${cleanSym}`)
+                        .orWhere('symbol', `MCX:${cleanSym}`);
                   })
                   .where('quantity', '>', 0)
                   .first()
@@ -7838,7 +7943,13 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
         utr: utr || null,
         updated_at: new Date()
       });
+      req.processedWithdrawalUserId = withdrawal.user_id;
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine && triggerEngine.io && req.processedWithdrawalUserId) {
+      triggerEngine.io.to(req.processedWithdrawalUserId.toString()).emit('sync_user_data');
+    }
 
     res.json({ success: true, message: `Withdrawal #${req.params.id} marked as ${status}` });
   } catch (err) {

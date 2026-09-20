@@ -191,17 +191,25 @@ class MTMRiskManager {
                 // Acquire exclusive advisory lock for user to prevent race conditions with concurrent orders/ticks
                 await trx.raw('SELECT pg_advisory_xact_lock(?)', [userId]);
 
-                // 1. Cancel all pending entry and trigger orders for the user and refund margin
+                // 1. Cancel all pending entry, trigger, AMO, and partially-filled orders for the user and refund margin
                 const pendingOrders = await trx('orders')
                     .where({ user_id: userId })
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
 
                 for (const ord of pendingOrders) {
-                    const refund = parseFloat(ord.margin) || 0;
+                    const totalMargin = parseFloat(ord.margin) || 0;
+                    const totalQty = parseFloat(ord.quantity) || 1;
+                    const pendingQty = (ord.pending_quantity !== null && ord.pending_quantity !== undefined)
+                        ? parseFloat(ord.pending_quantity)
+                        : (ord.status === 'PARTIAL_FILLED' ? Math.max(0, totalQty - parseFloat(ord.filled_quantity || 0)) : totalQty);
+                    const refund = totalQty > 0
+                        ? Math.round(((pendingQty / totalQty) * totalMargin + Number.EPSILON) * 100) / 100
+                        : totalMargin;
+
                     if (refund > 0) {
                         await LedgerService.releaseMargin(trx, userId, refund, `${reason}: margin refunded for cancelled order ${ord.quantity} ${ord.symbol}`);
                     }
-                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
                     cancelledOrders.push(ord);
                 }
 
@@ -233,10 +241,16 @@ class MTMRiskManager {
                 }
             });
 
-            // Outside transaction: clean Redis triggers for all cancelled orders
+            // Outside transaction: clean Redis triggers and volume matching queue for all cancelled orders
             const triggerEngine = require('./triggerEngine');
+            let volumeMatchingEngine = null;
+            try { volumeMatchingEngine = require('./volumeMatchingEngine'); } catch(e) {}
+
             for (const ord of cancelledOrders) {
                 triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+                if (volumeMatchingEngine && typeof volumeMatchingEngine.dequeueOrder === 'function') {
+                    volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+                }
             }
             try {
                 const { pubClient } = require('./redisClient');
