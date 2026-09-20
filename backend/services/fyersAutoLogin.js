@@ -74,7 +74,7 @@ async function getFyersCredentials() {
     let totp_key = null;
     let app_id = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     let secret_id = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
-    let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://www.skandx.in/api/fyers/callback');
+    let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://skandx.in/api/fyers/callback');
 
     try {
         const rows = await db('system_settings').whereIn('key', [
