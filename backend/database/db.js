@@ -1,5 +1,7 @@
 const knex = require('knex');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true, override: true });
+require('dotenv').config({ path: path.join(__dirname, '../../.env'), quiet: true, override: true });
 
 // Determine environment
 const isProduction = !!process.env.DATABASE_URL;
