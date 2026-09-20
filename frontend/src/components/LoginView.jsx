@@ -97,6 +97,9 @@ export default function LoginView() {
       const res = await sendLoginEmailOtp(email, password);
       if (res && res.success) {
         setEmailOtpSent(true);
+        if (res.otp) {
+          setEmailOtp(String(res.otp));
+        }
         setMessage(res.message || `Verification code sent to ${email}. Check your inbox!`);
       } else {
         useStore.setState({ authError: res?.error || 'Failed to send email OTP.' });

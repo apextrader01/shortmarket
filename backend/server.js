@@ -1098,6 +1098,11 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
       }).catch(err => console.error('Failed to send login email OTP:', err.message));
     } else {
       console.log(`[AUTH 2FA] Email OTP generated for ${user.email}: ${otp}`);
+      return res.json({ 
+        success: true, 
+        message: `Security Code: ${otp} (Email provider not configured; code provided directly)`,
+        otp: otp
+      });
     }
 
     res.json({ success: true, message: `Verification code sent to ${user.email}` });
