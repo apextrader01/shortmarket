@@ -17,7 +17,7 @@ export default function PositionsView() {
   };
 
   const isOvernightDelivery = (p) => {
-    return isDeliveryPosition(p) && !isToday(p.created_at);
+    return isDeliveryPosition(p);
   };
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
