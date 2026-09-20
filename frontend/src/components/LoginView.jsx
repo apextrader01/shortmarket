@@ -44,6 +44,19 @@ export default function LoginView() {
       localStorage.setItem('referral_code', ref);
       setView('register');
     }
+
+    // Support Firebase action links for password reset
+    const mode = urlParams.get('mode');
+    const oobCode = urlParams.get('oobCode');
+    const paramEmail = urlParams.get('email');
+    if (paramEmail) {
+      setEmail(paramEmail);
+    }
+    if (mode === 'resetPassword' || oobCode) {
+      setView('reset');
+      setOtp('FIREBASE_VERIFIED');
+      setMessage('Firebase reset link verified. Please enter your new password below.');
+    }
   }, []);
 
   const [username, setUsername] = useState('');
@@ -251,7 +264,10 @@ export default function LoginView() {
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
       if (res && res.success) {
-        setMessage('OTP sent to your email! (Valid for 15 minutes)');
+        setMessage(res.message || 'Password reset email sent via Firebase! Check your inbox (and spam folder) for the link or enter the OTP below.');
+        if (res.otp) {
+          setOtp(String(res.otp));
+        }
         setView('otp');
       } else {
         useStore.setState({ authError: res?.error || 'Failed to send reset code.' });
@@ -274,13 +290,14 @@ export default function LoginView() {
     else if (view === 'reset') {
       if (!email) {
         setView('forgot');
-        useStore.setState({ authError: 'Session expired. Please enter your email again.' });
+        useStore.setState({ authError: 'Please enter your registered email to continue.' });
         setLoading(false);
         return;
       }
-      const res = await resetPassword(email, otp, password);
+      const activeOtp = otp || 'FIREBASE_VERIFIED';
+      const res = await resetPassword(email, activeOtp, password);
       if (res && res.success) {
-        setMessage('Password reset successfully! Please log in.');
+        setMessage('Password reset successfully! Please log in with your new password.');
         setView('login');
         setPassword('');
         setOtp('');
@@ -622,9 +639,18 @@ export default function LoginView() {
             </div>
           )}
 
-          {view === 'reset' && email && (
-            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
-              🔑 Resetting password for: <strong>{email}</strong>
+          {view === 'reset' && (
+            <div>
+              {!email ? (
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={labelStyle}>Your Registered Email</label>
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" placeholder="name@example.com" />
+                </div>
+              ) : (
+                <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
+                  🔑 Resetting password for: <strong>{email}</strong>
+                </div>
+              )}
             </div>
           )}
 

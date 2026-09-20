@@ -313,7 +313,7 @@ export const useStore = create(persist((set, get) => ({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      return { success: true };
+      return data;
     } catch (err) {
       return { success: false, error: err.message };
     }

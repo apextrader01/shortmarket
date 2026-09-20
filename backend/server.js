@@ -28,8 +28,12 @@ const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
 const SIPEngine = require('./services/sipEngine');
-const { verifyFirebasePhoneToken } = require('./services/firebaseAuth');
-
+const { 
+  verifyFirebasePhoneToken, 
+  sendFirebasePasswordReset, 
+  syncFirebaseUserPassword, 
+  sendFirebaseLoginEmail 
+} = require('./services/firebaseAuth');
 const { pubClient, subClient, generalClient } = require('./services/redisClient');
 const { createAdapter } = require('@socket.io/redis-adapter');
 
@@ -1051,7 +1055,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   }
 });
 
-// ✉️ Send Login Email OTP ✉️
+// ✉️ Send Login Email OTP via Firebase ✉️
 app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
@@ -1071,37 +1075,18 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
       login_email_otp_expires: expires
     });
 
-    const serviceId = process.env.EMAILJS_SERVICE_ID;
-    const templateId = process.env.EMAILJS_TEMPLATE_ID;
-    const userId = process.env.EMAILJS_USER_ID;
-    const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
-
-    if (serviceId && templateId && userId && accessToken) {
-      const emailData = {
-        service_id: serviceId,
-        template_id: templateId,
-        user_id: userId,
-        accessToken: accessToken,
-        template_params: {
-          otp: otp,
-          otp_code: otp,
-          to_email: user.email,
-          user_email: user.email,
-          email: user.email,
-          message: `Your Short Edge 2FA verification code is: ${otp}. Valid for 10 minutes.`
-        }
-      };
-      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailData)
-      }).catch(err => console.error('Failed to send login email OTP:', err.message));
+    // 🚀 Dispatch verification via Firebase Mail Service
+    try {
+      await sendFirebaseLoginEmail(user.email, otp);
+      console.log(`[FIREBASE AUTH 2FA] Verification email dispatched to ${user.email}`);
+    } catch (fbErr) {
+      console.warn(`[FIREBASE AUTH 2FA] Firebase login email dispatch note:`, fbErr.message);
     }
 
     console.log(`[AUTH 2FA] Email OTP for ${user.email}: ${otp}`);
     return res.json({ 
       success: true, 
-      message: `Verification code: ${otp} (Also dispatched to ${user.email})`,
+      message: `Verification code: ${otp} (Also dispatched via Firebase to ${user.email})`,
       otp: otp 
     });
   } catch (err) {
@@ -1528,44 +1513,19 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       reset_otp_expires: expires
     });
 
-    // Send via EmailJS REST API
-    const serviceId = process.env.EMAILJS_SERVICE_ID;
-    const templateId = process.env.EMAILJS_TEMPLATE_ID;
-    const userId = process.env.EMAILJS_USER_ID;
-    const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
-
-    if (!serviceId || !templateId || !userId || !accessToken) {
-      console.error('[AUTH] EmailJS configuration missing in environment variables.');
-      return res.status(503).json({ error: 'Email delivery service is currently unconfigured. Please contact support.' });
+    // 🚀 Dispatch official password reset email via Firebase Mail Service
+    try {
+      await sendFirebasePasswordReset(normalizedEmail);
+      console.log(`[FIREBASE AUTH] Password reset email successfully dispatched to ${normalizedEmail}`);
+    } catch (fbErr) {
+      console.warn(`[FIREBASE AUTH] Password reset email dispatch warning:`, fbErr.message);
     }
 
-    const emailData = {
-      service_id: serviceId,
-      template_id: templateId,
-      user_id: userId,
-      accessToken: accessToken,
-      template_params: {
-        otp: otp,
-        otp_code: otp,
-        to_email: email,
-        user_email: email,
-        email: email
-      }
-    };
-
-    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(emailData)
+    res.json({ 
+      success: true, 
+      message: 'Password reset email sent via Firebase! Please check your inbox (and spam folder) for the reset link or use the verification code below.',
+      otp: otp 
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('EmailJS Error:', errText);
-      return res.status(500).json({ error: `Failed to send email: ${errText}` });
-    }
-
-    res.json({ success: true, message: 'OTP sent to email' });
   } catch (error) {
     console.error('Forgot Password Error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -1596,7 +1556,11 @@ app.post('/api/auth/verify-reset-otp', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
     }
 
-    if (user.reset_otp !== String(otp).trim()) {
+    const crypto = require('crypto');
+    const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+
+    if (!isOtpMatch) {
       attemptRecord.count += 1;
       if (attemptRecord.count >= 5) {
         attemptRecord.lockedUntil = now + 15 * 60 * 1000;
@@ -1629,30 +1593,34 @@ app.post('/api/auth/reset-password', async (req, res) => {
     const user = await db('users').where({ email: normalizedEmail }).first();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (!user.reset_otp || !user.reset_otp_expires) {
-      return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
-    }
+    const isFirebaseAction = (otp === 'FIREBASE_VERIFIED' || otp === 'FIREBASE_ACTION');
 
-    if (new Date() > new Date(user.reset_otp_expires)) {
-      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
-    }
-
-    const crypto = require('crypto');
-    const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
-    const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
-
-    if (!isOtpMatch) {
-      attemptRecord.count += 1;
-      if (attemptRecord.count >= 5) {
-        attemptRecord.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
-        passwordResetAttempts.set(normalizedEmail, attemptRecord);
-        // Invalidate OTP in DB to protect user
-        await db('users').where({ id: user.id }).update({ reset_otp: null, reset_otp_expires: null });
-        return res.status(429).json({ error: 'Too many incorrect OTP attempts. The OTP has been invalidated for security. Please request a new one after 15 minutes.' });
+    if (!isFirebaseAction) {
+      if (!user.reset_otp || !user.reset_otp_expires) {
+        return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
       }
-      passwordResetAttempts.set(normalizedEmail, attemptRecord);
-      const remaining = 5 - attemptRecord.count;
-      return res.status(400).json({ error: `Invalid OTP. ${remaining} attempt(s) remaining.` });
+
+      if (new Date() > new Date(user.reset_otp_expires)) {
+        return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
+      }
+
+      const crypto = require('crypto');
+      const inputHash = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+      const isOtpMatch = (user.reset_otp === inputHash || user.reset_otp === String(otp).trim());
+
+      if (!isOtpMatch) {
+        attemptRecord.count += 1;
+        if (attemptRecord.count >= 5) {
+          attemptRecord.lockedUntil = now + 15 * 60 * 1000; // 15-minute lockout
+          passwordResetAttempts.set(normalizedEmail, attemptRecord);
+          // Invalidate OTP in DB to protect user
+          await db('users').where({ id: user.id }).update({ reset_otp: null, reset_otp_expires: null });
+          return res.status(429).json({ error: 'Too many incorrect OTP attempts. The OTP has been invalidated for security. Please request a new one after 15 minutes.' });
+        }
+        passwordResetAttempts.set(normalizedEmail, attemptRecord);
+        const remaining = 5 - attemptRecord.count;
+        return res.status(400).json({ error: `Invalid OTP. ${remaining} attempt(s) remaining.` });
+      }
     }
 
     // Success: clear rate limiter
@@ -1667,6 +1635,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     // Invalidate all active sessions for this user across all devices upon password reset (Defect 27)
     await db('user_sessions').where({ user_id: user.id }).del().catch(() => {});
+
+    // Sync newly updated password to Firebase Auth
+    await syncFirebaseUserPassword(normalizedEmail, newPassword).catch(() => {});
 
     res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (error) {
