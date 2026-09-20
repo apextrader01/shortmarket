@@ -9,24 +9,9 @@ import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper
 
 const EMPTY_PRICES = {};
 
-const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
-
-const isDerivativeSymbol = (sym) => {
-  if (!sym || typeof sym !== 'string') return false;
-  if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
-  const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
-  if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
-  if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
-  if (COMMODITIES_LIST.some(c => clean.startsWith(c))) return true;
-  return false;
-};
-
 export default function PositionsView() {
 
   const isDeliveryPosition = (p) => {
-    // Derivatives (Options, Futures, Commodities) are NEVER delivery equity holdings!
-    // They are open F&O positions that stay in the Positions tab until squared off or expired.
-    if (isDerivativeSymbol(p?.symbol) || isDerivativeContract?.(p?.symbol)) return false;
     const prod = (p?.product_type || p?.productLabel || p?.product || '').toUpperCase();
     return prod === 'DEL' || prod === 'CNC' || prod === 'DELIVERY';
   };
@@ -121,6 +106,18 @@ export default function PositionsView() {
     if (!sym || typeof sym !== 'string') return false;
     const clean = sym.includes(':') ? sym.split(':')[1] : sym;
     return clean.endsWith('-MF') || clean.includes('MUTUALFUND') || /^\d{5,6}$/.test(clean) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(clean);
+  };
+
+  const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+  const isDerivativeSymbol = (sym) => {
+    if (!sym || typeof sym !== 'string') return false;
+    if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+    if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
+    if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
+    if (COMMODITIES_LIST.some(c => clean.startsWith(c))) return true;
+    return false;
   };
 
   const getAssetCategoryOrder = (item) => {
