@@ -15,6 +15,7 @@ class TriggerEngine {
         this.activeTriggers = new Map(); // symbol -> [order_objects]
         this.activeTriggerSymbols = new Set(); // ⚡ In-memory active trigger symbols filter
         this.trailingOrders = new Map(); // ⚡ orderId -> orderObj for real-time Trailing Stop Loss (TSL)
+        this.trailingOrdersBySymbol = new Map(); // ⚡ symbol -> Map(orderId -> orderObj) for O(1) tick evaluation
         this.isProcessing = false;
         this.io = null;
         this.priceCache = {};
@@ -53,6 +54,7 @@ class TriggerEngine {
             
             this.activeTriggerSymbols.clear();
             this.trailingOrders.clear();
+            this.trailingOrdersBySymbol.clear();
             for (const order of orders) {
                 await this.addOrderToMemory(order);
                 if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
@@ -68,7 +70,14 @@ class TriggerEngine {
         if (!generalClient || !generalClient.isReady || !order) return;
         
         if (Number(order.trail_amount) > 0 || order.is_trailing) {
-            this.trailingOrders.set(order.id.toString(), { ...order });
+            const ordCopy = { ...order };
+            this.trailingOrders.set(order.id.toString(), ordCopy);
+            if (order.symbol) {
+                if (!this.trailingOrdersBySymbol.has(order.symbol)) {
+                    this.trailingOrdersBySymbol.set(order.symbol, new Map());
+                }
+                this.trailingOrdersBySymbol.get(order.symbol).set(order.id.toString(), ordCopy);
+            }
         }
         
         let key = null;
@@ -130,7 +139,21 @@ class TriggerEngine {
             // Remove from any other sets first to prevent duplicates
             await this.removeOrderFromMemory(order.id, order.symbol);
             if (Number(order.trail_amount) > 0 || order.is_trailing) {
-                this.trailingOrders.set(order.id.toString(), { ...order });
+                const ordCopy = { ...order };
+                this.trailingOrders.set(order.id.toString(), ordCopy);
+                if (order.symbol) {
+                    const clean = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+                    if (!this.trailingOrdersBySymbol.has(order.symbol)) {
+                        this.trailingOrdersBySymbol.set(order.symbol, new Map());
+                    }
+                    this.trailingOrdersBySymbol.get(order.symbol).set(order.id.toString(), ordCopy);
+                    if (clean && clean !== order.symbol) {
+                        if (!this.trailingOrdersBySymbol.has(clean)) {
+                            this.trailingOrdersBySymbol.set(clean, new Map());
+                        }
+                        this.trailingOrdersBySymbol.get(clean).set(order.id.toString(), ordCopy);
+                    }
+                }
             }
             await generalClient.zAdd(key, [{ score: score, value: order.id.toString() }]);
             if (order.symbol) this.activeTriggerSymbols.add(order.symbol);
@@ -139,22 +162,39 @@ class TriggerEngine {
 
     async removeOrderFromMemory(orderId, symbol) {
         const { generalClient } = require('./redisClient');
+        const existingTrailing = this.trailingOrders.get(orderId.toString());
         this.trailingOrders.delete(orderId.toString());
+        const sym = symbol || existingTrailing?.symbol;
+        if (sym) {
+            const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+            [sym, clean].forEach(s => {
+                if (this.trailingOrdersBySymbol.has(s)) {
+                    const symMap = this.trailingOrdersBySymbol.get(s);
+                    symMap.delete(orderId.toString());
+                    if (symMap.size === 0) {
+                        this.trailingOrdersBySymbol.delete(s);
+                    }
+                }
+            });
+        }
         if (!generalClient || !generalClient.isReady) return;
         
         // Parallelize removal across all 4 sets to minimize round-trip latency
-        const keys = [
-            `trigger:${symbol}:BUY:LIMIT`,
-            `trigger:${symbol}:SELL:LIMIT`,
-            `trigger:${symbol}:GTE`,
-            `trigger:${symbol}:LTE`
-        ];
+        const targetSym = symbol || sym;
+        const keys = targetSym ? [
+            `trigger:${targetSym}:BUY:LIMIT`,
+            `trigger:${targetSym}:SELL:LIMIT`,
+            `trigger:${targetSym}:GTE`,
+            `trigger:${targetSym}:LTE`
+        ] : [];
         
-        await Promise.all(keys.map(key => generalClient.zRem(key, orderId.toString()).catch(() => {})));
-        const cards = await Promise.all(keys.map(key => generalClient.zCard(key).catch(() => 0)));
-        const totalRem = cards.reduce((sum, count) => sum + (Number(count) || 0), 0);
-        if (totalRem === 0) {
-            this.activeTriggerSymbols.delete(symbol);
+        if (keys.length > 0) {
+            await Promise.all(keys.map(key => generalClient.zRem(key, orderId.toString()).catch(() => {})));
+            const cards = await Promise.all(keys.map(key => generalClient.zCard(key).catch(() => 0)));
+            const totalRem = cards.reduce((sum, count) => sum + (Number(count) || 0), 0);
+            if (totalRem === 0) {
+                this.activeTriggerSymbols.delete(targetSym);
+            }
         }
     }
 
@@ -165,10 +205,14 @@ class TriggerEngine {
     async evaluateTick(symbol, ltp) {
         if (!ltp || !symbol) return;
 
-        // ⚡ Ratchet Trailing Stop Loss (TSL) orders in-memory
-        if (this.trailingOrders.size > 0) {
-            for (const [orderId, tOrder] of this.trailingOrders.entries()) {
-                if (tOrder.symbol !== symbol) continue;
+        // ⚡ Ratchet Trailing Stop Loss (TSL) orders in-memory (O(1) indexed by symbol)
+        const cleanSym = symbol && symbol.includes(':') ? symbol.split(':')[1] : symbol;
+        const symMap = this.trailingOrdersBySymbol.get(symbol);
+        const cleanMap = (cleanSym && cleanSym !== symbol) ? this.trailingOrdersBySymbol.get(cleanSym) : null;
+        const targetTrailingMap = symMap || cleanMap;
+
+        if (targetTrailingMap && targetTrailingMap.size > 0) {
+            for (const [orderId, tOrder] of targetTrailingMap.entries()) {
                 const trailAmount = Number(tOrder.trail_amount || 0);
                 if (trailAmount <= 0) continue;
 
@@ -251,9 +295,10 @@ class TriggerEngine {
         }
 
         // ⚡ Blazing fast O(1) in-memory check: skip Redis if NO triggers exist for this symbol!
-        const cleanSym = symbol && symbol.includes(':') ? symbol.split(':')[1] : symbol;
-        const targetSym = this.activeTriggerSymbols.has(symbol) ? symbol : (this.activeTriggerSymbols.has(cleanSym) ? cleanSym : null);
-        if (!targetSym) return;
+        const symbolsToCheck = [];
+        if (this.activeTriggerSymbols.has(symbol)) symbolsToCheck.push(symbol);
+        if (cleanSym && cleanSym !== symbol && this.activeTriggerSymbols.has(cleanSym)) symbolsToCheck.push(cleanSym);
+        if (symbolsToCheck.length === 0) return;
         const { generalClient } = require('./redisClient');
         if (!generalClient || !generalClient.isReady) return;
 
@@ -291,44 +336,47 @@ class TriggerEngine {
             return results
         `;
 
-        try {
-            const keys = [
-                `trigger:${targetSym}:BUY:LIMIT`,
-                `trigger:${targetSym}:SELL:LIMIT`,
-                `trigger:${targetSym}:GTE`,
-                `trigger:${targetSym}:LTE`
-            ];
-            
-            // eval(script, options) in node-redis v4
-            const triggeredOrderIds = await generalClient.eval(luaScript, {
-                keys: keys,
-                arguments: [ltp.toString()]
-            });
+        for (const targetSym of symbolsToCheck) {
+            try {
+                const keys = [
+                    `trigger:${targetSym}:BUY:LIMIT`,
+                    `trigger:${targetSym}:SELL:LIMIT`,
+                    `trigger:${targetSym}:GTE`,
+                    `trigger:${targetSym}:LTE`
+                ];
+                
+                // eval(script, options) in node-redis v4
+                const triggeredOrderIds = await generalClient.eval(luaScript, {
+                    keys: keys,
+                    arguments: [ltp.toString()]
+                });
 
-            if (triggeredOrderIds && triggeredOrderIds.length > 0) {
-                // Check if symbol still has remaining triggers in Redis
-                const remaining = (await generalClient.zCard(`trigger:${targetSym}:BUY:LIMIT`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${targetSym}:SELL:LIMIT`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${targetSym}:GTE`).catch(()=>0)) +
-                                  (await generalClient.zCard(`trigger:${targetSym}:LTE`).catch(()=>0));
-                if (remaining === 0) {
-                    this.activeTriggerSymbols.delete(targetSym);
-                }
+                if (triggeredOrderIds && triggeredOrderIds.length > 0) {
+                    // Check if symbol still has remaining triggers in Redis
+                    const remaining = (await generalClient.zCard(`trigger:${targetSym}:BUY:LIMIT`).catch(()=>0)) +
+                                      (await generalClient.zCard(`trigger:${targetSym}:SELL:LIMIT`).catch(()=>0)) +
+                                      (await generalClient.zCard(`trigger:${targetSym}:GTE`).catch(()=>0)) +
+                                      (await generalClient.zCard(`trigger:${targetSym}:LTE`).catch(()=>0));
+                    if (remaining === 0) {
+                        this.activeTriggerSymbols.delete(targetSym);
+                    }
 
-                for (const orderId of triggeredOrderIds) {
-                    const order = await db('orders').where({ id: orderId }).first();
-                    if (order) {
+                    // ⚡ Batch-fetch all triggered orders in a single database query
+                    const triggeredOrders = await db('orders').whereIn('id', triggeredOrderIds);
+                    if (triggeredOrders && triggeredOrders.length > 0) {
                         const volumeMatchingEngine = require('./volumeMatchingEngine');
-                        volumeMatchingEngine.submitOrder(order, ltp).catch(err => {
-                            console.error('Execution Error:', err);
-                            // On failure, re-add to Redis to try again on next tick
-                            this.addOrderToMemory(order);
-                        });
+                        for (const order of triggeredOrders) {
+                            volumeMatchingEngine.submitOrder(order, ltp).catch(err => {
+                                console.error('Execution Error:', err);
+                                // On failure, re-add to Redis to try again on next tick
+                                this.addOrderToMemory(order);
+                            });
+                        }
                     }
                 }
+            } catch (err) {
+                console.error('Redis Lua Trigger Error for ' + targetSym + ':', err.message);
             }
-        } catch (err) {
-            console.error('Redis Lua Trigger Error:', err.message);
         }
     }
 

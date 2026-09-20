@@ -14,6 +14,8 @@ function isAnyMarketOpen() {
     return currentMins >= 540 && currentMins <= 1425;
 }
 
+const istDateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+
 class MTMRiskManager {
     constructor(priceCache, marketChecker = null) {
         this.priceCache = priceCache;
@@ -61,6 +63,13 @@ class MTMRiskManager {
         this.isChecking = true;
         try {
             const now = Date.now();
+            // Prune stale debounce entries older than 5 minutes to prevent RAM growth
+            for (const uid in this.lastLiquidationTime) {
+                if (now - this.lastLiquidationTime[uid] > 300000) {
+                    delete this.lastLiquidationTime[uid];
+                }
+            }
+
             // Cache positions for 5 seconds to reduce DB pressure while staying responsive to order closes
             if (!this.cachedPositions || now - (this.lastCacheTime || 0) > 5000) {
                 this.cachedPositions = await db('positions')
@@ -92,8 +101,7 @@ class MTMRiskManager {
                 .whereIn('id', userIdsWithPositions)
                 .select('id', 'balance', 'risk_guardian_active', 'max_daily_loss');
 
-            const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-            const istDateStr = formatter.format(new Date()); // "YYYY-MM-DD"
+            const istDateStr = istDateFormatter.format(new Date()); // "YYYY-MM-DD"
             const todayStart = new Date(`${istDateStr}T00:00:00+05:30`);
 
             // Fetch today's executed orders ONLY for users with active Risk Guardian (aggregated in SQL)

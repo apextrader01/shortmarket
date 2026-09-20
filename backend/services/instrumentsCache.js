@@ -1,8 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 let allInstruments = [];
 let lotSizeMap = {};
+let cachedAllStocks = [];
+let cachedAllStocksJson = '[]';
+let cachedAllStocksETag = '""';
 
 function flattenTree(node, results = []) {
     if (!node || typeof node !== 'object') return results;
@@ -71,6 +75,26 @@ function initializeCache() {
         lotSizeMap[item.symbol] = item.lotsize || 1;
         lotSizeMap[item.unique_symbol] = item.lotsize || 1;
     });
+
+    // Pre-calculate stocks array once for O(1) instantaneous response in getAllStocks()
+    cachedAllStocks = allInstruments
+        .filter(item => {
+            const clean = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
+            const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+            const isFut = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+            const isNSE_BSE = item.exchange === 'NSE' || item.exchange === 'BSE';
+            return isNSE_BSE && !isOpt && !isFut;
+        })
+        .map(item => ({
+            symbol: item.symbol,
+            name: item.name,
+            exchange: item.exchange,
+            lotsize: item.lotsize || 1,
+            token: item.token || ''
+        }));
+    
+    cachedAllStocksJson = JSON.stringify(cachedAllStocks);
+    cachedAllStocksETag = `"${crypto.createHash('md5').update(cachedAllStocksJson).digest('hex')}"`;
     
     console.log(`Loaded ${allInstruments.length} instruments into memory after filtering duplicates.`);
 }
@@ -90,47 +114,47 @@ function getLotSizes(symbols) {
 }
 
 function getAllStocks() {
-    // Only return stocks and spots for the main API response
-    // Filter out futures and options, and slim payload to essential fields
-    return allInstruments
-        .filter(item => {
-            const clean = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
-            const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
-            const isFut = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
-            const isNSE_BSE = item.exchange === 'NSE' || item.exchange === 'BSE';
-            return isNSE_BSE && !isOpt && !isFut;
-        })
-        .map(item => ({
-            symbol: item.symbol,
-            name: item.name,
-            exchange: item.exchange,
-            lotsize: item.lotsize || 1,
-            token: item.token || ''
-        }));
+    // Return pre-calculated cache for O(1) instantaneous response without regex iteration
+    return cachedAllStocks;
+}
+
+function getAllStocksJson() {
+    return cachedAllStocksJson;
+}
+
+function getAllStocksETag() {
+    return cachedAllStocksETag;
 }
 
 function searchInstruments(query) {
     if (!query || query.length < 2) return [];
     
     const queryParts = query.toLowerCase().split(/\s+/).filter(Boolean);
-    
-    // Simple filter: every part of the query must be included in the search_string
     const nowMs = Date.now();
-    const results = allInstruments.filter(item => {
+    const results = [];
+    
+    for (let i = 0; i < allInstruments.length; i++) {
+        const item = allInstruments[i];
         const expMs = item.expiryTimestamp 
             ? Number(item.expiryTimestamp) 
             : (item.expiry_timestamp 
                 ? (Number(item.expiry_timestamp) > 1e11 ? Number(item.expiry_timestamp) : Number(item.expiry_timestamp) * 1000) 
                 : null);
-        if (expMs && expMs < nowMs) return false;
-        for (const part of queryParts) {
-            if (!item.search_string.includes(part)) return false;
+        if (expMs && expMs < nowMs) continue;
+        
+        let match = true;
+        for (let j = 0; j < queryParts.length; j++) {
+            if (!item.search_string.includes(queryParts[j])) {
+                match = false;
+                break;
+            }
         }
-        return true;
-    });
-    
-    // Return max 50 results to prevent large payloads
-    return results.slice(0, 50);
+        if (match) {
+            results.push(item);
+            if (results.length >= 100) break; // ⚡ Stop once 100 matches are found to balance speed and relevance
+        }
+    }
+    return results;
 }
 
 // Watch for file changes so we can reload dynamically if updateOptionsMaster is run
@@ -200,7 +224,7 @@ function getAssetSubsegment(sym) {
 function getLotSize(symbol) {
     if (!symbol) return 1;
     const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
-    return lotSizeMap[symbol] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
+    return lotSizeMap[symbol] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
 }
 
 const isMCXWinterSession = (d = new Date()) => {
@@ -330,6 +354,8 @@ module.exports = {
     getLotSizes,
     getLotSize,
     getAllStocks,
+    getAllStocksJson,
+    getAllStocksETag,
     searchInstruments,
     isDerivativeContract,
     isCommodityContract,

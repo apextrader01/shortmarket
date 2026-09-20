@@ -283,6 +283,7 @@ async function runMigration() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_status ON deposit_requests(status, created_at DESC)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_created_at ON user_sessions(created_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_users_registration_ip ON users(registration_ip)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_date ON journal_trades(user_id, trade_date DESC)').catch(() => {});
     console.log('  ✅ Performance indexes verified');
 

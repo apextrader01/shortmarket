@@ -256,7 +256,9 @@ async function initFyers(io, pc, isMaster = true) {
                         change: priceObj.change,
                         pct: priceObj.pct,
                         totBuyQuan: priceObj.totBuyQuan,
-                        totSellQuan: priceObj.totSellQuan
+                        totSellQuan: priceObj.totSellQuan,
+                        upper_circuit: priceObj.upper_circuit || 0,
+                        lower_circuit: priceObj.lower_circuit || 0
                     };
                 }
             });
@@ -489,19 +491,11 @@ function startLiveWebSocket() {
                     // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
                     if (triggerEngine) {
                         triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
-                        if (uniqueSymbol.includes(':')) {
-                            const raw = uniqueSymbol.split(':')[1];
-                            triggerEngine.evaluateTick(raw, ltp).catch(() => {});
-                        }
                     }
 
                     // Feed tick into realistic volume and market depth matching engine
                     if (volumeMatchingEngine) {
                         volumeMatchingEngine.onTick(uniqueSymbol, priceObj).catch(() => {});
-                        if (uniqueSymbol.includes(':')) {
-                            const raw = uniqueSymbol.split(':')[1];
-                            volumeMatchingEngine.onTick(raw, priceObj).catch(() => {});
-                        }
                     }
                 });
             }
@@ -699,6 +693,7 @@ async function garbageCollectSubscriptions() {
         if (now - lastSeen > 60000) {
             clientSubscriptions.delete(symbol);
             symbolLastSeen.delete(symbol);
+            clientViewerLastSeen.delete(symbol);
             
             const fSym = toFyersSymbol(symbol);
             if (fSym) {

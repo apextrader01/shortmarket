@@ -33,6 +33,7 @@ async function flushTelemetry() {
             p.hIncrBy(`telemetry:api:${routeKey}`, 'time_ms', stats.timeMs);
             if (stats.bytes > 0) p.hIncrBy(`telemetry:api:${routeKey}`, 'bytes', stats.bytes);
             p.sAdd('telemetry:routes', routeKey);
+            p.expire(`telemetry:api:${routeKey}`, 30 * 86400);
             opsCount++;
         }
 
@@ -41,6 +42,7 @@ async function flushTelemetry() {
             p.hIncrBy(`telemetry:user:${userId}`, 'api_time_ms', stats.api_time_ms);
             if (stats.api_bytes > 0) p.hIncrBy(`telemetry:user:${userId}`, 'api_bytes', stats.api_bytes);
             p.sAdd('telemetry:users', String(userId));
+            p.expire(`telemetry:user:${userId}`, 30 * 86400);
             opsCount++;
         }
 

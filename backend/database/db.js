@@ -647,6 +647,7 @@ async function ensureCriticalColumns() {
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip VARCHAR(50)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_ip VARCHAR(50)`);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_users_last_ip ON users(last_ip)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_users_registration_ip ON users(registration_ip)');
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS device_model VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS os_name VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS browser_name VARCHAR(100)`);

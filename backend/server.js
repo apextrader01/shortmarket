@@ -681,35 +681,8 @@ app.get('/api/stocks/lotsizes', async (req, res) => {
 
 app.get('/api/stocks', async (req, res) => {
   try {
-    const { generalClient } = require('./services/redisClient');
-    const cacheKey = 'api:stocks:nse_bse:v2';
-    
-    let payload = null;
-
-    // 1. Try Redis cache first
-    if (generalClient && generalClient.isReady) {
-      const cached = await generalClient.get(cacheKey);
-      if (cached) {
-        payload = cached;
-      }
-    }
-    
-    // 2. Compute if not in cache (Query In-Memory JSON)
-    if (!payload) {
-      const { getAllStocks } = require('./services/instrumentsCache');
-      const stocksArray = getAllStocks();
-      if (!stocksArray || stocksArray.length === 0) return res.json([]);
-      payload = JSON.stringify(stocksArray);
-      
-      // Save to Redis (cache for 6 hours)
-      if (generalClient && generalClient.isReady) {
-        generalClient.set(cacheKey, payload, { EX: 21600 }).catch(console.error);
-      }
-    }
-
-    // 3. ETag & HTTP 304 Handling: Save 100% of network bandwidth on conditional requests
-    const crypto = require('crypto');
-    const etag = `"${crypto.createHash('md5').update(payload).digest('hex')}"`;
+    const { getAllStocksJson, getAllStocksETag } = require('./services/instrumentsCache');
+    const etag = getAllStocksETag();
     res.setHeader('ETag', etag);
     res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     
@@ -718,7 +691,7 @@ app.get('/api/stocks', async (req, res) => {
     }
     
     res.setHeader('Content-Type', 'application/json');
-    res.send(payload);
+    res.send(getAllStocksJson());
   } catch (err) {
     console.error('Stocks API Error:', err);
     res.status(500).json([]);
@@ -2576,18 +2549,45 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
     const rawUsers = await userQuery;
 
-    // Group users by IP to detect multi-account fraud across all users
-    const ipCounts = await db('users')
-      .whereNotNull('last_ip')
-      .whereNot('last_ip', '')
-      .groupBy('last_ip')
-      .select('last_ip')
-      .count('id as count');
-
+    // Extract distinct IPs present in the current batch/page of users
+    const pageIps = [...new Set(rawUsers.flatMap(u => [u.last_ip, u.registration_ip]).filter(Boolean))];
     const ipMap = {};
-    ipCounts.forEach(r => {
-      ipMap[r.last_ip] = parseInt(r.count, 10);
-    });
+    const sharedUsersByIp = {};
+
+    if (pageIps.length > 0) {
+      // ⚡ O(1) page-scoped IP aggregation: query only the IPs on this page instead of scanning 1 Lakh rows
+      const ipCounts = await db('users')
+        .whereIn('last_ip', pageIps)
+        .groupBy('last_ip')
+        .select('last_ip')
+        .count('id as count');
+
+      ipCounts.forEach(r => {
+        ipMap[r.last_ip] = parseInt(r.count, 10);
+      });
+
+      const sharedIps = pageIps.filter(ip => (ipMap[ip] || 1) > 1);
+      if (sharedIps.length > 0) {
+        // ⚡ Batch query all shared user accounts in a single roundtrip (eliminates N+1 loop queries)
+        const matchingUsers = await db('users')
+          .where(function() {
+            this.whereIn('last_ip', sharedIps).orWhereIn('registration_ip', sharedIps);
+          })
+          .select('id', 'username', 'last_ip', 'registration_ip')
+          .limit(sharedIps.length * 6);
+
+        matchingUsers.forEach(m => {
+          [m.last_ip, m.registration_ip].forEach(ip => {
+            if (ip && sharedIps.includes(ip)) {
+              if (!sharedUsersByIp[ip]) sharedUsersByIp[ip] = [];
+              if (!sharedUsersByIp[ip].some(item => item.id === m.id)) {
+                sharedUsersByIp[ip].push({ id: m.id, username: m.username });
+              }
+            }
+          });
+        });
+      }
+    }
 
     const enhancedUsers = [];
     for (const u of rawUsers) {
@@ -2601,15 +2601,8 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
       }
       const sharedCount = ip ? (ipMap[ip] || 1) : 1;
       let sharedUsers = [];
-      if (sharedCount > 1 && ip) {
-        const matching = await db('users')
-          .where(function() {
-            this.where('last_ip', ip).orWhere('registration_ip', ip);
-          })
-          .whereNot('id', u.id)
-          .select('id', 'username')
-          .limit(5);
-        sharedUsers = matching.map(m => m.username);
+      if (sharedCount > 1 && ip && sharedUsersByIp[ip]) {
+        sharedUsers = sharedUsersByIp[ip].filter(m => m.id !== u.id).slice(0, 5).map(m => m.username);
       }
       enhancedUsers.push({
         ...u,
@@ -3031,10 +3024,10 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
       .join('users', 'orders.user_id', '=', 'users.id')
       .select('orders.*', 'users.username', 'users.email', 'users.client_id');
     
-    let countQuery = db('orders')
-      .join('users', 'orders.user_id', '=', 'users.id');
+    let countQuery = db('orders');
 
     if (search) {
+      countQuery = countQuery.join('users', 'orders.user_id', '=', 'users.id');
       const s = `%${search}%`;
       query = query.where(function() {
         this.where('orders.symbol', 'ilike', s)
@@ -3096,10 +3089,10 @@ app.get('/api/admin/positions', authenticateToken, async (req, res) => {
       .where('positions.quantity', '!=', 0);
     
     let countQuery = db('positions')
-      .join('users', 'positions.user_id', '=', 'users.id')
       .where('positions.quantity', '!=', 0);
 
     if (search) {
+      countQuery = countQuery.join('users', 'positions.user_id', '=', 'users.id');
       const s = `%${search}%`;
       query = query.where(function() {
         this.where('positions.symbol', 'ilike', s)
@@ -3156,10 +3149,10 @@ app.get('/api/admin/ledger', authenticateToken, async (req, res) => {
       .join('users', 'ledger.user_id', '=', 'users.id')
       .select('ledger.*', 'users.username', 'users.email', 'users.client_id');
 
-    let countQuery = db('ledger')
-      .join('users', 'ledger.user_id', '=', 'users.id');
+    let countQuery = db('ledger');
 
     if (search) {
+      countQuery = countQuery.join('users', 'ledger.user_id', '=', 'users.id');
       const s = `%${search}%`;
       query = query.where(function() {
         this.where('ledger.description', 'ilike', s)
