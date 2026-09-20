@@ -224,9 +224,8 @@ function proceedWithNginxAndPM2() {
   // 6. Kill ANY rogue processes on ports 5000 and 5001 (with strict timeouts)
   console.log('\n🧹 Clearing rogue processes and PM2 in-memory caches...');
   
-  // Fast kill old node processes
-  try { execSync('pkill -9 -f "server.js" 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
-  try { execSync('pkill -9 -f "shortmarket" 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
+  // Fast kill old backend servers, excluding this script
+  try { execSync(`pkill -9 -f "node.*server\\.js" 2>/dev/null || true`, { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
   try { execSync('fuser -k -9 5000/tcp 5001/tcp 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
 
   // Clean kill PM2 daemons for both root and appwebsitetester using explicit PM2_HOME and -H
