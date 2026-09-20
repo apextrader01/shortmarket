@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ==============================================================================
-// SHORT EDGE - DEEP FORENSIC REPAIR & VERIFICATION SCRIPT
+// SHORT EDGE - DEEP FORENSIC REPAIR & VERIFICATION SCRIPT (V2 - Bulletproof)
 // Resolves database credentials, Nginx proxy ports, stale PM2 daemons,
-// and runs an end-to-end live authentication verification.
+// eliminates IPC hangs with timeouts and explicit PM2_HOME, and verifies live.
 // ==============================================================================
 
 const fs = require('fs');
@@ -135,7 +135,15 @@ BEGIN
 END
 \$\$;`, `Setting password for role "${dbUser}"`);
 
-runPsql(`SELECT 'CREATE DATABASE "${dbName}" OWNER "${dbUser}"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${dbName}')\\gexec`, `Checking database "${dbName}"`);
+try {
+  const check = execFileSync('sudo', ['-u', 'postgres', 'psql', '-tAc', `SELECT 1 FROM pg_database WHERE datname = '${dbName}';`], { encoding: 'utf8' }).trim();
+  if (check !== '1') {
+    runPsql(`CREATE DATABASE "${dbName}" OWNER "${dbUser}";`, `Creating database "${dbName}"`);
+  } else {
+    console.log(`   ✔ Database "${dbName}" already exists.`);
+  }
+} catch (e) {}
+
 runPsql(`GRANT ALL PRIVILEGES ON DATABASE "${dbName}" TO "${dbUser}";`, `Granting privileges`);
 runPsql(`ALTER DATABASE "${dbName}" OWNER TO "${dbUser}";`, `Setting database owner`);
 
@@ -187,15 +195,19 @@ function proceedWithNginxAndPM2() {
     }
   }
 
-  // Remove conflicting shortmarket-staging link if custom domain is active
-  const stagingLink = '/etc/nginx/sites-enabled/shortmarket-staging';
-  const customDomainLinks = fs.existsSync('/etc/nginx/sites-enabled') 
-    ? fs.readdirSync('/etc/nginx/sites-enabled').filter(f => f.includes('nip.io') || f.includes('.in') || f.includes('.com'))
-    : [];
-
-  if (fs.existsSync(stagingLink) && customDomainLinks.length > 0) {
-    console.log(`   🗑️  Removing conflicting default /etc/nginx/sites-enabled/shortmarket-staging link...`);
-    try { fs.unlinkSync(stagingLink); nginxChanged = true; } catch (e) {}
+  // Remove duplicate/conflicting symlinks from sites-enabled
+  const enabledDir = '/etc/nginx/sites-enabled';
+  if (fs.existsSync(enabledDir)) {
+    const enabledFiles = fs.readdirSync(enabledDir);
+    for (const f of enabledFiles) {
+      if (f === 'shortmarket-staging' || f === 'default' || f === 'shortmarket.save') {
+        try {
+          fs.unlinkSync(path.join(enabledDir, f));
+          nginxChanged = true;
+          console.log(`   🗑️  Removed conflicting symlink: ${f} from sites-enabled`);
+        } catch (e) {}
+      }
+    }
   }
 
   if (nginxChanged) {
@@ -209,16 +221,33 @@ function proceedWithNginxAndPM2() {
     console.log('   ✔ Nginx already correctly configured for port 5000.');
   }
 
-  // 6. Kill ANY rogue processes on ports 5000 and 5001
+  // 6. Kill ANY rogue processes on ports 5000 and 5001 (with strict timeouts)
   console.log('\n🧹 Clearing rogue processes and PM2 in-memory caches...');
-  const currentPath = process.env.PATH || '/usr/local/bin:/usr/bin:/bin';
-  const execOpts = { stdio: 'ignore', env: { ...process.env, PATH: currentPath } };
+  
+  // Fast kill old node processes
+  try { execSync('pkill -9 -f "server.js" 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
+  try { execSync('pkill -9 -f "shortmarket" 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
+  try { execSync('fuser -k -9 5000/tcp 5001/tcp 2>/dev/null || true', { timeout: 3000, stdio: 'ignore' }); } catch (e) {}
 
-  try { execSync('fuser -k 5000/tcp 5001/tcp 2>/dev/null || true', execOpts); } catch (e) {}
-  try { execSync('pm2 delete all 2>/dev/null || true', execOpts); } catch (e) {}
-  try { execSync('sudo -u appwebsitetester env PATH="$PATH" pm2 delete all 2>/dev/null || true', execOpts); } catch (e) {}
-  try { execSync('pm2 kill 2>/dev/null || true', execOpts); } catch (e) {}
-  try { execSync('sudo -u appwebsitetester env PATH="$PATH" pm2 kill 2>/dev/null || true', execOpts); } catch (e) {}
+  // Clean kill PM2 daemons for both root and appwebsitetester using explicit PM2_HOME and -H
+  const cleanPm2 = (user, homeDir) => {
+    try {
+      const isRoot = user === 'root';
+      const cmd = isRoot 
+        ? `PM2_HOME="${homeDir}/.pm2" pm2 kill` 
+        : `sudo -u ${user} -H PM2_HOME="${homeDir}/.pm2" pm2 kill`;
+      execSync(cmd + ' 2>/dev/null || true', { timeout: 5000, stdio: 'ignore' });
+    } catch (e) {}
+
+    // Clean any orphan socket files
+    try { fs.unlinkSync(`${homeDir}/.pm2/rpc.sock`); } catch (e) {}
+    try { fs.unlinkSync(`${homeDir}/.pm2/pub.sock`); } catch (e) {}
+  };
+
+  cleanPm2('root', '/root');
+  if (fs.existsSync('/home/appwebsitetester')) {
+    cleanPm2('appwebsitetester', '/home/appwebsitetester');
+  }
 
   console.log('   ✔ All old daemons and stale ports cleared.');
 
@@ -227,7 +256,7 @@ function proceedWithNginxAndPM2() {
   const migrationScript = path.join(primaryDir, 'backend/scripts/migrate_columns.js');
   if (fs.existsSync(migrationScript)) {
     try {
-      execSync(`node "${migrationScript}"`, { cwd: path.join(primaryDir, 'backend'), stdio: 'inherit' });
+      execSync(`node "${migrationScript}"`, { cwd: path.join(primaryDir, 'backend'), timeout: 30000, stdio: 'inherit' });
     } catch (e) {
       console.warn(`   ⚠️ Migration notice: ${e.message}`);
     }
@@ -239,14 +268,20 @@ function proceedWithNginxAndPM2() {
 
   try {
     if (hasAppUser) {
-      execSync(`sudo -u appwebsitetester env PATH="$PATH" bash -c "cd ${primaryDir} && pm2 start ecosystem.config.js && pm2 save"`, { stdio: 'inherit' });
+      execSync(`sudo -u appwebsitetester -H PM2_HOME="/home/appwebsitetester/.pm2" bash -c "cd ${primaryDir} && pm2 start ecosystem.config.js && pm2 save"`, { timeout: 15000, stdio: 'inherit' });
     } else {
-      execSync(`cd ${primaryDir} && pm2 start ecosystem.config.js && pm2 save`, { stdio: 'inherit' });
+      execSync(`cd ${primaryDir} && pm2 start ecosystem.config.js && pm2 save`, { timeout: 15000, stdio: 'inherit' });
     }
     console.log('   ✔ PM2 cluster successfully started!');
   } catch (e) {
-    console.error(`   ❌ Failed to start PM2: ${e.message}`);
-    process.exit(1);
+    console.warn(`   ⚠️ Starting directly under current user...`);
+    try {
+      execSync(`cd ${primaryDir} && pm2 start ecosystem.config.js && pm2 save`, { timeout: 15000, stdio: 'inherit' });
+      console.log('   ✔ PM2 cluster successfully started!');
+    } catch (err2) {
+      console.error(`   ❌ Failed to start PM2: ${err2.message}`);
+      process.exit(1);
+    }
   }
 
   // 9. Self-Test live HTTP endpoints
