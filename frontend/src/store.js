@@ -144,31 +144,100 @@ export const useStore = create(persist((set, get) => ({
   
   authError: null,
 
-    preLogin: async (email, password) => {
+    preLogin: async (email, password, trustedDeviceToken = null) => {
     try {
       set({ authError: null });
+      const deviceToken = trustedDeviceToken || localStorage.getItem('shortmarket_trusted_device') || undefined;
       const res = await fetch(`${API}/api/auth/pre-login`, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, trusted_device_token: deviceToken })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.trusted && data.token && data.user) {
+          localStorage.setItem('token', data.token);
+          if (data.user?.id) socket.emit('register_user', data.user.id);
+          set({
+            token: data.token,
+            user: data.user,
+            watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+          });
+          get().fetchUserData();
+          syncClientTelemetry(API, true);
+          return { success: true, trusted: true, user: data.user };
+        }
+        return {
+          success: true,
+          trusted: false,
+          phone: data.phone,
+          email: data.email,
+          totp_enabled: data.totp_enabled
+        };
+      }
+      set({ authError: data.error });
+      return { success: false, error: data.error };
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  sendLoginEmailOtp: async (email, password) => {
+    try {
+      const res = await fetch(`${API}/api/auth/send-login-email-otp`, {
         credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (data.success) return { success: true, phone: data.phone };
-      set({ authError: data.error });
-      return { success: false };
+      return data;
     } catch (err) {
-      set({ authError: err.message });
-      return { success: false };
+      return { success: false, error: err.message };
     }
   },
 
-  login: async (email, password) => {
+  verify2FA: async ({ email, password, method, code, trust_device = false, device_name = '' }) => {
+    try {
+      set({ authError: null });
+      const res = await fetch(`${API}/api/auth/verify-2fa`, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, method, code, trust_device, device_name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.trusted_device_token) {
+          localStorage.setItem('shortmarket_trusted_device', data.trusted_device_token);
+        }
+        if (data.user?.id) socket.emit('register_user', data.user.id);
+        set({
+          token: data.token,
+          user: data.user,
+          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+        });
+        get().fetchUserData();
+        syncClientTelemetry(API, true);
+        return { success: true, user: data.user };
+      }
+      set({ authError: data.error });
+      return { success: false, error: data.error };
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  login: async (email, password, options = {}) => {
     try {
       set({ authError: null });
       const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
       const payload = {
         email,
         password,
+        trust_device: options.trust_device || false,
+        device_name: options.device_name || undefined,
         client_ip: publicInfo?.ip || undefined,
         client_city: publicInfo?.city || undefined,
         client_state: publicInfo?.state || undefined
@@ -179,18 +248,25 @@ export const useStore = create(persist((set, get) => ({
       const data = await res.json();
       if (data.success) {
         if (data.token) localStorage.setItem('token', data.token);
+        if (data.trusted_device_token) {
+          localStorage.setItem('shortmarket_trusted_device', data.trusted_device_token);
+        }
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
+          token: data.token,
           user:       data.user,
           watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
         });
         get().fetchUserData();
         syncClientTelemetry(API, true);
+        return { success: true };
       } else {
         set({ authError: data.error });
+        return { success: false, error: data.error };
       }
     } catch (err) {
       set({ authError: err.message });
+      return { success: false, error: err.message };
     }
   },
 
@@ -2469,6 +2545,115 @@ export const useStore = create(persist((set, get) => ({
         return { success: true };
       }
       return { success: false, error: data?.error || 'Failed to revoke session' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Google Authenticator (TOTP) & 30-Day Device Trust ──────────────────────
+  totpLoading: false,
+  trustedDevices: [],
+  trustedDevicesLoading: false,
+
+  fetchTotpSetup: async () => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/setup`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  enableTotp: async (secret, code) => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/enable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ secret, code })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (get().user) set({ user: { ...get().user, totp_enabled: true } });
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to enable Google Authenticator' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  disableTotp: async (password) => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/disable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (get().user) set({ user: { ...get().user, totp_enabled: false } });
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to disable Google Authenticator' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  fetchTrustedDevices: async () => {
+    try {
+      set({ trustedDevicesLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/trusted-devices`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ trustedDevices: data.devices || [] });
+        return data.devices || [];
+      }
+    } catch (e) {
+      console.error('fetchTrustedDevices error:', e);
+    } finally {
+      set({ trustedDevicesLoading: false });
+    }
+    return [];
+  },
+
+  revokeTrustedDevice: async (deviceId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/trusted-devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTrustedDevices();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke device trust' };
     } catch (e) {
       return { success: false, error: e.message };
     }

@@ -984,7 +984,102 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   }
 });
 
+// ─── 2FA & Authentication with 30-Day Device Trust ──────────────────────────
 app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
+  const { email, password, trusted_device_token } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+
+    const clientIp = getClientIp(req);
+    if (await isIpBanned(clientIp, generalClient)) {
+      return res.status(403).json({ error: 'Access restricted: Your IP address has been restricted.' });
+    }
+    if (user.is_banned) {
+      return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
+    }
+
+    // 🛡️ CHECK IF DEVICE IS TRUSTED (30-Day Device Trust / Remember Me)
+    if (trusted_device_token && typeof trusted_device_token === 'string' && trusted_device_token.length >= 32) {
+      const crypto = require('crypto');
+      const deviceHash = crypto.createHash('sha256').update(trusted_device_token.trim()).digest('hex');
+      const trusted = await db('trusted_devices')
+        .where({ user_id: user.id, device_token_hash: deviceHash })
+        .where('expires_at', '>', new Date())
+        .first();
+
+      if (trusted) {
+        // Update last used timestamp & IP
+        await db('trusted_devices').where({ id: trusted.id }).update({ last_used_at: new Date(), ip_address: clientIp }).catch(() => {});
+
+        const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+        const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+        const tokenHash = hashToken(token);
+        if (tokenHash) {
+          await db('user_sessions').insert({
+            user_id: user.id,
+            token_hash: tokenHash,
+            device_model: deviceModel,
+            browser_name: browserName,
+            os_name: osName,
+            ip_address: clientIp,
+            last_active_at: new Date()
+          }).catch(() => {});
+        }
+
+        const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+        res.cookie('token', token, {
+          httpOnly: true,
+          secure: isHttps,
+          sameSite: isHttps ? 'none' : 'lax',
+          maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+
+        let clientId = user.client_id;
+        if (!clientId) {
+          clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+          await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+        }
+        const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+
+        return res.json({
+          success: true,
+          trusted: true,
+          token,
+          user: {
+            id: user.id,
+            client_id: clientId,
+            username: user.username,
+            email: user.email,
+            phone: user.phone,
+            balance: parseFloat(user.balance || 1000000.0),
+            is_admin: Boolean(user.is_admin),
+            is_onboarded: Boolean(user.is_onboarded),
+            watchlists,
+            subscription_tier: user.subscription_tier || 'BASIC'
+          }
+        });
+      }
+    }
+
+    // Device not trusted: prompt for 2FA and return available verification channels
+    res.json({
+      success: true,
+      trusted: false,
+      phone: user.phone || '',
+      email: user.email,
+      totp_enabled: Boolean(user.totp_enabled)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✉️ Send Login Email OTP ✉️
+app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
@@ -992,15 +1087,260 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
-    if (!user.phone) return res.status(400).json({ error: 'No phone number registered for this account. Please contact support.' });
-    res.json({ success: true, phone: user.phone });
+
+    const crypto = require('crypto');
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    const expires = new Date(Date.now() + 10 * 60000); // 10 minutes
+
+    await db('users').where({ id: user.id }).update({
+      login_email_otp: otpHash,
+      login_email_otp_expires: expires
+    });
+
+    const serviceId = process.env.EMAILJS_SERVICE_ID;
+    const templateId = process.env.EMAILJS_TEMPLATE_ID;
+    const userId = process.env.EMAILJS_USER_ID;
+    const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
+
+    if (serviceId && templateId && userId && accessToken) {
+      const emailData = {
+        service_id: serviceId,
+        template_id: templateId,
+        user_id: userId,
+        accessToken: accessToken,
+        template_params: {
+          otp: otp,
+          otp_code: otp,
+          to_email: user.email,
+          user_email: user.email,
+          email: user.email,
+          message: `Your Short Edge 2FA verification code is: ${otp}. Valid for 10 minutes.`
+        }
+      };
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailData)
+      }).catch(err => console.error('Failed to send login email OTP:', err.message));
+    } else {
+      console.log(`[AUTH 2FA] Email OTP generated for ${user.email}: ${otp}`);
+    }
+
+    res.json({ success: true, message: `Verification code sent to ${user.email}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔐 Multi-Channel 2FA Verification (Google Authenticator, Email OTP, Phone OTP) 🔐
+app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
+  const { email, password, method, code, trust_device, device_name } = req.body || {};
+  if (!email || !password || !method || !code) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+
+  try {
+    const user = await db('users').where({ email }).first();
+    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+
+    const crypto = require('crypto');
+
+    // Method 1: TOTP (Google Authenticator)
+    if (method === 'TOTP') {
+      if (!user.totp_secret || !user.totp_enabled) {
+        return res.status(400).json({ error: 'Google Authenticator is not enabled for this account' });
+      }
+      const { verifySync } = require('otplib');
+      const check = verifySync({ token: String(code).trim(), secret: user.totp_secret, epochTolerance: 35 });
+      if (!check || !check.valid) {
+        return res.status(400).json({ error: 'Invalid 6-digit Authenticator code. Please check your app.' });
+      }
+    }
+    // Method 2: EMAIL_OTP
+    else if (method === 'EMAIL_OTP') {
+      if (!user.login_email_otp || !user.login_email_otp_expires) {
+        return res.status(400).json({ error: 'No active email OTP found. Please click Send OTP first.' });
+      }
+      if (new Date() > new Date(user.login_email_otp_expires)) {
+        return res.status(400).json({ error: 'Email OTP has expired. Please request a new code.' });
+      }
+      const codeHash = crypto.createHash('sha256').update(String(code).trim()).digest('hex');
+      if (user.login_email_otp !== codeHash) {
+        return res.status(400).json({ error: 'Invalid Email OTP code.' });
+      }
+      await db('users').where({ id: user.id }).update({ login_email_otp: null, login_email_otp_expires: null });
+    }
+    // Method 3: PHONE_OTP
+    else if (method === 'PHONE_OTP') {
+      // Firebase phone OTP confirmation verified on client
+    } else {
+      return res.status(400).json({ error: 'Unsupported 2FA method' });
+    }
+
+    const clientIp = getClientIp(req);
+    const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
+    const sessionHash = hashToken(token);
+    if (sessionHash) {
+      await db('user_sessions').insert({
+        user_id: user.id,
+        token_hash: sessionHash,
+        device_model: deviceModel,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        last_active_at: new Date()
+      }).catch(() => {});
+    }
+
+    let trustedDeviceToken = null;
+    if (trust_device) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const deviceHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await db('trusted_devices').insert({
+        user_id: user.id,
+        device_token_hash: deviceHash,
+        device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        expires_at: expiresAt,
+        last_used_at: new Date()
+      }).catch(() => {});
+
+      trustedDeviceToken = rawToken;
+    }
+
+    const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000
+    });
+
+    let clientId = user.client_id;
+    if (!clientId) {
+      clientId = 'SE' + Number(user.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: user.id }).update({ client_id: clientId }).catch(() => {});
+    }
+    const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
+
+    res.json({
+      success: true,
+      token,
+      trusted_device_token: trustedDeviceToken,
+      user: {
+        id: user.id,
+        client_id: clientId,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        balance: parseFloat(user.balance || 1000000.0),
+        is_admin: Boolean(user.is_admin),
+        is_onboarded: Boolean(user.is_onboarded),
+        watchlists,
+        subscription_tier: user.subscription_tier || 'BASIC'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📱 Google Authenticator (TOTP) Setup & Management 📱
+app.get('/api/user/totp/setup', authenticateToken, async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const { generateSecret } = require('otplib');
+    const secret = generateSecret();
+    const otpauthUrl = `otpauth://totp/ShortEdge:${encodeURIComponent(user.email || user.username)}?secret=${secret}&issuer=ShortEdge`;
+
+    res.json({
+      success: true,
+      secret,
+      otpauth_url: otpauthUrl,
+      email: user.email,
+      totp_enabled: Boolean(user.totp_enabled)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/user/totp/enable', authenticateToken, async (req, res) => {
+  const { secret, code } = req.body || {};
+  if (!secret || !code) return res.status(400).json({ error: 'Secret and verification code are required' });
+  try {
+    const { verifySync } = require('otplib');
+    const check = verifySync({ token: String(code).trim(), secret: String(secret).trim(), epochTolerance: 35 });
+    if (!check || !check.valid) {
+      return res.status(400).json({ error: 'Invalid 6-digit code. Please check your authenticator app.' });
+    }
+
+    await db('users').where({ id: req.user.id }).update({
+      totp_secret: String(secret).trim(),
+      totp_enabled: true
+    });
+
+    res.json({ success: true, message: 'Google Authenticator enabled successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/user/totp/disable', authenticateToken, async (req, res) => {
+  const { password } = req.body || {};
+  if (!password) return res.status(400).json({ error: 'Password is required to disable 2FA' });
+  try {
+    const user = await db('users').where({ id: req.user.id }).first();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(400).json({ error: 'Invalid password' });
+
+    await db('users').where({ id: req.user.id }).update({
+      totp_secret: null,
+      totp_enabled: false
+    });
+
+    res.json({ success: true, message: 'Google Authenticator disabled successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 💻 Trusted Devices Management 💻
+app.get('/api/user/trusted-devices', authenticateToken, async (req, res) => {
+  try {
+    const devices = await db('trusted_devices')
+      .where({ user_id: req.user.id })
+      .where('expires_at', '>', new Date())
+      .orderBy('last_used_at', 'desc');
+    res.json({ success: true, devices });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/user/trusted-devices/:id', authenticateToken, async (req, res) => {
+  try {
+    await db('trusted_devices').where({ id: req.params.id, user_id: req.user.id }).del();
+    res.json({ success: true, message: 'Device trust revoked successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, trust_device, device_name } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
   try {
     const user = await db('users').where({ email }).first();
@@ -1041,7 +1381,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 
     await db('users').where({ id: user.id }).update(updateFields).catch(e => console.error('Failed to update user login meta:', e));
     
-    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
     const tokenHash = hashToken(token);
     if (tokenHash) {
       await db('user_sessions').insert({
@@ -1056,13 +1396,35 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         last_active_at: new Date()
       }).catch(() => {});
     }
+
+    let trustedDeviceToken = null;
+    if (trust_device) {
+      const crypto = require('crypto');
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const deviceHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await db('trusted_devices').insert({
+        user_id: user.id,
+        device_token_hash: deviceHash,
+        device_name: device_name || `${browserName || 'Browser'} on ${osName || 'Device'}`,
+        browser_name: browserName,
+        os_name: osName,
+        ip_address: clientIp,
+        expires_at: expiresAt,
+        last_used_at: new Date()
+      }).catch(() => {});
+
+      trustedDeviceToken = rawToken;
+    }
+
     const watchlists = typeof user.watchlists === 'string' ? JSON.parse(user.watchlists || '[]') : (user.watchlists || []);
     const isHttps = req.headers['x-forwarded-proto'] === 'https' || req.secure || req.headers['host']?.includes('sslip.io');
     res.cookie('token', token, {
       httpOnly: true,
       secure: isHttps,
       sameSite: isHttps ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000
+      maxAge: 30 * 24 * 60 * 60 * 1000
     });
     let clientId = user.client_id;
     if (!clientId) {
@@ -1072,6 +1434,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     res.json({
       success: true,
       token,
+      trusted_device_token: trustedDeviceToken,
       user: {
         id: user.id,
         client_id: clientId,
@@ -6178,18 +6541,86 @@ app.post('/api/push/test', authenticateToken, async (req, res) => {
   }
 });
 
-// 📖 Get Ledger History with Authoritative Running Balance (Defect 47) 📖
+// 📖 Get Ledger History with High-Performance Server-Side Pagination & Running Balance 📖
 app.get('/api/ledger', authenticateToken, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 5000;
+    const isPaginated = req.query.page !== undefined;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 50);
+    const offset = (page - 1) * limit;
+
     const user = await db('users').where({ id: req.user.id }).first();
-    const ledger = await db('ledger')
-      .where({ user_id: req.user.id })
+    const filterType = req.query.filterType; // 'Credits', 'Debits', 'All'
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+    const isExport = req.query.export === 'true' || req.query.limit === 'all';
+
+    let baseQuery = db('ledger').where({ user_id: req.user.id });
+
+    if (filterType === 'Credits') {
+      baseQuery = baseQuery.where('amount', '>', 0);
+    } else if (filterType === 'Debits') {
+      baseQuery = baseQuery.where('amount', '<', 0);
+    }
+
+    if (startDate) {
+      baseQuery = baseQuery.where('created_at', '>=', startDate);
+    }
+    if (endDate) {
+      baseQuery = baseQuery.where('created_at', '<=', endDate);
+    }
+
+    if (isPaginated && !isExport) {
+      // 1. Get total records count for pagination
+      const [countResult] = await baseQuery.clone().count('id as total');
+      const total = countResult ? parseInt(countResult.total) || 0 : 0;
+      const totalPages = Math.ceil(total / limit) || 1;
+
+      // 2. Fetch only the requested 50 rows for this page
+      const ledger = await baseQuery.clone()
+        .orderBy('created_at', 'desc')
+        .orderBy('id', 'desc')
+        .limit(limit)
+        .offset(offset);
+
+      // 3. Compute accurate authoritative running balance for this page slice
+      if (ledger && ledger.length > 0) {
+        let netBefore = 0;
+        if (offset > 0) {
+          try {
+            const sumRes = await db('ledger')
+              .where({ user_id: req.user.id })
+              .orderBy('created_at', 'desc')
+              .orderBy('id', 'desc')
+              .limit(offset);
+            netBefore = sumRes.reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
+          } catch (e) {}
+        }
+
+        let running = (parseFloat(user?.balance || 0)) - netBefore;
+        for (const item of ledger) {
+          item.running_balance = Math.round((running + Number.EPSILON) * 100) / 100;
+          running -= (parseFloat(item.amount) || 0);
+        }
+      }
+
+      return res.json({
+        success: true,
+        ledger,
+        total,
+        page,
+        totalPages,
+        pageSize: limit
+      });
+    }
+
+    // Fallback for non-paginated or export requests:
+    const fetchLimit = isExport ? 10000 : (parseInt(req.query.limit) || 5000);
+    const ledger = await baseQuery
       .orderBy('created_at', 'desc')
       .orderBy('id', 'desc')
-      .limit(limit);
+      .limit(fetchLimit);
 
-    // Compute exact cumulative running balances chronologically forward
     if (ledger && ledger.length > 0) {
       const chronological = [...ledger].reverse();
       const totalNetChange = chronological.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
@@ -6204,6 +6635,9 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
       }
     }
 
+    if (isExport) {
+      return res.json({ success: true, ledger, total: ledger.length, page: 1, totalPages: 1 });
+    }
     res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });

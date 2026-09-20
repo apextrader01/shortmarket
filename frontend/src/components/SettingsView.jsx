@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink } from 'lucide-react';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy } from 'lucide-react';
 import {
   isUserPinEnabled,
   saveUserPin,
@@ -877,18 +877,36 @@ export default function SettingsView() {
 export function BiometricSettingsSection({ user }) {
   const userId = user?.id || 'default';
   const { 
-    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
+    fetchTotpSetup, enableTotp, disableTotp, totpLoading,
+    trustedDevices, trustedDevicesLoading, fetchTrustedDevices, revokeTrustedDevice
   } = useStore(useShallow(state => ({ 
     userSessions: state.userSessions || [],
     userSessionsLoading: state.userSessionsLoading,
     fetchUserSessions: state.fetchUserSessions,
     revokeOtherSessions: state.revokeOtherSessions,
-    revokeSession: state.revokeSession
+    revokeSession: state.revokeSession,
+    fetchTotpSetup: state.fetchTotpSetup,
+    enableTotp: state.enableTotp,
+    disableTotp: state.disableTotp,
+    totpLoading: state.totpLoading,
+    trustedDevices: state.trustedDevices || [],
+    trustedDevicesLoading: state.trustedDevicesLoading,
+    fetchTrustedDevices: state.fetchTrustedDevices,
+    revokeTrustedDevice: state.revokeTrustedDevice
   })));
 
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+
+  // TOTP & 30-day Trusted Devices States
+  const [showTotpSetup, setShowTotpSetup] = useState(false);
+  const [totpSetupData, setTotpSetupData] = useState(null);
+  const [totpVerificationCode, setTotpVerificationCode] = useState('');
+  const [totpCopied, setTotpCopied] = useState(false);
+  const [showTotpDisable, setShowTotpDisable] = useState(false);
+  const [totpDisablePassword, setTotpDisablePassword] = useState('');
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -899,6 +917,9 @@ export function BiometricSettingsSection({ user }) {
   useEffect(() => {
     if (fetchUserSessions) {
       fetchUserSessions();
+    }
+    if (fetchTrustedDevices) {
+      fetchTrustedDevices();
     }
   }, []);
 
@@ -918,6 +939,45 @@ export function BiometricSettingsSection({ user }) {
     isBiometricsAvailable().then(setBioAvailable);
     setAutoLockMinutesState(getAutoLockDuration(userId));
   }, [userId]);
+
+  const handleStartTotpSetup = async () => {
+    setStatusMsg({ type: '', text: '' });
+    const data = await fetchTotpSetup();
+    if (data && data.success) {
+      setTotpSetupData(data);
+      setShowTotpSetup(true);
+      setShowTotpDisable(false);
+    } else {
+      setStatusMsg({ type: 'error', text: data?.error || 'Failed to initialize Google Authenticator' });
+    }
+  };
+
+  const handleConfirmTotpEnable = async (e) => {
+    e.preventDefault();
+    if (!totpSetupData?.secret || !totpVerificationCode) return;
+    const res = await enableTotp(totpSetupData.secret, totpVerificationCode);
+    if (res && res.success) {
+      setShowTotpSetup(false);
+      setTotpSetupData(null);
+      setTotpVerificationCode('');
+      setStatusMsg({ type: 'success', text: '✅ Google Authenticator (TOTP) successfully activated!' });
+    } else {
+      setStatusMsg({ type: 'error', text: res?.error || 'Invalid 6-digit code. Please check app and try again.' });
+    }
+  };
+
+  const handleConfirmTotpDisable = async (e) => {
+    e.preventDefault();
+    if (!totpDisablePassword) return;
+    const res = await disableTotp(totpDisablePassword);
+    if (res && res.success) {
+      setShowTotpDisable(false);
+      setTotpDisablePassword('');
+      setStatusMsg({ type: 'success', text: 'Google Authenticator has been disabled.' });
+    } else {
+      setStatusMsg({ type: 'error', text: res?.error || 'Failed to disable 2FA. Incorrect password.' });
+    }
+  };
 
   const handleSelectAutoLock = (val) => {
     setAutoLockMinutesState(val);
@@ -1164,7 +1224,159 @@ export function BiometricSettingsSection({ user }) {
             </div>
           </div>
         )}
+
+        {/* Google Authenticator (TOTP) Status Tile */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: user?.totp_enabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: user?.totp_enabled ? '#22c55e' : 'var(--text-secondary)' }}>
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Google Authenticator</div>
+              <div style={{ fontSize: '11.5px', color: user?.totp_enabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                {user?.totp_enabled ? '✅ Active (App Code 2FA)' : '⚪ Not Enabled'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {user?.totp_enabled ? (
+              <button
+                type="button"
+                onClick={() => setShowTotpDisable(true)}
+                style={{ width: '100%', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Disable 2FA
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartTotpSetup}
+                disabled={totpLoading}
+                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {totpLoading ? 'Loading...' : 'Set Up Google 2FA'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Google Authenticator Setup Card / Modal */}
+      {showTotpSetup && totpSetupData && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid var(--color-blue)', padding: '24px', borderRadius: '12px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} color="var(--color-blue-light)" /> Set Up Google Authenticator (TOTP)
+            </h4>
+            <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpSetup(false)} />
+          </div>
+
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '18px', lineHeight: '1.5' }}>
+            Scan this QR code with <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any TOTP app, then enter the 6-digit code below to activate.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'center' }}>
+            {totpSetupData.qrCode && (
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                <img src={totpSetupData.qrCode} alt="TOTP QR Code" style={{ width: '160px', height: '160px', display: 'block' }} />
+              </div>
+            )}
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Manual Secret Key (if camera scan is unavailable):
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={totpSetupData.secret}
+                    style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '1px', fontSize: '13px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#38bdf8', padding: '8px 12px', borderRadius: '6px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(totpSetupData.secret);
+                      setTotpCopied(true);
+                      setTimeout(() => setTotpCopied(false), 2500);
+                    }}
+                    style={{ padding: '8px 14px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Copy size={13} /> {totpCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmTotpEnable} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Enter 6-Digit Code from App to Confirm:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={totpVerificationCode}
+                    onChange={e => setTotpVerificationCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="000000"
+                    style={{ width: '100%', boxSizing: 'border-box', letterSpacing: '6px', textAlign: 'center', fontSize: '18px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={totpLoading || totpVerificationCode.length !== 6}
+                  style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {totpLoading ? 'Verifying...' : 'Verify & Activate'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Authenticator Disable Modal */}
+      {showTotpDisable && (
+        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#ef4444' }}>Disable Google Authenticator</h4>
+            <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpDisable(false)} />
+          </div>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+            Enter your account password to confirm disabling Google Authenticator:
+          </p>
+          <form onSubmit={handleConfirmTotpDisable} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="password"
+              placeholder="Account Password"
+              value={totpDisablePassword}
+              onChange={e => setTotpDisablePassword(e.target.value)}
+              style={{ flex: 1, minWidth: '180px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}
+              required
+            />
+            <button
+              type="submit"
+              disabled={totpLoading}
+              style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              {totpLoading ? 'Disabling...' : 'Confirm Disable'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* PIN Setup Form Overlay / Modal */}
       {showPinSetup && (
@@ -1485,6 +1697,117 @@ export function BiometricSettingsSection({ user }) {
           <span>
             <strong>Security Recommendation:</strong> If you notice an unfamiliar device or location, immediately click <strong>Log Out All Other Devices</strong> and change your account password.
           </span>
+        </div>
+      </div>
+
+      {/* ─── 30-Day Trusted Devices (Bypass Daily 2FA) ───────────────── */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
+              <ShieldCheck size={18} color="var(--color-blue)" /> 30-Day Trusted Devices (Bypass Daily 2FA)
+            </h3>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              These browsers & devices are authorized to bypass daily SMS/OTP challenges for 30 days.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => fetchTrustedDevices()}
+            disabled={trustedDevicesLoading}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+            title="Refresh trusted devices"
+          >
+            <RefreshCw size={13} className={trustedDevicesLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {trustedDevicesLoading && trustedDevices.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+              Loading trusted devices...
+            </div>
+          ) : trustedDevices.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              No trusted devices registered yet. Check <strong>"Trust this device for 30 days"</strong> during login to remember this device.
+            </div>
+          ) : (
+            trustedDevices.map((device) => {
+              const expiresDate = new Date(device.expires_at);
+              const daysRemaining = Math.max(0, Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+              return (
+                <div key={device.id} style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: 'rgba(59,130,246,0.15)', padding: '10px', borderRadius: '50%', color: 'var(--color-blue-light)' }}>
+                      <Laptop size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {device.device_name || `${device.browser_name || 'Browser'} on ${device.os_name || 'Device'}`}
+                        <span style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '700' }}>
+                          TRUSTED ({daysRemaining}d left)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <span>IP: {device.ip_address || '—'}</span>
+                        <span>Last active: {device.last_used_at ? new Date(device.last_used_at).toLocaleDateString('en-GB') : '—'}</span>
+                        <span>Expires: {expiresDate.toLocaleDateString('en-GB')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Revoke trust for this device? You will need 2FA to log in on it next time.')) {
+                        const res = await revokeTrustedDevice(device.id);
+                        if (res && res.success) {
+                          setStatusMsg({ type: 'success', text: 'Device trust revoked successfully.' });
+                          setTimeout(() => setStatusMsg({ type: '', text: '' }), 3500);
+                        }
+                      }
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      color: '#ef4444',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={13} /> Revoke Trust
+                  </button>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

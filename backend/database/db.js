@@ -127,6 +127,17 @@ async function initSchema() {
         });
         console.log('Added subscription columns to users table');
       }
+
+      const hasTotpSecret = await db.schema.hasColumn('users', 'totp_secret');
+      if (!hasTotpSecret) {
+        await db.schema.alterTable('users', table => {
+          table.text('totp_secret');
+          table.boolean('totp_enabled').defaultTo(false);
+          table.string('login_email_otp');
+          table.datetime('login_email_otp_expires');
+        });
+        console.log('Added totp and login email otp columns to users table');
+      }
     }
 
     // 2. Positions Table
@@ -861,6 +872,29 @@ async function ensureCriticalColumns() {
     `);
     await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)');
     await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash)');
+
+    // Trusted Devices Table (30-Day Device Trust & Remember Me)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trusted_devices (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        device_token_hash VARCHAR(64) NOT NULL UNIQUE,
+        device_name VARCHAR(100),
+        browser_name VARCHAR(100),
+        os_name VARCHAR(100),
+        ip_address VARCHAR(50),
+        expires_at TIMESTAMP NOT NULL,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_lookup ON trusted_devices(user_id, device_token_hash)').catch(() => {});
+
+    // Ensure TOTP and Email OTP columns on users table
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_email_otp VARCHAR(64)').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_email_otp_expires TIMESTAMP').catch(() => {});
 
     // Seed default market controls if not exist
     const hasEq = await db('system_settings').where({ key: 'equity_market_status' }).first();

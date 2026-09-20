@@ -5,7 +5,17 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../firebase';
 
 export default function LoginView() {
-  const { login, preLogin, register, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ login: state.login, preLogin: state.preLogin, register: state.register, forgotPassword: state.forgotPassword, verifyResetOtp: state.verifyResetOtp, resetPassword: state.resetPassword, authError: state.authError })));
+  const { login, preLogin, sendLoginEmailOtp, verify2FA, register, forgotPassword, verifyResetOtp, resetPassword, authError } = useStore(useShallow(state => ({ 
+    login: state.login, 
+    preLogin: state.preLogin, 
+    sendLoginEmailOtp: state.sendLoginEmailOtp,
+    verify2FA: state.verify2FA,
+    register: state.register, 
+    forgotPassword: state.forgotPassword, 
+    verifyResetOtp: state.verifyResetOtp, 
+    resetPassword: state.resetPassword, 
+    authError: state.authError 
+  })));
   
   // view: 'login', 'register', 'forgot', 'otp', 'reset', 'login_otp', 'register_otp'
   const [view, setView] = useState(() => {
@@ -46,6 +56,58 @@ export default function LoginView() {
   const [loading,  setLoading]  = useState(false);
   const [message,  setMessage]  = useState('');
 
+  // 2FA & 30-Day Device Trust States
+  const [twoFactorMethod, setTwoFactorMethod] = useState('phone'); // 'phone' | 'totp' | 'email'
+  const [hasTotp, setHasTotp] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [trustDevice, setTrustDevice] = useState(true);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [registeredPhone, setRegisteredPhone] = useState('');
+
+  const triggerPhoneSms = async (targetPhone) => {
+    try {
+      setLoading(true);
+      useStore.setState({ authError: null });
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.clear(); } catch (_) {}
+        window.recaptchaVerifier = null;
+      }
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible'
+      });
+      const rawPhone = String(targetPhone || registeredPhone || '').trim();
+      const cleanPhone = rawPhone.replace(/\D/g, '');
+      const formattedPhone = rawPhone.startsWith('+') ? rawPhone : '+91' + cleanPhone;
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+      setConfirmationResult(confirmation);
+      setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
+    } catch (error) {
+      useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerEmailOtp = async () => {
+    try {
+      setSendingEmailOtp(true);
+      useStore.setState({ authError: null });
+      const res = await sendLoginEmailOtp(email, password);
+      if (res && res.success) {
+        setEmailOtpSent(true);
+        setMessage(res.message || `Verification code sent to ${email}. Check your inbox!`);
+      } else {
+        useStore.setState({ authError: res?.error || 'Failed to send email OTP.' });
+      }
+    } catch (e) {
+      useStore.setState({ authError: e.message || 'Failed to send email OTP.' });
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -55,6 +117,25 @@ export default function LoginView() {
     if (view === 'login') {
       const res = await preLogin(email, password);
       if (res && res.success) {
+        if (res.trusted) {
+          // Device is trusted for 30 days! User logged in immediately without 2FA!
+          setLoading(false);
+          return;
+        }
+        setHasTotp(!!res.totp_enabled);
+        const cleanPhone = String(res.phone || '').trim().replace(/\D/g, '');
+        setRegisteredPhone(cleanPhone);
+
+        // If user already set up Google Authenticator, default to TOTP
+        if (res.totp_enabled) {
+          setTwoFactorMethod('totp');
+          setView('login_otp');
+          setMessage('Two-factor authentication required. Enter your 6-digit Google Authenticator code.');
+          setLoading(false);
+          return;
+        }
+
+        // Try sending phone SMS OTP:
         try {
           if (window.recaptchaVerifier) {
             try { window.recaptchaVerifier.clear(); } catch (_) {}
@@ -64,26 +145,63 @@ export default function LoginView() {
             size: 'invisible'
           });
           const rawPhone = String(res.phone || '').trim();
-          const cleanPhone = rawPhone.replace(/\D/g, '');
           const formattedPhone = rawPhone.startsWith('+') ? rawPhone : '+91' + cleanPhone;
           const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
           setConfirmationResult(confirmation);
+          setTwoFactorMethod('phone');
           setView('login_otp');
           setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
         } catch (error) {
-          useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
+          // If SMS gateway fails or rate limits, gracefully offer Email OTP or Google Authenticator
+          setTwoFactorMethod('email');
+          setView('login_otp');
+          setMessage('SMS service unavailable. You can verify via Email OTP or Google Authenticator.');
         }
       }
     } 
     else if (view === 'login_otp') {
-      try {
-        if (!confirmationResult) {
-          throw new Error('No pending OTP verification session. Please log in again.');
+      if (twoFactorMethod === 'totp') {
+        if (!totpCode || totpCode.trim().length !== 6) {
+          useStore.setState({ authError: 'Please enter a valid 6-digit Google Authenticator code.' });
+          setLoading(false);
+          return;
         }
-        await confirmationResult.confirm(phoneOtp);
-        await login(email, password);
-      } catch (error) {
-        useStore.setState({ authError: 'Invalid 2FA code. Please check and try again.' });
+        const res = await verify2FA({
+          email,
+          password,
+          method: 'TOTP',
+          code: totpCode.trim(),
+          trust_device: trustDevice
+        });
+        if (!res || !res.success) {
+          useStore.setState({ authError: res?.error || 'Invalid Google Authenticator code.' });
+        }
+      } else if (twoFactorMethod === 'email') {
+        if (!emailOtp || emailOtp.trim().length !== 6) {
+          useStore.setState({ authError: 'Please enter the 6-digit Email OTP.' });
+          setLoading(false);
+          return;
+        }
+        const res = await verify2FA({
+          email,
+          password,
+          method: 'EMAIL_OTP',
+          code: emailOtp.trim(),
+          trust_device: trustDevice
+        });
+        if (!res || !res.success) {
+          useStore.setState({ authError: res?.error || 'Invalid or expired Email OTP.' });
+        }
+      } else if (twoFactorMethod === 'phone') {
+        try {
+          if (!confirmationResult) {
+            throw new Error('No pending OTP verification session. Please click "Resend SMS".');
+          }
+          await confirmationResult.confirm(phoneOtp);
+          await login(email, password, { trust_device: trustDevice });
+        } catch (error) {
+          useStore.setState({ authError: error.message?.includes('invalid') ? 'Invalid 2FA code. Please check and try again.' : (error.message || 'Verification failed') });
+        }
       }
     }
     else if (view === 'register') {
@@ -248,7 +366,7 @@ export default function LoginView() {
             {view === 'register' && 'Join the edge in professional trading.'}
             {view === 'forgot' && 'We will send you a secure OTP to reset it.'}
             {view === 'otp' && 'Enter the 6-digit code sent to your email.'}
-            {view === 'login_otp' && 'Enter the 6-digit code sent to your registered phone number.'}
+            {view === 'login_otp' && (twoFactorMethod === 'totp' ? 'Enter the dynamic 6-digit code from Google Authenticator.' : (twoFactorMethod === 'email' ? 'Enter the 6-digit verification code sent to your email.' : 'Enter the 6-digit code sent to your registered phone number.'))}
             {view === 'register_otp' && 'Enter the 6-digit code sent to your phone via SMS.'}
             {view === 'reset' && 'Choose a strong, unique password.'}
           </div>
@@ -322,7 +440,7 @@ export default function LoginView() {
             </div>
           )}
 
-          {(view === 'register_otp' || view === 'login_otp') && (
+          {view === 'register_otp' && (
             <div>
               <label style={labelStyle}>6-Digit Phone OTP</label>
               <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
@@ -330,8 +448,167 @@ export default function LoginView() {
           )}
 
           {view === 'login_otp' && (
-            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
-              🔒 Authenticating account: <strong>{email}</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '13px', color: '#60a5fa' }}>
+                🔒 Authenticating account: <strong>{email}</strong>
+              </div>
+
+              {/* 2FA Method Selector */}
+              <div>
+                <label style={{ ...labelStyle, marginBottom: '8px' }}>Choose Verification Method:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTwoFactorMethod('phone');
+                      useStore.setState({ authError: null });
+                      if (!confirmationResult && registeredPhone) triggerPhoneSms();
+                    }}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: '6px',
+                      border: twoFactorMethod === 'phone' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      background: twoFactorMethod === 'phone' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
+                      color: twoFactorMethod === 'phone' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>📱</span> SMS OTP
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTwoFactorMethod('totp');
+                      useStore.setState({ authError: null });
+                    }}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: '6px',
+                      border: twoFactorMethod === 'totp' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      background: twoFactorMethod === 'totp' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
+                      color: twoFactorMethod === 'totp' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>🔑</span> Authenticator
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTwoFactorMethod('email');
+                      useStore.setState({ authError: null });
+                      if (!emailOtpSent) triggerEmailOtp();
+                    }}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: '6px',
+                      border: twoFactorMethod === 'email' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      background: twoFactorMethod === 'email' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
+                      color: twoFactorMethod === 'email' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>✉️</span> Email OTP
+                  </button>
+                </div>
+              </div>
+
+              {/* Method 1: Phone SMS */}
+              {twoFactorMethod === 'phone' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>
+                      6-Digit Phone OTP {registeredPhone ? `(..${registeredPhone.slice(-4)})` : ''}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => triggerPhoneSms()}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '11.5px', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      {confirmationResult ? 'Resend SMS' : 'Send SMS Code'}
+                    </button>
+                  </div>
+                  <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
+                </div>
+              )}
+
+              {/* Method 2: Google Authenticator (TOTP) */}
+              {twoFactorMethod === 'totp' && (
+                <div>
+                  <label style={labelStyle}>6-Digit Google Authenticator Code</label>
+                  <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={totpCode} onChange={(e) => setTotpCode(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                    Open your Google Authenticator or Authy app and enter the 6-digit dynamic code.
+                  </div>
+                </div>
+              )}
+
+              {/* Method 3: Email OTP */}
+              {twoFactorMethod === 'email' && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>6-Digit Email OTP</label>
+                    <button
+                      type="button"
+                      disabled={sendingEmailOtp}
+                      onClick={() => triggerEmailOtp()}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '11.5px', cursor: 'pointer', fontWeight: '600' }}
+                    >
+                      {sendingEmailOtp ? 'Sending...' : (emailOtpSent ? 'Resend Code' : 'Send Code')}
+                    </button>
+                  </div>
+                  <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={emailOtp} onChange={(e) => setEmailOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                    We sent a secure 6-digit code to <strong>{email}</strong>.
+                  </div>
+                </div>
+              )}
+
+              {/* 30-Day Device Trust Checkbox */}
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                userSelect: 'none'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={trustDevice}
+                  onChange={(e) => setTrustDevice(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                />
+                <div>
+                  <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 30 days</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Don't ask for 2FA verification on this device again for 30 days
+                  </div>
+                </div>
+              </label>
             </div>
           )}
 
@@ -350,6 +627,34 @@ export default function LoginView() {
                 )}
               </div>
               <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="premium-input" placeholder="••••••••" />
+
+              {view === 'login' && (
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  marginTop: '12px'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={trustDevice}
+                    onChange={(e) => setTrustDevice(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#3b82f6', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '600', color: '#fff' }}>Trust this device for 30 days</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Stay signed in without repeated daily OTP logins
+                    </div>
+                  </div>
+                </label>
+              )}
             </div>
           )}
 
@@ -357,7 +662,7 @@ export default function LoginView() {
           <button type="submit" disabled={loading} className="premium-btn" style={{ marginTop: '12px' }}>
             {loading ? 'PROCESSING...' : 
               (view === 'login' ? 'LOG IN' : 
-               view === 'login_otp' ? 'VERIFY OTP' :
+               view === 'login_otp' ? (twoFactorMethod === 'totp' ? 'VERIFY AUTHENTICATOR' : (twoFactorMethod === 'email' ? 'VERIFY EMAIL OTP' : 'VERIFY SMS OTP')) :
                view === 'register' ? 'CREATE ACCOUNT' : 
                view === 'register_otp' ? 'VERIFY OTP' : 
                view === 'forgot' ? 'SEND RESET LINK' : 

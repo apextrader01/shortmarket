@@ -43,6 +43,10 @@ const LedgerStatement = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [filterType, setFilterType] = useState('All');
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const pageSize = 50;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -50,97 +54,94 @@ const LedgerStatement = () => {
 
   const { token, user } = useStore(useShallow(state => ({ token: state.token, user: state.user })));
 
+  // Calculate start/end date strings for server query
+  const dateRange = useMemo(() => {
+    let start = '';
+    let end = '';
+    const now = new Date();
+    if (filterPeriod === 'Week') {
+      start = new Date(now.getTime() - 7 * 86400000).toISOString();
+    } else if (filterPeriod === '15 Days') {
+      start = new Date(now.getTime() - 15 * 86400000).toISOString();
+    } else if (filterPeriod === 'Month') {
+      start = new Date(now.getTime() - 30 * 86400000).toISOString();
+    } else if (filterPeriod === '3 Months') {
+      start = new Date(now.getTime() - 90 * 86400000).toISOString();
+    } else if (filterPeriod === 'Custom') {
+      if (customStart) start = new Date(customStart).toISOString();
+      if (customEnd) end = new Date(new Date(customEnd).setHours(23, 59, 59, 999)).toISOString();
+    }
+    return { start, end };
+  }, [filterPeriod, customStart, customEnd]);
+
+  // Server-side paginated ledger fetch (Saving client RAM/ROM and CPU)
   useEffect(() => {
     const fetchLedger = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API}/api/ledger?limit=250`, {
+        let query = `page=${currentPage}&limit=${pageSize}`;
+        if (filterType !== 'All') query += `&filterType=${filterType}`;
+        if (dateRange.start) query += `&startDate=${encodeURIComponent(dateRange.start)}`;
+        if (dateRange.end) query += `&endDate=${encodeURIComponent(dateRange.end)}`;
+
+        const res = await fetch(`${API}/api/ledger?${query}`, {
           headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
         });
         const data = await res.json();
-        if (Array.isArray(data)) setLedger(data);
-        else setLedger([]);
+        if (data && data.success && Array.isArray(data.ledger)) {
+          setLedger(data.ledger);
+          setTotalItems(data.total || 0);
+          setTotalPages(data.totalPages || 1);
+        } else if (Array.isArray(data)) {
+          setLedger(data);
+          setTotalItems(data.length);
+          setTotalPages(Math.ceil(data.length / pageSize) || 1);
+        } else {
+          setLedger([]);
+          setTotalItems(0);
+          setTotalPages(1);
+        }
       } catch (err) {
         console.error('Failed to fetch ledger:', err);
         setLedger([]);
+        setTotalItems(0);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
     };
     fetchLedger();
-  }, [token]);
+  }, [token, currentPage, filterPeriod, filterType, dateRange]);
 
-  // Defect 47: Calculate running balances forward chronologically or use server running_balance
-  const ledgerWithBalance = useMemo(() => {
-    if (!ledger || !ledger.length) return [];
+  const handleExport = async (format) => {
+    try {
+      setExporting(true);
+      let query = `export=true&limit=all`;
+      if (filterType !== 'All') query += `&filterType=${filterType}`;
+      if (dateRange.start) query += `&startDate=${encodeURIComponent(dateRange.start)}`;
+      if (dateRange.end) query += `&endDate=${encodeURIComponent(dateRange.end)}`;
 
-    // If server provided running_balance, preserve it
-    if (ledger[0] && ledger[0].running_balance !== undefined && ledger[0].running_balance !== null) {
-      return ledger;
+      const res = await fetch(`${API}/api/ledger?${query}`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      const exportData = (data && data.ledger) ? data.ledger : (Array.isArray(data) ? data : ledger);
+      generateLedgerReport(exportData, user || {}, filterPeriod, format);
+    } catch (err) {
+      generateLedgerReport(ledger, user || {}, filterPeriod, format);
+    } finally {
+      setExporting(false);
     }
+  };
 
-    // Otherwise compute forward chronologically from initial starting balance
-    const chronological = [...ledger].sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id);
-    const totalNetChange = chronological.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    const startBalance = (parseFloat(user?.balance || 0)) - totalNetChange;
-
-    let accum = startBalance;
-    const withBalMap = new Map();
-    for (const entry of chronological) {
-      accum += Number(entry.amount || 0);
-      withBalMap.set(entry.id, Math.round((accum + Number.EPSILON) * 100) / 100);
-    }
-
-    return ledger.map(entry => ({
-      ...entry,
-      running_balance: withBalMap.get(entry.id) ?? user?.balance ?? 0
-    }));
-  }, [ledger, user]);
-
-  // Apply filters
-  const filteredLedger = useMemo(() => {
-    return ledgerWithBalance.filter(entry => {
-      if (filterType === 'Credits' && Number(entry.amount) <= 0) return false;
-      if (filterType === 'Debits' && Number(entry.amount) >= 0) return false;
-
-      const entryDate = new Date(entry.created_at);
-      const now = new Date();
-      const diffTime = Math.abs(now - entryDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (filterPeriod === 'Custom') {
-        if (customStart) {
-          const start = new Date(customStart);
-          start.setHours(0, 0, 0, 0);
-          if (entryDate < start) return false;
-        }
-        if (customEnd) {
-          const end = new Date(customEnd);
-          end.setHours(23, 59, 59, 999);
-          if (entryDate > end) return false;
-        }
-      } else {
-        if (filterPeriod === 'Week' && diffDays > 7) return false;
-        if (filterPeriod === '15 Days' && diffDays > 15) return false;
-        if (filterPeriod === 'Month' && diffDays > 30) return false;
-        if (filterPeriod === '3 Months' && diffDays > 90) return false;
-        if (filterPeriod === 'All') return true;
-      }
-
-      return true;
-    });
-  }, [ledgerWithBalance, filterType, filterPeriod, customStart, customEnd]);
-
-  const pageSize = 50;
-  const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
-  const paginatedLedger = filteredLedger.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginatedLedger = ledger;
 
   const isRealCashFlow = (l) => {
     const t = String(l.type || '').toUpperCase();
     return t !== 'MARGIN_BLOCK' && t !== 'MARGIN_RELEASE';
   };
-  const totalCredits = filteredLedger.filter(l => isRealCashFlow(l) && Number(l.amount) > 0).reduce((a, b) => a + Number(b.amount), 0);
-  const totalDebits = filteredLedger.filter(l => isRealCashFlow(l) && Number(l.amount) < 0).reduce((a, b) => a + Math.abs(Number(b.amount)), 0);
+  const totalCredits = ledger.filter(l => isRealCashFlow(l) && Number(l.amount) > 0).reduce((a, b) => a + Number(b.amount), 0);
+  const totalDebits = ledger.filter(l => isRealCashFlow(l) && Number(l.amount) < 0).reduce((a, b) => a + Math.abs(Number(b.amount)), 0);
 
   const renderLedgerBadge = (type, amount) => {
     const t = (type || '').toUpperCase();
@@ -247,16 +248,18 @@ const LedgerStatement = () => {
         {/* Export Buttons */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button 
-            onClick={() => generateLedgerReport(filteredLedger, user || {}, filterPeriod, 'excel')} 
-            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => handleExport('excel')} 
+            disabled={exporting}
+            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <Download size={13} /> Excel (.csv)
+            <Download size={13} /> {exporting ? 'Exporting...' : 'Excel (.csv)'}
           </button>
           <button 
-            onClick={() => generateLedgerReport(filteredLedger, user || {}, filterPeriod, 'pdf')} 
-            style={{ background: 'var(--color-blue)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => handleExport('pdf')} 
+            disabled={exporting}
+            style={{ background: 'var(--color-blue)', border: 'none', color: '#fff', padding: '7px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <FileText size={13} /> PDF Statement
+            <FileText size={13} /> {exporting ? 'Exporting...' : 'PDF Statement'}
           </button>
         </div>
       </div>
@@ -284,7 +287,7 @@ const LedgerStatement = () => {
         <div className="glass-panel" style={{ padding: '14px', borderRadius: '8px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Total Entries</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginTop: '4px' }}>
-            {filteredLedger.length} Records
+            {totalItems} Records
           </div>
         </div>
       </div>
@@ -295,7 +298,7 @@ const LedgerStatement = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {loading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading ledger...</div>
-            ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
+            ) : ledger.length === 0 || activeSubTab === 'MTF' ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No Results Found.</div>
             ) : (
               paginatedLedger.map((entry) => (
@@ -333,7 +336,7 @@ const LedgerStatement = () => {
             <tbody>
               {loading ? (
                 <tr><td colSpan="7" style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</td></tr>
-              ) : filteredLedger.length === 0 || activeSubTab === 'MTF' ? (
+              ) : ledger.length === 0 || activeSubTab === 'MTF' ? (
                 <tr>
                   <td colSpan="7" style={{ padding: '64px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
@@ -375,7 +378,7 @@ const LedgerStatement = () => {
             </tbody>
           </table>
         )}
-        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={filteredLedger.length} pageSize={pageSize} />
+        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
     </div>
   );
@@ -1690,13 +1693,36 @@ function Pagination({ currentPage, totalPages, onPageChange, totalItems, pageSiz
   const startIdx = (currentPage - 1) * pageSize + 1;
   const endIdx = Math.min(currentPage * pageSize, totalItems);
 
+  // 5-page chunk pagination: 1-5, 6-10, 11-15, etc.
+  const chunkIndex = Math.floor((currentPage - 1) / 5);
+  const startPage = chunkIndex * 5 + 1;
+  const numPagesToShow = Math.min(5, Math.max(0, totalPages - startPage + 1));
+  const pages = Array.from({ length: numPagesToShow }, (_, i) => startPage + i);
+
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 12px', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-        Showing <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{startIdx}</span> - <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{endIdx}</span> of <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{totalItems}</span> entries
+        Showing <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{startIdx}</span> - <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{endIdx}</span> of <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{totalItems}</span> entries (Page {currentPage} of {totalPages})
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {/* Fast jump to previous 5 pages */}
+        {startPage > 1 && (
+          <button
+            type="button"
+            title="Jump back 5 pages"
+            onClick={() => onPageChange(Math.max(1, startPage - 5))}
+            style={{
+              padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-color)',
+              background: 'var(--bg-hover)', color: 'var(--text-primary)',
+              cursor: 'pointer', fontSize: '12px', fontWeight: '700'
+            }}
+          >
+            «
+          </button>
+        )}
+
         <button
+          type="button"
           disabled={currentPage === 1}
           onClick={() => onPageChange(currentPage - 1)}
           style={{
@@ -1709,30 +1735,25 @@ function Pagination({ currentPage, totalPages, onPageChange, totalItems, pageSiz
           Previous
         </button>
 
-        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-          let pageNum;
-          if (totalPages <= 5) pageNum = i + 1;
-          else if (currentPage <= 3) pageNum = i + 1;
-          else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-          else pageNum = currentPage - 2 + i;
-          return (
-            <button
-              key={pageNum}
-              onClick={() => onPageChange(pageNum)}
-              style={{
-                padding: '5px 10px', borderRadius: '6px',
-                border: pageNum === currentPage ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                background: pageNum === currentPage ? 'var(--color-blue)' : 'var(--bg-hover)',
-                color: pageNum === currentPage ? '#fff' : 'var(--text-secondary)',
-                cursor: 'pointer', fontSize: '12px', fontWeight: '700', minWidth: '32px'
-              }}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
+        {pages.map((pageNum) => (
+          <button
+            key={pageNum}
+            type="button"
+            onClick={() => onPageChange(pageNum)}
+            style={{
+              padding: '5px 10px', borderRadius: '6px',
+              border: pageNum === currentPage ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+              background: pageNum === currentPage ? 'var(--color-blue)' : 'var(--bg-hover)',
+              color: pageNum === currentPage ? '#fff' : 'var(--text-secondary)',
+              cursor: 'pointer', fontSize: '12px', fontWeight: '700', minWidth: '32px'
+            }}
+          >
+            {pageNum}
+          </button>
+        ))}
 
         <button
+          type="button"
           disabled={currentPage === totalPages}
           onClick={() => onPageChange(currentPage + 1)}
           style={{
@@ -1744,6 +1765,22 @@ function Pagination({ currentPage, totalPages, onPageChange, totalItems, pageSiz
         >
           Next
         </button>
+
+        {/* Fast jump to next 5 pages */}
+        {startPage + 5 <= totalPages && (
+          <button
+            type="button"
+            title="Jump forward 5 pages"
+            onClick={() => onPageChange(startPage + 5)}
+            style={{
+              padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-color)',
+              background: 'var(--bg-hover)', color: 'var(--text-primary)',
+              cursor: 'pointer', fontSize: '12px', fontWeight: '700'
+            }}
+          >
+            »
+          </button>
+        )}
       </div>
     </div>
   );
