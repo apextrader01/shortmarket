@@ -119,7 +119,11 @@ async function performFyersAutoLogin(retryCount = 0) {
         });
         const otpData = await otpRes.json();
         if (!otpData.request_key) {
-            throw new Error(`Step 1 (Send OTP) failed: ${otpData.message || JSON.stringify(otpData)}`);
+            const rawMsg = otpData.message || JSON.stringify(otpData);
+            if (rawMsg.toLowerCase().includes('too many requests')) {
+                throw new Error(`Fyers OTP Rate Limit reached: Fyers limits repeated OTP requests. Please use the "Connect Web" button instead to log in directly without OTP rate limits!`);
+            }
+            throw new Error(`Step 1 (Send OTP) failed: ${rawMsg}`);
         }
 
         // Step 2: Verify TOTP

@@ -172,6 +172,29 @@ async function verifyFyersAuth(auth_code, customSecretKey = null, customAppId = 
     }
 }
 
+// JWT and Token validation helpers
+function decodeFyersJwt(token) {
+    if (!token || typeof token !== 'string') return null;
+    try {
+        const parts = token.split('.');
+        if (parts.length >= 2) {
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+            return payload;
+        }
+    } catch (e) {}
+    return null;
+}
+
+function isTokenExpired(token) {
+    if (!token || typeof token !== 'string') return true;
+    const payload = decodeFyersJwt(token);
+    if (payload && payload.exp) {
+        return Date.now() >= payload.exp * 1000;
+    }
+    return false;
+}
+
 // On boot, try to load token from disk
 function loadTokenFromDisk() {
     try {
@@ -190,8 +213,14 @@ function loadTokenFromDisk() {
             if (token && token.trim().length > 20) {
                 activeAccessToken = token.trim();
                 fyers.setAccessToken(activeAccessToken);
+                if (isTokenExpired(activeAccessToken)) {
+                    isFyersConnected = false;
+                    lastDataSocketError = 'Token Expired: Daily Fyers token has expired. Please reconnect via Connect Web.';
+                    console.warn("⚠️ Fyers token on disk is EXPIRED. Please connect via Admin Dashboard.");
+                    return false;
+                }
                 isFyersConnected = true;
-                console.log("🔌 Loaded Fyers token from disk.");
+                console.log("🔌 Loaded valid Fyers token from disk.");
                 return true;
             }
         }
@@ -845,23 +874,38 @@ async function fetchBatchLTPs(symbols) {
 
                 if (response && response.s === 'ok') {
                     processQuotesResponse(response);
-                } else if (response && response.s === 'error') {
-                    for (let j = 0; j < chunk.length; j++) {
-                        const fSym = chunk[j];
-                        try {
-                            await new Promise(r => setTimeout(r, 150));
-                            const indRes = await fyers.getQuotes([fSym]);
-                            if (indRes && indRes.s === 'ok') {
-                                processQuotesResponse(indRes);
-                            }
-                        } catch(indErr) {}
+                } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
+                    if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
+                        lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+                        isFyersConnected = false;
+                    }
+                    if (response.code !== -15 && response.code !== -17) {
+                        for (let j = 0; j < chunk.length; j++) {
+                            const fSym = chunk[j];
+                            try {
+                                await new Promise(r => setTimeout(r, 150));
+                                const indRes = await fyers.getQuotes([fSym]);
+                                if (indRes && indRes.s === 'ok') {
+                                    processQuotesResponse(indRes);
+                                }
+                            } catch(indErr) {}
+                        }
                     }
                 }
-            } catch(chunkErr) {}
+            } catch(chunkErr) {
+                if (chunkErr && (chunkErr.code === -15 || chunkErr.code === -17 || (chunkErr.message && (chunkErr.message.toLowerCase().includes('token') || chunkErr.message.toLowerCase().includes('authenticate'))))) {
+                    lastDataSocketError = `Token Expired: ${chunkErr.message || 'Invalid or expired token'}`;
+                    isFyersConnected = false;
+                }
+            }
         }
         
         return { ...results, ...mfResults };
     } catch(e) {
+        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+            lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
+            isFyersConnected = false;
+        }
         console.error("Fyers fetchBatchLTPs error:", e);
     }
     return mfResults;
@@ -948,8 +992,17 @@ async function fetchCandleData(symbol, interval = 'ONE_DAY') {
             }
             
             return formattedCandles;
+        } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
+            if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
+                lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+                isFyersConnected = false;
+            }
         }
     } catch (e) {
+        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+            lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
+            isFyersConnected = false;
+        }
         console.error("Fyers fetchCandleData error:", e);
     }
     return [];
@@ -988,17 +1041,24 @@ function getPriceFromCache() {
 }
 
 function getFyersStatus() {
-    const recentTick = (Date.now() - lastTickTime) < 15000;
-    const isTokenExpiredError = lastDataSocketError && (
-        lastDataSocketError.toLowerCase().includes('expired token') || 
+    const expiredByJwt = isTokenExpired(activeAccessToken);
+    const isTokenExpiredError = expiredByJwt || (lastDataSocketError && (
+        lastDataSocketError.toLowerCase().includes('expired') || 
+        lastDataSocketError.toLowerCase().includes('valid token') ||
+        lastDataSocketError.toLowerCase().includes('authenticate') ||
         lastDataSocketError.toLowerCase().includes('failed to decode jwt')
-    );
-    const masterConnected = isFyersConnected && !isTokenExpiredError;
+    ));
+    const hasValidToken = !!activeAccessToken && !isTokenExpiredError;
+    const recentTick = (Date.now() - lastTickTime) < 15000;
+    const jwtPayload = decodeFyersJwt(activeAccessToken);
+    const tokenExpiryDate = jwtPayload && jwtPayload.exp ? new Date(jwtPayload.exp * 1000).toISOString() : null;
+
     return {
         isMasterNode,
-        isFyersConnected: isMasterNode ? masterConnected : (isFyersConnected || recentTick),
-        hasAccessToken: (!!activeAccessToken && !isTokenExpiredError),
+        isFyersConnected: isMasterNode ? (isFyersConnected && hasValidToken) : (isFyersConnected || recentTick),
+        hasAccessToken: hasValidToken,
         tokenExpired: !!isTokenExpiredError,
+        tokenExpiryDate,
         wsInstanceExists: !!wsInstance,
         lastDataSocketError: lastDataSocketError,
         subscriptions: Array.from(clientSubscriptions),
@@ -1029,6 +1089,7 @@ module.exports = {
     addSubscriptionBatch,
     handlePingSubscriptions,
     getFyersStatus,
+    isAnyTradingSessionOpen,
     toFyersSymbol,
     fromFyersSymbol
 };

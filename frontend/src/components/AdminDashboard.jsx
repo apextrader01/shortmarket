@@ -1353,6 +1353,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchFyersCredentials();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fyers_success') === 'true') {
+      alert('🎉 Fyers Data Feed Connected Successfully!');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (typeof fetchFyersStatus === 'function') fetchFyersStatus();
+    } else if (params.get('fyers_error')) {
+      alert(`❌ Fyers Connection Failed: ${decodeURIComponent(params.get('fyers_error'))}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
   const handleSaveAndAutoLogin = async (e) => {
@@ -2309,7 +2318,7 @@ export default function AdminDashboard() {
             ) : (fyersStatus?.hasAccessToken && !fyersStatus?.tokenExpired) ? (
               <span>🟡 Waiting Ticks</span>
             ) : (
-              <span>🔴 Token Expired</span>
+              <span style={{ color: '#ef4444', fontWeight: 'bold' }}>🔴 Token Expired</span>
             )}
           </div>
         </div>
@@ -2386,8 +2395,29 @@ export default function AdminDashboard() {
                 alert('Error connecting Fyers');
               }
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-color)', fontSize: '11px', padding: '4px 9px', height: '28px' }}
-            title="Manual OAuth Web Login"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: (fyersStatus?.tokenExpired || !fyersStatus?.hasAccessToken)
+                ? 'linear-gradient(135deg, #16a34a, #15803d)'
+                : 'rgba(255,255,255,0.08)',
+              color: '#fff',
+              border: (fyersStatus?.tokenExpired || !fyersStatus?.hasAccessToken)
+                ? '1px solid #22c55e'
+                : '1px solid var(--border-color)',
+              boxShadow: (fyersStatus?.tokenExpired || !fyersStatus?.hasAccessToken)
+                ? '0 0 10px rgba(34, 197, 94, 0.4)'
+                : 'none',
+              fontSize: '11px',
+              padding: '4px 9px',
+              height: '28px',
+              fontWeight: (fyersStatus?.tokenExpired || !fyersStatus?.hasAccessToken) ? '700' : '500',
+              cursor: 'pointer'
+            }}
+            title={fyersStatus?.tokenExpired || !fyersStatus?.hasAccessToken
+              ? "Token is expired! Click here to log into Fyers immediately"
+              : "Manual OAuth Web Login"}
           >
             Connect Web
           </button>

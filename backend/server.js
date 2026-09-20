@@ -5860,12 +5860,16 @@ app.post('/api/ltp-batch', async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid symbols array' });
     }
     
-    const { fetchBatchLTPs, registerTokens } = require('./services/fyers');
+    const { fetchBatchLTPs, registerTokens, isAnyTradingSessionOpen } = require('./services/fyers');
     if (registerTokens) registerTokens(symbols);
     
     const result = {};
     const missingSymbols = [];
     const now = Date.now();
+    const marketOpen = typeof isAnyTradingSessionOpen === 'function' ? isAnyTradingSessionOpen() : true;
+    // When market is closed (weekends, nights), prices don't change every 15 seconds.
+    // Allow cached closing prices to stay valid up to 72 hours so users don't see '-' or empty prices.
+    const maxCacheAge = marketOpen ? 15000 : 72 * 60 * 60 * 1000;
     
     // 1. Serve everything we already have in the live priceCache instantly (unless force=true)
     for (const item of symbols) {
@@ -5874,7 +5878,7 @@ app.post('/api/ltp-batch', async (req, res) => {
       
       const rawSym = sym.includes(':') ? sym.split(':')[1] : null;
       const cached = priceCache[sym] || (rawSym ? priceCache[rawSym] : null) || priceCache[`NSE:${sym}`] || priceCache[`BSE:${sym}`] || priceCache[`MCX:${sym}`];
-      const isStale = cached && cached.timestamp ? (now - cached.timestamp > 15000) : false;
+      const isStale = cached && cached.timestamp ? (now - cached.timestamp > maxCacheAge) : false;
       
       if (!force && cached && cached.ltp > 0 && !isStale) {
         result[sym] = cached;
@@ -5918,7 +5922,20 @@ app.post('/api/ltp-batch', async (req, res) => {
       // All concurrent requests for this same symbol set await the SAME promise
       const data = await fetchPromise;
       for (const [sym, ltpData] of Object.entries(data)) {
-        result[sym] = ltpData;
+        if (ltpData && ltpData.ltp > 0) {
+          result[sym] = ltpData;
+        }
+      }
+
+      // 3. Fallback: If Fyers didn't return a price (e.g. rate limit, expired token, or off-hours),
+      // preserve whatever valid price was already cached in priceCache so the UI doesn't drop to '-'
+      for (const sym of missingSymbols) {
+        if (!result[sym]) {
+          const fallback = getPriceDataFromCache(sym);
+          if (fallback && fallback.ltp > 0) {
+            result[sym] = fallback;
+          }
+        }
       }
     }
     
@@ -8115,19 +8132,19 @@ app.get('/api/fyers/status', (req, res) => {
 app.get('/api/fyers/callback', async (req, res) => {
   const { auth_code } = req.query;
   if (!auth_code) {
-    return res.redirect('/?fyers_error=no_auth_code');
+    return res.redirect('/adminpanel?fyers_error=no_auth_code');
   }
   try {
     const { verifyFyersAuth } = require('./services/fyers');
     const result = await verifyFyersAuth(auth_code);
     if (result.success) {
-      res.redirect('/?fyers_success=true');
+      res.redirect('/adminpanel?fyers_success=true');
     } else {
-      res.redirect('/?fyers_error=' + encodeURIComponent(result.error));
+      res.redirect('/adminpanel?fyers_error=' + encodeURIComponent(result.error));
     }
   } catch (err) {
     console.error(err);
-    res.redirect('/?fyers_error=server_error');
+    res.redirect('/adminpanel?fyers_error=server_error');
   }
 });
 
