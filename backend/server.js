@@ -3673,6 +3673,7 @@ app.post('/api/position/convert', authenticateToken, async (req, res) => {
             });
           }
         }
+      }
     });
 
     const triggerEngine = require('./services/triggerEngine');
