@@ -942,7 +942,10 @@ export const useStore = create(persist((set, get) => ({
     window._activeFetchUserDataPromise = (async () => {
       try {
         syncClientTelemetry(API).catch(() => {});
-        const headers = {  };
+        const token = localStorage.getItem('token') || get().token;
+        const headers = {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
 
         let positions, orders, user, holdData, sipsList;
         let authFailed = false;

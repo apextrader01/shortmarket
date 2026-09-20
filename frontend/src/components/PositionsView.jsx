@@ -29,6 +29,7 @@ export default function PositionsView() {
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
+    useStore.getState().fetchUserData?.();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
