@@ -395,17 +395,19 @@ export default function PositionsView() {
       }
 
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
+      const liveLtp = prices[pos.symbol]?.ltp || 0;
+      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type || 'DEL');
       const payload = {
         symbol: pos.symbol,
         type: 'MARKET',
         side: exitSide,
         quantity: Math.abs(Number(pos.unencumberedQty)),
-        price: 0,
+        price: liveLtp,
         sl_price: null,
         tgt_price: null,
         margin: 0,
         lotsize: pos.lotSize || 1,
-        product_type: pos.product_type || 'DEL'
+        product_type: effectiveProductType
       };
       const res = await store.placeOrder(payload);
       if (res && res.success) {
@@ -1319,7 +1321,7 @@ export default function PositionsView() {
                     side: exitSide,
                     quantity: qtyToExit,
                     lotsize: ls,
-                    price: partialExitType === 'MARKET' ? 0 : parseFloat(partialExitPrice),
+                    price: partialExitType === 'MARKET' ? (prices[partialExitPos.symbol]?.ltp || 0) : parseFloat(partialExitPrice),
                     sl_price: null,
                     tgt_price: null,
                     margin: 0,

@@ -195,8 +195,8 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         sebiCharge = turnover * 0.000001; // ₹10 per crore
     }
 
-    // 5. Stamp Duty - Charged ONLY on Buy
-    if (side === 'BUY') {
+    // 5. Stamp Duty - Charged ONLY on Buy (Exempt on option expiry exercises)
+    if (side === 'BUY' && !isExercise) {
         if (isEquity && (productType === 'DEL' || productType === 'CNC' || productType === 'DELIVERY')) {
             stampDuty = turnover * 0.00015;
         } else if (isEquity && ['INT', 'INTRADAY', 'BO', 'CO', 'MIS'].includes(productType)) {

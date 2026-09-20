@@ -566,6 +566,10 @@ export default function OrderModal() {
       alert("Please enter a valid limit price greater than 0.");
       return;
     }
+    if (orderType === 'MARKET' && (!livePrice || livePrice <= 0) && !isAmo) {
+      alert("Market feed is connecting. Please wait a moment or place a Limit order.");
+      return;
+    }
 
     // Validate Bracket Order (BO) and Cover Order (CO) formats
     if (isBO || isCO) {

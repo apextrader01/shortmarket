@@ -673,6 +673,10 @@ export default function BasketModal() {
         alert(`Please enter a valid limit price greater than 0 for ${item.symbol}.`);
         return;
       }
+      if (item.orderType === 'MARKET' && (!item.livePrice || item.livePrice <= 0)) {
+        alert(`Live price feed is connecting for ${item.symbol}. Please wait a moment or specify a Limit price.`);
+        return;
+      }
     }
 
     if (isMarketBlocked) {

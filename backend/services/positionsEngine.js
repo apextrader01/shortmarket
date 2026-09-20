@@ -121,9 +121,9 @@ class PositionsEngine {
             }
 
             console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
-            // Step A: Cancel PENDING entry orders for INT/BO/CO
+            // Step A: Cancel PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for INT/BO/CO
             const pendingEntryOrders = await db('orders')
-                .where('status', 'PENDING')
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
                 .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
             for (const order of pendingEntryOrders) {
@@ -131,15 +131,23 @@ class PositionsEngine {
                 if ((market === 'EQUITY' && !isCommodity) || (market === 'COMMODITY' && isCommodity)) {
                     await db.transaction(async (trx) => {
                         const updated = await trx('orders')
-                            .where({ id: order.id, status: 'PENDING' })
+                            .where({ id: order.id })
+                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
-                            if (parseFloat(order.margin) > 0) {
-                                await LedgerService.releaseMargin(trx, order.user_id, order.margin, `EOD sweep: margin refunded for ${order.symbol}`);
+                            const refundMargin = (order.pending_quantity && order.quantity)
+                                ? Math.round((Number(order.margin || 0) * (Number(order.pending_quantity) / Number(order.quantity)) + Number.EPSILON) * 100) / 100
+                                : Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
+                            if (refundMargin > 0) {
+                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD sweep: margin refunded for ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
-                            console.log(`[EOD SWEEP] Cancelled PENDING Entry ${order.id} (${order.symbol})`);
+                            try {
+                                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                                volumeMatchingEngine.dequeueOrder(order.id, order.symbol);
+                            } catch (e) {}
+                            console.log(`[EOD SWEEP] Cancelled Entry ${order.id} (${order.symbol})`);
                         }
                     });
                 }
@@ -159,10 +167,15 @@ class PositionsEngine {
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
-                            if (parseFloat(order.margin) > 0) {
-                                await LedgerService.releaseMargin(trx, order.user_id, order.margin, `EOD sweep: margin refunded for ${order.symbol}`);
+                            const refundMargin = Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
+                            if (refundMargin > 0) {
+                                await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD sweep: margin refunded for ${order.symbol}`);
                             }
                             triggerEngine.removeOrderFromMemory(order.id, order.symbol);
+                            try {
+                                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                                volumeMatchingEngine.dequeueOrder(order.id, order.symbol);
+                            } catch (e) {}
                             console.log(`[EOD SWEEP] Cancelled PENDING_TRIGGER Leg ${order.id} (${order.symbol})`);
                         }
                     });
@@ -338,7 +351,7 @@ class PositionsEngine {
             // Find all active assets in Holdings, Positions, or Orders to evaluate for expiry settlement
             let posQuery = db('positions').whereNot({ quantity: 0 });
             let holdQuery = db('holdings').whereNot({ quantity: 0 });
-            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
             
             if (isCommodity) {
                 posQuery = posQuery.where('symbol', 'like', '%MCX%');
@@ -379,15 +392,19 @@ class PositionsEngine {
             // Globally cancel all open orders for expiring contracts
             for (const stale of expiringOrders) {
                 await db.transaction(async (trx) => {
-                    if (stale.margin > 0) {
-                        const user = await trx('users').where({ id: stale.user_id }).first();
+                    const refundMargin = (stale.pending_quantity && stale.quantity)
+                        ? Math.round((Number(stale.margin || 0) * (Number(stale.pending_quantity) / Number(stale.quantity)) + Number.EPSILON) * 100) / 100
+                        : Math.round((Number(stale.margin || 0) + Number.EPSILON) * 100) / 100;
+
+                    if (refundMargin > 0) {
+                        const user = await trx('users').where({ id: stale.user_id }).forUpdate().first();
                         if (user) {
                             await trx('users').where({ id: stale.user_id }).update({
-                                balance: Number(user.balance) + Number(stale.margin)
+                                balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100
                             });
                             await trx('ledger').insert({
                                 user_id: stale.user_id,
-                                amount: Number(stale.margin),
+                                amount: refundMargin,
                                 type: 'MARGIN_RELEASE',
                                 description: `Margin refunded: expiry settlement cancelled open order for ${stale.symbol}`
                             });
@@ -395,6 +412,10 @@ class PositionsEngine {
                     }
                     await trx('orders').where({ id: stale.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                     triggerEngine.removeOrderFromMemory(stale.id, stale.symbol);
+                    try {
+                        const volumeMatchingEngine = require('./volumeMatchingEngine');
+                        volumeMatchingEngine.dequeueOrder(stale.id, stale.symbol);
+                    } catch (e) {}
                     console.log(`[EXPIRY SETTLE] Cancelled pending order ${stale.id} globally for expiring ${stale.symbol}`);
                 });
             }

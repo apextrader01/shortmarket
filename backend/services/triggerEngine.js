@@ -391,6 +391,7 @@ class TriggerEngine {
             // 2. Position Logic
             const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
             const isDeliveryProduct = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+            const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
 
             const existingPos = await trx('positions')
                 .where({ user_id: order.user_id })
@@ -439,8 +440,8 @@ class TriggerEngine {
                         }
                         
                         // Create a CLOSED position record for today
-                        const realizedPnl = (execPrice - hAvg) * offsetQty;
-                        const principalAmount = hAvg * offsetQty;
+                        const realizedPnl = Math.round(((execPrice - hAvg) * offsetQty + Number.EPSILON) * 100) / 100;
+                        const principalAmount = Math.round(((hAvg * offsetQty) + Number.EPSILON) * 100) / 100;
                         await trx('positions').insert({
                             user_id: order.user_id,
                             symbol: order.symbol,
@@ -450,13 +451,17 @@ class TriggerEngine {
                             exit_price: execPrice,
                             realized_pnl: realizedPnl,
                             product_type: order.product_type || 'DEL',
+                            created_at: new Date(),
                             updated_at: new Date()
                         });
                         
                         // Update Balance and Ledger with Principal, Realized P&L and RMS Penalty
                         const rmsPenalty = order.is_rms ? 59 : 0;
-                        const user = await trx('users').where({ id: order.user_id }).first();
-                        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + principalAmount + realizedPnl - rmsPenalty });
+                        const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                        if (user) {
+                            const updatedBalance = Math.round((Number(user.balance) + principalAmount + realizedPnl - rmsPenalty + Number.EPSILON) * 100) / 100;
+                            await trx('users').where({ id: order.user_id }).update({ balance: updatedBalance });
+                        }
                         
                         await trx('ledger').insert({
                             user_id: order.user_id, amount: principalAmount, type: 'MARGIN_RELEASE', description: `Holding principal value released for ${offsetQty} ${order.symbol}`
@@ -520,7 +525,7 @@ class TriggerEngine {
                     await trx('positions').insert({
                         user_id: order.user_id, symbol: order.symbol, quantity: remainingQty,
                         average_price: execPrice, product_type: order.product_type,
-                        margin: finalMargin, updated_at: new Date()
+                        margin: finalMargin, created_at: new Date(), updated_at: new Date()
                     });
                 }
             };
@@ -670,8 +675,10 @@ class TriggerEngine {
                         await trx('ledger').insert({ user_id: order.user_id, amount: -rmsPenalty, type: 'RMS_PENALTY', description: `RMS Penalty for ${order.symbol}` });
                     }
                     
-                    const user = await trx('users').where({ id: order.user_id }).first();
-                    await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + balanceChange + Number.EPSILON) * 100) / 100 });
+                    const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                    if (user) {
+                        await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + balanceChange + Number.EPSILON) * 100) / 100 });
+                    }
 
                     // If order quantity exceeds existing position (Reverse Position)
                     if (absQty > absPosQty) {
@@ -680,14 +687,14 @@ class TriggerEngine {
                         // Check if reversing with delivery sell shares from existing holdings
                         let isHoldingSell = false;
                         if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
-                            const cleanSym = order.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
                             const holding = await trx('holdings')
                                 .where({ user_id: order.user_id })
                                 .where(builder => {
                                     builder.where({ symbol: order.symbol })
                                            .orWhere({ symbol: cleanSym })
                                            .orWhere({ symbol: `NSE:${cleanSym}` })
-                                           .orWhere({ symbol: `BSE:${cleanSym}` });
+                                           .orWhere({ symbol: `BSE:${cleanSym}` })
+                                           .orWhere({ symbol: `MCX:${cleanSym}` });
                                 })
                                 .first();
                             if (holding && Number(holding.quantity) >= Math.abs(remainingQty)) {
@@ -703,10 +710,14 @@ class TriggerEngine {
 
                             // Balance margin difference: blocked on order vs required on new position
                             const orderMarginBlocked = Number(order.margin || 0);
-                            const marginDelta = newPosMargin - orderMarginBlocked;
+                            const marginDelta = Math.round((newPosMargin - orderMarginBlocked + Number.EPSILON) * 100) / 100;
                             if (marginDelta > 0) {
                                 // More margin required than was blocked on order
-                                await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                                const u = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                                if (u) {
+                                    const newBal = Math.round((Number(u.balance) - marginDelta + Number.EPSILON) * 100) / 100;
+                                    await trx('users').where({ id: order.user_id }).update({ balance: newBal });
+                                }
                                 await trx('ledger').insert({
                                     user_id: order.user_id,
                                     amount: -marginDelta,
@@ -715,8 +726,12 @@ class TriggerEngine {
                                 });
                             } else if (marginDelta < 0) {
                                 // Excess margin was blocked on order, refund the difference
-                                const excessRefund = Math.abs(marginDelta);
-                                await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                                const excessRefund = Math.round((Math.abs(marginDelta) + Number.EPSILON) * 100) / 100;
+                                const u = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                                if (u) {
+                                    const newBal = Math.round((Number(u.balance) + excessRefund + Number.EPSILON) * 100) / 100;
+                                    await trx('users').where({ id: order.user_id }).update({ balance: newBal });
+                                }
                                 await trx('ledger').insert({
                                     user_id: order.user_id,
                                     amount: excessRefund,
@@ -728,7 +743,11 @@ class TriggerEngine {
                             // If order had blocked any margin, refund it since it's backed by holdings
                             const orderMarginBlocked = Number(order.margin || 0);
                             if (orderMarginBlocked > 0) {
-                                await trx('users').where({ id: order.user_id }).increment('balance', orderMarginBlocked);
+                                const u = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                                if (u) {
+                                    const newBal = Math.round((Number(u.balance) + orderMarginBlocked + Number.EPSILON) * 100) / 100;
+                                    await trx('users').where({ id: order.user_id }).update({ balance: newBal });
+                                }
                                 await trx('ledger').insert({
                                     user_id: order.user_id,
                                     amount: orderMarginBlocked,
@@ -745,7 +764,7 @@ class TriggerEngine {
                     const currentTotal = Math.abs(existingPos.quantity) * Math.abs(Number(existingPos.average_price));
                     const newTotal = Math.abs(Number(order.quantity)) * execPrice;
                     const newQty = roundQty(existingPos.quantity + qtyChange);
-                    const newAvgPrice = Math.abs((currentTotal + newTotal) / Math.abs(newQty));
+                    const newAvgPrice = Math.round((Math.abs((currentTotal + newTotal) / Math.abs(newQty)) + Number.EPSILON) * 100) / 100;
                     
                     await trx('positions').where({ id: existingPos.id }).update({
                         quantity: newQty,

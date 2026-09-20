@@ -2303,7 +2303,7 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: targetUserId })
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
 
       // 1. Nullify self-referencing FK links to prevent FK constraint crashes
       await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
@@ -2329,13 +2329,21 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
     });
 
     const triggerEngine = require('./services/triggerEngine');
+    const volumeMatchingEngine = require('./services/volumeMatchingEngine');
     for (const ord of pendingOrders) {
       triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+      try {
+        volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+      } catch (e) {}
     }
     try {
       const { pubClient } = require('./services/redisClient');
       if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
     } catch(e) {}
+
+    if (triggerEngine && triggerEngine.io) {
+      triggerEngine.io.to(targetUserId.toString()).emit('sync_user_data');
+    }
 
     res.json({ success: true, message: 'User account reset to ₹10,00,000.' });
   } catch (err) {
@@ -2362,7 +2370,17 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete an administrator account.' });
     }
 
+    let ordersToClean = [];
     await db.transaction(async (trx) => {
+      // Serialize delete per-user
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [targetUserId]);
+
+      ordersToClean = await trx('orders')
+        .where({ user_id: targetUserId })
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+
+      // 1. Nullify self-referencing foreign keys first to prevent constraint violations
+      await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
       await trx('orders').where({ user_id: targetUserId }).del();
       await trx('positions').where({ user_id: targetUserId }).del();
       await trx('ledger').where({ user_id: targetUserId }).del();
@@ -2372,6 +2390,15 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
       await trx('user_sessions').where({ user_id: targetUserId }).del();
       await trx('users').where({ id: targetUserId }).del();
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+    for (const ord of ordersToClean) {
+      triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+      try {
+        volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+      } catch (e) {}
+    }
 
     res.json({ success: true, message: 'User account permanently deleted.' });
   } catch (err) {
@@ -2402,7 +2429,7 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
     if (!caller || !caller.is_admin) return res.status(403).json({ error: 'Unauthorized' });
 
     const { balance } = req.body;
-    const newBal = Number(balance);
+    const newBal = Math.round((Number(balance) + Number.EPSILON) * 100) / 100;
     if (balance === undefined || isNaN(newBal) || newBal < 0) {
       return res.status(400).json({ error: 'Valid non-negative balance required' });
     }
@@ -2413,13 +2440,13 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
       // Serialize balance adjustments per-user
       await trx.raw('SELECT pg_advisory_xact_lock(?)', [targetUserId]);
 
-      const targetUser = await trx('users').where({ id: targetUserId }).first();
+      const targetUser = await trx('users').where({ id: targetUserId }).forUpdate().first();
       if (!targetUser) {
         throw Object.assign(new Error('User not found'), { statusCode: 404 });
       }
 
       const prevBal = Number(targetUser.balance) || 0;
-      const delta = parseFloat((newBal - prevBal).toFixed(2));
+      const delta = Math.round((newBal - prevBal + Number.EPSILON) * 100) / 100;
 
       await trx('users').where({ id: targetUserId }).update({ balance: newBal });
 
@@ -2433,6 +2460,11 @@ app.post('/api/admin/user/:id/balance', authenticateToken, async (req, res) => {
       }
       updatedBal = newBal;
     });
+
+    const triggerEngine = require('./services/triggerEngine');
+    if (triggerEngine && triggerEngine.io) {
+      triggerEngine.io.to(targetUserId.toString()).emit('sync_user_data');
+    }
 
     res.json({ success: true, balance: updatedBal });
   } catch (err) {
@@ -3169,7 +3201,7 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: req.user.id })
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
 
       // 1. Nullify self-referencing FK links first so the batch delete doesn't
       //    trip the orders.linked_order_id / parent_order_id constraints.
@@ -3202,13 +3234,21 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
     });
 
     const triggerEngine = require('./services/triggerEngine');
+    const volumeMatchingEngine = require('./services/volumeMatchingEngine');
     for (const ord of pendingOrders) {
       triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+      try {
+        volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+      } catch (e) {}
     }
     try {
       const { pubClient } = require('./services/redisClient');
       if (pubClient) pubClient.publish('reload_triggers', '1').catch(() => {});
     } catch(e) {}
+
+    if (triggerEngine && triggerEngine.io) {
+      triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+    }
     res.json({ 
       success: true, 
       balance: newBalance,
@@ -5924,11 +5964,8 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
           updated_at: new Date()
         });
 
-        // 2. Reduce holding to 0
-        await trx('holdings').where({ id: holding.id }).update({
-          quantity: 0,
-          updated_at: new Date()
-        });
+        // 2. Remove exited holding
+        await trx('holdings').where({ id: holding.id }).del();
 
         // 3. Credit gross proceeds to user balance (taxes were debited in chargeExecutionTaxes)
         await trx('users').where({ id: req.user.id }).increment('balance', totalValue);
@@ -6074,8 +6111,12 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
         triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
       }
       if (req.holdingSellOrdersToClean) {
+        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
         for (const ord of req.holdingSellOrdersToClean) {
           triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+          try {
+            volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+          } catch (e) {}
         }
       }
     }
@@ -6481,7 +6522,9 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
             slice_group_id: sliceGroupId,
             slice_index: isSliced ? sIdx + 1 : null,
             slice_total: isSliced ? slices.length : null,
-            trail_amount: trail_amount ? parseFloat(trail_amount) : null
+            trail_amount: trail_amount ? parseFloat(trail_amount) : null,
+            created_at: new Date(),
+            updated_at: new Date()
           }).returning('id');
 
           const orderIdVal = typeof orderId === 'object' ? orderId.id : orderId;
@@ -6571,6 +6614,10 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
             }
         } catch(e) {}
     }, 300);
+
+    if (triggerEngine && triggerEngine.io && req.user && req.user.id) {
+      triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+    }
 
     const hasErrors = finalResponseOrders.some(o => o.error);
     res.json({ success: !hasErrors, orders: finalResponseOrders });
@@ -6755,6 +6802,10 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
     } catch(e) {}
     for (const sib of siblingsToClean) {
       triggerEngine.removeOrderFromMemory(sib.id, sib.symbol);
+      try {
+        const volumeMatchingEngine = require('./services/volumeMatchingEngine');
+        volumeMatchingEngine.dequeueOrder(sib.id, sib.symbol);
+      } catch(e) {}
     }
 
     if (autoExitOrderToExecute) {
@@ -7141,6 +7192,10 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                 pubClient.publish('reload_volume_orders', '1').catch(e=>{});
             }
         } catch(e) {}
+        
+        if (triggerEngine && triggerEngine.io && req.user && req.user.id) {
+            triggerEngine.io.to(req.user.id.toString()).emit('sync_user_data');
+        }
         
         res.json({ success: true });
 
@@ -7920,11 +7975,13 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
 
       // If rejecting a trading wallet withdrawal, refund the balance back to user
       if (status === 'REJECTED') {
-        const isTradingWallet = withdrawal.remarks && withdrawal.remarks.includes('Trading Wallet');
+        const isTradingWallet = (withdrawal.remarks && withdrawal.remarks.includes('Trading Wallet')) || 
+                                withdrawal.account_type === 'TRADING_WALLET' ||
+                                (withdrawal.description && withdrawal.description.includes('Trading Wallet'));
         if (isTradingWallet) {
           const refundUser = await trx('users').where({ id: withdrawal.user_id }).forUpdate().first();
           if (refundUser) {
-            const refundedBalance = Math.round((parseFloat(refundUser.balance) + parseFloat(withdrawal.amount)) * 100) / 100;
+            const refundedBalance = Math.round((parseFloat(refundUser.balance) + parseFloat(withdrawal.amount) + Number.EPSILON) * 100) / 100;
             await trx('users').where({ id: withdrawal.user_id }).update({ balance: refundedBalance });
             await trx('ledger').insert({
               user_id: withdrawal.user_id,
@@ -7938,8 +7995,8 @@ app.post('/api/admin/withdrawals/:id/process', authenticateToken, async (req, re
 
       await trx('reward_withdrawals').where({ id: req.params.id }).update({
         status,
-        admin_notes: remarks || null,
-        remarks: remarks || withdrawal.remarks,
+        admin_notes: remarks || withdrawal.admin_notes || null,
+        remarks: withdrawal.remarks, // Preserve original withdrawal remarks
         utr: utr || null,
         updated_at: new Date()
       });

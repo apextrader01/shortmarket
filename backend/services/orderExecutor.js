@@ -80,7 +80,9 @@ async function spawnBracketOrders(trx, order, childQty) {
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,
-      margin: 0
+      margin: 0,
+      created_at: new Date(),
+      updated_at: new Date()
     };
     const [slId] = await trx('orders').insert(slOrder).returning('id');
     slOrder.id = typeof slId === 'object' ? slId.id : slId;
@@ -103,7 +105,9 @@ async function spawnBracketOrders(trx, order, childQty) {
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,
-      margin: 0
+      margin: 0,
+      created_at: new Date(),
+      updated_at: new Date()
     };
     const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
     tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;

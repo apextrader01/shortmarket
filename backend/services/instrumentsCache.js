@@ -84,7 +84,7 @@ function getLotSizes(symbols) {
     symbols.forEach(sym => {
         if (!sym) return;
         const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '');
-        result[sym] = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
+        result[sym] = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
     });
     return result;
 }

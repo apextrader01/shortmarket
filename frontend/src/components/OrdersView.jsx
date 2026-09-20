@@ -61,9 +61,15 @@ export default function OrdersView() {
 
   const isToday = (dateString) => {
      if (!dateString) return false;
-     const d = new Date(dateString);
-     const today = new Date();
-     return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+     try {
+       const d = new Date(dateString);
+       const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+       return formatter.format(d) === formatter.format(new Date());
+     } catch (e) {
+       const d = new Date(dateString);
+       const today = new Date();
+       return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+     }
   };
 
   // Filter orders based on active tab

@@ -32,15 +32,22 @@ export const isToday = (dateString) => {
  * with synthesized closed orders not already recorded in database closed positions.
  */
 export const getTodayClosedPositions = (positions = [], orders = []) => {
+  const normalizeProd = (p) => {
+    const u = String(p || '').toUpperCase();
+    if (['DEL', 'CNC', 'DELIVERY'].includes(u)) return 'DEL';
+    if (['INT', 'MIS', 'BO', 'CO', 'INTRADAY'].includes(u)) return 'INT';
+    return u || 'INT';
+  };
+
   // 1. Include explicit closed positions updated/closed today from database
   const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
-  const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`));
+  const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${normalizeProd(p.product_type)}`));
   
   // Track all actively OPEN position keys so open positions are NEVER duplicated into closed
   const openPositionsKeys = new Set(
     (positions || [])
       .filter(p => Number(p.quantity) !== 0)
-      .map(p => `${normalizeSym(p.symbol)}-${p.product_type || 'INT'}`)
+      .map(p => `${normalizeSym(p.symbol)}-${normalizeProd(p.product_type)}`)
   );
 
   // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed AND NOT currently open
@@ -52,7 +59,8 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
       || (o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0)
       || (o.closed_quantity && Number(o.closed_quantity) > 0);
     const normSym = normalizeSym(o.symbol);
-    const key = `${normSym}-${o.product_type || 'INT'}`;
+    const prod = normalizeProd(o.product_type);
+    const key = `${normSym}-${prod}`;
 
     if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
       const orderQty = Math.abs(Number(o.quantity || 1));

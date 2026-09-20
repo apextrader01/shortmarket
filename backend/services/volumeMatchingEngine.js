@@ -170,6 +170,9 @@ class VolumeMatchingEngine {
     const ordObj = this.activeOrders.get(order.id.toString());
     if (!ordObj) return;
 
+    // Ensure valid live price before checking marketability or execution
+    if (!baseLtp || baseLtp <= 0) return;
+
     // Check if limit order is currently unmarketable
     if (ordObj.type === 'LIMIT' && ordObj.price) {
       const limitPrice = Number(ordObj.price);
@@ -690,6 +693,7 @@ class VolumeMatchingEngine {
                 average_price: slicePrice,
                 product_type: existingPos.product_type || order.product_type || 'INT',
                 margin: revMargin,
+                created_at: new Date(),
                 updated_at: new Date()
               });
             }
@@ -711,11 +715,13 @@ class VolumeMatchingEngine {
           }
 
           // Balance & Ledger updates
-          const user = await trx('users').where({ id: order.user_id }).first();
+          const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
           const netCredit = marginRefund + realizedPnl;
-          await trx('users').where({ id: order.user_id }).update({
-            balance: Math.round((Number(user.balance) + netCredit) * 100) / 100
-          });
+          if (user) {
+            await trx('users').where({ id: order.user_id }).update({
+              balance: Math.round((Number(user.balance) + netCredit + Number.EPSILON) * 100) / 100
+            });
+          }
 
           if (marginRefund > 0) {
             await trx('ledger').insert({
@@ -743,7 +749,7 @@ class VolumeMatchingEngine {
                 .orWhere({ symbol: cleanSym })
                 .orWhere({ symbol: `NSE:${cleanSym}` })
                 .orWhere({ symbol: `BSE:${cleanSym}` })
-                .orWhere({ symbol: `BSE:${cleanSym}` });
+                .orWhere({ symbol: `MCX:${cleanSym}` });
             })
             .first();
 
@@ -795,6 +801,7 @@ class VolumeMatchingEngine {
                 exit_price: slicePrice,
                 realized_pnl: realizedPnl,
                 product_type: order.product_type || 'DEL',
+                created_at: new Date(),
                 updated_at: new Date()
               });
             }
@@ -807,10 +814,12 @@ class VolumeMatchingEngine {
             }
 
             // Credit net sale proceeds to user balance
-            const user = await trx('users').where({ id: order.user_id }).first();
-            await trx('users').where({ id: order.user_id }).update({
-              balance: Math.round((Number(user.balance) + grossProceeds) * 100) / 100
-            });
+            const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+            if (user) {
+              await trx('users').where({ id: order.user_id }).update({
+                balance: Math.round((Number(user.balance) + grossProceeds + Number.EPSILON) * 100) / 100
+              });
+            }
 
             await trx('ledger').insert({
               user_id: order.user_id,
@@ -832,6 +841,7 @@ class VolumeMatchingEngine {
               average_price: slicePrice,
               product_type: order.product_type || 'INT',
               margin: sliceMargin,
+              created_at: new Date(),
               updated_at: new Date()
             });
           }
@@ -859,6 +869,7 @@ class VolumeMatchingEngine {
               average_price: slicePrice,
               product_type: order.product_type || 'INT',
               margin: sliceMargin,
+              created_at: new Date(),
               updated_at: new Date()
             });
           }
@@ -942,7 +953,9 @@ class VolumeMatchingEngine {
             taxes: accumulatedTaxes,
             status: newStatus
           });
-          this.io.emit('sync_user_data', { userId: order.user_id });
+          if (order.user_id) {
+            this.io.to(order.user_id.toString()).emit('sync_user_data', { userId: order.user_id });
+          }
         }
       });
     } catch (err) {
@@ -1079,13 +1092,14 @@ class VolumeMatchingEngine {
             continue;
           }
 
-          const volDelta = currentVol - prevVol;
+          let volDelta = currentVol - prevVol;
           if (volDelta <= 0) continue; // No new real exchange volume — do NOT fill
 
           // Update shared tracker so onTick doesn't double-count this volume
           this.lastSymbolVolume.set(normSym, currentVol);
 
           for (const order of [...queue]) {
+            if (volDelta <= 0) break;
             if (!order || order.pending_quantity <= 0) continue;
 
             // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume via onTick
@@ -1117,6 +1131,7 @@ class VolumeMatchingEngine {
 
               if (slice > 0) {
                 await this.processSliceFill(order, slice, ltp);
+                volDelta -= slice;
                 if (order.pending_quantity <= 0) {
                   this.dequeueOrder(order.id, order.symbol);
                 }

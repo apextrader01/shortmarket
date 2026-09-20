@@ -225,9 +225,10 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
             }
         }
 
-        // Also cancel any remaining PENDING entry orders for this user+symbol (only intraday types)
+        // Also cancel any remaining PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for this user+symbol (only intraday types)
         const pendingOrders = await trx('orders')
-            .where({ user_id: pos.user_id, status: 'PENDING' })
+            .where({ user_id: pos.user_id })
+            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
             .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
             .where(builder => {
                 builder.where({ symbol: pos.symbol })
@@ -238,11 +239,15 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
             });
         for (const o of pendingOrders) {
             const updated = await trx('orders')
-                .where({ id: o.id, status: 'PENDING' })
+                .where({ id: o.id })
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
                 .update({ status: 'CANCELLED', updated_at: new Date() });
             if (updated > 0) {
-                if (parseFloat(o.margin) > 0) {
-                    await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Square-Off Cancelled: ${o.symbol}`);
+                const refundMargin = (o.pending_quantity && o.quantity)
+                    ? Math.round((Number(o.margin || 0) * (Number(o.pending_quantity) / Number(o.quantity)) + Number.EPSILON) * 100) / 100
+                    : Math.round((Number(o.margin || 0) + Number.EPSILON) * 100) / 100;
+                if (refundMargin > 0) {
+                    await LedgerService.releaseMargin(trx, pos.user_id, refundMargin, `Square-Off Cancelled: ${o.symbol}`);
                 }
                 triggerEngine.removeOrderFromMemory(o.id, o.symbol);
                 const volumeMatchingEngine = require('./volumeMatchingEngine');

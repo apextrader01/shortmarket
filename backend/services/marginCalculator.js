@@ -111,16 +111,16 @@ function getFuturesMarginRate(symbol) {
   if (!symbol) return 0.185;
   const upper = String(symbol).toUpperCase().replace(/^(NSE:|BSE:|MCX:)/i, '');
 
-  for (const [key, rate] of Object.entries(dynamicMarginOverrides)) {
+  for (const [key, rate] of Object.entries(dynamicMarginOverrides).sort((a, b) => b[0].length - a[0].length)) {
     if (upper.startsWith(key.toUpperCase())) return Number(rate);
   }
-  for (const [key, rate] of Object.entries(COMMODITY_FUTURES_MARGIN_RATES)) {
+  for (const [key, rate] of Object.entries(COMMODITY_FUTURES_MARGIN_RATES).sort((a, b) => b[0].length - a[0].length)) {
     if (upper.startsWith(key)) return rate;
   }
-  for (const [key, rate] of Object.entries(INDEX_FUTURES_MARGIN_RATES)) {
+  for (const [key, rate] of Object.entries(INDEX_FUTURES_MARGIN_RATES).sort((a, b) => b[0].length - a[0].length)) {
     if (upper.startsWith(key)) return rate;
   }
-  for (const [key, rate] of Object.entries(STOCK_FUTURES_MARGIN_RATES)) {
+  for (const [key, rate] of Object.entries(STOCK_FUTURES_MARGIN_RATES).sort((a, b) => b[0].length - a[0].length)) {
     if (upper.startsWith(key)) return rate;
   }
   return 0.185;

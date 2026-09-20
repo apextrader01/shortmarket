@@ -668,7 +668,7 @@ async function garbageCollectSubscriptions() {
         };
         
         // 1. Protect Indices
-        ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'BSE:SENSEX-INDEX'].forEach(protectSymbol);
+        ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'NSE:FINNIFTY-INDEX', 'NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYNXT50-INDEX', 'BSE:SENSEX-INDEX', 'BSE:BANKEX-INDEX'].forEach(protectSymbol);
         
         // 2. Protect Pending Orders & Resting Volume Orders
         try {
