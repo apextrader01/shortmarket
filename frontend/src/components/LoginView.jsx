@@ -66,25 +66,41 @@ export default function LoginView() {
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [registeredPhone, setRegisteredPhone] = useState('');
 
+  const setupRecaptchaVerifier = () => {
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (_) {}
+      window.recaptchaVerifier = null;
+    }
+    const container = document.getElementById('recaptcha-container');
+    if (container) {
+      container.innerHTML = '';
+    }
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible'
+    });
+    return window.recaptchaVerifier;
+  };
+
   const triggerPhoneSms = async (targetPhone) => {
     try {
       setLoading(true);
       useStore.setState({ authError: null });
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch (_) {}
-        window.recaptchaVerifier = null;
-      }
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible'
-      });
+      const verifier = setupRecaptchaVerifier();
       const rawPhone = String(targetPhone || registeredPhone || '').trim();
       const cleanPhone = rawPhone.replace(/\D/g, '');
       const formattedPhone = rawPhone.startsWith('+') ? rawPhone : '+91' + cleanPhone;
-      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+      const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
       setConfirmationResult(confirmation);
       setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
     } catch (error) {
-      useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
+      console.error('Phone SMS Error:', error);
+      if (error?.code === 'auth/unauthorized-domain') {
+        useStore.setState({ authError: 'Domain unauthorized in Firebase. Please add www.skandx.in to Firebase Authorized Domains.' });
+      } else {
+        useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
+      }
     } finally {
       setLoading(false);
     }
@@ -140,21 +156,19 @@ export default function LoginView() {
 
         // Try sending phone SMS OTP:
         try {
-          if (window.recaptchaVerifier) {
-            try { window.recaptchaVerifier.clear(); } catch (_) {}
-            window.recaptchaVerifier = null;
-          }
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible'
-          });
+          const verifier = setupRecaptchaVerifier();
           const rawPhone = String(res.phone || '').trim();
           const formattedPhone = rawPhone.startsWith('+') ? rawPhone : '+91' + cleanPhone;
-          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+          const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
           setConfirmationResult(confirmation);
           setTwoFactorMethod('phone');
           setView('login_otp');
           setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
         } catch (error) {
+          console.error('Auto SMS error:', error);
+          if (error?.code === 'auth/unauthorized-domain') {
+            useStore.setState({ authError: 'Domain unauthorized in Firebase. Please add www.skandx.in to Firebase Authorized Domains.' });
+          }
           // If SMS gateway fails or rate limits, gracefully offer Email OTP or Google Authenticator
           setTwoFactorMethod('email');
           setView('login_otp');
@@ -209,19 +223,12 @@ export default function LoginView() {
     }
     else if (view === 'register') {
       try {
-        // Clear stale recaptcha verifier to avoid expired token errors
-        if (window.recaptchaVerifier) {
-          try { window.recaptchaVerifier.clear(); } catch (_) {}
-          window.recaptchaVerifier = null;
-        }
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible'
-        });
+        const verifier = setupRecaptchaVerifier();
         const cleanPhone = phone.replace(/\D/g, '');
         const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 
           ? '+' + cleanPhone 
           : '+91' + cleanPhone;
-        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
         setConfirmationResult(confirmation);
         setView('register_otp');
         setMessage('OTP sent to your phone.');
