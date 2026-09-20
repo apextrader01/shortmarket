@@ -2,11 +2,11 @@
 
 # Ensure script is run as root
 if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root (sudo bash setup-ssl.sh)"
+  echo "Please run as root: sudo bash setup-ssl.sh yourdomain.com"
   exit 1
 fi
 
-# Determine Domain: Uses $1 if provided (e.g. sudo bash setup-ssl.sh shortmarket.in), otherwise auto-detects VM IP for nip.io
+# Determine Domain: Uses $1 if provided (e.g. sudo bash setup-ssl.sh skandx.in), otherwise auto-detects VM IP for nip.io
 if [ -n "$1" ]; then
   DOMAIN="$1"
 else
@@ -16,8 +16,12 @@ fi
 
 PORT=5000
 
+echo "======================================================="
+echo "🔒 Configuring SSL and Nginx for: $DOMAIN"
+echo "======================================================="
+
 echo "Installing Nginx and Certbot..."
-apt update
+apt update -y
 apt install -y nginx certbot python3-certbot-nginx
 
 echo "Configuring High-Performance Nginx for $DOMAIN..."
@@ -25,7 +29,7 @@ echo "Configuring High-Performance Nginx for $DOMAIN..."
 cat > /etc/nginx/sites-available/$DOMAIN <<EOF
 server {
     listen 80;
-    server_name $DOMAIN;
+    server_name $DOMAIN www.$DOMAIN;
 
     # Maximum file upload size for KYC & profile images (20MB)
     client_max_body_size 20M;
@@ -60,15 +64,21 @@ server {
 }
 EOF
 
+# Clean up stale, legacy or conflicting Nginx configs
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/shortmarket-staging
+rm -f /etc/nginx/sites-enabled/shortmarket
+
 # Enable the site
 ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
 
 # Test Nginx config and restart
 nginx -t && systemctl restart nginx
 
-echo "Obtaining SSL certificate via Certbot..."
+echo "Obtaining SSL certificate via Certbot for $DOMAIN..."
+certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email --redirect || \
 certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email
 
-echo "Done! Your platform is now securely running at https://$DOMAIN"
-
+echo "======================================================="
+echo "🎉 SUCCESS! Your platform is now live at: https://$DOMAIN"
+echo "======================================================="
