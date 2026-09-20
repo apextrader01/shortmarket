@@ -48,9 +48,22 @@ const LedgerStatement = () => {
   const [exporting, setExporting] = useState(false);
   const pageSize = 50;
 
-  useEffect(() => {
+  const handleFilterPeriodChange = (p) => {
+    setFilterPeriod(p);
     setCurrentPage(1);
-  }, [filterPeriod, filterType, customStart, customEnd]);
+  };
+  const handleFilterTypeChange = (t) => {
+    setFilterType(t);
+    setCurrentPage(1);
+  };
+  const handleCustomStartChange = (val) => {
+    setCustomStart(val);
+    setCurrentPage(1);
+  };
+  const handleCustomEndChange = (val) => {
+    setCustomEnd(val);
+    setCurrentPage(1);
+  };
 
   const { token, user } = useStore(useShallow(state => ({ token: state.token, user: state.user })));
 
@@ -214,7 +227,7 @@ const LedgerStatement = () => {
             {['Week', '15 Days', 'Month', '3 Months', 'All'].map(p => (
               <span 
                 key={p} 
-                onClick={() => setFilterPeriod(p)}
+                onClick={() => handleFilterPeriodChange(p)}
                 style={{ padding: '6px 12px', fontSize: '12px', cursor: 'pointer', background: p === filterPeriod ? 'rgba(59, 130, 246, 0.2)' : 'transparent', color: p === filterPeriod ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}
               >
                 {p}
@@ -222,21 +235,21 @@ const LedgerStatement = () => {
             ))}
           </div>
           <span 
-            onClick={() => setFilterPeriod('Custom')}
+            onClick={() => handleFilterPeriodChange('Custom')}
             style={{ fontSize: '12px', color: filterPeriod === 'Custom' ? 'var(--color-blue-light)' : 'var(--text-secondary)', padding: '6px 12px', border: filterPeriod === 'Custom' ? '1px solid var(--color-blue-light)' : '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer' }}
           >
             <Calendar size={12} style={{display:'inline', marginRight:'4px'}}/> Custom
           </span>
           {filterPeriod === 'Custom' && (
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customStart} onChange={(e) => handleCustomStartChange(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>to</span>
-              <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
+              <input type="date" value={customEnd} onChange={(e) => handleCustomEndChange(e.target.value)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px', fontSize: '12px', outline: 'none', colorScheme: 'dark' }} />
             </div>
           )}
           <select 
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
+            onChange={(e) => handleFilterTypeChange(e.target.value)}
             style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
           >
             <option value="All" style={{ color: '#000' }}>All Transactions</option>

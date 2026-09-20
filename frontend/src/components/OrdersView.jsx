@@ -3,6 +3,7 @@ import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { Box, Clock, Target, History, ShoppingBag } from 'lucide-react';
 import AlertsView from './AlertsView';
+import { isToday } from '../utils/pnlHelper';
 
 const formatOrderQty = (order, qty) => {
   const isMf = (order?.symbol || '').endsWith('-MF') || (order?.symbol || '').includes(':MF');
@@ -59,18 +60,7 @@ export default function OrdersView() {
 
   const tabs = ['Open Orders', 'Pending Triggers', 'Order History', 'Alerts'];
 
-  const isToday = (dateString) => {
-     if (!dateString) return false;
-     try {
-       const d = new Date(dateString);
-       const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-       return formatter.format(d) === formatter.format(new Date());
-     } catch (e) {
-       const d = new Date(dateString);
-       const today = new Date();
-       return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-     }
-  };
+
 
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {

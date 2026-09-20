@@ -5,26 +5,11 @@ import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
 import { checkPositionConversionAllowed, isDerivativeContract } from '../utils/lotsizeHelper';
-import { getTodayClosedPositions } from '../utils/pnlHelper';
+import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
 
 const EMPTY_PRICES = {};
 
 export default function PositionsView() {
-  const getISTDate = (date) => {
-    try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-    } catch (e) {
-      const d = new Date(date);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-  };
-
-  const isToday = (dateString) => {
-    if (!dateString) return false;
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return false;
-    return getISTDate(d) === getISTDate(new Date());
-  };
 
   const isDeliveryPosition = (p) => {
     const prod = (p?.product_type || p?.productLabel || p?.product || '').toUpperCase();

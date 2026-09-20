@@ -9,21 +9,29 @@
 
 export const normalizeSym = (sym) => (sym ? String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '').trim() : '');
 
+const istDateFormatter = new Intl.DateTimeFormat('en-CA', { 
+  timeZone: 'Asia/Kolkata', 
+  year: 'numeric', 
+  month: '2-digit', 
+  day: '2-digit' 
+});
+
 export const getISTDate = (date) => {
   if (!date) return '';
-  return new Intl.DateTimeFormat('en-CA', { 
-    timeZone: 'Asia/Kolkata', 
-    year: 'numeric', 
-    month: '2-digit', 
-    day: '2-digit' 
-  }).format(new Date(date));
+  try {
+    return istDateFormatter.format(new Date(date));
+  } catch (e) {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 };
 
 export const isToday = (dateString) => {
   if (!dateString) return false;
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return false;
-  return getISTDate(d) === getISTDate(new Date());
+  const todayStr = getISTDate(new Date());
+  return getISTDate(d) === todayStr;
 };
 
 /**

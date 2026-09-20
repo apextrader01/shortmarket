@@ -6588,13 +6588,28 @@ app.get('/api/ledger', authenticateToken, async (req, res) => {
         let netBefore = 0;
         if (offset > 0) {
           try {
-            const sumRes = await db('ledger')
+            // High-performance DB-side aggregate sum: transfers only 1 number over the wire, 0 heap objects allocated
+            const sumSubquery = db('ledger')
+              .select('amount')
               .where({ user_id: req.user.id })
               .orderBy('created_at', 'desc')
               .orderBy('id', 'desc')
-              .limit(offset);
-            netBefore = sumRes.reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
-          } catch (e) {}
+              .limit(offset)
+              .as('prev_slice');
+            const sumRes = await db.from(sumSubquery).sum('amount as total');
+            netBefore = parseFloat(sumRes?.[0]?.total || 0);
+          } catch (e) {
+            // High-performance lightweight fallback (only amount field selected)
+            try {
+              const sumRes = await db('ledger')
+                .select('amount')
+                .where({ user_id: req.user.id })
+                .orderBy('created_at', 'desc')
+                .orderBy('id', 'desc')
+                .limit(offset);
+              netBefore = sumRes.reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
+            } catch (err) {}
+          }
         }
 
         let running = (parseFloat(user?.balance || 0)) - netBefore;

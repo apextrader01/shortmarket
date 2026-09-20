@@ -1002,6 +1002,14 @@ function initCronJobs(priceCache, triggerEngine) {
                 }
             } catch (sessErr) {}
 
+            // Purge expired trusted device tokens to reclaim ROM (database disk space)
+            try {
+                const purgedDevices = await db('trusted_devices').where('expires_at', '<', new Date()).del();
+                if (purgedDevices > 0) {
+                    console.log(`[CRON] Purged ${purgedDevices} expired trusted device token(s).`);
+                }
+            } catch (devErr) {}
+
             // Auto-expire past tournaments whose end_date has passed
             try {
                 const now = new Date();

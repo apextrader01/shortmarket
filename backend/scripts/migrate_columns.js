@@ -268,10 +268,22 @@ async function runMigration() {
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_order_variety ON orders(order_variety)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_status_created ON orders(user_id, status, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_symbol ON positions(user_id, symbol)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_product ON positions(user_id, product_type)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_quantity ON positions(quantity)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_created_at ON positions(created_at)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol)').catch(() => {});
     await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_created ON ledger(user_id, created_at DESC, id DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_status_next_exec ON sips(status, next_execution_date)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_status ON deposit_requests(status, created_at DESC)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_created_at ON user_sessions(created_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_date ON journal_trades(user_id, trade_date DESC)').catch(() => {});
     console.log('  ✅ Performance indexes verified');
 
     console.log('\n🎉 ALL DATABASE MIGRATIONS APPLIED SUCCESSFULLY!');
