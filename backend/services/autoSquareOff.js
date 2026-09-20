@@ -200,9 +200,17 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
         await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, isRmsPenalty, customRemark);
 
         // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
+        const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
         const triggers = await trx('orders')
-            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING_TRIGGER' })
-            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+            .where({ user_id: pos.user_id, status: 'PENDING_TRIGGER' })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+            .where(builder => {
+                builder.where({ symbol: pos.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+            });
         for (const t of triggers) {
             const updated = await trx('orders')
                 .where({ id: t.id, status: 'PENDING_TRIGGER' })
@@ -212,13 +220,22 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
                     await LedgerService.releaseMargin(trx, pos.user_id, t.margin, `Square-Off Cancelled: ${t.symbol}`);
                 }
                 triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                volumeMatchingEngine.dequeueOrder(t.id, t.symbol);
             }
         }
 
         // Also cancel any remaining PENDING entry orders for this user+symbol (only intraday types)
         const pendingOrders = await trx('orders')
-            .where({ user_id: pos.user_id, symbol: pos.symbol, status: 'PENDING' })
-            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+            .where({ user_id: pos.user_id, status: 'PENDING' })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+            .where(builder => {
+                builder.where({ symbol: pos.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+            });
         for (const o of pendingOrders) {
             const updated = await trx('orders')
                 .where({ id: o.id, status: 'PENDING' })
@@ -228,6 +245,8 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
                     await LedgerService.releaseMargin(trx, pos.user_id, o.margin, `Square-Off Cancelled: ${o.symbol}`);
                 }
                 triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                volumeMatchingEngine.dequeueOrder(o.id, o.symbol);
             }
         }
     });

@@ -532,7 +532,7 @@ class TriggerEngine {
             if (existingPos) {
                 // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "10.0000" + 1 = "10.00001")
                 existingPos.quantity = roundQty(Number(existingPos.quantity));
-                existingPos.average_price = Number(existingPos.average_price);
+                existingPos.average_price = Math.abs(Number(existingPos.average_price));
                 existingPos.margin = Number(existingPos.margin || 0);
                 
                 // Calculate if closing or averaging
@@ -543,14 +543,13 @@ class TriggerEngine {
 
                 if (isPartialClose) {
                     const absQty = roundQty(Math.abs(Number(order.quantity)));
-                    const absPosQty = roundQty(Math.abs(existingPos.quantity));
-                    const closeQty = Math.min(absQty, absPosQty);
+                    const posAbsQty = Math.abs(existingPos.quantity);
+                    const closeQty = roundQty(Math.min(posAbsQty, absQty));
 
-                    // Closing orders must not spawn bracket legs; reversals protect only the net new position
-                    if (absQty <= absPosQty) {
+                    if (absQty <= posAbsQty) {
                         bracketTargetQty = 0;
                     } else {
-                        bracketTargetQty = roundQty(Math.abs(absQty - absPosQty));
+                        bracketTargetQty = roundQty(Math.abs(absQty - posAbsQty));
                     }
                     
                     let realizedPnl = 0;
@@ -561,16 +560,13 @@ class TriggerEngine {
                     }
                     realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
                     
-                    const proportionClosed = closeQty / absPosQty;
-                    const marginRefund = Math.round(((existingPos.margin || 0) * proportionClosed + Number.EPSILON) * 100) / 100;
+                    const propClosed = posAbsQty > 0 ? (closeQty / posAbsQty) : 1;
+                    const marginRefund = Math.round((parseFloat(existingPos.margin) * propClosed) * 100) / 100;
                     const newMargin = Math.max(0, Math.round(((existingPos.margin || 0) - marginRefund + Number.EPSILON) * 100) / 100);
                     
-                    const newQty = roundQty(existingPos.quantity + qtyChange);
+                    const newQty = roundQty(existingPos.quantity > 0 ? (existingPos.quantity - closeQty) : (existingPos.quantity + closeQty));
                     
-                    const isFullyClosed = absQty >= absPosQty;
-                    
-                    // Close the position
-                    if (isFullyClosed) {
+                    if (newQty === 0 || posAbsQty <= closeQty) {
                         await trx('positions').where({ id: existingPos.id }).update({ 
                            quantity: 0, 
                            closed_quantity: roundQty((parseFloat(existingPos.closed_quantity) || 0) + closeQty), 
@@ -607,7 +603,7 @@ class TriggerEngine {
                             await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                             const refundMargin = parseFloat(dangler.margin) || 0;
                             if (refundMargin > 0) {
-                                const user = await trx('users').where({ id: order.user_id }).first();
+                                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
                                 if (user) {
                                     await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100 });
                                     await trx('ledger').insert({
@@ -746,15 +742,15 @@ class TriggerEngine {
                     }
                 } else {
                     // Averaging
-                    const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
+                    const currentTotal = Math.abs(existingPos.quantity) * Math.abs(Number(existingPos.average_price));
                     const newTotal = Math.abs(Number(order.quantity)) * execPrice;
                     const newQty = roundQty(existingPos.quantity + qtyChange);
-                    const newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
+                    const newAvgPrice = Math.abs((currentTotal + newTotal) / Math.abs(newQty));
                     
                     await trx('positions').where({ id: existingPos.id }).update({
                         quantity: newQty,
                         average_price: newAvgPrice,
-                        margin: parseFloat(existingPos.margin) + Number(order.margin || 0),
+                        margin: Math.round(((parseFloat(existingPos.margin) || 0) + Number(order.margin || 0) + Number.EPSILON) * 100) / 100,
                         exit_price: null,
                         updated_at: new Date()
                     });
@@ -790,9 +786,9 @@ class TriggerEngine {
                     await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                     const sibMargin = parseFloat(sibling.margin) || 0;
                     if (sibMargin > 0) {
-                        const user = await trx('users').where({ id: order.user_id }).first();
+                        const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
                         if (user) {
-                            await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + sibMargin });
+                            await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + sibMargin + Number.EPSILON) * 100) / 100 });
                             await trx('ledger').insert({
                                 user_id: order.user_id,
                                 amount: sibMargin,

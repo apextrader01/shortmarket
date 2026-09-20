@@ -609,6 +609,51 @@ class VolumeMatchingEngine {
               updated_at: new Date()
             });
 
+            // Cancel dangling linked pending and trigger orders (SL/Target child legs or linked brackets)
+            const cleanSym = order.symbol && order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+            const isIntOrder = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+            const isDelOrder = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
+            const danglingOrders = await trx('orders')
+              .where({ user_id: order.user_id })
+              .where(builder => {
+                if (isIntOrder) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                else if (isDelOrder) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                else builder.where({ product_type: order.product_type });
+              })
+              .where(builder => {
+                builder.where({ symbol: order.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .where(builder => {
+                builder.where('status', 'PENDING_TRIGGER')
+                       .orWhereNotNull('parent_order_id');
+              })
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+            for (const dangler of danglingOrders) {
+              await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+              const refundMargin = parseFloat(dangler.margin) || 0;
+              if (refundMargin > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100 });
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: refundMargin,
+                    type: 'MARGIN_RELEASE',
+                    description: `Margin released for cancelled dangling order ${dangler.symbol}`
+                  });
+                }
+              }
+              const triggerEngine = require('./triggerEngine');
+              triggerEngine.removeOrderFromMemory(dangler.id, dangler.symbol);
+              this.dequeueOrder(dangler.id, dangler.symbol);
+            }
+
             // Position Reversal: If order slice quantity exceeds closed position, open reverse position
             if (leftoverQty > 0) {
               const revSide = order.side === 'BUY' ? 1 : -1;
@@ -841,6 +886,45 @@ class VolumeMatchingEngine {
               price: newAvgPrice,
               quantity: newFilled
             }, newFilled);
+          }
+
+          // 4. OCO (One Cancels Other) Logic for BO/CO child legs
+          const parentOrdId = currentOrder.parent_order_id || order.parent_order_id;
+          const linkedOrdId = currentOrder.linked_order_id || order.linked_order_id;
+          if (parentOrdId || linkedOrdId) {
+            const siblingQuery = trx('orders')
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+              .whereNot({ id: order.id })
+              .forUpdate();
+
+            if (parentOrdId && linkedOrdId) {
+              siblingQuery.where(b => b.where({ parent_order_id: parentOrdId }).orWhere({ id: linkedOrdId }));
+            } else if (parentOrdId) {
+              siblingQuery.where({ parent_order_id: parentOrdId });
+            } else {
+              siblingQuery.where({ id: linkedOrdId });
+            }
+
+            const siblings = await siblingQuery;
+            const triggerEngine = require('./triggerEngine');
+            for (const sibling of siblings) {
+              await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+              const sibMargin = parseFloat(sibling.margin) || 0;
+              if (sibMargin > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + sibMargin + Number.EPSILON) * 100) / 100 });
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: sibMargin,
+                    type: 'MARGIN_RELEASE',
+                    description: `Margin released for cancelled OCO sibling order ${sibling.symbol}`
+                  });
+                }
+              }
+              triggerEngine.removeOrderFromMemory(sibling.id, sibling.symbol);
+              this.dequeueOrder(sibling.id, sibling.symbol);
+            }
           }
         }
 

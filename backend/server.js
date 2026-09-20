@@ -6569,7 +6569,16 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
           // Bracket order cancelled: Auto-exit the underlying position at market
           const parentOrder = await trx('orders').where({ id: order.parent_order_id }).first();
           if (parentOrder && parentOrder.status === 'EXECUTED') {
-              const pos = await trx('positions').where({ user_id: req.user.id, symbol: order.symbol, product_type: parentOrder.product_type }).whereNot({ quantity: 0 }).first();
+              const cleanOrdSym = (order.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+              const pos = await trx('positions')
+                .where({ user_id: req.user.id, product_type: parentOrder.product_type })
+                .where(b => b.where({ symbol: order.symbol })
+                             .orWhere({ symbol: cleanOrdSym })
+                             .orWhere({ symbol: `NSE:${cleanOrdSym}` })
+                             .orWhere({ symbol: `BSE:${cleanOrdSym}` })
+                             .orWhere({ symbol: `MCX:${cleanOrdSym}` }))
+                .whereNot({ quantity: 0 })
+                .first();
               if (pos) {
                  const exitQty = Math.min(Math.abs(pos.quantity), Number(parentOrder.quantity));
                  const exitSide = pos.quantity > 0 ? 'SELL' : 'BUY';

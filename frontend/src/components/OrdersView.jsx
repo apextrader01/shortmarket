@@ -68,7 +68,7 @@ export default function OrdersView() {
 
   // Filter orders based on active tab
   let displayOrders = orders.filter(order => {
-    if (activeTab === 'Open Orders') return (order.status === 'PENDING' || order.status === 'PARTIAL_FILLED' || order.status === 'AMO_PENDING') && !order.parent_order_id;
+    if (activeTab === 'Open Orders') return order.status === 'PENDING' || order.status === 'PARTIAL_FILLED' || order.status === 'AMO_PENDING';
     if (activeTab === 'Order History') return order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'PARTIAL_FILLED' && order.status !== 'AMO_PENDING' && isToday(order.updated_at || order.created_at);
     return false;
   });

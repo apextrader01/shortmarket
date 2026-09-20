@@ -253,7 +253,7 @@ class SIPEngine {
 
         if (existingHolding) {
           const currentQty = parseFloat(existingHolding.quantity);
-          const currentAvg = parseFloat(existingHolding.average_price);
+          const currentAvg = Math.abs(parseFloat(existingHolding.average_price) || 0);
           const newQty = isMf ? parseFloat((currentQty + units).toFixed(4)) : (currentQty + units);
           const newAvg = ((currentQty * currentAvg) + actualDebitAmount) / newQty;
 
@@ -449,7 +449,7 @@ class SIPEngine {
 
             if (existingHolding) {
               const curQty = parseFloat(existingHolding.quantity) || 0;
-              const curAvg = parseFloat(existingHolding.average_price) || nav;
+              const curAvg = Math.abs(parseFloat(existingHolding.average_price) || 0) || nav;
               const newQty = parseFloat((curQty + units).toFixed(4));
               const newAvg = parseFloat((((curQty * curAvg) + marginAmount) / newQty).toFixed(4));
 

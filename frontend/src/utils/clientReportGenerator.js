@@ -193,9 +193,15 @@ export function calculateIndianCharges(order) {
     else stampDuty = tradeValue * 0.00003;
   }
 
+  // DP Charge: ₹15.93 (₹13.50 + 18% GST) on equity delivery sale only (CDSL/NSDL standard)
+  let dpCharge = 0;
+  if (isDelivery && isSell && !isOption && !isFuture && !isMCX) {
+    dpCharge = 15.93;
+  }
+
   // GST: 18% on (Brokerage + Exchange + SEBI)
   const gst = (brokerage + exchangeFee + sebiFee) * 0.18;
-  const totalCharges = brokerage + stt + exchangeFee + sebiFee + stampDuty + gst;
+  const totalCharges = brokerage + stt + exchangeFee + sebiFee + stampDuty + gst + dpCharge;
 
   return {
     tradeValue: Math.round(tradeValue * 100) / 100,
@@ -204,6 +210,7 @@ export function calculateIndianCharges(order) {
     exchangeFee: Math.round(exchangeFee * 100) / 100,
     sebiFee: Math.round(sebiFee * 100) / 100,
     stampDuty: Math.round(stampDuty * 100) / 100,
+    dpCharge: Math.round(dpCharge * 100) / 100,
     gst: Math.round(gst * 100) / 100,
     totalCharges: Math.round(totalCharges * 100) / 100
   };
