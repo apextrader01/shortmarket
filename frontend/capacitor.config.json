@@ -3,8 +3,8 @@
   "appName": "shortedge",
   "webDir": "dist",
   "server": {
-    "url": "https://34-93-99-22.nip.io",
+    "url": "https://www.skandx.in",
     "cleartext": true,
-    "allowNavigation": ["api-hsm.fyers.in"]
+    "allowNavigation": ["api-hsm.fyers.in", "*.skandx.in"]
   }
 }
