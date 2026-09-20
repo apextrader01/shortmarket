@@ -74,7 +74,7 @@ async function getFyersCredentials() {
     let totp_key = null;
     let app_id = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
     let secret_id = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
-    let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://34-93-99-22.nip.io/api/fyers/callback');
+    let redirect_url = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://www.skandx.in/api/fyers/callback');
 
     try {
         const rows = await db('system_settings').whereIn('key', [
@@ -158,37 +158,46 @@ async function performFyersAutoLogin(retryCount = 0) {
         let authData = null;
         let authUrl = null;
         const candidateTypes = [appTypeNum, String(appTypeNum), 200, '200', 100, '100', 2, '2'];
+        const candidateRedirects = Array.from(new Set([
+            redirect_url,
+            'https://www.skandx.in/api/fyers/callback',
+            'https://skandx.in/api/fyers/callback',
+            'https://34-93-99-22.nip.io/api/fyers/callback'
+        ].filter(Boolean)));
 
-        for (const trialType of candidateTypes) {
-            try {
-                const authRes = await fetch('https://api-t1.fyers.in/api/v3/token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${dataToken}`
-                    },
-                    body: JSON.stringify({
-                        fyers_id: fy_id.trim(),
-                        app_id: cleanAppId,
-                        redirect_uri: redirect_url,
-                        app_type: trialType,
-                        appType: trialType,
-                        code_challenge: '',
-                        state: 'None',
-                        scope: '',
-                        nonce: '',
-                        response_type: 'code',
-                        create_cookie: true
-                    })
-                });
-                const parsed = await authRes.json();
-                authData = parsed;
-                const foundUrl = parsed.Url || parsed.url || parsed.data?.url || parsed.data?.Url;
-                if (foundUrl) {
-                    authUrl = foundUrl;
-                    break;
-                }
-            } catch (e) {}
+        outerLoop:
+        for (const trialRedirect of candidateRedirects) {
+            for (const trialType of candidateTypes) {
+                try {
+                    const authRes = await fetch('https://api-t1.fyers.in/api/v3/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${dataToken}`
+                        },
+                        body: JSON.stringify({
+                            fyers_id: fy_id.trim(),
+                            app_id: cleanAppId,
+                            redirect_uri: trialRedirect,
+                            app_type: trialType,
+                            appType: trialType,
+                            code_challenge: '',
+                            state: 'None',
+                            scope: '',
+                            nonce: '',
+                            response_type: 'code',
+                            create_cookie: true
+                        })
+                    });
+                    const parsed = await authRes.json();
+                    authData = parsed;
+                    const foundUrl = parsed.Url || parsed.url || parsed.data?.url || parsed.data?.Url;
+                    if (foundUrl) {
+                        authUrl = foundUrl;
+                        break outerLoop;
+                    }
+                } catch (e) {}
+            }
         }
 
         if (!authUrl) {
