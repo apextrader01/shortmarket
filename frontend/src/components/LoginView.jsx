@@ -81,19 +81,27 @@ export default function LoginView() {
 
   const setupRecaptchaVerifier = () => {
     if (window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier.clear();
-      } catch (_) {}
-      window.recaptchaVerifier = null;
+      return window.recaptchaVerifier;
     }
     const container = document.getElementById('recaptcha-container');
     if (container) {
       container.innerHTML = '';
     }
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible'
-    });
-    return window.recaptchaVerifier;
+    try {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {},
+        'expired-callback': () => {
+          try { window.recaptchaVerifier?.clear(); } catch (_) {}
+          window.recaptchaVerifier = null;
+        }
+      });
+      return window.recaptchaVerifier;
+    } catch (err) {
+      console.warn('Recaptcha verifier notice:', err.message);
+      if (window.recaptchaVerifier) return window.recaptchaVerifier;
+      throw err;
+    }
   };
 
   const triggerPhoneSms = async (targetPhone) => {
@@ -185,7 +193,8 @@ export default function LoginView() {
           // If SMS gateway fails or rate limits, gracefully offer Email OTP or Google Authenticator
           setTwoFactorMethod('email');
           setView('login_otp');
-          setMessage('SMS service unavailable. You can verify via Email OTP or Google Authenticator.');
+          setMessage('SMS service unavailable. Verification code dispatched to your email.');
+          triggerEmailOtp();
         }
       }
     } 

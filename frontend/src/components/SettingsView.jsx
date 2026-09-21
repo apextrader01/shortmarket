@@ -854,13 +854,13 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* Biometric & 4-Digit PIN Security Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+        {/* Security, Two-Factor Authentication & App Unlock Card */}
+        <div id="security-2fa-section" style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Fingerprint size={20} color="var(--color-blue)" /> Quick App Unlock (4-Digit PIN & Biometrics)
+            <ShieldCheck size={20} color="var(--color-blue)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-            Set a 4-digit PIN or enable Face ID / Fingerprint to quickly unlock Short Edge on mobile and desktop without typing your full password.
+            Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your Short Edge trading account.
           </p>
 
           <BiometricSettingsSection user={user} />
@@ -1074,6 +1074,51 @@ export function BiometricSettingsSection({ user }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+        {/* Google Authenticator (TOTP) Status Tile - Highlighted as Top Security Option */}
+        <div style={{
+          background: user?.totp_enabled ? 'rgba(34,197,94,0.04)' : 'rgba(59,130,246,0.05)',
+          border: user?.totp_enabled ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(59,130,246,0.4)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: user?.totp_enabled ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)', padding: '10px', borderRadius: '50%', color: user?.totp_enabled ? '#22c55e' : '#60a5fa' }}>
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Google Authenticator (2FA)</div>
+              <div style={{ fontSize: '11.5px', color: user?.totp_enabled ? '#22c55e' : '#f59e0b', fontWeight: '600', marginTop: '2px' }}>
+                {user?.totp_enabled ? '✅ Active (Dynamic 6-Digit App Code)' : '⚠️ Recommended (Scan QR & Save Key)'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {user?.totp_enabled ? (
+              <button
+                type="button"
+                onClick={() => setShowTotpDisable(true)}
+                style={{ width: '100%', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Disable 2FA
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartTotpSetup}
+                disabled={totpLoading}
+                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {totpLoading ? 'Loading QR Code...' : '⚡ Set Up Google Authenticator'}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* PIN Status Tile */}
         <div style={{
           background: 'rgba(255,255,255,0.02)',
@@ -1224,51 +1269,6 @@ export function BiometricSettingsSection({ user }) {
             </div>
           </div>
         )}
-
-        {/* Google Authenticator (TOTP) Status Tile */}
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          padding: '18px',
-          borderRadius: '10px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          gap: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: user?.totp_enabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: user?.totp_enabled ? '#22c55e' : 'var(--text-secondary)' }}>
-              <ShieldCheck size={20} />
-            </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Google Authenticator</div>
-              <div style={{ fontSize: '11.5px', color: user?.totp_enabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
-                {user?.totp_enabled ? '✅ Active (App Code 2FA)' : '⚪ Not Enabled'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-            {user?.totp_enabled ? (
-              <button
-                type="button"
-                onClick={() => setShowTotpDisable(true)}
-                style={{ width: '100%', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
-              >
-                Disable 2FA
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartTotpSetup}
-                disabled={totpLoading}
-                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-              >
-                {totpLoading ? 'Loading...' : 'Set Up Google 2FA'}
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Google Authenticator Setup Card / Modal */}
@@ -1286,9 +1286,16 @@ export function BiometricSettingsSection({ user }) {
           </p>
 
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'center' }}>
-            {totpSetupData.qrCode && (
-              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-                <img src={totpSetupData.qrCode} alt="TOTP QR Code" style={{ width: '160px', height: '160px', display: 'block' }} />
+            {(totpSetupData.qrCode || totpSetupData.otpauth_url) && (
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', flexShrink: 0 }}>
+                <img
+                  src={totpSetupData.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetupData.otpauth_url || '')}`}
+                  alt="TOTP QR Code"
+                  style={{ width: '160px', height: '160px', display: 'block' }}
+                />
+                <div style={{ textAlign: 'center', fontSize: '10px', color: '#334155', fontWeight: '700', marginTop: '6px' }}>
+                  Scan in Authenticator
+                </div>
               </div>
             )}
 

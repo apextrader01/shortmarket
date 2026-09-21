@@ -618,7 +618,7 @@ function App() {
             </header>
 
           <div className="content-wrapper" style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', minWidth: 0 }}>
-            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
+            {!['AdminPanel', 'MutualFunds', 'Leaderboard', 'ClientData', 'Settings', 'AboutUs', 'Reports', 'Pricing', 'Journal'].includes(activeTab) && (
               <MarketWatch 
                 className={activeTab !== 'Markets' && activeTab !== 'Watchlist' ? 'mobile-hidden' : (activeTab === 'Chart' ? 'mobile-hidden' : 'mobile-full')} 
                 onStockSelect={(sym) => {
@@ -692,7 +692,7 @@ function App() {
                   </Suspense>
                 </div>
               )}
-              {activeTab === 'ClientData' && (
+              {(activeTab === 'ClientData' || activeTab === 'Settings') && (
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', minHeight: 0, overflowY: 'auto' }}>
                   <Suspense fallback={<TabLoader />}>
                     <ClientDataView onDepositClick={() => setShowDepositModal(true)} setActiveTab={setActiveTab} />

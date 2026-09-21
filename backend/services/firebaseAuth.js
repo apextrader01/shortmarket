@@ -146,36 +146,102 @@ async function syncFirebaseUserPassword(email, newPassword) {
 }
 
 /**
- * Send login verification email via Firebase
+ * Send transactional email with OTP code using configured EmailJS REST API
+ */
+async function sendEmailOtpViaService(email, code) {
+  const serviceId = process.env.EMAILJS_SERVICE_ID;
+  const templateId = process.env.EMAILJS_TEMPLATE_ID;
+  const userId = process.env.EMAILJS_USER_ID;
+  const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
+
+  if (!serviceId || !templateId || !userId || !accessToken) {
+    console.warn('[TRANSACTIONAL EMAIL] Missing EmailJS env config.');
+    return false;
+  }
+
+  const emailData = {
+    service_id: serviceId,
+    template_id: templateId,
+    user_id: userId,
+    accessToken: accessToken,
+    template_params: {
+      to_email: email,
+      user_email: email,
+      email: email,
+      to_name: email.split('@')[0],
+      name: email.split('@')[0],
+      otp: code,
+      otp_code: code,
+      passcode: code,
+      code: code,
+      message: `Your Short Edge verification code is: ${code}. This code is valid for 10 minutes. Do not share it with anyone.`
+    }
+  };
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailData)
+      });
+      if (res.ok) {
+        console.log(`[TRANSACTIONAL EMAIL] Login OTP email successfully dispatched to ${email}`);
+        return true;
+      } else {
+        const errText = await res.text();
+        console.warn(`[TRANSACTIONAL EMAIL] EmailJS attempt ${attempt} response ${res.status}: ${errText}`);
+      }
+    } catch (err) {
+      console.warn(`[TRANSACTIONAL EMAIL] EmailJS attempt ${attempt} error:`, err.message, err.cause?.code || '');
+      if (attempt < 2) await new Promise(r => setTimeout(r, 600));
+    }
+  }
+  return false;
+}
+
+/**
+ * Send login verification email via Firebase / Transactional Service
  */
 async function sendFirebaseLoginEmail(email, code = null) {
   if (!email) throw new Error('Email is required');
   const cleanEmail = String(email).trim().toLowerCase();
 
-  await ensureFirebaseUser(cleanEmail);
+  // 1. Deliver the 6-digit numeric OTP directly to the user's inbox IMMEDIATELY
+  let emailSent = false;
+  if (code) {
+    emailSent = await sendEmailOtpViaService(cleanEmail, code);
+  }
 
-  // Try sending Firebase Email Sign-In link if provider is enabled
+  // Non-blocking user sync for Firebase
+  ensureFirebaseUser(cleanEmail).catch(() => {});
+
+  // 2. Try sending Firebase Email Sign-In link if provider is enabled
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_WEB_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         requestType: 'EMAIL_SIGNIN',
         email: cleanEmail,
         continueUrl: 'https://www.skandx.in/login?email=' + encodeURIComponent(cleanEmail)
       })
     });
+    clearTimeout(timeoutId);
     const data = await response.json();
     if (!data.error) {
       console.log(`[FIREBASE AUTH] Sign-in email link dispatched to ${cleanEmail}`);
-      return { success: true, method: 'EMAIL_LINK', email: cleanEmail };
+      return { success: true, method: 'EMAIL_LINK', email: cleanEmail, code, emailSent: true };
     }
   } catch (err) {
-    console.warn('[FIREBASE AUTH] Email sign-in link attempt:', err.message);
+    // Non-fatal if passwordless sign-in link is disabled
   }
 
-  // If Email link provider is not enabled in Firebase console, return code status
-  return { success: true, method: 'OTP', email: cleanEmail, code };
+  // Return code status
+  return { success: true, method: 'OTP', email: cleanEmail, code, emailSent };
 }
 
 /**

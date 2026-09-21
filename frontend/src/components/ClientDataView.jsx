@@ -3,7 +3,7 @@ import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
 import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, ShieldCheck, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
 const ReferralsView = lazy(() => import('./ReferralsView'));
 import SettingsView, { BiometricSettingsSection } from './SettingsView';
 import ResetPortfolioModal from './ResetPortfolioModal';
@@ -453,7 +453,33 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                   cursor: 'pointer'
                 }}
               >
-                <Settings size={13} /> Profile & Settings (Telegram, Passwords, Security) &rarr;
+                <Settings size={13} /> Profile & Settings &rarr;
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('security-2fa-section');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    setShowProfile(true);
+                  }
+                }} 
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '5px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: user?.totp_enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  border: user?.totp_enabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  color: user?.totp_enabled ? '#4ade80' : '#f59e0b',
+                  cursor: 'pointer'
+                }}
+              >
+                <ShieldCheck size={13} /> {user?.totp_enabled ? 'Google 2FA: Active ✅' : 'Google Authenticator (2FA) 🔑'}
               </button>
             </div>
             {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
@@ -971,14 +997,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
               </div>
             </div>
 
-            {/* 🔐 Biometric & 4-Digit PIN Security */}
-            <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', gridColumn: isMobile ? '1' : '1 / -1' }}>
+            {/* 🔐 Two-Factor Authentication & App Security */}
+            <div id="security-2fa-section" style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', gridColumn: isMobile ? '1' : '1 / -1' }}>
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Fingerprint size={16} color="var(--color-blue-light)" /> Quick App Unlock (4-Digit PIN & Biometrics)
+                  <ShieldCheck size={16} color="var(--color-blue-light)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Set a 4-digit PIN or enable Face ID / Fingerprint to quickly unlock Short Edge on mobile and desktop without typing your full password.
+                  Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your Short Edge trading account.
                 </div>
               </div>
               <BiometricSettingsSection user={user} />

@@ -1075,18 +1075,22 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
       login_email_otp_expires: expires
     });
 
-    // 🚀 Dispatch verification via Firebase Mail Service
+    let emailSent = false;
+    // 🚀 Dispatch verification via Firebase / Transactional Mail Service
     try {
-      await sendFirebaseLoginEmail(user.email, otp);
-      console.log(`[FIREBASE AUTH 2FA] Verification email dispatched to ${user.email}`);
+      const emailResult = await sendFirebaseLoginEmail(user.email, otp);
+      emailSent = Boolean(emailResult?.emailSent);
+      console.log(`[AUTH 2FA] Verification email dispatched to ${user.email} (sent: ${emailSent})`);
     } catch (fbErr) {
-      console.warn(`[FIREBASE AUTH 2FA] Firebase login email dispatch note:`, fbErr.message);
+      console.warn(`[AUTH 2FA] Verification email dispatch note:`, fbErr.message);
     }
 
     console.log(`[AUTH 2FA] Email OTP for ${user.email}: ${otp}`);
     return res.json({ 
       success: true, 
-      message: `Verification code: ${otp} (Also dispatched via Firebase to ${user.email})`,
+      message: emailSent 
+        ? `Verification code dispatched to ${user.email}. Please check your inbox (and spam folder)!` 
+        : `Verification code: ${otp} (Dispatched to ${user.email})`,
       otp: otp 
     });
   } catch (err) {
@@ -1224,11 +1228,13 @@ app.get('/api/user/totp/setup', authenticateToken, async (req, res) => {
     const { generateSecret } = require('otplib');
     const secret = generateSecret();
     const otpauthUrl = `otpauth://totp/ShortEdge:${encodeURIComponent(user.email || user.username)}?secret=${secret}&issuer=ShortEdge`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
 
     res.json({
       success: true,
       secret,
       otpauth_url: otpauthUrl,
+      qrCode: qrCodeUrl,
       email: user.email,
       totp_enabled: Boolean(user.totp_enabled)
     });

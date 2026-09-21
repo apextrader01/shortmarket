@@ -2566,6 +2566,9 @@ export const useStore = create(persist((set, get) => ({
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       const data = await res.json();
+      if (data && data.success && !data.qrCode && data.otpauth_url) {
+        data.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.otpauth_url)}`;
+      }
       return data;
     } catch (e) {
       return { success: false, error: e.message };
