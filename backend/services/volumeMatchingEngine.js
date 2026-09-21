@@ -205,16 +205,8 @@ class VolumeMatchingEngine {
 
     // Realistic Level-2 market depth matching:
     // Orders match against real bids/asks currently resting on the exchange order book.
-    // For derivatives/commodities (lotsize > 1): retail (<= 2 lots) can fill up to pending qty,
-    // whale orders (> 2 lots) cap initial depth sweep at 2 lots.
-    // For cash equities (lotsize === 1): retail (<= 500 shares) can fill up to pending qty,
-    // whale orders (> 500 shares) cap initial depth sweep at 500 shares.
-    let depthCap = 0;
-    if (lotsize > 1) {
-      depthCap = totalOrderQty <= 2 * lotsize ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 2 * lotsize);
-    } else {
-      depthCap = totalOrderQty <= 500 ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 500);
-    }
+    // There is NO artificial capping: order fills whatever real quantity is available in depth.
+    let depthCap = ordObj.pending_quantity;
 
     let depthFilled = 0;
     let totalDepthCost = 0;
@@ -334,11 +326,9 @@ class VolumeMatchingEngine {
         } else {
           const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
           if (currentVol > prevVol) {
-            const rawDelta = currentVol - prevVol;
-            // Guard against stale baseline / reconnect feed jumps (> 25,000 in a single tick)
-            // Real 1-second volume on liquid stocks like VMM rarely exceeds 5K-15K shares.
-            // A delta > 25,000 indicates a feed gap / reconnect burst.
-            deltaVol = rawDelta > 25000 ? Math.min(rawDelta, 25000) : rawDelta;
+            // Real exchange volume delta: NO artificial capping.
+            // If 2 Lakh executed in the real world, deltaVol is 2 Lakh.
+            deltaVol = currentVol - prevVol;
             this.lastSymbolVolume.set(normSym, currentVol);
           }
         }
@@ -370,29 +360,18 @@ class VolumeMatchingEngine {
 
         // Determine lot size for contract compliance
         const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
-        const { getLotSizes } = require('./instrumentsCache');
-        const lotSizes = getLotSizes([order.symbol, cleanSym]);
-        const lotsize = lotSizes[order.symbol] || lotSizes[cleanSym] || 1;
+        const { getLotSizes, resolveSingleLotSize } = require('./instrumentsCache');
+        const lotsize = resolveSingleLotSize(order.symbol);
 
         let fillQty = 0;
         if (lotsize > 1) {
-          // Derivatives and Commodities trade strictly in whole lots. Never fill fractional lots!
-          // CRITICAL: fillQty must NEVER exceed availableVol (real exchange volume delta).
-          // Calculate how many whole lots the real volume can support.
+          // Derivatives and Commodities trade strictly in whole lots (no artificial lot capping).
+          // Orders match up to real available whole lots from exchange volume ticks.
           const maxLotsFromVol = Math.floor(availableVol / lotsize);
           if (maxLotsFromVol >= 1) {
-            // Real volume supports at least 1 full lot
-            if (order.pending_quantity <= 2 * lotsize) {
-              // Retail derivative orders (<= 2 lots): fill up to available volume
-              fillQty = Math.min(order.pending_quantity, maxLotsFromVol * lotsize);
-            } else {
-              // Large / Whale derivative orders (> 2 lots): pace at 30%-50% of available volume,
-              // capped at 5 lots per tick to prevent single-tick market sweeps
-              const rawCap = Math.min(order.pending_quantity, Math.max(lotsize, Math.floor(availableVol * 0.5)));
-              fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-              fillQty = Math.min(order.pending_quantity, Math.min(fillQty, 5 * lotsize));
-            }
-            // Ensure lot-aligned
+            const rawCap = Math.min(order.pending_quantity, availableVol);
+            fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
+            fillQty = Math.min(order.pending_quantity, fillQty);
             fillQty = Math.floor(fillQty / lotsize) * lotsize;
           } else if (order.pending_quantity < lotsize && availableVol >= order.pending_quantity) {
             // Non-standard partial residual strictly smaller than 1 lot
@@ -400,28 +379,10 @@ class VolumeMatchingEngine {
           }
           // else: not enough real volume for even 1 lot — wait for more ticks
         } else {
-          // Equities (lot = 1):
-          // Retail orders (<= 500 shares) can fill immediately up to available tick volume
-          if (order.pending_quantity <= 500) {
-            fillQty = Math.min(order.pending_quantity, availableVol);
-          } else {
-            // Whale / Large orders (> 500 shares): Pace execution realistically against market volume.
-            // Symmetrical for BUY and SELL:
-            // A large order participates at a realistic Percentage of Volume (POV rate: 30% - 50%),
-            // with a single-tick fill cap of 1,000 shares.
-            // This guarantees that a 1 Lakh share order does NOT fill instantly out of thin air,
-            // but instead queues with PARTIALLY FILLED status and fills smoothly across ticks.
-            if (availableVol <= 500) {
-              fillQty = Math.min(order.pending_quantity, availableVol);
-            } else {
-              const maxFill = Math.min(
-                order.pending_quantity,
-                Math.max(500, Math.floor(availableVol * 0.5))
-              );
-              fillQty = Math.min(order.pending_quantity, Math.min(maxFill, 1000));
-            }
-            fillQty = Math.min(fillQty, availableVol);
-          }
+          // Equities (lot = 1): NO artificial capping.
+          // Orders match real volume 1:1 against whatever volume executed on the real exchange.
+          // (e.g. 500 real volume -> 500 fill; 15k real volume -> 15k fill; 2 Lakh real volume -> full 1 Lakh fill)
+          fillQty = Math.min(order.pending_quantity, availableVol);
         }
 
         if (fillQty > 0) {
@@ -1091,16 +1052,12 @@ class VolumeMatchingEngine {
 
               let slice = 0;
               if (lotsize > 1) {
-                // Fill proportional to real volume delta (strictly whole lots)
+                // Fill proportional to real volume delta (strictly whole lots, no artificial lot capping)
                 const maxLotsFromVol = Math.floor(volDelta / lotsize);
                 if (maxLotsFromVol >= 1 && order.pending_quantity >= lotsize) {
-                  if (order.pending_quantity <= 2 * lotsize) {
-                    slice = Math.min(order.pending_quantity, maxLotsFromVol * lotsize);
-                  } else {
-                    const rawCap = Math.min(order.pending_quantity, Math.max(lotsize, Math.floor(volDelta * 0.5)));
-                    slice = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-                    slice = Math.min(order.pending_quantity, Math.min(slice, 5 * lotsize));
-                  }
+                  const rawCap = Math.min(order.pending_quantity, volDelta);
+                  slice = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
+                  slice = Math.min(order.pending_quantity, slice);
                   slice = Math.floor(slice / lotsize) * lotsize;
                 } else if (order.pending_quantity < lotsize && volDelta >= order.pending_quantity) {
                   // Non-standard partial residual strictly smaller than 1 lot

@@ -1,11 +1,11 @@
 /**
- * Comprehensive Verification: Universal Real Volume Matching Parity
- * Covers:
- *  1. Cash Equities (Large Cap & Small Cap) - Buy & Sell
- *  2. Options & Futures (Index & Stock Derivatives) - Buy & Sell
- *  3. MCX Commodities (Crude Oil, Gold, Silver) - Buy & Sell
- *  4. Zero Volume / Illiquid Protection (No fills out of thin air)
- *  5. Whole Lot Integrity across all segments
+ * Comprehensive Verification: Universal Real Volume Matching (No Artificial Capping)
+ * Matches 1:1 against real exchange trade volume:
+ *  - 1 Lakh pending, 2 Lakh traded in real world -> 1 Lakh executed (100% fill)
+ *  - 1 Lakh pending, 500 traded in real world -> 500 executed (99,500 pending)
+ *  - 99,500 pending, 15,000 traded in real world -> 15,000 executed (84,500 pending)
+ *  - Derivatives & MCX: strict whole lots, no artificial lot cap (e.g. 50 lots traded -> 50 lots fill)
+ *  - Illiquid / Zero volume: 0 traded -> 0 fill (stays pending)
  */
 
 const assert = require('assert');
@@ -13,13 +13,13 @@ const path = require('path');
 const fs = require('fs');
 
 console.log('======================================================================');
-console.log('🔬 UNIVERSAL REAL VOLUME MATCHING PARITY & INTEGRITY TEST');
+console.log('🔬 UNIVERSAL REAL VOLUME MATCHING (NO ARTIFICIAL CAPPING) TEST');
 console.log('======================================================================\n');
 
 // 1. Source Code Inspections
 const vmeContent = fs.readFileSync(path.join(__dirname, 'services', 'volumeMatchingEngine.js'), 'utf8');
 
-console.log('▶ TEST SUITE 1: Source Code Zero-Thin-Air Verification');
+console.log('▶ TEST SUITE 1: Source Code Zero-Thin-Air & No-Capping Verification');
 
 // Must NOT sweep pending quantity out of thin air in submitOrder
 assert(!vmeContent.includes('const sweepPrice = calculateMarketSlippage'), 'Thin air calculateMarketSlippage sweep must not exist in submitOrder');
@@ -28,9 +28,8 @@ console.log('  ✔ [PASS] Thin-air sweepPrice removed from submitOrder');
 
 // Pacing & Lot integrity in onTick
 assert(vmeContent.includes('Math.floor(rawCap / lotsize) * lotsize'), 'F&O pacing must enforce whole lot alignment');
-assert(vmeContent.includes('Math.min(fillQty, 5 * lotsize)'), 'Large F&O pacing must cap at 5 lots per tick');
-assert(vmeContent.includes('Math.min(order.pending_quantity, Math.min(maxFill, 1000))'), 'Large Equity pacing must cap at 1,000 shares per tick');
-console.log('  ✔ [PASS] Symmetrical pacing for Equities (1,000 cap) and Derivatives (5 lots cap)');
+assert(vmeContent.includes('fillQty = Math.min(order.pending_quantity, availableVol)'), 'Equities volume matching must fill up to real volume without capping');
+console.log('  ✔ [PASS] Equities and Derivatives match 1:1 with real volume without artificial capping');
 
 // No Math.random in heartbeat
 assert(!vmeContent.includes('Math.random()'), 'Heartbeat must not synthesize fake random volume');
@@ -59,8 +58,8 @@ for (const t of lotTests) {
 }
 
 
-// 3. Mathematical Simulation of Matching Logic Across Segments
-console.log('\n▶ TEST SUITE 3: Real Volume Matching Engine Simulation');
+// 3. Simulation of Real Volume Matching Engine (No Capping)
+console.log('\n▶ TEST SUITE 3: Real Volume Matching Engine Simulation (User Scenarios)');
 
 function simulateMatch(order, tickDelta) {
   const lotsize = resolveSingleLotSize(order.symbol);
@@ -70,95 +69,95 @@ function simulateMatch(order, tickDelta) {
   if (lotsize > 1) {
     const maxLotsFromVol = Math.floor(availableVol / lotsize);
     if (maxLotsFromVol >= 1) {
-      if (order.pending <= 2 * lotsize) {
-        fillQty = Math.min(order.pending, maxLotsFromVol * lotsize);
-      } else {
-        const rawCap = Math.min(order.pending, Math.max(lotsize, Math.floor(availableVol * 0.5)));
-        fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-        fillQty = Math.min(order.pending, Math.min(fillQty, 5 * lotsize));
-      }
+      const rawCap = Math.min(order.pending, availableVol);
+      fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
+      fillQty = Math.min(order.pending, fillQty);
       fillQty = Math.floor(fillQty / lotsize) * lotsize;
     } else if (order.pending < lotsize && availableVol >= order.pending) {
       fillQty = order.pending;
     }
   } else {
-    if (order.pending <= 500) {
-      fillQty = Math.min(order.pending, availableVol);
-    } else {
-      if (availableVol <= 500) {
-        fillQty = Math.min(order.pending, availableVol);
-      } else {
-        const maxFill = Math.min(
-          order.pending,
-          Math.max(500, Math.floor(availableVol * 0.5))
-        );
-        fillQty = Math.min(order.pending, Math.min(maxFill, 1000));
-      }
-      fillQty = Math.min(fillQty, availableVol);
-    }
+    fillQty = Math.min(order.pending, availableVol);
   }
 
   return fillQty;
 }
 
-// Case A: Illiquid Small Cap Stock (0 Volume Tick)
-console.log('\n  --- Case A: Illiquid Small Cap Stock (0 Volume) ---');
-let smallCapBuy = { symbol: 'NSE:KITEX', side: 'BUY', pending: 100, filled: 0 };
-let fillZero = simulateMatch(smallCapBuy, 0);
-assert.strictEqual(fillZero, 0, 'Zero volume tick must result in ZERO fill');
-assert.strictEqual(smallCapBuy.pending, 100, 'Order must remain 100% pending');
-console.log('  ✔ [PASS] Illiquid stock with 0 volume stays PENDING (0 fill)');
+// User Scenario 1: Share X has 1 Lakh pending order. Next minute 500 executed in real world -> 500 executed on web
+console.log('\n  --- User Scenario 1: 1 Lakh Pending, 500 Executed in Real World ---');
+let orderX = { symbol: 'NSE:RELIANCE-EQ', side: 'BUY', pending: 100000, filled: 0 };
+let fill1 = simulateMatch(orderX, 500);
+assert.strictEqual(fill1, 500, '500 executed in real world -> exactly 500 executed on web');
+orderX.filled += fill1;
+orderX.pending -= fill1;
+assert.strictEqual(orderX.filled, 500);
+assert.strictEqual(orderX.pending, 99500);
+console.log('  ✔ [PASS] 500 executed in real world -> 500 filled on web, 99,500 pending');
 
-// Case B: Small Cap Stock Real Trade (200 shares volume)
-console.log('  --- Case B: Small Cap Stock Real Trade (200 shares) ---');
-let fillReal = simulateMatch(smallCapBuy, 200);
-assert.strictEqual(fillReal, 100, '200 shares real volume fills 100-share retail order completely');
-smallCapBuy.filled += fillReal;
-smallCapBuy.pending -= fillReal;
-assert.strictEqual(smallCapBuy.pending, 0, 'Order completely executed');
-console.log('  ✔ [PASS] 200-share real exchange volume executes retail order cleanly');
+// User Scenario 2: After that, 15,000 executed in real world -> 15,000 executed on web
+console.log('\n  --- User Scenario 2: 99,500 Pending, 15,000 Executed in Real World ---');
+let fill2 = simulateMatch(orderX, 15000);
+assert.strictEqual(fill2, 15000, '15,000 executed in real world -> exactly 15,000 executed on web');
+orderX.filled += fill2;
+orderX.pending -= fill2;
+assert.strictEqual(orderX.filled, 15500);
+assert.strictEqual(orderX.pending, 84500);
+console.log('  ✔ [PASS] 15,000 executed in real world -> 15,000 filled on web, 84,500 pending');
 
-// Case C: Large Cap Cash Equity BUY vs SELL Symmetrical Pacing (1 Lakh shares)
-console.log('  --- Case C: Large Cap Stock (RELIANCE) 1 Lakh BUY & SELL ---');
-let relBuy = { symbol: 'NSE:RELIANCE-EQ', side: 'BUY', pending: 100000, filled: 0 };
-let relSell = { symbol: 'NSE:RELIANCE-EQ', side: 'SELL', pending: 100000, filled: 0 };
+// User Scenario 3: 1 Lakh Pending, 2 Lakh Executed in Real World -> 1 Lakh Executed on Web (Full Fill)
+console.log('\n  --- User Scenario 3: 1 Lakh Pending, 2 Lakh Executed in Real World ---');
+let orderY = { symbol: 'NSE:VMM-EQ', side: 'BUY', pending: 100000, filled: 0 };
+let fill3 = simulateMatch(orderY, 200000);
+assert.strictEqual(fill3, 100000, '2 Lakh executed in real world -> full 1 Lakh executed on web');
+orderY.filled += fill3;
+orderY.pending -= fill3;
+assert.strictEqual(orderY.filled, 100000);
+assert.strictEqual(orderY.pending, 0);
+console.log('  ✔ [PASS] 2 Lakh executed in real world -> full 1 Lakh executed on web (100% complete)');
 
-// Tick with 10,000 shares volume
-let fillBuyTick1 = simulateMatch(relBuy, 10000);
-let fillSellTick1 = simulateMatch(relSell, 10000);
-assert.strictEqual(fillBuyTick1, 1000, 'Large BUY order capped at 1,000 shares');
-assert.strictEqual(fillSellTick1, 1000, 'Large SELL order capped at 1,000 shares');
-assert.strictEqual(fillBuyTick1, fillSellTick1, 'BUY and SELL pace with 100% mathematical parity');
-console.log('  ✔ [PASS] 1 Lakh RELIANCE BUY & SELL pace symmetrically capped at 1,000 shares/tick');
+// User Scenario 4: Derivatives / Futures / Options in Whole Lot Size (No Lot Capping)
+console.log('\n  --- User Scenario 4: NIFTY Option 50 Lots (3,250 Qty) Pending, 100 Lots (6,500 Qty) Real Volume ---');
+let nifOpt = { symbol: 'NSE:NIFTY24DEC24000CE', side: 'BUY', pending: 3250, filled: 0 };
+let nifFill = simulateMatch(nifOpt, 6500);
+assert.strictEqual(nifFill, 3250, '100 lots real volume fills all 50 pending lots without artificial capping');
+nifOpt.filled += nifFill;
+nifOpt.pending -= nifFill;
+assert.strictEqual(nifOpt.filled, 3250);
+assert.strictEqual(nifOpt.pending, 0);
+console.log('  ✔ [PASS] 50 Lots NIFTY Option fills 100% when 100 lots trade in real world');
 
-// Case D: NIFTY Option (65 Lot Size) Large Order (20 Lots = 1,300 Qty)
-console.log('  --- Case D: NIFTY Option (20 Lots = 1,300 Qty) ---');
-let nifOpt = { symbol: 'NSE:NIFTY24DEC24000CE', side: 'BUY', pending: 1300, filled: 0 };
-// Tick with 5,000 contracts volume delta
-let nifFill1 = simulateMatch(nifOpt, 5000);
-assert.strictEqual(nifFill1, 5 * 65, 'Large option order capped at 5 lots (325 shares) per tick');
-nifOpt.filled += nifFill1;
-nifOpt.pending -= nifFill1;
-assert.strictEqual(nifOpt.filled, 325);
-assert.strictEqual(nifOpt.pending, 975);
-console.log('  ✔ [PASS] 20 Lots NIFTY Option paces to 5 lots (325 qty) filled / 15 lots (975 qty) queued');
+// User Scenario 5: NIFTY Option 50 Lots Pending, 2 Lots (130 Qty) Real Volume
+console.log('\n  --- User Scenario 5: NIFTY Option 50 Lots Pending, 2 Lots Real Volume ---');
+let nifOpt2 = { symbol: 'NSE:NIFTY24DEC24000CE', side: 'BUY', pending: 3250, filled: 0 };
+let nifFill2 = simulateMatch(nifOpt2, 130);
+assert.strictEqual(nifFill2, 130, '2 lots real volume fills exactly 2 lots (130 qty)');
+nifOpt2.filled += nifFill2;
+nifOpt2.pending -= nifFill2;
+assert.strictEqual(nifOpt2.filled, 130);
+assert.strictEqual(nifOpt2.pending, 3120);
+console.log('  ✔ [PASS] 2 Lots real volume fills exactly 2 lots (130 qty), 48 lots pending');
 
-// Case E: Retail Option (1 Lot = 65 Qty)
-console.log('  --- Case E: Retail Option (1 Lot = 65 Qty) ---');
-let retailOpt = { symbol: 'NSE:NIFTY24DEC24000CE', side: 'BUY', pending: 65, filled: 0 };
-let retOptFill = simulateMatch(retailOpt, 200);
-assert.strictEqual(retOptFill, 65, 'Retail 1-lot option fills immediately when real volume exists');
-console.log('  ✔ [PASS] Retail 1-lot option fills 65 qty immediately against real volume');
+// User Scenario 6: MCX Crude Oil (Lot = 100)
+console.log('\n  --- User Scenario 6: MCX Crude Oil Whole Lot Matching ---');
+let mcxOrder = { symbol: 'MCX:CRUDEOIL26OCTFUT', side: 'BUY', pending: 1000, filled: 0 }; // 10 lots
+let mcxFill1 = simulateMatch(mcxOrder, 75); // Less than 1 lot
+assert.strictEqual(mcxFill1, 0, 'Volume < 1 lot (75 barrels) fills 0');
+let mcxFill2 = simulateMatch(mcxOrder, 500); // 5 lots
+assert.strictEqual(mcxFill2, 500, 'Volume of 500 barrels fills exactly 5 lots (500 barrels)');
+mcxOrder.filled += mcxFill2;
+mcxOrder.pending -= mcxFill2;
+assert.strictEqual(mcxOrder.filled, 500);
+assert.strictEqual(mcxOrder.pending, 500);
+console.log('  ✔ [PASS] MCX Crude Oil enforces strict whole lots (0 fill for 75 vol, 500 fill for 500 vol)');
 
-// Case F: MCX Crude Oil (Lot = 100) Insufficient Volume (75 Barrels)
-console.log('  --- Case F: MCX Crude Oil Whole-Lot Enforcement ---');
-let mcxOrder = { symbol: 'MCX:CRUDEOIL26OCTFUT', side: 'BUY', pending: 100, filled: 0 };
-let mcxPartialVolFill = simulateMatch(mcxOrder, 75);
-assert.strictEqual(mcxPartialVolFill, 0, 'Volume of 75 barrels cannot fill 100-barrel contract');
-let mcxFullVolFill = simulateMatch(mcxOrder, 150);
-assert.strictEqual(mcxFullVolFill, 100, 'Volume of 150 barrels fills exactly 1 whole lot (100 barrels)');
-console.log('  ✔ [PASS] MCX Crude Oil strictly preserves whole-lot execution');
+// User Scenario 7: Zero Volume Tick (Illiquid Stock)
+console.log('\n  --- User Scenario 7: Zero Volume Protection ---');
+let illiquidOrder = { symbol: 'NSE:KITEX', side: 'BUY', pending: 500, filled: 0 };
+let zeroFill = simulateMatch(illiquidOrder, 0);
+assert.strictEqual(zeroFill, 0, '0 real volume must produce 0 fill');
+assert.strictEqual(illiquidOrder.pending, 500);
+console.log('  ✔ [PASS] Zero volume tick produces 0 fill, order stays pending');
 
 console.log('\n======================================================================');
-console.log('🎉 ALL MULTI-SEGMENT REAL VOLUME MATCHING TESTS PASSED FLAWLESSLY!');
+console.log('🎉 ALL USER SCENARIOS (NO CAPPING, 1:1 REAL VOLUME) PASSED FLAWLESSLY!');
 console.log('======================================================================\n');
