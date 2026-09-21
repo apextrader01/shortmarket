@@ -88,10 +88,8 @@ class TriggerEngine {
                 key = `trigger:${order.symbol}:${order.side}:LIMIT`;
                 score = Number(order.price);
             } else if (order.type === 'MARKET') {
-                // Market orders should execute immediately, they won't normally sit in PENDING for ticks.
-                // But if they do, we can just give them a 0 (Buy) or Infinity (Sell) score to trigger instantly.
-                key = `trigger:${order.symbol}:${order.side}:LIMIT`;
-                score = order.side === 'BUY' ? 999999999 : 0;
+                // Market orders flow directly through VolumeMatchingEngine, not Redis triggers
+                return;
             } else if (order.type && (order.type.startsWith('SL') || order.type === 'TRAILING_STOP' || order.type === 'GTT')) {
                 const trigger = Number(order.trigger_price || order.price);
                 let isGreaterOrEqual = false;

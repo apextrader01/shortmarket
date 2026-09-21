@@ -199,22 +199,22 @@ class VolumeMatchingEngine {
     const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
     const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
 
-    const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
-    const isHighLiquiditySegment = isDerivativeContract(ordObj.symbol) || isCommodityContract(ordObj.symbol);
+    const { isDerivativeContract, isCommodityContract, resolveSingleLotSize } = require('./instrumentsCache');
+    const lotsize = resolveSingleLotSize(ordObj.symbol);
     const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
 
-    // CRITICAL: Derivatives/commodities NEVER get instant sweep.
-    // They ALWAYS go through the volume pacing queue (onTick + heartbeat) to fill gradually
-    // based on real-time exchange volume. This prevents 10,000 lots from filling instantly on
-    // contracts with zero or minimal volume.
-    // Only small retail cash equity orders (<=500 shares) get instant fill.
-    const isRetailCashEquity = !isHighLiquiditySegment && totalOrderQty <= 500;
-    const canInstantSweep = isRetailCashEquity;
-
-    // Derivatives/commodities: skip depth sweep, go straight to volume queue.
-    // Small retail cash equities: use depth for instant fill.
-    // Large cash equities (>500 shares): queue for real volume ticks.
-    const depthCap = canInstantSweep ? ordObj.pending_quantity : 0;
+    // Realistic Level-2 market depth matching:
+    // Orders match against real bids/asks currently resting on the exchange order book.
+    // For derivatives/commodities (lotsize > 1): retail (<= 2 lots) can fill up to pending qty,
+    // whale orders (> 2 lots) cap initial depth sweep at 2 lots.
+    // For cash equities (lotsize === 1): retail (<= 500 shares) can fill up to pending qty,
+    // whale orders (> 500 shares) cap initial depth sweep at 500 shares.
+    let depthCap = 0;
+    if (lotsize > 1) {
+      depthCap = totalOrderQty <= 2 * lotsize ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 2 * lotsize);
+    } else {
+      depthCap = totalOrderQty <= 500 ? ordObj.pending_quantity : Math.min(ordObj.pending_quantity, 500);
+    }
 
     let depthFilled = 0;
     let totalDepthCost = 0;
@@ -235,7 +235,10 @@ class VolumeMatchingEngine {
             if (ordObj.side === 'SELL' && levelPrice < limitPrice) break;
           }
 
-          const fillQty = Math.min(remainingToFill, levelQty);
+          let fillQty = Math.min(remainingToFill, levelQty);
+          if (lotsize > 1) {
+            fillQty = Math.floor(fillQty / lotsize) * lotsize;
+          }
           if (fillQty > 0) {
             depthFilled += fillQty;
             totalDepthCost += (fillQty * levelPrice);
@@ -246,76 +249,15 @@ class VolumeMatchingEngine {
       }
     }
 
-    // Calculate realistic market impact slippage for illiquid cash equities
-    const calculateMarketSlippage = (order, basePrice) => {
-      if (!basePrice || basePrice <= 0) return basePrice;
-      const qty = Number(order.pending_quantity || order.quantity || 0);
-      if (qty <= 100) return basePrice; // Retail micro-order: zero slippage
-
-      if (isHighLiquiditySegment) return basePrice; // High-liquidity F&O / Commodities / Index: zero slippage
-
-      const depthTotalQty = Array.isArray(book) ? book.reduce((sum, lvl) => sum + Number(lvl.qty || lvl.quantity || lvl.volume || 0), 0) : 0;
-      const liveDailyVol = Number(cached.volume || cached.vol_traded_today || 0);
-      const marketTotalQty = Number(order.side === 'BUY' ? (cached.totSellQuan || 0) : (cached.totBuyQuan || 0));
-
-      const effectiveVolume = Math.max(liveDailyVol, marketTotalQty, depthTotalQty * 10);
-
-      if (effectiveVolume >= 100000) return basePrice;
-      if (effectiveVolume > 0 && (qty / effectiveVolume) <= 0.05) return basePrice;
-
-      let slippageRatio = 0.01;
-      if (effectiveVolume > 0) {
-        const impactRatio = qty / effectiveVolume;
-        slippageRatio = Math.min(0.05, Math.max(0.005, impactRatio * 0.015));
-      } else {
-        slippageRatio = 0.02;
-      }
-
-      if (order.side === 'BUY') {
-        return Number((basePrice * (1 + slippageRatio)).toFixed(2));
-      } else {
-        return Number((basePrice * (1 - slippageRatio)).toFixed(2));
-      }
-    };
-
     if (depthFilled > 0) {
       const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
       await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
-
-      // Only retail cash equities sweep remaining qty immediately
-      if ((ordObj.type === 'MARKET' || ordObj.isMarket) && ordObj.pending_quantity > 0 && baseLtp > 0) {
-        if (canInstantSweep) {
-          const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
-          await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
-        }
-      }
-    } else {
-      if (ordObj.type === 'MARKET' || ordObj.isMarket) {
-        if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
-          if (canInstantSweep) {
-            // Only small retail cash equity orders execute instantly at market price
-            const sweepPrice = calculateMarketSlippage(ordObj, baseLtp);
-            await this.processSliceFill(ordObj, ordObj.pending_quantity, sweepPrice);
-          }
-          // else: derivative/commodity/large cash equity — queue for real volume ticks
-        }
-      } else {
-        // For LIMIT orders: check if marketable against baseLtp
-        let isMarketable = false;
-        if (ordObj.type === 'LIMIT' && ordObj.price && baseLtp > 0) {
-          const limitPrice = Number(ordObj.price);
-          if (ordObj.side === 'BUY' && baseLtp <= limitPrice) isMarketable = true;
-          if (ordObj.side === 'SELL' && baseLtp >= limitPrice) isMarketable = true;
-        }
-
-        if (isMarketable && ordObj.pending_quantity > 0) {
-          if (canInstantSweep) {
-            await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
-          }
-          // else: derivative/commodity/large cash equity LIMIT — queue for real volume ticks
-        }
-      }
     }
+
+    // Notice: Any remaining ordObj.pending_quantity stays queued in this.symbolQueues.
+    // We NEVER fill remaining quantity out of thin air! It strictly waits for real exchange
+    // trade volume ticks in onTick to ensure realistic volume matching across all segments.
+    // (Checked: ordObj.type === 'MARKET' || ordObj.isMarket)
 
     // Automatically dequeue order if completely executed
     if (ordObj.pending_quantity <= 0) {
@@ -440,12 +382,20 @@ class VolumeMatchingEngine {
           const maxLotsFromVol = Math.floor(availableVol / lotsize);
           if (maxLotsFromVol >= 1) {
             // Real volume supports at least 1 full lot
-            const maxFillFromVol = maxLotsFromVol * lotsize;
-            fillQty = Math.min(order.pending_quantity, maxFillFromVol);
+            if (order.pending_quantity <= 2 * lotsize) {
+              // Retail derivative orders (<= 2 lots): fill up to available volume
+              fillQty = Math.min(order.pending_quantity, maxLotsFromVol * lotsize);
+            } else {
+              // Large / Whale derivative orders (> 2 lots): pace at 30%-50% of available volume,
+              // capped at 5 lots per tick to prevent single-tick market sweeps
+              const rawCap = Math.min(order.pending_quantity, Math.max(lotsize, Math.floor(availableVol * 0.5)));
+              fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
+              fillQty = Math.min(order.pending_quantity, Math.min(fillQty, 5 * lotsize));
+            }
             // Ensure lot-aligned
             fillQty = Math.floor(fillQty / lotsize) * lotsize;
-          } else if (order.pending_quantity <= lotsize && availableVol > 0) {
-            // Last remaining slice is less than or equal to 1 lot — fill it if ANY real volume exists
+          } else if (order.pending_quantity < lotsize && availableVol >= order.pending_quantity) {
+            // Non-standard partial residual strictly smaller than 1 lot
             fillQty = order.pending_quantity;
           }
           // else: not enough real volume for even 1 lot — wait for more ticks
@@ -1141,18 +1091,23 @@ class VolumeMatchingEngine {
 
               let slice = 0;
               if (lotsize > 1) {
-                // Fill proportional to real volume delta (multiple lots allowed)
+                // Fill proportional to real volume delta (strictly whole lots)
                 const maxLotsFromVol = Math.floor(volDelta / lotsize);
                 if (maxLotsFromVol >= 1 && order.pending_quantity >= lotsize) {
-                  const maxFillFromVol = maxLotsFromVol * lotsize;
-                  slice = Math.min(order.pending_quantity, maxFillFromVol);
+                  if (order.pending_quantity <= 2 * lotsize) {
+                    slice = Math.min(order.pending_quantity, maxLotsFromVol * lotsize);
+                  } else {
+                    const rawCap = Math.min(order.pending_quantity, Math.max(lotsize, Math.floor(volDelta * 0.5)));
+                    slice = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
+                    slice = Math.min(order.pending_quantity, Math.min(slice, 5 * lotsize));
+                  }
                   slice = Math.floor(slice / lotsize) * lotsize;
-                } else if (order.pending_quantity <= lotsize && volDelta > 0) {
-                  // Last remaining partial lot — fill if any real volume exists
+                } else if (order.pending_quantity < lotsize && volDelta >= order.pending_quantity) {
+                  // Non-standard partial residual strictly smaller than 1 lot
                   slice = order.pending_quantity;
                 }
               } else {
-                slice = Math.min(order.pending_quantity, volDelta, Math.floor(Math.random() * 20) + 5);
+                slice = Math.min(order.pending_quantity, volDelta);
               }
 
               if (slice > 0) {

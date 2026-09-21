@@ -102,13 +102,55 @@ function initializeCache() {
 // Initial load
 initializeCache();
 
+let diskLotsizeMap = null;
+let sortedDiskLotKeys = null;
+function getDiskLotsizeMap() {
+    if (!diskLotsizeMap) {
+        try {
+            const lotsPath = path.join(__dirname, '..', 'database', 'lotsizeMap.json');
+            if (fs.existsSync(lotsPath)) {
+                diskLotsizeMap = JSON.parse(fs.readFileSync(lotsPath, 'utf8'));
+                sortedDiskLotKeys = Object.keys(diskLotsizeMap).sort((a, b) => b.length - a.length);
+            } else {
+                diskLotsizeMap = {};
+                sortedDiskLotKeys = [];
+            }
+        } catch (e) {
+            diskLotsizeMap = {};
+            sortedDiskLotKeys = [];
+        }
+    }
+    return diskLotsizeMap;
+}
+
+function resolveSingleLotSize(sym) {
+    if (!sym) return 1;
+    const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const direct = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym];
+    if (direct && direct > 1) return direct;
+
+    // For actual derivatives and commodities, fall back to prefix match in lotsizeMap.json
+    if (isDerivativeContract(sym) || isCommodityContract(sym)) {
+        const diskMap = getDiskLotsizeMap();
+        if (diskMap[cleanSym]) return Math.max(1, Number(diskMap[cleanSym]) || 1);
+        if (sortedDiskLotKeys) {
+            for (const key of sortedDiskLotKeys) {
+                if (cleanSym.startsWith(key)) {
+                    return Math.max(1, Number(diskMap[key]) || 1);
+                }
+            }
+        }
+    }
+
+    return direct || 1;
+}
+
 function getLotSizes(symbols) {
     if (!Array.isArray(symbols)) return {};
     const result = {};
     symbols.forEach(sym => {
         if (!sym) return;
-        const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '');
-        result[sym] = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
+        result[sym] = resolveSingleLotSize(sym);
     });
     return result;
 }
@@ -222,9 +264,7 @@ function getAssetSubsegment(sym) {
 }
 
 function getLotSize(symbol) {
-    if (!symbol) return 1;
-    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
-    return lotSizeMap[symbol] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym] || 1;
+    return resolveSingleLotSize(symbol);
 }
 
 const isMCXWinterSession = (d = new Date()) => {
@@ -362,5 +402,6 @@ module.exports = {
     isFnoEligibleStock,
     getAssetSubsegment,
     isMCXWinterSession,
-    checkPositionConversionAllowed
+    checkPositionConversionAllowed,
+    resolveSingleLotSize
 };

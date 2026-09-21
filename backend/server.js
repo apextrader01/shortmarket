@@ -5542,8 +5542,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const triggerEngine = require('./services/triggerEngine');
     const ord = req.orderToProcess;
     
-    // BUG FIX: Use effectiveProductType (not raw product_type from req.body which may be undefined)
-    await triggerEngine.addOrderToMemory(ord);
+    // Only register non-market orders in triggerEngine (LIMIT, SL, SL-L, TSL, GTT)
+    if (!ord.isMarket && ord.type !== 'MARKET') {
+      await triggerEngine.addOrderToMemory(ord);
+    }
     
     setTimeout(() => {
         try {
