@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
 import { useStore, API } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -25,7 +25,9 @@ import {
   ExternalLink,
   ShieldCheck,
   Zap,
-  SlidersHorizontal
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const EMPTY_PRICES = {};
@@ -53,6 +55,7 @@ export default function PortfolioView() {
   const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'PROFIT', 'LOSS'
   const [assetFilter, setAssetFilter] = useState('ALL'); // 'ALL', 'EQUITY', 'MF'
   const [selectedMfFund, setSelectedMfFund] = useState(null);
+  const [showAssetBreakdown, setShowAssetBreakdown] = useState(false);
 
   const [mfNames, setMfNames] = useState({
     'EDEL-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
@@ -480,15 +483,16 @@ export default function PortfolioView() {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center', 
-        padding: isMobile ? '0 16px' : '0 28px', 
+        padding: isMobile ? '0 12px' : '0 20px', 
+        height: isMobile ? '44px' : '48px',
         borderBottom: '1px solid var(--border-color)', 
         background: '#0d1527',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', gap: isMobile ? '16px' : '28px', overflowX: isMobile ? 'auto' : 'visible' }}>
+        <div style={{ display: 'flex', gap: isMobile ? '12px' : '20px', height: '100%', alignItems: 'stretch', overflowX: isMobile ? 'auto' : 'visible' }}>
           {[
             { id: 'Overview', label: 'Portfolio Overview', icon: Briefcase },
             { id: 'Analytics', label: 'Trade Analytics', icon: BarChart3 },
@@ -504,19 +508,22 @@ export default function PortfolioView() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '16px 2px',
-                  fontSize: '13.5px',
+                  gap: '7px',
+                  padding: isMobile ? '0 4px' : '0 6px',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                  fontSize: isMobile ? '12px' : '13px',
                   fontWeight: active ? '700' : '500',
                   color: active ? '#2563eb' : 'var(--text-secondary)',
                   borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+                  marginBottom: '-1px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
                 }}
               >
-                <Icon size={16} style={{ color: active ? '#2563eb' : 'var(--text-secondary)' }} />
+                <Icon size={15} style={{ color: active ? '#2563eb' : 'var(--text-secondary)' }} />
                 <span>{tab.label}</span>
               </div>
             );
@@ -569,41 +576,41 @@ export default function PortfolioView() {
           </Suspense>
         </div>
       ) : (
-        <div style={{ padding: isMobile ? '10px 14px' : '14px 24px', paddingBottom: '120px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: isMobile ? '8px 12px' : '12px 20px', paddingBottom: '100px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
-          {/* Top 4 Key Metric Cards */}
+          {/* Top 4 Key Metric Cards (Optimized High-Density Layout) */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', 
-            gap: isMobile ? '12px' : '16px' 
+            gap: isMobile ? '8px' : '12px' 
           }}>
             
             {/* Card 1: Total Portfolio Current Value */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '14px' : '18px',
-              borderRadius: '14px',
+              padding: isMobile ? '8px 10px' : '10px 14px',
+              borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
-              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
+              boxShadow: 'var(--card-shadow, 0 2px 10px rgba(0,0,0,0.06))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Wallet size={14} style={{ color: '#2563eb' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Wallet size={13} style={{ color: '#2563eb' }} />
                   </div>
                   <span>Current Worth</span>
                 </div>
-                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
+                <span style={{ fontSize: '9.5px', fontWeight: '700', padding: '1px 5px', borderRadius: '3px', background: 'rgba(37, 99, 235, 0.1)', color: '#2563eb' }}>
                   PORTFOLIO
                 </span>
               </div>
-              <div style={{ fontSize: isMobile ? '18px' : '24px', fontWeight: '700', letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
+              <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
                 {formatCurrency(totalCurrent)}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Invested:</span>
                 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{formatCurrency(totalInvested)}</span>
               </div>
@@ -611,27 +618,27 @@ export default function PortfolioView() {
 
             {/* Card 2: Overall Gain / Return */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '14px' : '18px',
-              borderRadius: '14px',
+              padding: isMobile ? '8px 10px' : '10px 14px',
+              borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
-              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
+              boxShadow: 'var(--card-shadow, 0 2px 10px rgba(0,0,0,0.06))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: isGain ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Sparkles size={14} style={{ color: isGain ? '#00E676' : '#FF3B30' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: isGain ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sparkles size={13} style={{ color: isGain ? '#00E676' : '#FF3B30' }} />
                   </div>
                   <span>Total Return</span>
                 </div>
                 <span style={{ 
-                  fontSize: '10px', 
+                  fontSize: '9.5px', 
                   fontWeight: '700', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px', 
+                  padding: '1px 5px', 
+                  borderRadius: '3px', 
                   background: isGain ? 'rgba(0, 230, 118, 0.12)' : 'rgba(255, 59, 48, 0.12)', 
                   color: isGain ? '#00E676' : '#FF3B30' 
                 }}>
@@ -639,14 +646,14 @@ export default function PortfolioView() {
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '18px' : '24px', 
+                fontSize: isMobile ? '16px' : '20px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.5px',
+                letterSpacing: '-0.3px',
                 color: isGain ? '#00E676' : '#FF3B30'
               }}>
                 {isGain ? '+' : ''}{formatCurrency(overallGain)}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Return ROI:</span>
                 <span style={{ color: isGain ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
                   {isGain ? '+' : ''}{overallPct.toFixed(2)}%
@@ -656,71 +663,71 @@ export default function PortfolioView() {
 
             {/* Card 3: Unrealized P&L (Live) */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '14px' : '18px',
-              borderRadius: '14px',
+              padding: isMobile ? '8px 10px' : '10px 14px',
+              borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
-              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
+              boxShadow: 'var(--card-shadow, 0 2px 10px rgba(0,0,0,0.06))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: unrealizedPnl >= 0 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {unrealizedPnl >= 0 ? <TrendingUp size={14} style={{ color: '#00E676' }} /> : <TrendingDown size={14} style={{ color: '#FF3B30' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: unrealizedPnl >= 0 ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 59, 48, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {unrealizedPnl >= 0 ? <TrendingUp size={13} style={{ color: '#00E676' }} /> : <TrendingDown size={13} style={{ color: '#FF3B30' }} />}
                   </div>
                   <span>Unrealized P&L</span>
                 </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'rgba(234, 179, 8, 0.12)', color: '#EAB308' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00E676', display: 'inline-block' }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '9.5px', fontWeight: '700', padding: '1px 5px', borderRadius: '3px', background: 'rgba(234, 179, 8, 0.12)', color: '#EAB308' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#00E676', display: 'inline-block' }} />
                   LIVE
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '18px' : '24px', 
+                fontSize: isMobile ? '16px' : '20px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.5px',
+                letterSpacing: '-0.3px',
                 color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30'
               }}>
                 {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>
                 All Open Positions
               </div>
             </div>
 
             {/* Card 4: Today's Realized P&L */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '14px' : '18px',
-              borderRadius: '14px',
+              padding: isMobile ? '8px 10px' : '10px 14px',
+              borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
-              boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0,0,0,0.08))',
+              boxShadow: 'var(--card-shadow, 0 2px 10px rgba(0,0,0,0.06))',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
-                  <div style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Coins size={14} style={{ color: '#c084fc' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Coins size={13} style={{ color: '#c084fc' }} />
                   </div>
                   <span>Today's Realized</span>
                 </div>
-                <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc' }}>
+                <span style={{ fontSize: '9.5px', fontWeight: '700', padding: '1px 5px', borderRadius: '3px', background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc' }}>
                   BOOKED
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '18px' : '24px', 
+                fontSize: isMobile ? '16px' : '20px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.5px',
+                letterSpacing: '-0.3px',
                 color: todayRealizedPnl >= 0 ? '#00E676' : '#FF3B30'
               }}>
                 {todayRealizedPnl >= 0 ? '+' : ''}{formatCurrency(todayRealizedPnl)}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Closed Trades:</span>
                 <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{todayTradesCount}</span>
               </div>
@@ -728,241 +735,300 @@ export default function PortfolioView() {
 
           </div>
 
-          {/* Asset Allocation & Breakdown Section */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr',
-            gap: '16px'
+          {/* Asset Allocation & Breakdown Section (Collapsible) */}
+          <div className="glass-panel" style={{
+            background: 'var(--bg-panel)',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)',
+            overflow: 'hidden',
+            boxShadow: 'var(--card-shadow, 0 4px 16px rgba(0, 0, 0, 0.08))'
           }}>
-            
-            {/* Left Box: Asset Allocation Donut Chart */}
-            <div className="glass-panel" style={{
-              background: 'var(--bg-panel)',
-              padding: '20px',
-              borderRadius: '16px',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <PieChartIcon size={16} style={{ color: '#38bdf8' }} />
-                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>Asset Allocation</h4>
-                </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Total: <strong style={{ color: 'var(--text-primary)' }}>{formatShortCurrency(totalInvested)}</strong>
+            {/* Header toggle bar */}
+            <div 
+              onClick={() => setShowAssetBreakdown(!showAssetBreakdown)}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: isMobile ? '9px 12px' : '10px 18px',
+                cursor: 'pointer',
+                background: showAssetBreakdown ? 'rgba(255,255,255,0.03)' : 'transparent',
+                userSelect: 'none',
+                transition: 'background 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <PieChartIcon size={15} style={{ color: '#38bdf8' }} />
+                <span style={{ fontSize: isMobile ? '12.5px' : '13.5px', fontWeight: '700', color: 'var(--text-primary)' }}>Asset Allocation & Distribution</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: isMobile ? 'none' : 'inline' }}>
+                  (Total: <strong style={{ color: 'var(--text-primary)' }}>{formatShortCurrency(totalInvested)}</strong>)
                 </span>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Summary badge pills */}
+                {!isMobile && (
+                  <div style={{ display: 'flex', gap: '6px', fontSize: '11px' }}>
+                    <span style={{ color: '#3B82F6', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                      Stocks {getAssetPct(totalInvestedStocks)}%
+                    </span>
+                    <span style={{ color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                      ETFs {getAssetPct(totalInvestedETFs)}%
+                    </span>
+                    <span style={{ color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                      F&O {getAssetPct(totalInvestedDerivatives)}%
+                    </span>
+                    <span style={{ color: '#A855F7', background: 'rgba(168, 85, 247, 0.1)', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                      MF {getAssetPct(totalInvestedMutualFunds)}%
+                    </span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#38bdf8', fontWeight: '600' }}>
+                  <span>{showAssetBreakdown ? 'Hide Charts' : 'View Charts'}</span>
+                  {showAssetBreakdown ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </div>
+              </div>
+            </div>
 
-              {/* Donut Chart Container */}
-              <div style={{ width: '100%', height: '210px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={65}
-                      outerRadius={88}
-                      paddingAngle={4}
-                      dataKey="value"
-                      isAnimationActive={false}
-                      stroke="none"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(val) => formatCurrency(val)}
-                      contentStyle={{ 
-                        background: 'rgba(11, 17, 33, 0.95)', 
-                        border: '1px solid rgba(255, 255, 255, 0.15)', 
-                        borderRadius: '10px',
-                        fontSize: '12px',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
-                      }}
-                      itemStyle={{ color: '#FFFFFF', fontWeight: '600' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-
-                {/* Center Donut Label */}
-                <div style={{
-                  position: 'absolute',
-                  textAlign: 'center',
-                  pointerEvents: 'none',
+            {/* Collapsible Content */}
+            {showAssetBreakdown && (
+              <div style={{
+                padding: isMobile ? '12px' : '18px',
+                borderTop: '1px solid var(--border-color)',
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : '1fr 1.2fr',
+                gap: '16px'
+              }}>
+                {/* Left Box: Asset Allocation Donut Chart */}
+                <div className="glass-panel" style={{
+                  background: 'var(--bg-panel)',
+                  padding: '16px',
+                  borderRadius: '14px',
+                  border: '1px solid var(--border-color)',
+                  boxShadow: 'var(--card-shadow, 0 4px 16px rgba(0, 0, 0, 0.08))',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'center'
+                  justifyContent: 'space-between'
                 }}>
-                  <div style={{ fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>Assets</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{formatShortCurrency(totalInvested)}</div>
-                  <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '600' }}>100%</div>
-                </div>
-              </div>
-
-              {/* Bottom Quick Legend */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', flexWrap: 'wrap', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                {[
-                  { name: 'Stocks', color: '#3B82F6', val: totalInvestedStocks },
-                  { name: 'ETFs', color: '#10B981', val: totalInvestedETFs },
-                  { name: 'Derivatives', color: '#F59E0B', val: totalInvestedDerivatives },
-                  { name: 'Mutual Funds', color: '#A855F7', val: totalInvestedMutualFunds }
-                ].map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
-                    <span style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
-                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{getAssetPct(item.val)}%</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <PieChartIcon size={15} style={{ color: '#38bdf8' }} />
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '700' }}>Asset Allocation</h4>
+                    </div>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Total: <strong style={{ color: 'var(--text-primary)' }}>{formatShortCurrency(totalInvested)}</strong>
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Right Box: Asset Distribution Details Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-              
-              {/* Stocks Card */}
-              <div className="glass-panel" style={{
-                background: 'var(--bg-panel)',
-                padding: '16px',
-                borderRadius: '14px',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#3B82F6' }} />
-                    <span style={{ fontWeight: '600', fontSize: '13px' }}>Stocks</span>
+                  {/* Donut Chart Container */}
+                  <div style={{ width: '100%', height: '190px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={82}
+                          paddingAngle={4}
+                          dataKey="value"
+                          isAnimationActive={false}
+                          stroke="none"
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(val) => formatCurrency(val)}
+                          contentStyle={{ 
+                            background: 'rgba(11, 17, 33, 0.95)', 
+                            border: '1px solid rgba(255, 255, 255, 0.15)', 
+                            borderRadius: '10px',
+                            fontSize: '12px',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                          }}
+                          itemStyle={{ color: '#FFFFFF', fontWeight: '600' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* Center Donut Label */}
+                    <div style={{
+                      position: 'absolute',
+                      textAlign: 'center',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>Assets</div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{formatShortCurrency(totalInvested)}</div>
+                      <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: '600' }}>100%</div>
+                    </div>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                    {getAssetPct(totalInvestedStocks)}%
-                  </span>
-                </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  {formatCurrency(totalInvestedStocks)}
-                </div>
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${getAssetPct(totalInvestedStocks)}%`, height: '100%', background: '#3B82F6', borderRadius: '2px' }} />
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  {countStocks} Position(s) Active
-                </div>
-              </div>
 
-              {/* ETFs Card */}
-              <div className="glass-panel" style={{
-                background: 'var(--bg-panel)',
-                padding: '16px',
-                borderRadius: '14px',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#10B981' }} />
-                    <span style={{ fontWeight: '600', fontSize: '13px' }}>ETFs</span>
+                  {/* Bottom Quick Legend */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    {[
+                      { name: 'Stocks', color: '#3B82F6', val: totalInvestedStocks },
+                      { name: 'ETFs', color: '#10B981', val: totalInvestedETFs },
+                      { name: 'Derivatives', color: '#F59E0B', val: totalInvestedDerivatives },
+                      { name: 'Mutual Funds', color: '#A855F7', val: totalInvestedMutualFunds }
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: item.color }} />
+                        <span style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
+                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{getAssetPct(item.val)}%</span>
+                      </div>
+                    ))}
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                    {getAssetPct(totalInvestedETFs)}%
-                  </span>
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  {formatCurrency(totalInvestedETFs)}
-                </div>
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${getAssetPct(totalInvestedETFs)}%`, height: '100%', background: '#10B981', borderRadius: '2px' }} />
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  {countETFs} ETF Scheme(s)
-                </div>
-              </div>
 
-              {/* Derivatives Card */}
-              <div className="glass-panel" style={{
-                background: 'var(--bg-panel)',
-                padding: '16px',
-                borderRadius: '14px',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#F59E0B' }} />
-                    <span style={{ fontWeight: '600', fontSize: '13px' }}>Derivatives (F&O)</span>
+                {/* Right Box: Asset Distribution Details Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                  
+                  {/* Stocks Card */}
+                  <div className="glass-panel" style={{
+                    background: 'var(--bg-panel)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#3B82F6' }} />
+                        <span style={{ fontWeight: '600', fontSize: '12.5px' }}>Stocks</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                        {getAssetPct(totalInvestedStocks)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      {formatCurrency(totalInvestedStocks)}
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${getAssetPct(totalInvestedStocks)}%`, height: '100%', background: '#3B82F6', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      {countStocks} Position(s) Active
+                    </div>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                    {getAssetPct(totalInvestedDerivatives)}%
-                  </span>
-                </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  {formatCurrency(totalInvestedDerivatives)}
-                </div>
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${getAssetPct(totalInvestedDerivatives)}%`, height: '100%', background: '#F59E0B', borderRadius: '2px' }} />
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  {countDerivatives} Contract(s) Held
-                </div>
-              </div>
 
-              {/* Mutual Funds Card */}
-              <div className="glass-panel" style={{
-                background: 'var(--bg-panel)',
-                padding: '16px',
-                borderRadius: '14px',
-                border: '1px solid var(--border-color)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#A855F7' }} />
-                    <span style={{ fontWeight: '600', fontSize: '13px' }}>Mutual Funds</span>
+                  {/* ETFs Card */}
+                  <div className="glass-panel" style={{
+                    background: 'var(--bg-panel)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#10B981' }} />
+                        <span style={{ fontWeight: '600', fontSize: '12.5px' }}>ETFs</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.12)', color: '#059669', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                        {getAssetPct(totalInvestedETFs)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      {formatCurrency(totalInvestedETFs)}
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${getAssetPct(totalInvestedETFs)}%`, height: '100%', background: '#10B981', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      {countETFs} ETF Scheme(s)
+                    </div>
                   </div>
-                  <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.12)', color: '#9333ea', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
-                    {getAssetPct(totalInvestedMutualFunds)}%
-                  </span>
+
+                  {/* Derivatives Card */}
+                  <div className="glass-panel" style={{
+                    background: 'var(--bg-panel)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#F59E0B' }} />
+                        <span style={{ fontWeight: '600', fontSize: '12.5px' }}>Derivatives (F&O)</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                        {getAssetPct(totalInvestedDerivatives)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      {formatCurrency(totalInvestedDerivatives)}
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${getAssetPct(totalInvestedDerivatives)}%`, height: '100%', background: '#F59E0B', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      {countDerivatives} Contract(s) Held
+                    </div>
+                  </div>
+
+                  {/* Mutual Funds Card */}
+                  <div className="glass-panel" style={{
+                    background: 'var(--bg-panel)',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <div style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#A855F7' }} />
+                        <span style={{ fontWeight: '600', fontSize: '12.5px' }}>Mutual Funds</span>
+                      </div>
+                      <span style={{ fontSize: '10.5px', background: 'rgba(168, 85, 247, 0.12)', color: '#9333ea', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                        {getAssetPct(totalInvestedMutualFunds)}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      {formatCurrency(totalInvestedMutualFunds)}
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${getAssetPct(totalInvestedMutualFunds)}%`, height: '100%', background: '#A855F7', borderRadius: '2px' }} />
+                    </div>
+                    <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                      {countMutualFunds} Mutual Fund(s)
+                    </div>
+                  </div>
+
                 </div>
-                <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                  {formatCurrency(totalInvestedMutualFunds)}
-                </div>
-                {/* Progress bar */}
-                <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${getAssetPct(totalInvestedMutualFunds)}%`, height: '100%', background: '#A855F7', borderRadius: '2px' }} />
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  {countMutualFunds} Mutual Fund(s)
-                </div>
+
               </div>
-
-            </div>
-
+            )}
           </div>
 
           {/* Holdings Section */}
           <div className="glass-panel" style={{
             background: 'var(--bg-panel)',
-            borderRadius: '16px',
+            borderRadius: '12px',
             border: '1px solid var(--border-color)',
-            boxShadow: 'var(--card-shadow, 0 8px 32px rgba(0, 0, 0, 0.08))',
-            overflow: 'hidden'
+            boxShadow: 'var(--card-shadow, 0 4px 20px rgba(0, 0, 0, 0.08))',
+            overflow: 'visible',
+            contain: 'none'
           }}>
             
             {/* Holdings Header with Search & Filter Controls */}
@@ -1112,7 +1178,7 @@ export default function PortfolioView() {
             </div>
 
             {/* Holdings Table Content */}
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ overflowX: isMobile ? 'auto' : 'visible', overflowY: 'visible', WebkitOverflowScrolling: 'touch' }}>
               {isMobile ? (
                 /* 📱 High-Density Mobile Holdings List */
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1215,18 +1281,18 @@ export default function PortfolioView() {
                 </div>
               ) : (
                 /* 🖥️ Modern Desktop Holdings Table */
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ padding: '12px 14px', fontWeight: '600' }}>Symbol / Scheme</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Qty / Units</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Avg Price</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Live LTP / NAV</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Day Change</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Invested Value</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Current Value</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'right' }}>Total Return (P&L)</th>
-                      <th style={{ padding: '12px 14px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '13px' }}>
+                  <thead style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35 }}>
+                    <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Symbol / Scheme</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Qty / Units</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Avg Price</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Live LTP / NAV</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Day Change</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested Value</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current Value</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
