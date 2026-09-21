@@ -4867,7 +4867,7 @@ export default function AdminDashboard() {
                     const a = document.createElement('a');
                     a.setAttribute('hidden', '');
                     a.setAttribute('href', url);
-                    a.setAttribute('download', `shortmarket_telemetry_${telemetryTimeframe}_${Date.now()}.csv`);
+                    a.setAttribute('download', `skandx_telemetry_${telemetryTimeframe}_${Date.now()}.csv`);
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);

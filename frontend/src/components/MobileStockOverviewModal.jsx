@@ -28,7 +28,6 @@ export default function MobileStockOverviewModal() {
   const {
     mobileStockOverviewSymbol,
     setMobileStockOverviewSymbol,
-    prices,
     openOrderModal,
     setChartModalSymbol,
     openMarketDepthModal,
@@ -37,7 +36,6 @@ export default function MobileStockOverviewModal() {
   } = useStore(useShallow(state => ({
     mobileStockOverviewSymbol: state.mobileStockOverviewSymbol,
     setMobileStockOverviewSymbol: state.setMobileStockOverviewSymbol,
-    prices: state.prices,
     openOrderModal: state.openOrderModal,
     setChartModalSymbol: state.setChartModalSymbol,
     openMarketDepthModal: state.openMarketDepthModal,
@@ -74,11 +72,14 @@ export default function MobileStockOverviewModal() {
     return { exchange: ex, rawSymbol: raw, displayName: cleanName };
   }, [symbol, stockMeta]);
 
-  // Live price object from store
-  const livePrice = prices[symbol] || 
-    prices[rawSymbol] || 
-    prices[`${exchange}:${rawSymbol}`] || 
-    {};
+  // Live price object from store — fine-grained selector eliminates hundreds of re-renders per second
+  const livePrice = useStore(state => {
+    if (!symbol) return {};
+    return state.prices[symbol] || 
+      state.prices[rawSymbol] || 
+      state.prices[`${exchange}:${rawSymbol}`] || 
+      {};
+  });
 
   const currentLtp = livePrice.ltp !== undefined ? Number(livePrice.ltp) : (stockMeta?.ltp || 0);
   const change = livePrice.change !== undefined ? Number(livePrice.change) : 0;

@@ -7848,19 +7848,40 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
   // Clean symbol by stripping exchange prefix (NSE:, BSE:, MCX:) and suffix (-EQ, -A, -B, -INDEX, etc.)
   let cleanName = symbol.replace(/^(NSE|BSE|MCX):/i, '').split('-')[0].trim();
 
+  // ⚡ Fast-path for Indices (NIFTY50, BANKNIFTY, SENSEX, etc.) — indices are not equities and fail Groww stock search
+  const isIndex = symbol.toUpperCase().includes('INDEX') || ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'NIFTY50', 'NIFTYBANK'].includes(cleanName.toUpperCase());
+  if (isIndex) {
+    const indexData = {
+      header: { companyName: symbol.replace(/^(NSE|BSE|MCX):/i, '').replace(/-INDEX$/i, ''), nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Index' },
+      priceData: {},
+      stats: {},
+      details: { businessSummary: `${symbol} is a premier benchmark index tracked on Indian financial markets.`, managingDirector: '-', foundedYear: '-' },
+      isIndex: true,
+      fundamentals: []
+    };
+    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data: indexData }, 200);
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.json(indexData);
+  }
+
   // Derivatives (Options/Futures) won't be found on Groww stock search.
   const isDerivative = isDerivativeContract(symbol);
   if (isDerivative) {
-    return res.json({
+    const derivData = {
       header: { companyName: symbol, nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Derivatives' },
       priceData: {},
       stats: {},
       details: { businessSummary: `Derivative contract (${symbol}) traded on Indian financial exchanges.`, managingDirector: '-', foundedYear: '-' },
-      isDerivative: true
-    });
+      isDerivative: true,
+      fundamentals: []
+    };
+    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data: derivData }, 200);
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.json(derivData);
   }
 
   if (stockDetailsCache[cleanName] && (Date.now() - stockDetailsCache[cleanName].timestamp < 3600000)) {
+    res.set('Cache-Control', 'public, max-age=3600');
     return res.json(stockDetailsCache[cleanName].data);
   }
 
@@ -7883,7 +7904,7 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
     }
 
     if (!searchId) {
-      // Return a clean fallback object instead of 404 error
+      // Return a clean fallback object instead of 404 error and cache it to eliminate repeat 3s timeouts
       const fallback = {
         header: { companyName: cleanName, nseScriptCode: cleanName, bseScriptCode: cleanName, industryName: 'Equity' },
         priceData: {},
@@ -7891,6 +7912,8 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
         details: { businessSummary: `${cleanName} is a publicly traded security on Indian stock exchanges.`, managingDirector: '-', foundedYear: '-' },
         fundamentals: []
       };
+      setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data: fallback }, 200);
+      res.set('Cache-Control', 'public, max-age=3600');
       return res.json(fallback);
     }
 
@@ -7935,7 +7958,8 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
       data.news = [];
     }
 
-    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data }, 100);
+    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data }, 200);
+    res.set('Cache-Control', 'public, max-age=3600');
     res.json(data);
   } catch (err) {
     console.error('Stock Details Fetch Error for', cleanName, err.message);
@@ -7946,6 +7970,8 @@ app.get('/api/stocks/:symbol/details', async (req, res) => {
       details: { businessSummary: `${cleanName} is a publicly traded security on Indian stock exchanges.`, managingDirector: '-', foundedYear: '-' },
       fundamentals: []
     };
+    setLRUCache(stockDetailsCache, cleanName, { timestamp: Date.now(), data: fallback }, 200);
+    res.set('Cache-Control', 'public, max-age=300');
     res.json(fallback);
   }
 });
