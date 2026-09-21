@@ -205,6 +205,7 @@ export default function PositionsView() {
     }
     return map;
   }));
+  const prices = relevantPrices;
 
   // Group positions by Symbol + Product Type (Flat List)
   const { flatPositions, globalMTM, totalInvested, totalCurrent } = useMemo(() => {
@@ -418,7 +419,7 @@ export default function PositionsView() {
       }
 
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
-      const liveLtp = prices[pos.symbol]?.ltp || 0;
+      const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
       const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type || 'DEL');
       const payload = {
         symbol: pos.symbol,
@@ -1412,7 +1413,7 @@ export default function PositionsView() {
                       side: exitSide,
                       quantity: qtyToExit,
                       lotsize: ls,
-                      price: partialExitType === 'MARKET' ? (prices[partialExitPos.symbol]?.ltp || 0) : parseFloat(partialExitPrice),
+                      price: partialExitType === 'MARKET' ? (relevantPrices[partialExitPos.symbol]?.ltp || store.prices?.[partialExitPos.symbol]?.ltp || partialExitPos.ltp || 0) : parseFloat(partialExitPrice),
                       sl_price: null,
                       tgt_price: null,
                       margin: 0,

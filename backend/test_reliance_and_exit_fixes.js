@@ -32,6 +32,11 @@ it('PositionsView.jsx declares isExitShort in partialExitPos render scope before
   assert(positionsViewContent.includes('{partialExitPos && (() => {'), 'IIFE wrapper for partialExitPos modal missing');
 });
 
+it('PositionsView.jsx defines prices alias and safe liveLtp fallback to prevent "prices is not defined"', () => {
+  assert(positionsViewContent.includes('const prices = relevantPrices;'), 'prices alias missing');
+  assert(positionsViewContent.includes('const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;'), 'safe liveLtp in exitAllPositions missing');
+});
+
 // 2. Verify pnlHelper.js filter for ghost closed positions
 console.log('\n▶ TEST SUITE 2: pnlHelper.js Closed Positions Filter Logic');
 const pnlHelperPath = path.join(__dirname, '..', 'frontend', 'src', 'utils', 'pnlHelper.js');
