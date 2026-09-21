@@ -176,11 +176,6 @@ export default function PortfolioView() {
       return p.symbol === sym || pClean === cleanSym;
     });
 
-    // If position was closed today (quantity 0 and closed_quantity > 0), do not display as active holding
-    if (matchingPos && Number(matchingPos.quantity) === 0 && Number(matchingPos.closed_quantity) > 0) {
-      return;
-    }
-
     // Derivative contracts (CE, PE, FUT) are never persistent holdings; only show if active positive open position
     if (isDerivativeContract(sym)) {
       if (!matchingPos || Number(matchingPos.quantity) === 0) return;

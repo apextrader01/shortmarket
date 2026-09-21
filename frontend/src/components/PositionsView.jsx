@@ -48,13 +48,35 @@ export default function PositionsView() {
       // 1. Existing database holdings
       (holdings || []).forEach(h => {
         if (h && h.symbol) {
-          mergedHoldingsMap[h.symbol] = {
-            ...h,
-            quantity: Number(h.quantity) || 0,
-            average_price: Math.abs(Number(h.average_price) || 0),
-            side: h.side || (Number(h.quantity) < 0 ? 'SELL' : 'BUY'),
-            isDbHolding: true
-          };
+          const sym = h.symbol;
+          const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+          const key = cleanSym || sym;
+          const hQty = Number(h.quantity) || 0;
+          const hPrice = Math.abs(Number(h.average_price) || 0);
+          if (hQty <= 0) return;
+
+          if (!mergedHoldingsMap[key]) {
+            mergedHoldingsMap[key] = {
+              ...h,
+              symbol: h.symbol,
+              displaySymbol: cleanSym,
+              quantity: hQty,
+              average_price: hPrice,
+              side: h.side || (hQty < 0 ? 'SELL' : 'BUY'),
+              isDbHolding: true
+            };
+          } else {
+            const existing = mergedHoldingsMap[key];
+            const prevQty = Number(existing.quantity) || 0;
+            const prevPrice = Math.abs(Number(existing.average_price) || 0);
+            const totalQty = prevQty + hQty;
+            const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
+            const absTotalQty = Math.abs(totalQty);
+            const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+            existing.quantity = totalQty;
+            existing.average_price = Math.abs(weightedAvg);
+            existing.side = totalQty < 0 ? 'SELL' : 'BUY';
+          }
         }
       });
 
@@ -63,15 +85,10 @@ export default function PositionsView() {
         const qty = Number(p.quantity) || 0;
         const avg = Math.abs(Number(p.average_price) || 0);
         const cleanSym = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const key = cleanSym || p.symbol;
 
-        // Check if an existing DB holding exists for this symbol
-        const matchedKey = Object.keys(mergedHoldingsMap).find(k => {
-          const cleanK = k.replace(/^(NSE:|BSE:|MCX:)/i, '');
-          return k === p.symbol || cleanK === cleanSym;
-        });
-
-        if (matchedKey && mergedHoldingsMap[matchedKey].isDbHolding) {
-          const existing = mergedHoldingsMap[matchedKey];
+        if (mergedHoldingsMap[key] && mergedHoldingsMap[key].isDbHolding) {
+          const existing = mergedHoldingsMap[key];
           const prevQty = Number(existing.quantity) || 0;
           const prevPrice = Math.abs(Number(existing.average_price) || 0);
           const totalQty = prevQty + qty;
@@ -81,11 +98,12 @@ export default function PositionsView() {
           existing.quantity = totalQty;
           existing.average_price = Math.abs(weightedAvg);
           existing.side = totalQty < 0 ? 'SELL' : 'BUY';
-        } else {
+        } else if (!mergedHoldingsMap[key]) {
           const key = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;
           mergedHoldingsMap[key] = {
             ...p,
             id: p.id || key,
+            displaySymbol: cleanSym,
             isOvernightPos: true,
             quantity: qty,
             average_price: Math.abs(avg),
@@ -136,10 +154,7 @@ export default function PositionsView() {
     return 1; // Stocks & ETFs (first)
   };
 
-  const getMfName = (sym) => {
-    if (!sym) return null;
-    return mfNames[sym] || mfNames[sym + '-MF'] || mfNames[sym.replace('-MF', '')] || null;
-  };
+
 
   const handleMfAction = (pos, mode = 'REDEEM') => {
     const rawSym = pos?.symbol || '';
@@ -155,7 +170,31 @@ export default function PositionsView() {
     });
   };
 
-  const [mfNames, setMfNames] = useState({});
+  const [mfNames, setMfNames] = useState({
+    'EDEL-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    'MIRA-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    'NIPP-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '118615-MF': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    '118825-MF': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    '118778-MF': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '120197-MF': 'ICICI Prudential Liquid Fund - Direct Plan - Growth',
+    '118615': 'Edelweiss Balanced Advantage Fund - Direct Plan - Growth',
+    '118825': 'Mirae Asset Large Cap Fund - Direct Plan - Growth',
+    '118778': 'Nippon India Small Cap Fund - Direct Plan - Growth Option',
+    '120197': 'ICICI Prudential Liquid Fund - Direct Plan - Growth',
+    '151565-MF': 'HDFC FMP 1269D March 2023 - Direct Plan - Growth Option',
+    '151565': 'HDFC FMP 1269D March 2023 - Direct Plan - Growth Option',
+    '122639-MF': 'Parag Parikh Flexi Cap Fund - Direct Plan - Growth',
+    '122639': 'Parag Parikh Flexi Cap Fund - Direct Plan - Growth',
+    '125497-MF': 'SBI SMALL CAP FUND - Direct Plan - Growth',
+    '125497': 'SBI SMALL CAP FUND - Direct Plan - Growth'
+  });
+
+  const getMfName = (sym) => {
+    if (!sym) return null;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return mfNames[sym] || mfNames[clean] || mfNames[`${clean}-MF`] || mfNames[clean.replace('-MF', '')] || null;
+  };
   useEffect(() => {
     const symbols = (sourceData || []).map(p => p.symbol).filter(isMutualFund);
     const unique = [...new Set(symbols)];
@@ -192,7 +231,15 @@ export default function PositionsView() {
     if (viewMode === 'CLOSED') return [];
     const syms = new Set();
     (sourceData || []).forEach(p => {
-      if (p.symbol) syms.add(p.symbol);
+      if (p.symbol) {
+        syms.add(p.symbol);
+        const clean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        if (clean) {
+          syms.add(clean);
+          syms.add(`NSE:${clean}`);
+          syms.add(`BSE:${clean}`);
+        }
+      }
     });
     return Array.from(syms);
   }, [sourceData, viewMode]);
@@ -221,7 +268,8 @@ export default function PositionsView() {
       if (viewMode === 'CLOSED' && isOpen) return;
 
       const normProd = viewMode === 'HOLDINGS' ? 'DEL' : (pos.product_type || 'INT');
-      const key = `${pos.symbol}-${normProd}`;
+      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const key = viewMode === 'HOLDINGS' ? `${cleanSym}-${normProd}` : `${pos.symbol}-${normProd}`;
       if (!symbolAgg[key]) {
          symbolAgg[key] = { ...pos, encumberedQty: 0, unencumberedQty: 0 };
       }
@@ -279,7 +327,8 @@ export default function PositionsView() {
       const posQty = Number(pos.quantity) || 0;
       if (posQty === 0 && viewMode === 'OPEN') return;
 
-      const priceData = relevantPrices[pos.symbol] || {};
+      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const priceData = relevantPrices[pos.symbol] || relevantPrices[cleanSym] || relevantPrices[`NSE:${cleanSym}`] || relevantPrices[`BSE:${cleanSym}`] || {};
       const avg = Math.abs(parseFloat(pos.average_price) || 0);
       const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : (avg || 0);
       const qty = posQty;
@@ -296,7 +345,6 @@ export default function PositionsView() {
           
       const lotSize = priceData.lotsize || 1;
       
-      const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
       let segment = 'Stock';
       if (isMutualFund(pos.symbol)) {
         segment = 'MF';
