@@ -6234,6 +6234,18 @@ app.post('/api/user/risk-guardian', authenticateToken, async (req, res) => {
 // ⚡ Exit All Holdings ⚡
 app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
   try {
+    // 🛡️ MARKET TIMING ENFORCEMENT: Holdings are equity delivery assets traded on NSE/BSE.
+    // Regular instant liquidation can ONLY be executed during continuous trading hours (09:15 AM - 03:30 PM IST).
+    const marketCheck = isSegmentMarketOpen(false, null, 'DEL', false);
+    if (!marketCheck.open) {
+      const hoursDesc = '09:15 AM - 03:30 PM';
+      return res.status(400).json({
+        error: marketCheck.isTotalBlock 
+          ? marketCheck.reason 
+          : `Market is closed. Regular orders can only be placed during trading hours (${hoursDesc}). Please select AMO to place an After Market Order.`
+      });
+    }
+
     let totalSoldAmount = 0;
     const exitOrders = [];
 
@@ -6659,7 +6671,18 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
     
     const marketCheck = isSegmentMarketOpen(isCommodity, item.symbol, item.product_type, false);
     if (!marketCheck.open) {
-      if (marketCheck.isTotalBlock || (isIntradayProduct && !marketCheck.isAmoWindow)) {
+      if (marketCheck.isTotalBlock) {
+        return res.status(400).json({ error: marketCheck.reason });
+      }
+      const isItemAmo = Boolean(item.is_amo || req.body.is_amo || req.body.variety === 'AMO');
+      if (!isItemAmo) {
+        const hoursDesc = isCommodity ? '09:00 AM - 11:30 PM' : '09:15 AM - 03:30 PM';
+        const marketName = isCommodity ? 'MCX Commodity Market' : 'Market';
+        return res.status(400).json({
+          error: `${marketName} is closed. Regular orders can only be placed during trading hours (${hoursDesc}). Please select AMO to place an After Market Order.`
+        });
+      }
+      if (!marketCheck.isAmoWindow) {
         return res.status(400).json({ error: marketCheck.reason });
       }
     }

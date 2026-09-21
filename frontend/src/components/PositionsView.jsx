@@ -4,8 +4,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, X, Share2, RefreshCw, TrendingUp, Wallet } from 'lucide-react';
 import PnLShareCardModal from './PnLShareCardModal';
 import MutualFundDetailsModal from './MutualFundDetailsModal';
-import { checkPositionConversionAllowed, isDerivativeContract } from '../utils/lotsizeHelper';
+import { checkPositionConversionAllowed, isDerivativeContract, isCommodityContract } from '../utils/lotsizeHelper';
 import { getTodayClosedPositions, getISTDate, isToday } from '../utils/pnlHelper';
+import { getMarketSession } from '../utils/marketTiming';
 
 const EMPTY_PRICES = {};
 
@@ -33,7 +34,13 @@ export default function PositionsView() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { positions, holdings, orders } = useStore(useShallow(state => ({ positions: state.positions, holdings: state.holdings, orders: state.orders })));
+  const { positions, holdings, orders, marketStatus, marketCalendar } = useStore(useShallow(state => ({
+    positions: state.positions,
+    holdings: state.holdings,
+    orders: state.orders,
+    marketStatus: state.marketStatus,
+    marketCalendar: state.marketCalendar
+  })));
   
   const sourceData = useMemo(() => {
     if (viewMode === 'HOLDINGS') {
@@ -100,6 +107,7 @@ export default function PositionsView() {
   const [partialExitQty, setPartialExitQty] = useState('');
   const [partialExitType, setPartialExitType] = useState('MARKET');
   const [partialExitPrice, setPartialExitPrice] = useState('');
+  const [partialExitIsAmo, setPartialExitIsAmo] = useState(false);
 
   const isMutualFund = (sym, assetClass) => {
     if (assetClass === 'MUTUAL_FUND') return true;
@@ -359,13 +367,42 @@ export default function PositionsView() {
   }, [sourceData, relevantPrices, viewMode]);
 
   const exitAllPositions = async () => {
+    const store = useStore.getState();
     const openPositions = flatPositions.filter(p => Number(p.qty) !== 0 && Number(p.unencumberedQty) > 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
     if (openPositions.length === 0) {
       alert('No valid unencumbered positions to exit.');
       return;
     }
+
+    // 🛡️ MARKET TIMING ENFORCEMENT: Verify market is currently open for trading
+    const hasCommodity = openPositions.some(p => isCommodityContract(p.symbol));
+    const hasEquity = openPositions.some(p => !isCommodityContract(p.symbol));
+
+    const equitySession = getMarketSession({
+      symbol: 'NSE:RELIANCE',
+      productType: 'INT',
+      isCommodity: false,
+      marketStatus: store.marketStatus,
+      marketCalendar: store.marketCalendar
+    });
+    const commSession = getMarketSession({
+      symbol: 'MCX:CRUDEOIL',
+      productType: 'INT',
+      isCommodity: true,
+      marketStatus: store.marketStatus,
+      marketCalendar: store.marketCalendar
+    });
+
+    if (hasEquity && !equitySession.open) {
+      alert(equitySession.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
+      return;
+    }
+    if (hasCommodity && !commSession.open) {
+      alert(commSession.closedMessage || "MCX Commodity Market is closed. Regular orders can only be placed during trading hours (09:00 AM - 11:30 PM). Please select AMO to place an After Market Order.");
+      return;
+    }
+
     if (!window.confirm(`Exit ALL ${openPositions.length} unencumbered position(s) at market price?`)) return;
-    const store = useStore.getState();
     let failed = 0;
     let lastError = '';
     const results = await Promise.allSettled(openPositions.map(async (pos) => {
@@ -567,9 +604,21 @@ export default function PositionsView() {
           {viewMode === 'HOLDINGS' && flatPositions.length > 0 && (
             <button
               onClick={async () => {
+                const store = useStore.getState();
+                const session = getMarketSession({
+                  symbol: 'NSE:RELIANCE',
+                  productType: 'DEL',
+                  isCommodity: false,
+                  marketStatus: store.marketStatus,
+                  marketCalendar: store.marketCalendar
+                });
+                if (!session.open) {
+                  alert(session.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
+                  return;
+                }
                 if (!window.confirm(`Are you sure you want to EXIT ALL ${flatPositions.length} active holdings at current market price?`)) return;
                 try {
-                  const token = useStore.getState().token || localStorage.getItem('token');
+                  const token = store.token || localStorage.getItem('token');
                   const res = await fetch(`${API}/api/holdings/exit-all`, {
                     credentials: 'include',
                     method: 'POST',
@@ -581,7 +630,7 @@ export default function PositionsView() {
                   const data = await res.json();
                   if (res.ok) {
                     alert(data.message || 'Successfully exited all holdings!');
-                    useStore.getState().fetchUserData();
+                    store.fetchUserData();
                   } else {
                     alert(data.error || 'Failed to exit holdings');
                   }
@@ -1039,6 +1088,7 @@ export default function PositionsView() {
                             return;
                           }
                           setPartialExitPos(pos);
+                          setPartialExitIsAmo(false);
                           const ls = pos.lotSize || 1;
                           setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
                           setPartialExitType('MARKET');
@@ -1243,6 +1293,34 @@ export default function PositionsView() {
               <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
                 {partialExitPos.symbol}
               </div>
+
+              {/* Regular vs AMO Selector */}
+              <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setPartialExitIsAmo(false)}
+                  style={{
+                    flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                    background: !partialExitIsAmo ? '#2563eb' : 'transparent',
+                    color: !partialExitIsAmo ? '#ffffff' : 'var(--text-secondary)',
+                    fontSize: '12px', fontWeight: '600', transition: 'all 0.15s ease'
+                  }}
+                >
+                  Regular
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartialExitIsAmo(true)}
+                  style={{
+                    flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                    background: partialExitIsAmo ? '#f59e0b' : 'transparent',
+                    color: partialExitIsAmo ? '#000000' : 'var(--text-secondary)',
+                    fontSize: '12px', fontWeight: '700', transition: 'all 0.15s ease'
+                  }}
+                >
+                  🌙 AMO
+                </button>
+              </div>
               
               <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
@@ -1299,6 +1377,32 @@ export default function PositionsView() {
                     alert('Please enter a valid limit price greater than 0.');
                     return;
                   }
+
+                  // 🛡️ Market session check for partial exit
+                  const store = useStore.getState();
+                  const isCommodity = isCommodityContract(partialExitPos.symbol);
+                  const effProd = (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL');
+                  const session = getMarketSession({
+                    symbol: partialExitPos.symbol,
+                    productType: effProd,
+                    isCommodity,
+                    marketStatus: store.marketStatus,
+                    marketCalendar: store.marketCalendar
+                  });
+
+                  if (partialExitIsAmo && !session.isAmoWindow) {
+                    const amoTimingMsg = isCommodity
+                      ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+                      : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
+                    alert(amoTimingMsg);
+                    return;
+                  }
+
+                  if (!partialExitIsAmo && !session.open) {
+                    alert(session.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
+                    return;
+                  }
+
                   const isExitShort = Number(partialExitPos.qty) < 0 || partialExitPos.side === 'SELL';
                   const exitSide = isExitShort ? 'BUY' : 'SELL';
                   const ok = await useStore.getState().placeOrder({
@@ -1311,7 +1415,9 @@ export default function PositionsView() {
                     sl_price: null,
                     tgt_price: null,
                     margin: 0,
-                    product_type: (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL')
+                    product_type: effProd,
+                    variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
+                    is_amo: partialExitIsAmo
                   });
                   if (ok && ok.success) {
                     setPartialExitPos(null);
