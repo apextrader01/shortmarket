@@ -315,7 +315,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
 <body>
   <div class="no-print">
     <div style="font-size: 13px; font-weight: 700; color: #1e3a8a; display: flex; align-items: center; gap: 8px;">
-      <span style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SHORT EDGE</span>
+      <span style="background: #2563eb; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">SKANDX</span>
       <span>${safeTitle} - Statement Preview</span>
     </div>
     <div style="display: flex; gap: 8px;">
@@ -326,11 +326,11 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
 
   <div class="header">
     <div>
-      <div class="logo-title">SHORT EDGE</div>
+      <div class="logo-title">SKANDX</div>
       <div class="doc-title">${safeTitle}</div>
     </div>
     <div style="text-align: right; font-size: 10px; color: #475569;">
-      <div>Short Edge Trading Platform</div>
+      <div>SkandX Trading Platform</div>
       <div>Generated: ${generatedDate} IST</div>
       <div>Official Client Statement</div>
     </div>
@@ -348,7 +348,7 @@ export function buildReportHtml(title, clientMeta = {}, summaryCards = [], table
   ${tablesHtml}
 
   <div class="footer">
-    This is a computer-generated official statement from Short Edge. No physical signature is required. For discrepancies, contact support@shortedge.in.
+    This is a computer-generated official statement from SkandX. No physical signature is required. For discrepancies, contact support@skandx.in.
   </div>
 
   <script>
@@ -467,7 +467,7 @@ export function generateTaxPnLReport(orders = [], positions = [], user = {}, dat
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - SCRIPWISE TAX P&L STATEMENT')]);
+    rows.push([esc('SKANDX - SCRIPWISE TAX P&L STATEMENT')]);
     rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Turnover: ₹${totalTurnover.toFixed(2)}`), esc(`Gross Realized P&L: ₹${totalGrossPnl.toFixed(2)}`), esc(`Net Taxable P&L: ₹${totalNetTaxable.toFixed(2)}`)]);
     rows.push('');
@@ -631,7 +631,7 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - SEGMENTWISE P&L SUMMARY STATEMENT')]);
+    rows.push([esc('SKANDX - SEGMENTWISE P&L SUMMARY STATEMENT')]);
     rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push('');
     rows.push([esc('Trading Segment'), esc('Total Trades'), esc('Total Turnover (₹)'), esc('Gross P&L (₹)'), esc('Total Charges (₹)'), esc('Net Realized P&L (₹)')]);
@@ -774,7 +774,7 @@ export function generateTradesAndChargesReport(orders = [], user = {}, dateRange
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - TRADES & CHARGES BREAKDOWN STATEMENT')]);
+    rows.push([esc('SKANDX - TRADES & CHARGES BREAKDOWN STATEMENT')]);
     rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Trades: ${executed.length}`), esc(`Total Brokerage: ₹${grandBrokerage.toFixed(2)}`), esc(`Total Charges & Taxes: ₹${grandTotalCharges.toFixed(2)}`)]);
     rows.push('');
@@ -924,7 +924,7 @@ export function generateLedgerReport(ledger = [], user = {}, dateRange = 'All Re
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - FINANCIAL LEDGER ACCOUNT STATEMENT')]);
+    rows.push([esc('SKANDX - FINANCIAL LEDGER ACCOUNT STATEMENT')]);
     rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Period: ${displayPeriod}`)]);
     rows.push([esc(`Total Credits: ₹${totalCredits.toFixed(2)}`), esc(`Total Debits: ₹${totalDebits.toFixed(2)}`), esc(`Closing Available Balance: ₹${closingBalance.toFixed(2)}`)]);
     rows.push('');
@@ -1086,7 +1086,7 @@ export function generateContractNoteReport(orders = [], user = {}, tradeDate = n
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - ELECTRONIC CONTRACT NOTE (ECN)')]);
+    rows.push([esc('SKANDX - ELECTRONIC CONTRACT NOTE (ECN)')]);
     rows.push([esc(`Contract Note No: ${cnNumber}`), esc(`Trade Date: ${tradeDate}`), esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`)]);
     rows.push([esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Net Settlement: ₹${netSettlement.toFixed(2)} (${netSettlement >= 0 ? 'Receivable' : 'Payable'})`)]);
     rows.push('');
@@ -1268,7 +1268,7 @@ export function generateDPHoldingReport(holdings = [], prices = {}, user = {}, f
 
   if (format === 'excel') {
     const rows = [];
-    rows.push([esc('SHORT EDGE - DP HOLDINGS & DEMAT PORTFOLIO VALUATION')]);
+    rows.push([esc('SKANDX - DP HOLDINGS & DEMAT PORTFOLIO VALUATION')]);
     rows.push([esc(`Client ID: ${user.client_id || user.id || 'SE000001'}`), esc(`Client Name: ${user.username || 'Valued Trader'}`), esc(`Valuation Date: ${asOfDate}`)]);
     rows.push([esc(`Total Invested: ₹${totalInvested.toFixed(2)}`), esc(`Current Portfolio Value: ₹${totalCurrentVal.toFixed(2)}`), esc(`Unrealized P&L: ₹${totalUnrealizedPnl.toFixed(2)} (${totalReturnPct}%)`)]);
     rows.push('');

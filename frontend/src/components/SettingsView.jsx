@@ -715,7 +715,7 @@ export default function SettingsView() {
               <span>📱 3 Simple Steps to Connect:</span>
             </div>
             <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
-              <li>Open our official Telegram Bot: <a href={`https://t.me/${telegramSettings?.bot_username || 'ShortEdgeAlerts_bot'}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontWeight: '700', textDecoration: 'underline' }}>@{telegramSettings?.bot_username || 'ShortEdgeAlerts_bot'} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /></a></li>
+              <li>Open our official Telegram Bot: <a href={`https://t.me/${telegramSettings?.bot_username || 'SkandXAlerts_bot'}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontWeight: '700', textDecoration: 'underline' }}>@{telegramSettings?.bot_username || 'SkandXAlerts_bot'} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /></a></li>
               <li>Click <strong>Start</strong> (or send <code>/start</code>) in the chat. The bot will reply with your unique <strong>Chat ID</strong>.</li>
               <li>Paste your <strong>Chat ID</strong> below, choose your alert preferences, and click <strong>Save & Connect</strong>.</li>
             </ol>
@@ -860,7 +860,7 @@ export default function SettingsView() {
             <ShieldCheck size={20} color="var(--color-blue)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-            Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your Short Edge trading account.
+            Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
           </p>
 
           <BiometricSettingsSection user={user} />

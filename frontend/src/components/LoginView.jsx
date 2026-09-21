@@ -355,7 +355,7 @@ export default function LoginView() {
         <div className="login-visual-bg"></div>
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="logo-text-premium" style={{ marginBottom: 'auto' }}>
-            SHORT <span>EDGE</span>
+            Skand<span>X</span>
           </div>
           <div>
             <h1 style={{ fontSize: '48px', fontWeight: '800', lineHeight: '1.1', marginBottom: '16px', color: '#fff' }}>
@@ -372,7 +372,7 @@ export default function LoginView() {
       <div className="login-form-panel">
         <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '8px' }}>
-            SHORT <span>EDGE</span>
+            Skand<span>X</span>
           </div>
         </div>
         

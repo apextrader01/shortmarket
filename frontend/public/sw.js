@@ -1,4 +1,4 @@
-// Short Edge PWA Service Worker with Native Web Push Notification Support
+// SkandX PWA Service Worker with Native Web Push Notification Support
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -9,7 +9,7 @@ self.addEventListener('activate', (event) => {
 
 // 🔔 Listen for Push Notifications from Backend
 self.addEventListener('push', (event) => {
-  let data = { title: 'Short Edge Alert', body: 'New market update received' };
+  let data = { title: 'SkandX Alert', body: 'New market update received' };
   try {
     if (event.data) {
       data = event.data.json();
@@ -20,13 +20,13 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  const title = data.title || 'Short Edge Trading';
+  const title = data.title || 'SkandX Trading';
   const options = {
     body: data.body || 'You have a new trade update.',
     icon: data.icon || '/favicon.ico',
     badge: data.badge || '/favicon.ico',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'short-edge-alert-' + Date.now(),
+    tag: data.tag || 'skandx-alert-' + Date.now(),
     renotify: true,
     data: {
       url: data.data?.url || data.url || '/orders',

@@ -127,7 +127,7 @@ export async function registerBiometrics(userId = 'default', username = 'Trader'
   const publicKeyCredentialCreationOptions = {
     challenge,
     rp: {
-      name: 'Short Edge Trading'
+      name: 'SkandX Trading'
     },
     user: {
       id: userIdBytes,

@@ -49,7 +49,7 @@ export default function PricingView({ setActiveTab }) {
 
       const options = {
         key: orderData.key_id || 'rzp_test_placeholder',
-        name: 'Short Edge',
+        name: 'SkandX',
         description: `7-Day Free Trial (${plan})`,
         image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
         subscription_id: orderData.subscription_id,

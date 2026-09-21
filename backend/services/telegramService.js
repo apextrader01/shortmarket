@@ -9,7 +9,7 @@ let systemConfig = {
   peak_mode: 'BATCH_DELAY', // 'MUTE_DURING_PEAK' | 'BATCH_DELAY' | 'DIRECT_INSTANT'
   batch_delay_seconds: 10,
   bot_token: process.env.TELEGRAM_BOT_TOKEN || '7891234567:AAExamplePlaceholderTokenForShortEdge',
-  bot_username: process.env.TELEGRAM_BOT_USERNAME || 'ShortEdgeAlerts_bot'
+  bot_username: process.env.TELEGRAM_BOT_USERNAME || 'SkandXAlerts_bot'
 };
 
 // Queue for Non-Blocking Asynchronous Telegram Delivery
@@ -168,7 +168,7 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
     switch (alertType) {
       case 'ORDER': {
         const sideEmoji = payload.side === 'BUY' ? '🟢 BUY' : '🔴 SELL';
-        message = `⚡ <b>Short Edge · Order Executed</b>\n` +
+        message = `⚡ <b>SkandX · Order Executed</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
           `<b>Side:</b> ${sideEmoji} | <b>Type:</b> ${payload.product_type || 'INT'}\n` +
@@ -177,12 +177,12 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
           `<b>Status:</b> ✅ EXECUTED\n` +
           `<b>Time:</b> ${timeStr} IST\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
-          `<i>Trade safe · Short Edge Platform</i>`;
+          `<i>Trade safe · SkandX Platform</i>`;
         break;
       }
 
       case 'TARGET': {
-        message = `🎯 <b>Short Edge · Target Price Hit!</b>\n` +
+        message = `🎯 <b>SkandX · Target Price Hit!</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
           `<b>Target Hit Price:</b> ₹${Number(payload.exit_price || payload.price || 0).toFixed(2)}\n` +
@@ -195,7 +195,7 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
       }
 
       case 'STOPLOSS': {
-        message = `🛑 <b>Short Edge · Stop-Loss Triggered</b>\n` +
+        message = `🛑 <b>SkandX · Stop-Loss Triggered</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
           `<b>Trigger Price:</b> ₹${Number(payload.exit_price || payload.price || 0).toFixed(2)}\n` +
@@ -208,7 +208,7 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
       }
 
       case 'RISK': {
-        message = `⚠️ <b>Short Edge · Risk Guardian Alert</b>\n` +
+        message = `⚠️ <b>SkandX · Risk Guardian Alert</b>\n` +
           `━━━━━━━━━━━━━━━━━━\n` +
           `<b>Alert Reason:</b> ${payload.reason || 'Daily risk threshold reached'}\n` +
           (payload.details ? `<b>Details:</b> ${payload.details}\n` : '') +
@@ -219,7 +219,7 @@ async function sendTelegramAlert(userId, alertType, payload = {}) {
       }
 
       default: {
-        message = `📢 <b>Short Edge Alert</b>\n\n${payload.text || 'You have a new account update.'}\n\n<i>${timeStr} IST</i>`;
+        message = `📢 <b>SkandX Alert</b>\n\n${payload.text || 'You have a new account update.'}\n\n<i>${timeStr} IST</i>`;
       }
     }
 
@@ -248,7 +248,7 @@ async function sendTestAlert(chatId, username = 'Trader') {
   const testMessage = `🚀 <b>Telegram Alerts Connected!</b>\n` +
     `━━━━━━━━━━━━━━━━━━\n` +
     `Hello <b>${username}</b> 👋\n\n` +
-    `Your Short Edge trading account is successfully linked to this Telegram channel.\n\n` +
+    `Your SkandX trading account is successfully linked to this Telegram channel.\n\n` +
     `You will now receive instant notifications for:\n` +
     `• ⚡ Live Order Executions\n` +
     `• 🎯 Target / Take-Profit Hits\n` +
@@ -273,7 +273,7 @@ async function broadcastTelegramMessage(messageText) {
       if (u.telegram_chat_id) {
         alertQueue.push({
           chatId: u.telegram_chat_id,
-          text: `📢 <b>Short Edge Official Announcement</b>\n━━━━━━━━━━━━━━━━━━\n${messageText}`,
+          text: `📢 <b>SkandX Official Announcement</b>\n━━━━━━━━━━━━━━━━━━\n${messageText}`,
           queuedAt: Date.now()
         });
         count++;
@@ -302,7 +302,7 @@ async function handleIncomingTelegramUpdate(update) {
   const user = await db('users').where({ telegram_chat_id: chatId }).first();
 
   if (command === '/start') {
-    const welcome = `<b>👋 Welcome to Short Edge Trading Bot!</b>\n\n` +
+    const welcome = `<b>👋 Welcome to SkandX Trading Bot!</b>\n\n` +
       `Your Telegram Chat ID: <code>${chatId}</code>\n\n` +
       (user 
         ? `✅ <b>Account Linked:</b> ${user.username} (${user.client_id || 'ID: ' + user.id})\n\n` +
@@ -311,13 +311,13 @@ async function handleIncomingTelegramUpdate(update) {
           `📈 <code>/positions</code> - View your current open positions\n` +
           `🛑 <code>/exitall</code> - Emergency square-off all open positions\n` +
           `ℹ️ <code>/help</code> - Show command list`
-        : `⚠️ <b>Not Linked Yet:</b> Copy your Chat ID (<code>${chatId}</code>) and paste it into <b>Settings → Telegram Alerts</b> in your Short Edge app to link your account.`);
+        : `⚠️ <b>Not Linked Yet:</b> Copy your Chat ID (<code>${chatId}</code>) and paste it into <b>Settings → Telegram Alerts</b> in your SkandX app to link your account.`);
     await callTelegramApi(chatId, welcome);
     return { handled: true, command };
   }
 
   if (!user) {
-    await callTelegramApi(chatId, `⚠️ Your Telegram Chat ID (<code>${chatId}</code>) is not linked to any Short Edge account.\n\nPlease link it in <b>Settings → Telegram Alerts</b> on your web platform.`);
+    await callTelegramApi(chatId, `⚠️ Your Telegram Chat ID (<code>${chatId}</code>) is not linked to any SkandX account.\n\nPlease link it in <b>Settings → Telegram Alerts</b> on your web platform.`);
     return { handled: true, command };
   }
 
@@ -439,7 +439,7 @@ async function handleIncomingTelegramUpdate(update) {
   }
 
   if (command === '/help') {
-    const help = `<b>📱 Short Edge Telegram Commands:</b>\n\n` +
+    const help = `<b>📱 SkandX Telegram Commands:</b>\n\n` +
       `📊 <code>/pnl</code> - View today's Realized P&L, Win Rate, and Margin\n` +
       `📈 <code>/positions</code> - View all active open positions\n` +
       `🛑 <code>/exitall</code> - Emergency square off all positions\n` +

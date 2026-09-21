@@ -1261,7 +1261,7 @@ export default function AdminDashboard() {
     alert_daily_summary: true,
     batch_delay_seconds: 10,
     bot_token: '',
-    bot_username: 'ShortEdgeAlerts_bot'
+    bot_username: 'SkandXAlerts_bot'
   });
   const [tgBroadcastText, setTgBroadcastText] = useState('');
   const [tgBroadcasting, setTgBroadcasting] = useState(false);
@@ -2924,7 +2924,7 @@ export default function AdminDashboard() {
                     className="input-field"
                     value={tgConfigForm.bot_username}
                     onChange={e => setTgConfigForm(prev => ({ ...prev, bot_username: e.target.value }))}
-                    placeholder="e.g. ShortEdgeAlerts_bot"
+                    placeholder="e.g. SkandXAlerts_bot"
                     style={{ width: '100%' }}
                   />
                 </div>

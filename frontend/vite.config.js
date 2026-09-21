@@ -19,9 +19,9 @@ export default defineConfig({
         injectionPoint: undefined, // Don't try to inject precache manifest into our sw.js
       },
       manifest: {
-        name: 'ShortMarket',
-        short_name: 'ShortMarket',
-        description: 'Advanced Paper Trading Platform',
+        name: 'SkandX',
+        short_name: 'SkandX',
+        description: 'Advanced Trading Platform',
         theme_color: '#0a0b0d',
         background_color: '#0a0b0d',
         display: 'standalone',

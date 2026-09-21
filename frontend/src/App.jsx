@@ -533,7 +533,7 @@ function App() {
               {/* Left: title + index pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
-                  <img src="/logo.png" alt="Short Market Logo" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                  <img src="/logo.png" alt="SkandX Logo" style={{ height: '30px', objectFit: 'contain', background: '#fff', borderRadius: '6px', padding: '2px 8px' }} onError={(e) => e.target.style.display = 'none'} />
                 </div>
 
                 <TopIndexTicker />

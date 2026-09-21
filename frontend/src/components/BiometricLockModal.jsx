@@ -141,7 +141,7 @@ export default function BiometricLockModal({ onUnlock }) {
         </div>
 
         <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 4px 0', letterSpacing: '-0.3px' }}>
-          Short Edge Secure
+          SkandX Secure
         </h3>
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
           Welcome back, <strong style={{ color: '#fff' }}>{user?.username || 'Trader'}</strong> ({user?.client_id || 'SE000001'})

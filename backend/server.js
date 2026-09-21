@@ -6551,7 +6551,7 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
 app.post('/api/push/test', authenticateToken, async (req, res) => {
   try {
     await sendPushNotification(req.user.id, {
-      title: '🔔 Short Edge Alert',
+      title: '🔔 SkandX Alert',
       body: 'Live trade alerts and order push notifications are active on this device!',
       url: '/clientdata'
     });

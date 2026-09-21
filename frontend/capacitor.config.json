@@ -1,6 +1,6 @@
 {
   "appId": "com.shortedge.app",
-  "appName": "shortedge",
+  "appName": "SkandX",
   "webDir": "dist",
   "server": {
     "url": "https://www.skandx.in",

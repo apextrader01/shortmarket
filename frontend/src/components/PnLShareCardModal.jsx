@@ -154,7 +154,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
     // Header Branding
     ctx.fillStyle = t.textColor;
     ctx.font = '900 34px sans-serif';
-    ctx.fillText('SHORT EDGE', 80, 110);
+    ctx.fillText('SKANDX', 80, 110);
 
     ctx.fillStyle = t.accent;
     ctx.font = '700 16px sans-serif';
@@ -176,7 +176,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
     // Trader Info
     ctx.fillStyle = t.subTextColor;
     ctx.font = '500 20px sans-serif';
-    const traderName = user?.username ? ('@' + user.username) : '@ShortEdgeTrader';
+    const traderName = user?.username ? ('@' + user.username) : '@SkandXTrader';
     ctx.fillText(traderName + '  •  ' + dateStr + ' ' + timeStr, 80, 185);
 
     // Divider
@@ -308,15 +308,15 @@ export default function PnLShareCardModal({ trade, onClose }) {
 
     ctx.fillStyle = t.textColor;
     ctx.font = '700 22px sans-serif';
-    ctx.fillText('Trade with Speed & Precision on Short Edge', 80, footerY + 45);
+    ctx.fillText('Trade with Speed & Precision on SkandX', 80, footerY + 45);
 
     ctx.fillStyle = t.subTextColor;
     ctx.font = '500 15px sans-serif';
-    ctx.fillText('www.shortedge.in  •  Zero Latency Algo & Paper Trading', 80, footerY + 72);
+    ctx.fillText('www.skandx.in  •  Zero Latency Algo & Paper Trading', 80, footerY + 72);
 
     ctx.fillStyle = t.accent;
     ctx.font = '900 26px sans-serif';
-    ctx.fillText('⚡ SHORT EDGE', width - 280, footerY + 55);
+    ctx.fillText('⚡ SKANDX', width - 280, footerY + 55);
   };
 
   useEffect(() => {
@@ -328,7 +328,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
     if (!canvas) return;
     const image = canvas.toDataURL('image/png', 1.0);
     const link = document.createElement('a');
-    link.download = 'ShortEdge_PnL_' + displaySymbol + '_' + Date.now() + '.png';
+    link.download = 'SkandX_PnL_' + displaySymbol + '_' + Date.now() + '.png';
     link.href = image;
     link.click();
   };
@@ -344,7 +344,7 @@ export default function PnLShareCardModal({ trade, onClose }) {
           setCopySuccess(true);
           setTimeout(() => setCopySuccess(false), 2500);
         } else {
-          const text = 'Short Edge Trade:\n' + displaySymbol + ' ' + side + ' | P&L: ' + (isProfit ? '+' : '') + currency + pnl.toFixed(2) + ' (' + pnlPercent.toFixed(2) + '%)\nExecuted on Short Edge Terminal';
+          const text = 'SkandX Trade:\n' + displaySymbol + ' ' + side + ' | P&L: ' + (isProfit ? '+' : '') + currency + pnl.toFixed(2) + ' (' + pnlPercent.toFixed(2) + '%)\nExecuted on SkandX Terminal';
           await navigator.clipboard.writeText(text);
           setCopySuccess(true);
           setTimeout(() => setCopySuccess(false), 2500);
@@ -358,13 +358,13 @@ export default function PnLShareCardModal({ trade, onClose }) {
 
   const handleShareWhatsApp = () => {
     const shareText = encodeURIComponent(
-      'Short Edge Trade Result:\n' +
+      'SkandX Trade Result:\n' +
       'Symbol: ' + displaySymbol + '\n' +
       'Side: ' + side + ' (' + productType + ')\n' +
       'Realized P&L: ' + (isProfit ? '+' : '') + currency + Math.abs(pnl).toLocaleString(locale) + '\n' +
       'ROI: ' + (isProfit ? '+' : '') + pnlPercent.toFixed(2) + '%\n' +
       'Trader: @' + (user?.username || 'Trader') + '\n\n' +
-      'Trade seamlessly on Short Edge: https://shortedge.in'
+      'Trade seamlessly on SkandX: https://skandx.in'
     );
     window.open('https://api.whatsapp.com/send?text=' + shareText, '_blank');
   };

@@ -88,7 +88,7 @@ async function sendPushNotification(userId, payload) {
     const subscriptions = await db('push_subscriptions').where({ user_id: userId });
     if (subscriptions && subscriptions.length > 0) {
       const notificationPayload = JSON.stringify({
-        title: payload.title || 'Short Edge Alert',
+        title: payload.title || 'SkandX Alert',
         body: payload.body || 'You have a new market update',
         icon: payload.icon || '/favicon.ico',
         badge: payload.badge || '/favicon.ico',
@@ -142,7 +142,7 @@ async function sendPushNotification(userId, payload) {
 
           const message = {
             notification: {
-              title: payload.title || 'Short Edge Alert',
+              title: payload.title || 'SkandX Alert',
               body: payload.body || 'You have a new market update'
             },
             data: stringifiedData,

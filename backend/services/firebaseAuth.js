@@ -174,7 +174,7 @@ async function sendEmailOtpViaService(email, code) {
       otp_code: code,
       passcode: code,
       code: code,
-      message: `Your Short Edge verification code is: ${code}. This code is valid for 10 minutes. Do not share it with anyone.`
+      message: `Your SkandX verification code is: ${code}. This code is valid for 10 minutes. Do not share it with anyone.`
     }
   };
 

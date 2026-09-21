@@ -8319,19 +8319,19 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                 key: 'twitter',
                 title: '🐦 Twitter / X Alpha Thread Swipe',
                 category: 'Social Media',
-                text: `Most traders blow up because of poor sizing and emotional revenge trading.\n\nI started using @ShortEdgeTrade to systematically audit every trade, calculate 1% risk per trade, and follow automated pre-market checklists.\n\nLevel up your trading edge with an instant Pro trial: ${fullReferralUrl}`
+                text: `Most traders blow up because of poor sizing and emotional revenge trading.\n\nI started using @SkandX to systematically audit every trade, calculate 1% risk per trade, and follow automated pre-market checklists.\n\nLevel up your trading edge with an instant Pro trial: ${fullReferralUrl}`
               },
               {
                 key: 'whatsapp',
                 title: '💬 WhatsApp & Telegram Community Broadcast',
                 category: 'Community Groups',
-                text: `Hey guys! I have been journaling my trades and managing risk using ShortEdge Trade Diary. It includes automated P&L calendars, mistake leak trackers, and multi-market risk calculators.\n\nCheck it out here and join the community: ${fullReferralUrl}`
+                text: `Hey guys! I have been journaling my trades and managing risk using SkandX Trade Diary. It includes automated P&L calendars, mistake leak trackers, and multi-market risk calculators.\n\nCheck it out here and join the community: ${fullReferralUrl}`
               },
               {
                 key: 'discord',
                 title: '🎮 Discord & Telegram Direct Invite',
                 category: 'Direct Message',
-                text: `Check out ShortEdge Trade Diary — zero-latency trading tools, institutional execution calculators, and AI risk guardian: ${fullReferralUrl}`
+                text: `Check out SkandX Trade Diary — zero-latency trading tools, institutional execution calculators, and AI risk guardian: ${fullReferralUrl}`
               }
             ];
 
@@ -8453,7 +8453,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                     
                     {/* WhatsApp */}
                     <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ShortEdge Trading Diary to level up your trading discipline and risk management: ${fullReferralUrl}`)}`}
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out SkandX Trading Diary to level up your trading discipline and risk management: ${fullReferralUrl}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ textDecoration: 'none', backgroundColor: '#25D366', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -8463,7 +8463,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
                     {/* Telegram */}
                     <a
-                      href={`https://t.me/share/url?url=${encodeURIComponent(fullReferralUrl)}&text=${encodeURIComponent('Level up your trading edge with ShortEdge Trade Diary!')}`}
+                      href={`https://t.me/share/url?url=${encodeURIComponent(fullReferralUrl)}&text=${encodeURIComponent('Level up your trading edge with SkandX Trade Diary!')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ textDecoration: 'none', backgroundColor: '#0088cc', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -8473,7 +8473,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
 
                     {/* Twitter/X */}
                     <a
-                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Master your risk and eliminate emotional trading mistakes with @ShortEdgeTrade: ${fullReferralUrl}`)}`}
+                      href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Master your risk and eliminate emotional trading mistakes with @SkandX: ${fullReferralUrl}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ textDecoration: 'none', backgroundColor: '#1da1f2', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -8486,7 +8486,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px', marginTop: '4px', paddingTop: '10px', borderTop: `1px solid ${colors.borderColor}` }}>
                     {[
                       { step: '1', title: 'Share Your Link', desc: `Send your unique Client ID link to friends and trading communities.` },
-                      { step: '2', title: 'Friend Subscribes', desc: 'When your friend joins and activates a ShortEdge Pro subscription.' },
+                      { step: '2', title: 'Friend Subscribes', desc: 'When your friend joins and activates a SkandX Pro subscription.' },
                       { step: '3', title: 'Earn 10% Instantly', desc: '10% of their subscription fee is automatically deposited into your wallet.' }
                     ].map((st, i) => (
                       <div key={i} style={{ backgroundColor: colors.bgInner, borderRadius: '8px', padding: '10px 12px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
@@ -9074,7 +9074,7 @@ const [communityFilter, setCommunityFilter] = useState('ALL');
                         <button
                           onClick={() => {
                             setSelectedTradeForShare({
-                              symbol: 'ShortEdge Risk Mastery Quiz',
+                              symbol: 'SkandX Risk Mastery Quiz',
                               strategy: `🏆 Graded ${quizScore}/10 (${Math.round((quizScore / QUIZ_QUESTIONS.length) * 100)}%)`,
                               net_pnl: quizScore * 2500,
                               realized_pnl: quizScore * 2500,

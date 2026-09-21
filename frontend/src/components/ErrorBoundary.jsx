@@ -60,7 +60,7 @@ class ErrorBoundary extends React.Component {
             }}>
               <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700' }}>Platform Updated</h3>
               <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-secondary, #94a3b8)' }}>
-                A new version of Short Edge has been deployed. Please refresh to load the latest trading components.
+                A new version of SkandX has been deployed. Please refresh to load the latest trading components.
               </p>
               <button
                 onClick={() => window.location.reload()}

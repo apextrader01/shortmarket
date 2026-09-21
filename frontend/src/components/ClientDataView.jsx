@@ -498,7 +498,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           </div>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Get ready to invest</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Edge</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with SkandX</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '280px' }}>
@@ -1004,7 +1004,7 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
                   <ShieldCheck size={16} color="var(--color-blue-light)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your Short Edge trading account.
+                  Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
                 </div>
               </div>
               <BiometricSettingsSection user={user} />

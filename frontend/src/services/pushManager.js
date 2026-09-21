@@ -158,7 +158,7 @@ export async function subscribeUserToPush(token) {
       perm = await PushNotifications.requestPermissions();
     }
     if (perm.receive !== 'granted') {
-      throw new Error('Notification permission was denied. Please allow notifications in device Settings -> Apps -> Short Edge -> Notifications.');
+      throw new Error('Notification permission was denied. Please allow notifications in device Settings -> Apps -> SkandX -> Notifications.');
     }
 
     // Register with FCM and wait for token

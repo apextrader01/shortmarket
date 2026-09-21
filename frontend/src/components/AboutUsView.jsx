@@ -11,11 +11,11 @@ export default function AboutUsView({ setActiveTab }) {
   const policies = [
     {
       title: 'Membership Details',
-      content: 'Short Edge is a premier trading platform providing next-generation features for active traders and investors. Our membership grants you access to comprehensive market data, advanced charting, lightning-fast execution, and exclusive analytics. We are committed to providing a seamless and personalized trading experience.'
+      content: 'SkandX is a premier trading platform providing next-generation features for active traders and investors. Our membership grants you access to comprehensive market data, advanced charting, lightning-fast execution, and exclusive analytics. We are committed to providing a seamless and personalized trading experience.'
     },
     {
       title: 'Fraud Prevention',
-      content: 'Security is at the core of Short Edge. We employ bank-grade security protocols, end-to-end encryption, and real-time monitoring to protect your account. Two-factor authentication (2FA) is mandatory for all logins and withdrawals. Never share your OTP, password, or PIN with anyone, including Short Edge representatives.'
+      content: 'Security is at the core of SkandX. We employ bank-grade security protocols, end-to-end encryption, and real-time monitoring to protect your account. Two-factor authentication (2FA) is mandatory for all logins and withdrawals. Never share your OTP, password, or PIN with anyone, including SkandX representatives.'
     },
     {
       title: 'Privacy Policy',
@@ -23,16 +23,16 @@ export default function AboutUsView({ setActiveTab }) {
     },
     {
       title: 'Terms and Conditions',
-      content: 'By accessing and using the Short Edge platform, you agree to abide by our standard terms of service. Trading in equities, derivatives, and commodities involves substantial risk of loss. You acknowledge that you are solely responsible for all trading decisions and outcomes.'
+      content: 'By accessing and using the SkandX platform, you agree to abide by our standard terms of service. Trading in equities, derivatives, and commodities involves substantial risk of loss. You acknowledge that you are solely responsible for all trading decisions and outcomes.'
     },
     {
       title: 'Risk Policies',
       content: 'Options and margin trading are highly leveraged and carry a high degree of risk. Please review our comprehensive Risk Disclosure Document before engaging in leveraged trading.',
-      link: 'https://www.shortedge.in/riskpolicy'
+      link: 'https://www.skandx.in/riskpolicy'
     },
     {
       title: 'Roles and Responsibilities for UPI',
-      content: 'UPI transactions are subject to limits imposed by your banking institution and the NPCI. Short Edge processes UPI mandates instantly for fund addition, but settlement to your trading ledger is subject to successful confirmation from your bank. Ensure your UPI ID is linked to your registered bank account.'
+      content: 'UPI transactions are subject to limits imposed by your banking institution and the NPCI. SkandX processes UPI mandates instantly for fund addition, but settlement to your trading ledger is subject to successful confirmation from your bank. Ensure your UPI ID is linked to your registered bank account.'
     }
   ];
 
@@ -56,7 +56,7 @@ export default function AboutUsView({ setActiveTab }) {
           }}>
             S
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>Short Edge</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>SkandX</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '40px' }}>Service Truly Personalised</p>
 
           <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '30px' }}>
@@ -92,7 +92,7 @@ export default function AboutUsView({ setActiveTab }) {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Email</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                <a href="mailto:support@shortedge.in" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>support@shortedge.in</a>
+                <a href="mailto:support@skandx.in" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>support@skandx.in</a>
               </div>
             </div>
           </div>
@@ -102,7 +102,7 @@ export default function AboutUsView({ setActiveTab }) {
             <div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Website</div>
               <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                <a href="https://www.shortedge.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>https://www.shortedge.in</a>
+                <a href="https://www.skandx.in" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-blue-light)', textDecoration: 'none' }}>https://www.skandx.in</a>
               </div>
             </div>
           </div>
