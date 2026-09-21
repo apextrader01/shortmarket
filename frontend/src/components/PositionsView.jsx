@@ -369,9 +369,20 @@ export default function PositionsView() {
 
   const exitAllPositions = async () => {
     const store = useStore.getState();
-    const openPositions = flatPositions.filter(p => Number(p.qty) !== 0 && Number(p.unencumberedQty) > 0 && p.product_type !== 'BO' && p.product_type !== 'CO');
+    const openPositions = flatPositions.filter(p => {
+      if (Number(p.qty) === 0 || Number(p.unencumberedQty) <= 0) return false;
+      if (p.product_type === 'BO' || p.product_type === 'CO') return false;
+
+      // 🛡️ STRICT SHIELD (Option 1): Never exit Delivery / CNC / Holdings / Portfolio items from Open tab
+      const prod = String(p.product_type || p.productLabel || '').toUpperCase();
+      if (prod === 'DEL' || prod === 'CNC' || prod === 'DELIVERY' || p.isDbHolding || p.isOvernightPos) {
+        return false;
+      }
+      return true;
+    });
+
     if (openPositions.length === 0) {
-      alert('No valid unencumbered positions to exit.');
+      alert('No valid open intraday positions to exit. Delivery, CNC, and Holdings are protected.');
       return;
     }
 
@@ -403,7 +414,7 @@ export default function PositionsView() {
       return;
     }
 
-    if (!window.confirm(`Exit ALL ${openPositions.length} unencumbered position(s) at market price?`)) return;
+    if (!window.confirm(`Exit ALL ${openPositions.length} open intraday position(s) at market price? Delivery, CNC, and Holdings will NOT be touched.`)) return;
     let failed = 0;
     let lastError = '';
     const results = await Promise.allSettled(openPositions.map(async (pos) => {
@@ -420,7 +431,7 @@ export default function PositionsView() {
 
       const exitSide = Number(pos.qty) > 0 ? 'SELL' : 'BUY';
       const liveLtp = relevantPrices[pos.symbol]?.ltp || store.prices?.[pos.symbol]?.ltp || pos.ltp || 0;
-      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type || 'DEL');
+      const effectiveProductType = (pos.product_type === 'BO' || pos.product_type === 'CO') ? 'INT' : (pos.product_type === 'INT' || pos.product_type === 'MIS' ? pos.product_type : 'INT');
       const payload = {
         symbol: pos.symbol,
         type: 'MARKET',

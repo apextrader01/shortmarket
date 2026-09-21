@@ -166,9 +166,15 @@ class MTMRiskManager {
                     const maxLossLimit = parseFloat(user.max_daily_loss);
                     if (totalDailyPnl < 0 && Math.abs(totalDailyPnl) >= maxLossLimit) {
                         const auditReason = `Risk Guardian: Daily loss limit ₹${maxLossLimit.toLocaleString('en-IN')} reached (Realized: ₹${todayRealized.toFixed(2)}, Open P&L: ₹${totalUnrealizedPnl.toFixed(2)}, Total Daily P&L: ₹${totalDailyPnl.toFixed(2)})`;
-                        console.log(`[RISK GUARDIAN AUTO-EXIT] User ${uid} hit Max Daily Loss Limit. ${auditReason}. Auto-squaring off all open positions!`);
+                        console.log(`[RISK GUARDIAN AUTO-EXIT] User ${uid} hit Max Daily Loss Limit. ${auditReason}. Auto-squaring off open intraday positions!`);
                         this.lastLiquidationTime[uid] = now;
-                        await this.liquidateUser(uid, positions, auditReason, false);
+                        // 🛡️ STRICT SHIELD: Never liquidate Delivery, CNC, or Holdings/Portfolio assets
+                        const intradayPositions = positions.filter(p => !['DEL', 'CNC', 'DELIVERY'].includes(String(p.product_type || '').toUpperCase()));
+                        if (intradayPositions.length > 0) {
+                            await this.liquidateUser(uid, intradayPositions, auditReason, false);
+                        } else {
+                            console.log(`[RISK SHIELD] User ${uid} has 0 open intraday positions. All remaining positions are Delivery/CNC/Holdings and are strictly protected.`);
+                        }
                         continue;
                     }
                 }
@@ -199,10 +205,12 @@ class MTMRiskManager {
                 // Acquire exclusive advisory lock for user to prevent race conditions with concurrent orders/ticks
                 await trx.raw('SELECT pg_advisory_xact_lock(?)', [userId]);
 
-                // 1. Cancel all pending entry, trigger, AMO, and partially-filled orders for the user and refund margin
+                // 1. Cancel all pending entry, trigger, AMO, and partially-filled orders for the user's INTRADAY trades and refund margin
+                // Delivery / CNC / Holdings orders remain intact.
                 const pendingOrders = await trx('orders')
                     .where({ user_id: userId })
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
+                    .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
                 for (const ord of pendingOrders) {
                     const totalMargin = parseFloat(ord.margin) || 0;
@@ -226,6 +234,18 @@ class MTMRiskManager {
                 for (const pos of positions) {
                     const freshPos = await trx('positions').where({ id: pos.id }).first();
                     if (!freshPos || Number(freshPos.quantity) === 0) continue;
+
+                    // 🛡️ STRICT SHIELD (Option 1): Never liquidate Delivery, CNC, or Holdings/Portfolio assets
+                    const prodType = String(freshPos.product_type || '').toUpperCase();
+                    if (['DEL', 'CNC', 'DELIVERY'].includes(prodType)) {
+                        console.log(`[RISK SHIELD] Skipped liquidation for ${freshPos.symbol} (Product: ${freshPos.product_type}) - Delivery/CNC/Holdings asset is strictly protected.`);
+                        continue;
+                    }
+                    const isDbHolding = await trx('holdings').where({ user_id: userId, symbol: freshPos.symbol }).first();
+                    if (isDbHolding) {
+                        console.log(`[RISK SHIELD] Skipped liquidation for ${freshPos.symbol} - Exists in Holdings table.`);
+                        continue;
+                    }
 
                     let ltp = this.priceCache[freshPos.symbol]?.ltp;
                     if (ltp === undefined || ltp === null || isNaN(Number(ltp)) || Number(ltp) <= 0) {
