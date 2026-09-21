@@ -153,7 +153,7 @@ class VolumeMatchingEngine {
         const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
         if (filtered.length === 0) {
           this.symbolQueues.delete(normSym);
-          this.lastSymbolVolume.delete(normSym);
+          // Retain this.lastSymbolVolume so sequential orders maintain continuous volume tracking
         } else {
           this.symbolQueues.set(normSym, filtered);
         }
@@ -346,10 +346,13 @@ class VolumeMatchingEngine {
       order.taxes = ordObj.taxes;
     }
 
-    // Initialize last volume tracker for this symbol
-    if (cached.volume) {
+    // Initialize last volume tracker for this symbol from live cache if not already tracking
+    const liveVol = Number(cached.volume || cached.vol_traded_today || cached.vol || cached.v || 0);
+    if (liveVol > 0) {
       const normSym = normalizeSymbol(ordObj.symbol);
-      this.lastSymbolVolume.set(normSym, Number(cached.volume));
+      if (!this.lastSymbolVolume.has(normSym)) {
+        this.lastSymbolVolume.set(normSym, liveVol);
+      }
     }
   }
 
@@ -390,7 +393,10 @@ class VolumeMatchingEngine {
           const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
           if (currentVol > prevVol) {
             const rawDelta = currentVol - prevVol;
-            deltaVol = rawDelta;
+            // Guard against stale baseline / reconnect feed jumps (> 25,000 in a single tick)
+            // Real 1-second volume on liquid stocks like VMM rarely exceeds 5K-15K shares.
+            // A delta > 25,000 indicates a feed gap / reconnect burst.
+            deltaVol = rawDelta > 25000 ? Math.min(rawDelta, 25000) : rawDelta;
             this.lastSymbolVolume.set(normSym, currentVol);
           }
         }
@@ -444,9 +450,28 @@ class VolumeMatchingEngine {
           }
           // else: not enough real volume for even 1 lot — wait for more ticks
         } else {
-          // Equities (lot = 1): use 100% of real exchange volume directly.
-          // No artificial caps — real Fyers volume is distributed across all resting orders in FIFO.
-          fillQty = Math.min(order.pending_quantity, availableVol);
+          // Equities (lot = 1):
+          // Retail orders (<= 500 shares) can fill immediately up to available tick volume
+          if (order.pending_quantity <= 500) {
+            fillQty = Math.min(order.pending_quantity, availableVol);
+          } else {
+            // Whale / Large orders (> 500 shares): Pace execution realistically against market volume.
+            // Symmetrical for BUY and SELL:
+            // A large order participates at a realistic Percentage of Volume (POV rate: 30% - 50%),
+            // with a single-tick fill cap of 1,000 shares.
+            // This guarantees that a 1 Lakh share order does NOT fill instantly out of thin air,
+            // but instead queues with PARTIALLY FILLED status and fills smoothly across ticks.
+            if (availableVol <= 500) {
+              fillQty = Math.min(order.pending_quantity, availableVol);
+            } else {
+              const maxFill = Math.min(
+                order.pending_quantity,
+                Math.max(500, Math.floor(availableVol * 0.5))
+              );
+              fillQty = Math.min(order.pending_quantity, Math.min(maxFill, 1000));
+            }
+            fillQty = Math.min(fillQty, availableVol);
+          }
         }
 
         if (fillQty > 0) {
