@@ -109,7 +109,7 @@ it('PortfolioView.jsx imports and uses getTodayRealizedMetrics', () => {
 });
 
 it('PositionsView.jsx imports and uses getTodayClosedPositions', () => {
-  assert(positionsViewContent.includes("import { getTodayClosedPositions } from '../utils/pnlHelper';"), 'Import missing in PositionsView');
+  assert(positionsViewContent.includes("getTodayClosedPositions") && positionsViewContent.includes("from '../utils/pnlHelper'"), 'Import missing in PositionsView');
   assert(positionsViewContent.includes('return getTodayClosedPositions(positions, orders);'), 'getTodayClosedPositions usage missing in PositionsView');
 });
 

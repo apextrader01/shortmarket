@@ -48,7 +48,22 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
   };
 
   // 1. Include explicit closed positions updated/closed today from database
-  const dbClosed = (positions || []).filter(p => Number(p.quantity) === 0 && isToday(p.updated_at || p.created_at));
+  const dbClosed = (positions || []).filter(p => {
+    if (Number(p.quantity) !== 0) return false;
+    if (!isToday(p.updated_at || p.created_at)) return false;
+
+    // Must have either an actual exit price > 0, non-zero realized pnl, or a matching executed exit order today
+    const hasExitPrice = p.exit_price !== null && p.exit_price !== undefined && Number(p.exit_price) > 0;
+    const hasRealizedPnl = p.realized_pnl !== null && p.realized_pnl !== undefined && Number(p.realized_pnl) !== 0;
+    const hasMatchingTodayOrder = (orders || []).some(o => {
+      const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+      if (!isExecuted) return false;
+      if (!isToday(o.updated_at || o.created_at)) return false;
+      return normalizeSym(o.symbol) === normalizeSym(p.symbol);
+    });
+
+    return hasExitPrice || hasRealizedPnl || hasMatchingTodayOrder;
+  });
   const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${normalizeProd(p.product_type)}`));
   
   // Track all actively OPEN position keys so open positions are NEVER duplicated into closed

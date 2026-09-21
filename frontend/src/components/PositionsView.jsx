@@ -1274,170 +1274,172 @@ export default function PositionsView() {
 
 
       {/* Partial Exit Modal */}
-      {partialExitPos && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
+      {partialExitPos && (() => {
+        const isExitShort = Number(partialExitPos.qty) < 0 || partialExitPos.side === 'SELL';
+        const exitSide = isExitShort ? 'BUY' : 'SELL';
+        return (
           <div style={{
-            background: 'var(--bg-dark)', width: '380px', borderRadius: '12px',
-            border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-            overflow: 'hidden'
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
           }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Partial Exit</h3>
-              <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setPartialExitPos(null)} />
-            </div>
-            <div style={{ padding: '24px 20px' }}>
-              <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
-                {partialExitPos.symbol}
+            <div style={{
+              background: 'var(--bg-dark)', width: '380px', borderRadius: '12px',
+              border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+              overflow: 'hidden'
+            }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Partial Exit</h3>
+                <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setPartialExitPos(null)} />
               </div>
-
-              {/* Regular vs AMO Selector */}
-              <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
-                <button
-                  type="button"
-                  onClick={() => setPartialExitIsAmo(false)}
-                  style={{
-                    flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                    background: !partialExitIsAmo ? '#2563eb' : 'transparent',
-                    color: !partialExitIsAmo ? '#ffffff' : 'var(--text-secondary)',
-                    fontSize: '12px', fontWeight: '600', transition: 'all 0.15s ease'
-                  }}
-                >
-                  Regular
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPartialExitIsAmo(true)}
-                  style={{
-                    flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                    background: partialExitIsAmo ? '#f59e0b' : 'transparent',
-                    color: partialExitIsAmo ? '#000000' : 'var(--text-secondary)',
-                    fontSize: '12px', fontWeight: '700', transition: 'all 0.15s ease'
-                  }}
-                >
-                  🌙 AMO
-                </button>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                    {partialExitPos.lotSize > 1 ? 'Lots' : 'Qty'} (Max: {Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)})
-                  </label>
-                  <input
-                    type="number"
-                    value={partialExitQty}
-                    onChange={(e) => setPartialExitQty(e.target.value)}
-                    max={Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)}
-                    min="1"
-                    step={partialExitPos && ((partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF')) ? "any" : "1"}
-                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
-                  />
+              <div style={{ padding: '24px 20px' }}>
+                <div style={{ marginBottom: '16px', fontSize: '14px', fontWeight: '600', color: 'var(--color-blue-light)' }}>
+                  {partialExitPos.symbol}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order Type</label>
-                  <select
-                    value={partialExitType}
-                    onChange={(e) => setPartialExitType(e.target.value)}
-                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+
+                {/* Regular vs AMO Selector */}
+                <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPartialExitIsAmo(false)}
+                    style={{
+                      flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                      background: !partialExitIsAmo ? '#2563eb' : 'transparent',
+                      color: !partialExitIsAmo ? '#ffffff' : 'var(--text-secondary)',
+                      fontSize: '12px', fontWeight: '600', transition: 'all 0.15s ease'
+                    }}
                   >
-                    <option value="MARKET" style={{color:'#000'}}>Market</option>
-                    <option value="LIMIT" style={{color:'#000'}}>Limit</option>
-                  </select>
+                    Regular
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartialExitIsAmo(true)}
+                    style={{
+                      flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                      background: partialExitIsAmo ? '#f59e0b' : 'transparent',
+                      color: partialExitIsAmo ? '#000000' : 'var(--text-secondary)',
+                      fontSize: '12px', fontWeight: '700', transition: 'all 0.15s ease'
+                    }}
+                  >
+                    🌙 AMO
+                  </button>
                 </div>
+                
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      {partialExitPos.lotSize > 1 ? 'Lots' : 'Qty'} (Max: {Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)})
+                    </label>
+                    <input
+                      type="number"
+                      value={partialExitQty}
+                      onChange={(e) => setPartialExitQty(e.target.value)}
+                      max={Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty) / (partialExitPos.lotSize || 1)}
+                      min="1"
+                      step={partialExitPos && ((partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF')) ? "any" : "1"}
+                      style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Order Type</label>
+                    <select
+                      value={partialExitType}
+                      onChange={(e) => setPartialExitType(e.target.value)}
+                      style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    >
+                      <option value="MARKET" style={{color:'#000'}}>Market</option>
+                      <option value="LIMIT" style={{color:'#000'}}>Limit</option>
+                    </select>
+                  </div>
+                </div>
+
+                {partialExitType === 'LIMIT' && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Limit Price</label>
+                    <input
+                      type="number"
+                      value={partialExitPrice}
+                      onChange={(e) => setPartialExitPrice(e.target.value)}
+                      style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
+                    />
+                  </div>
+                )}
+
+                <button
+                  onClick={async () => {
+                    const inputVal = parseFloat(partialExitQty);
+                    const ls = partialExitPos.lotSize || 1;
+                    const isMfPos = (partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF');
+                    const qtyToExit = isMfPos ? parseFloat((inputVal * ls).toFixed(4)) : Math.round(inputVal * ls);
+                    const maxQty = Math.abs(partialExitPos.unencumberedQty !== undefined ? partialExitPos.unencumberedQty : partialExitPos.qty);
+                    if (!qtyToExit || qtyToExit <= 0 || qtyToExit > maxQty) {
+                      alert(`Invalid quantity. Max allowed (unencumbered): ${maxQty / ls} lots`);
+                      return;
+                    }
+                    if (partialExitType === 'LIMIT' && (!partialExitPrice || parseFloat(partialExitPrice) <= 0 || isNaN(parseFloat(partialExitPrice)))) {
+                      alert('Please enter a valid limit price greater than 0.');
+                      return;
+                    }
+
+                    // 🛡️ Market session check for partial exit
+                    const store = useStore.getState();
+                    const isCommodity = isCommodityContract(partialExitPos.symbol);
+                    const effProd = (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL');
+                    const session = getMarketSession({
+                      symbol: partialExitPos.symbol,
+                      productType: effProd,
+                      isCommodity,
+                      marketStatus: store.marketStatus,
+                      marketCalendar: store.marketCalendar
+                    });
+
+                    if (partialExitIsAmo && !session.isAmoWindow) {
+                      const amoTimingMsg = isCommodity
+                        ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+                        : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
+                      alert(amoTimingMsg);
+                      return;
+                    }
+
+                    if (!partialExitIsAmo && !session.open) {
+                      alert(session.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
+                      return;
+                    }
+
+                    const ok = await useStore.getState().placeOrder({
+                      symbol: partialExitPos.symbol,
+                      type: partialExitType,
+                      side: exitSide,
+                      quantity: qtyToExit,
+                      lotsize: ls,
+                      price: partialExitType === 'MARKET' ? (prices[partialExitPos.symbol]?.ltp || 0) : parseFloat(partialExitPrice),
+                      sl_price: null,
+                      tgt_price: null,
+                      margin: 0,
+                      product_type: effProd,
+                      variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
+                      is_amo: partialExitIsAmo
+                    });
+                    if (ok && ok.success) {
+                      setPartialExitPos(null);
+                    } else {
+                      const storeErr = useStore.getState().authError;
+                      alert(`Exit failed: ${(ok && ok.error) || storeErr || 'Check the browser console (F12) for error details.'}`);
+                    }
+                  }}
+                  style={{
+                    width: '100%', background: isExitShort ? 'var(--color-blue)' : 'var(--color-red)',
+                    color: 'var(--text-primary)', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
+                    fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
+                  }}
+                >
+                  {isExitShort ? 'BUY' : 'SELL'} {partialExitQty} {partialExitPos.lotSize > 1 ? 'LOTS' : 'QTY'}
+                </button>
               </div>
-
-              {partialExitType === 'LIMIT' && (
-                <div style={{ marginBottom: '24px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Limit Price</label>
-                  <input
-                    type="number"
-                    value={partialExitPrice}
-                    onChange={(e) => setPartialExitPrice(e.target.value)}
-                    style={{ width: '100%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '8px 12px', borderRadius: '4px', outline: 'none' }}
-                  />
-                </div>
-              )}
-
-              <button
-                onClick={async () => {
-                  const inputVal = parseFloat(partialExitQty);
-                  const ls = partialExitPos.lotSize || 1;
-                  const isMfPos = (partialExitPos.symbol || '').endsWith('-MF') || (partialExitPos.symbol || '').includes(':MF');
-                  const qtyToExit = isMfPos ? parseFloat((inputVal * ls).toFixed(4)) : Math.round(inputVal * ls);
-                  const maxQty = Math.abs(partialExitPos.unencumberedQty);
-                  if (!qtyToExit || qtyToExit <= 0 || qtyToExit > maxQty) {
-                    alert(`Invalid quantity. Max allowed (unencumbered): ${maxQty / ls} lots`);
-                    return;
-                  }
-                  if (partialExitType === 'LIMIT' && (!partialExitPrice || parseFloat(partialExitPrice) <= 0 || isNaN(parseFloat(partialExitPrice)))) {
-                    alert('Please enter a valid limit price greater than 0.');
-                    return;
-                  }
-
-                  // 🛡️ Market session check for partial exit
-                  const store = useStore.getState();
-                  const isCommodity = isCommodityContract(partialExitPos.symbol);
-                  const effProd = (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL');
-                  const session = getMarketSession({
-                    symbol: partialExitPos.symbol,
-                    productType: effProd,
-                    isCommodity,
-                    marketStatus: store.marketStatus,
-                    marketCalendar: store.marketCalendar
-                  });
-
-                  if (partialExitIsAmo && !session.isAmoWindow) {
-                    const amoTimingMsg = isCommodity
-                      ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
-                      : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
-                    alert(amoTimingMsg);
-                    return;
-                  }
-
-                  if (!partialExitIsAmo && !session.open) {
-                    alert(session.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
-                    return;
-                  }
-
-                  const isExitShort = Number(partialExitPos.qty) < 0 || partialExitPos.side === 'SELL';
-                  const exitSide = isExitShort ? 'BUY' : 'SELL';
-                  const ok = await useStore.getState().placeOrder({
-                    symbol: partialExitPos.symbol,
-                    type: partialExitType,
-                    side: exitSide,
-                    quantity: qtyToExit,
-                    lotsize: ls,
-                    price: partialExitType === 'MARKET' ? (prices[partialExitPos.symbol]?.ltp || 0) : parseFloat(partialExitPrice),
-                    sl_price: null,
-                    tgt_price: null,
-                    margin: 0,
-                    product_type: effProd,
-                    variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
-                    is_amo: partialExitIsAmo
-                  });
-                  if (ok && ok.success) {
-                    setPartialExitPos(null);
-                  } else {
-                    const storeErr = useStore.getState().authError;
-                    alert(`Exit failed: ${(ok && ok.error) || storeErr || 'Check the browser console (F12) for error details.'}`);
-                  }
-                }}
-                style={{
-                  width: '100%', background: isExitShort ? 'var(--color-blue)' : 'var(--color-red)',
-                  color: 'var(--text-primary)', border: 'none', padding: '12px', borderRadius: '6px', fontSize: '14px',
-                  fontWeight: 'bold', cursor: 'pointer', marginTop: partialExitType === 'MARKET' ? '12px' : '0'
-                }}
-              >
-                {isExitShort ? 'BUY' : 'SELL'} {partialExitQty} {partialExitPos.lotSize > 1 ? 'LOTS' : 'QTY'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Convert Position Modal */}
       {convertModalPos && (() => {
