@@ -1088,10 +1088,7 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
     console.log(`[AUTH 2FA] Email OTP for ${user.email}: ${otp}`);
     return res.json({ 
       success: true, 
-      message: emailSent 
-        ? `Verification code dispatched to ${user.email}. Please check your inbox (and spam folder)!` 
-        : `Verification code: ${otp} (Dispatched to ${user.email})`,
-      otp: otp 
+      message: `Verification code dispatched to ${user.email}. Please check your email inbox!`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1529,8 +1526,7 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: 'Password reset email sent via Firebase! Please check your inbox (and spam folder) for the reset link or use the verification code below.',
-      otp: otp 
+      message: 'Password reset link and verification code sent! Please check your inbox (and spam folder).'
     });
   } catch (error) {
     console.error('Forgot Password Error:', error);

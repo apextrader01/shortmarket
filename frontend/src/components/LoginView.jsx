@@ -144,10 +144,8 @@ export default function LoginView() {
       const res = await sendLoginEmailOtp(email, password);
       if (res && res.success) {
         setEmailOtpSent(true);
-        if (res.otp) {
-          setEmailOtp(String(res.otp));
-        }
-        setMessage(res.message || `Verification code sent to ${email}. Check your inbox!`);
+        setEmailOtp('');
+        setMessage(res.message || `Verification code sent to ${email}. Check your email inbox!`);
       } else {
         useStore.setState({ authError: res?.error || 'Failed to send email OTP.' });
       }
@@ -283,10 +281,8 @@ export default function LoginView() {
     else if (view === 'forgot') {
       const res = await forgotPassword(email);
       if (res && res.success) {
-        setMessage(res.message || 'Password reset email sent via Firebase! Check your inbox (and spam folder) for the link or enter the OTP below.');
-        if (res.otp) {
-          setOtp(String(res.otp));
-        }
+        setMessage(res.message || 'Password reset email sent! Check your inbox (and spam folder) for the verification code.');
+        setOtp('');
         setView('otp');
       } else {
         useStore.setState({ authError: res?.error || 'Failed to send reset code.' });
