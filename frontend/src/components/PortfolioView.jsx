@@ -159,11 +159,30 @@ export default function PortfolioView() {
   const allMergedHoldingsMap = {};
 
   (holdings || []).forEach(h => {
+    if (!h) return;
     const sym = h.symbol;
     const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
     const key = cleanSym || sym;
     const hQty = Number(h.quantity) || 0;
     const hPrice = Math.abs(Number(h.average_price) || 0);
+    if (hQty <= 0) return;
+
+    // Check if matching position exists in positions table
+    const matchingPos = (positions || []).find(p => {
+      const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      return p.symbol === sym || pClean === cleanSym;
+    });
+
+    // If position was closed today (quantity 0 and closed_quantity > 0), do not display as active holding
+    if (matchingPos && Number(matchingPos.quantity) === 0 && Number(matchingPos.closed_quantity) > 0) {
+      return;
+    }
+
+    // Derivative contracts (CE, PE, FUT) are never persistent holdings; only show if active positive open position
+    if (isDerivativeContract(sym)) {
+      if (!matchingPos || Number(matchingPos.quantity) === 0) return;
+    }
+
     if (!allMergedHoldingsMap[key]) {
       allMergedHoldingsMap[key] = { 
         ...h, 
@@ -550,7 +569,7 @@ export default function PortfolioView() {
           </Suspense>
         </div>
       ) : (
-        <div style={{ padding: isMobile ? '14px' : '24px', paddingBottom: '120px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        <div style={{ padding: isMobile ? '10px 14px' : '14px 24px', paddingBottom: '120px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Top 4 Key Metric Cards */}
           <div style={{ 

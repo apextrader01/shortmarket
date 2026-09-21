@@ -3,6 +3,35 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ quiet: true });
 
+// 🛡️ Hotpatch Fyers SDK v3 unhandled TypeError: Cannot read properties of undefined (reading 'prepareData')
+try {
+    const HSWebSocket = require('fyers-api-v3/HSM_Package/hslib.js');
+    if (HSWebSocket && HSWebSocket.prototype && HSWebSocket.prototype.connect && !HSWebSocket.prototype._patchedForPrepareData) {
+        const origConnect = HSWebSocket.prototype.connect;
+        HSWebSocket.prototype.connect = function(...args) {
+            const res = origConnect.apply(this, args);
+            if (this.ws) {
+                const origOnMessage = this.ws.onmessage;
+                this.ws.onmessage = function(event) {
+                    try {
+                        if (origOnMessage) return origOnMessage.call(this, event);
+                    } catch (err) {
+                        if (err && err.message && err.message.includes('prepareData')) {
+                            // Safely swallow unmapped topic binary tick frames during subscription handshake
+                            return;
+                        }
+                        console.error('⚠️ [Fyers WebSocket onmessage error]:', err.message);
+                    }
+                };
+            }
+            return res;
+        };
+        HSWebSocket.prototype._patchedForPrepareData = true;
+    }
+} catch (e) {
+    console.warn('⚠️ Could not patch Fyers SDK HSWebSocket:', e.message);
+}
+
 let global_io = null;
 let sharedPriceCache = null;
 let wsInstance = null;

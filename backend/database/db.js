@@ -636,8 +636,16 @@ async function ensureCriticalColumns() {
     await db.raw('UPDATE orders SET trigger_type = \'REGULAR\' WHERE trigger_type IS NULL').catch(() => {});
     await db.raw('UPDATE orders SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
     await db.raw('UPDATE positions SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
-    await db.raw('UPDATE positions SET closed_quantity = 0 WHERE closed_quantity IS NULL').catch(() => {});
     await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
+    // 🛡️ Purge derivative contracts and non-positive quantities from holdings table (derivatives belong in positions)
+    await db('holdings')
+      .where('quantity', '<=', 0)
+      .orWhere('symbol', 'like', '%CE')
+      .orWhere('symbol', 'like', '%PE')
+      .orWhere('symbol', 'like', '%FUT%')
+      .orWhereIn('asset_class', ['OPTIONS', 'DERIVATIVE', 'FUTURES'])
+      .del()
+      .catch(() => {});
 
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(10)`);

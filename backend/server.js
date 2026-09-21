@@ -1729,7 +1729,16 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       'NIPP':    { code: '118778', fallbackNav: 209.96 }
     };
 
-    const formattedHoldings = holdingsRows || [];
+    const isDerivContract = (sym) => {
+      if (!sym || typeof sym !== 'string') return false;
+      if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
+      const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+      if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
+      if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
+      return false;
+    };
+
+    const formattedHoldings = (holdingsRows || []).filter(h => !isDerivContract(h.symbol));
     for (const h of formattedHoldings) {
       if (LEGACY_FIX_MAP[h.symbol] && Math.round(Number(h.average_price)) === 100) {
         const item = LEGACY_FIX_MAP[h.symbol];
@@ -3614,11 +3623,22 @@ app.get('/api/positions', authenticateToken, async (req, res) => {
 // ─── Holdings ─────────────────────────────────────────────────────────────
 app.get('/api/holdings', authenticateToken, async (req, res) => {
   try {
+    const isDerivContract = (sym) => {
+      if (!sym || typeof sym !== 'string') return false;
+      if (sym.startsWith('MCX:') || sym.includes('-MCX') || sym.includes('NCDEX')) return true;
+      const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+      if (/(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean)) return true;
+      if (/(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT')) return true;
+      return false;
+    };
+
     // BUG FIX: Filter zero-qty holdings in SQL, not in JS after fetching
-    const holdings = await db('holdings')
+    const rawHoldings = await db('holdings')
       .where({ user_id: req.user.id })
       .whereNot({ quantity: 0 })
       .orderBy('id', 'desc');
+
+    const holdings = rawHoldings.filter(h => !isDerivContract(h.symbol) && Number(h.quantity) > 0);
 
     // Auto-align legacy MF holdings (EDEL, MIRA, NIPP) with real AMFI NAVs and calculate correct units
     const LEGACY_FIX_MAP = {
@@ -9681,6 +9701,9 @@ server.listen(PORT, async () => {
 // Clean shutdown handlers to instantly release port when PM2 restarts/stops the process
 const cleanupAndExit = () => {
   console.log('Stopping server and releasing port...');
+  if (server && typeof server.closeAllConnections === 'function') {
+    try { server.closeAllConnections(); } catch (e) {}
+  }
   server.close(() => {
     console.log('Server stopped.');
     process.exit(0);
@@ -9688,7 +9711,7 @@ const cleanupAndExit = () => {
   setTimeout(() => {
     console.log('Forced exit.');
     process.exit(0);
-  }, 2000);
+  }, 1000);
 };
 
 process.on('SIGINT', cleanupAndExit);

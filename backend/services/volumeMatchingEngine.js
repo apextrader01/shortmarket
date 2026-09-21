@@ -677,7 +677,29 @@ class VolumeMatchingEngine {
               description: `Realized P&L on ${closeQty} ${order.symbol}`
             });
           }
-        } else if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+
+          // Synchronize / decrement holdings table if an entry exists for this user and symbol to prevent ghost holdings
+          const holdingRecord = await trx('holdings')
+            .where({ user_id: order.user_id })
+            .where(b => {
+              b.where({ symbol: order.symbol })
+                .orWhere({ symbol: cleanSym })
+                .orWhere({ symbol: `NSE:${cleanSym}` })
+                .orWhere({ symbol: `BSE:${cleanSym}` })
+                .orWhere({ symbol: `MCX:${cleanSym}` });
+            })
+            .first();
+
+          if (holdingRecord) {
+            const currentHQty = roundQty(Number(holdingRecord.quantity || 0));
+            const newHQty = roundQty(currentHQty - closeQty);
+            if (newHQty <= 0) {
+              await trx('holdings').where({ id: holdingRecord.id }).del();
+            } else {
+              await trx('holdings').where({ id: holdingRecord.id }).update({ quantity: newHQty, updated_at: new Date() });
+            }
+          }
+        } else if ((order.side === 'SELL' || order.side === 'BUY') && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
           // Offsetting overnight delivery shares from holdings table
           const holding = await trx('holdings')
             .where({ user_id: order.user_id })
