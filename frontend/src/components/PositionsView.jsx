@@ -490,7 +490,9 @@ export default function PositionsView() {
         tgt_price: null,
         margin: 0,
         lotsize: pos.lotSize || 1,
-        product_type: effectiveProductType
+        product_type: effectiveProductType,
+        is_exit: true,
+        remarks: 'Exit All Positions'
       };
       const res = await store.placeOrder(payload);
       if (res && res.success) {
@@ -1478,7 +1480,9 @@ export default function PositionsView() {
                       margin: 0,
                       product_type: effProd,
                       variety: partialExitIsAmo ? 'AMO' : 'REGULAR',
-                      is_amo: partialExitIsAmo
+                      is_amo: partialExitIsAmo,
+                      is_exit: true,
+                      remarks: 'Exit Position'
                     });
                     if (ok && ok.success) {
                       setPartialExitPos(null);

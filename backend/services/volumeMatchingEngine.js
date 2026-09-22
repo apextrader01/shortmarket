@@ -150,6 +150,8 @@ class VolumeMatchingEngine {
       slice_group_id: order.slice_group_id || null,
       slice_index: order.slice_index ? Number(order.slice_index) : null,
       slice_total: order.slice_total ? Number(order.slice_total) : null,
+      remarks: order.remarks || '',
+      is_exit: Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks))),
       created_at: order.created_at || new Date(),
       _lastFillTime: null  // Allow immediate heartbeat fill on enqueue
     };
@@ -665,43 +667,63 @@ class VolumeMatchingEngine {
 
             // Position Reversal: If order slice quantity exceeds closed position, open reverse position
             if (leftoverQty > 0) {
-              const revSide = order.side === 'BUY' ? 1 : -1;
-              const revPosQty = revSide * leftoverQty;
-              const { calculateRequiredMargin } = require('./marginEngine');
-              const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, leftoverQty, slicePrice);
-              const revMargin = calcMargin > 0 ? calcMargin : (totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0);
+              const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+              if (isExitOrder) {
+                // For EXIT orders (Exit All, Position Exit Button), user intent is ONLY to close.
+                // Do NOT open an unwanted reverse position. Cancel remainder & refund any margin.
+                console.log(`[SAFEGUARD] Exit order ${order.id} closed position completely. Suppressing reversal on leftover ${leftoverQty} ${order.symbol}.`);
+                const excessRefund = totalQty > 0 ? Math.round(((leftoverQty / totalQty) * Number(order.margin || 0) + Number.EPSILON) * 100) / 100 : 0;
+                if (excessRefund > 0) {
+                  const user = await trx('users').where({ id: order.user_id }).first();
+                  if (user) {
+                    await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                    await trx('ledger').insert({
+                      user_id: order.user_id,
+                      amount: excessRefund,
+                      type: 'MARGIN_RELEASE',
+                      description: `Excess margin refunded on exit order ${order.symbol}`
+                    });
+                  }
+                }
+              } else {
+                const revSide = order.side === 'BUY' ? 1 : -1;
+                const revPosQty = revSide * leftoverQty;
+                const { calculateRequiredMargin } = require('./marginEngine');
+                const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, leftoverQty, slicePrice);
+                const revMargin = calcMargin > 0 ? calcMargin : (totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0);
 
-              const orderMarginBlocked = Number(order.margin || 0);
-              const marginDelta = revMargin - orderMarginBlocked;
-              if (marginDelta > 0) {
-                await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
-                await trx('ledger').insert({
+                const orderMarginBlocked = Number(order.margin || 0);
+                const marginDelta = revMargin - orderMarginBlocked;
+                if (marginDelta > 0) {
+                  await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: -marginDelta,
+                    type: 'MARGIN_BLOCK',
+                    description: `Margin blocked for reversed position ${revPosQty} ${order.symbol}`
+                  });
+                } else if (marginDelta < 0) {
+                  const excessRefund = Math.round((Math.abs(marginDelta) + Number.EPSILON) * 100) / 100;
+                  await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: excessRefund,
+                    type: 'MARGIN_RELEASE',
+                    description: `Excess margin refunded on reversal ${revPosQty} ${order.symbol}`
+                  });
+                }
+
+                await trx('positions').insert({
                   user_id: order.user_id,
-                  amount: -marginDelta,
-                  type: 'MARGIN_BLOCK',
-                  description: `Margin blocked for reversed position ${revPosQty} ${order.symbol}`
-                });
-              } else if (marginDelta < 0) {
-                const excessRefund = Math.round((Math.abs(marginDelta) + Number.EPSILON) * 100) / 100;
-                await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
-                await trx('ledger').insert({
-                  user_id: order.user_id,
-                  amount: excessRefund,
-                  type: 'MARGIN_RELEASE',
-                  description: `Excess margin refunded on reversal ${revPosQty} ${order.symbol}`
+                  symbol: order.symbol,
+                  quantity: revPosQty,
+                  average_price: slicePrice,
+                  product_type: existingPos.product_type || order.product_type || 'INT',
+                  margin: revMargin,
+                  created_at: new Date(),
+                  updated_at: new Date()
                 });
               }
-
-              await trx('positions').insert({
-                user_id: order.user_id,
-                symbol: order.symbol,
-                quantity: revPosQty,
-                average_price: slicePrice,
-                product_type: existingPos.product_type || order.product_type || 'INT',
-                margin: revMargin,
-                created_at: new Date(),
-                updated_at: new Date()
-              });
             }
           } else {
             await trx('positions').where({ id: existingPos.id }).update({
@@ -856,6 +878,13 @@ class VolumeMatchingEngine {
               description: `Delivery Holding Sale: ${closeQty} ${order.symbol} @ ₹${slicePrice}`
             });
           } else {
+            const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+            if (isExitOrder) {
+              console.warn(`[SAFEGUARD] Blocked exit order ${order.id} (${order.symbol}) from opening negative DEL position since holding is already closed.`);
+              order.status = 'CANCELLED';
+              this.dequeueOrder(order.id, order.symbol);
+              return;
+            }
             const isDeriv = isDerivativeContract(order.symbol);
             if (!isDeriv) {
               console.warn(`[SAFEGUARD] Blocked negative DEL cash equity position for user ${order.user_id}, symbol ${order.symbol}`);
@@ -889,6 +918,26 @@ class VolumeMatchingEngine {
               updated_at: new Date()
             });
           } else {
+            const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+            if (isExitOrder) {
+              console.warn(`[SAFEGUARD] Blocked exit order ${order.id} (${order.symbol}) from opening a new position since position is already closed.`);
+              if (sliceMargin > 0) {
+                const user = await trx('users').where({ id: order.user_id }).first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).increment('balance', sliceMargin);
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: sliceMargin,
+                    type: 'MARGIN_RELEASE',
+                    description: `Refund for excess exit slice: ${sliceQtyClean} ${order.symbol}`
+                  });
+                }
+              }
+              order.status = 'CANCELLED';
+              this.dequeueOrder(order.id, order.symbol);
+              return;
+            }
+
             const initialPosQty = order.side === 'BUY' ? sliceQtyClean : -sliceQtyClean;
             await trx('positions').insert({
               user_id: order.user_id,

@@ -4943,6 +4943,49 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  // Real-Time Position Clamping for Explicit Exit Orders (Prevents over-exiting / position reversals)
+  const isExplicitExit = Boolean(req.body.is_exit || (req.body.remarks && /exit|square-off|close/i.test(req.body.remarks)));
+  if (isExplicitExit) {
+    const cleanSym = String(symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const isIntProduct = (effectiveProductType === 'INT' || effectiveProductType === 'MIS' || effectiveProductType === 'BO' || effectiveProductType === 'CO');
+    const isDelProduct = (effectiveProductType === 'DEL' || effectiveProductType === 'CNC' || effectiveProductType === 'DELIVERY');
+    const dbPos = await db('positions')
+      .where({ user_id: req.user.id })
+      .where(builder => {
+        if (isIntProduct) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+        else if (isDelProduct) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+        else builder.where({ product_type: effectiveProductType });
+      })
+      .where(builder => {
+        builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+      })
+      .where('quantity', '!=', 0)
+      .first();
+
+    if (dbPos) {
+      const openQty = Math.abs(Number(dbPos.quantity));
+      if (openQty > 0 && quantity > openQty) {
+        quantity = isMF ? Number(openQty.toFixed(4)) : Math.round(openQty);
+        req.body.quantity = quantity;
+      }
+    } else if (isDelProduct) {
+      const dbHolding = await db('holdings')
+        .where({ user_id: req.user.id })
+        .where(builder => {
+          builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
+        })
+        .where('quantity', '!=', 0)
+        .first();
+      if (dbHolding) {
+        const openHQty = Math.abs(Number(dbHolding.quantity));
+        if (openHQty > 0 && quantity > openHQty) {
+          quantity = isMF ? Number(openHQty.toFixed(4)) : Math.round(openHQty);
+          req.body.quantity = quantity;
+        }
+      }
+    }
+  }
+
   // Block new Intraday / BO / CO orders after segment intraday cutoff time (EXCEPT exit/closing orders)
   const isAmoOrder = rawVariety === 'AMO' || Boolean(req.body.is_amo);
   if (!isAmoOrder && (effectiveProductType === 'INT' || effectiveProductType === 'MIS' || effectiveProductType === 'BO' || effectiveProductType === 'CO')) {
@@ -5511,7 +5554,8 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
 
       // Ensure margin passed down to insert is the final margin
       const marginToSave = requiresMargin ? finalMargin : 0;
-      const orderRemarks = req.body.slice_group_id ? `Slice ${req.body.slice_index || 1}/${req.body.slice_total || 1} [${req.body.slice_group_id}]` : (req.body.remarks || '');
+      const baseRemarks = req.body.remarks || (req.body.is_exit ? 'Exit Position' : '');
+      const orderRemarks = req.body.slice_group_id ? `Slice ${req.body.slice_index || 1}/${req.body.slice_total || 1} [${req.body.slice_group_id}]${baseRemarks ? ' ' + baseRemarks : ''}` : baseRemarks;
       const orderVariety = isCas ? 'CAS' : (isAmo ? 'AMO' : 'REGULAR');
       const initialStatus = (isAmo || isCas) ? 'AMO_PENDING' : status;
 
@@ -5534,6 +5578,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         order_variety: orderVariety,
         status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         remarks: orderRemarks,
+        is_exit: Boolean(req.body.is_exit || isExplicitExit),
         slice_group_id: req.body.slice_group_id || null,
         slice_index: req.body.slice_index ? Number(req.body.slice_index) : null,
         slice_total: req.body.slice_total ? Number(req.body.slice_total) : null,
