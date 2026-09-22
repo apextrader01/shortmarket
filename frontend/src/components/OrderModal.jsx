@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
-import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag } from 'lucide-react';
+import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag, AlertTriangle } from 'lucide-react';
 import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
 import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
 import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
@@ -107,16 +107,20 @@ export default function OrderModal() {
 
   const balanceNum = Number(user?.balance) || 0;
   const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
+  const maxAllowedQty = freezeLimit > 0 ? freezeLimit * 100 : 10000000;
+  const maxAllowedLots = (orderModal.lotsize && orderModal.lotsize > 1) ? Math.floor(maxAllowedQty / orderModal.lotsize) : maxAllowedQty;
   const isBuy = side === 'BUY';
   const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
   const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
   const isMutualFund = cleanSym.endsWith('-MF') || ['EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym) || (/^\d{5,6}$/.test(cleanSym) && !symbol.startsWith('BSE:') && !symbol.startsWith('NSE:'));
   const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : Math.round((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
-  const slicesCount = getOrderSlicesCount(symbol, totalQuantity, orderModal.lotsize);
+  const isCappedBySlicing = totalQuantity > maxAllowedQty;
+  const effectiveQuantity = isCappedBySlicing ? maxAllowedQty : totalQuantity;
+  const slicesCount = getOrderSlicesCount(symbol, effectiveQuantity, orderModal.lotsize);
   
   // Fetch Estimated Charges
   useEffect(() => {
-    if (!symbol || !totalQuantity) return;
+    if (!symbol || !effectiveQuantity) return;
     const fetchEst = async () => {
        setIsEstimating(true);
        try {
@@ -126,7 +130,7 @@ export default function OrderModal() {
              return;
          }
          const token = useStore.getState().token;
-         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
+         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${effectiveQuantity}&price=${p}`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });
          const data = await res.json();
@@ -142,12 +146,12 @@ export default function OrderModal() {
     
     const timer = setTimeout(fetchEst, 400); // Debounce
     return () => clearTimeout(timer);
-  }, [symbol, totalQuantity, orderType, price, livePrice, productType, side]);
+  }, [symbol, effectiveQuantity, orderType, price, livePrice, productType, side]);
 
   const marginCalc = calculateOrderMargin({
     symbol,
     side,
-    quantity: totalQuantity,
+    quantity: effectiveQuantity,
     price: orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0),
     productType,
     lotsize: orderModal.lotsize || 1,
@@ -558,7 +562,7 @@ export default function OrderModal() {
       }
     }
 
-    if (!totalQuantity || totalQuantity <= 0 || isNaN(totalQuantity)) {
+    if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
       alert("Please enter a valid quantity greater than 0.");
       return;
     }
@@ -623,7 +627,7 @@ export default function OrderModal() {
       symbol,
       type: finalType,
       side,
-      quantity: totalQuantity,
+      quantity: effectiveQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
       trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || parsedTrail > 0) && slTrigger ? parseFloat(slTrigger) : null,
       trail_amount: parsedTrail > 0 ? parsedTrail : null,
@@ -1015,8 +1019,29 @@ export default function OrderModal() {
                 />
               </fieldset>
               {orderModal.lotsize > 1 && (
-                <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '4px', paddingLeft: '2px' }}>
-                  Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
+                  <span style={{ color: isCappedBySlicing ? '#f59e0b' : 'var(--text-secondary)' }}>
+                    Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
+                  </span>
+                  {isCappedBySlicing && (
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(maxAllowedLots)}
+                      style={{
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                        color: '#f59e0b',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      title={`Click to set maximum allowable lots (${maxAllowedLots.toLocaleString('en-IN')})`}
+                    >
+                      Set Max: {maxAllowedLots.toLocaleString('en-IN')} Lots
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1116,7 +1141,34 @@ export default function OrderModal() {
           )}
 
           {/* Slicing Notice Banner */}
-          {totalQuantity > freezeLimit && (
+          {isCappedBySlicing ? (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#f59e0b', 
+              background: 'rgba(245, 158, 11, 0.12)', 
+              border: '1px solid rgba(245, 158, 11, 0.35)', 
+              borderRadius: '6px', 
+              padding: '8px 10px', 
+              marginTop: '8px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: '1.4'
+            }}>
+              <AlertTriangle size={15} color="#f59e0b" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontWeight: '700' }}>
+                  Order Slicing Cap Reached (Max 100 Slices):
+                </div>
+                <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                  Entered {totalQuantity.toLocaleString('en-IN')} Qty ({Number(quantity).toLocaleString('en-IN')} Lots) exceeds maximum allowed per order.
+                </div>
+                <div style={{ color: '#fbbf24', marginTop: '2px', fontWeight: '600' }}>
+                  ⚡ Capped at {maxAllowedQty.toLocaleString('en-IN')} Qty ({maxAllowedLots.toLocaleString('en-IN')} Lots across 100 orders of {freezeLimit.toLocaleString('en-IN')}). Remaining quantity must be placed in a separate order.
+                </div>
+              </div>
+            </div>
+          ) : totalQuantity > freezeLimit ? (
             <div style={{ 
               fontSize: '11.5px', 
               color: '#93c5fd', 
@@ -1134,7 +1186,7 @@ export default function OrderModal() {
                 Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} Qty</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
               </span>
             </div>
-          )}
+          ) : null}
 
           {/* Trailing Stop Loss (TSL) Jump Input */}
           {(tab === 'Stop Loss' || isCO || isBO) && (
@@ -1323,7 +1375,11 @@ export default function OrderModal() {
               }}
             >
               {isPlacing ? 'PLACING...' : (
-                isTrueExit ? `EXIT ${totalQuantity} Qty ${isAmo ? '(AMO)' : ''}` : `${side} ${totalQuantity} Qty ${isAmo ? '(AMO)' : ''}`
+                isTrueExit ? (
+                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} Qty ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                ) : (
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} Qty ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                )
               )}
             </button>
           </div>

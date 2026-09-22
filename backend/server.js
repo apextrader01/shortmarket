@@ -5544,12 +5544,35 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         const newBalance = Number(user.balance) - finalMargin;
         await trx('users').where({ id: req.user.id }).update({ balance: newBalance });
         
-        await trx('ledger').insert({
+        if (req.body.slice_group_id) {
+          const sliceGroupId = req.body.slice_group_id;
+          const existingLedger = await trx('ledger')
+            .where({ user_id: req.user.id, type: 'MARGIN_BLOCK' })
+            .where('description', 'like', `%[${sliceGroupId}]%`)
+            .first();
+
+          if (existingLedger) {
+            const updatedAmount = Math.round((Number(existingLedger.amount) - finalMargin + Number.EPSILON) * 100) / 100;
+            await trx('ledger').where({ id: existingLedger.id }).update({
+              amount: updatedAmount,
+              description: `Margin blocked for ${side} ${symbol} (${effectiveProductType}) [${sliceGroupId}]`
+            });
+          } else {
+            await trx('ledger').insert({
+              user_id: req.user.id,
+              amount: -finalMargin,
+              type: 'MARGIN_BLOCK',
+              description: `Margin blocked for ${side} ${symbol} (${effectiveProductType}) [${sliceGroupId}]`
+            });
+          }
+        } else {
+          await trx('ledger').insert({
             user_id: req.user.id,
             amount: -finalMargin,
             type: 'MARGIN_BLOCK',
             description: `Margin blocked for ${side} ${quantity} ${symbol} (${effectiveProductType})`
-        });
+          });
+        }
       }
 
       // Ensure margin passed down to insert is the final margin

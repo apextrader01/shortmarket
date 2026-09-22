@@ -652,12 +652,40 @@ class VolumeMatchingEngine {
                 const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
                 if (user) {
                   await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100 });
-                  await trx('ledger').insert({
-                    user_id: order.user_id,
-                    amount: refundMargin,
-                    type: 'MARGIN_RELEASE',
-                    description: `Margin released for cancelled dangling order ${dangler.symbol}`
-                  });
+                  let sliceGroupId = dangler.slice_group_id;
+                  if (!sliceGroupId && dangler.remarks && dangler.remarks.includes('[slice_')) {
+                    const match = dangler.remarks.match(/\[(slice_[^\]]+)\]/);
+                    if (match) sliceGroupId = match[1];
+                  }
+
+                  if (sliceGroupId) {
+                    const existingRelease = await trx('ledger')
+                      .where({ user_id: order.user_id, type: 'MARGIN_RELEASE' })
+                      .where('description', 'like', `%[${sliceGroupId}]%`)
+                      .first();
+
+                    if (existingRelease) {
+                      const updatedAmount = Math.round((Number(existingRelease.amount) + refundMargin + Number.EPSILON) * 100) / 100;
+                      await trx('ledger').where({ id: existingRelease.id }).update({
+                        amount: updatedAmount,
+                        description: `Margin released for cancelled orders ${dangler.symbol} [${sliceGroupId}]`
+                      });
+                    } else {
+                      await trx('ledger').insert({
+                        user_id: order.user_id,
+                        amount: refundMargin,
+                        type: 'MARGIN_RELEASE',
+                        description: `Margin released for cancelled orders ${dangler.symbol} [${sliceGroupId}]`
+                      });
+                    }
+                  } else {
+                    await trx('ledger').insert({
+                      user_id: order.user_id,
+                      amount: refundMargin,
+                      type: 'MARGIN_RELEASE',
+                      description: `Margin released for cancelled dangling order ${dangler.symbol}`
+                    });
+                  }
                 }
               }
               const triggerEngine = require('./triggerEngine');
@@ -677,12 +705,41 @@ class VolumeMatchingEngine {
                   const user = await trx('users').where({ id: order.user_id }).first();
                   if (user) {
                     await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
-                    await trx('ledger').insert({
-                      user_id: order.user_id,
-                      amount: excessRefund,
-                      type: 'MARGIN_RELEASE',
-                      description: `Excess margin refunded on exit order ${order.symbol}`
-                    });
+
+                    let sliceGroupId = order.slice_group_id;
+                    if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+                      const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+                      if (match) sliceGroupId = match[1];
+                    }
+
+                    if (sliceGroupId) {
+                      const existingRelease = await trx('ledger')
+                        .where({ user_id: order.user_id, type: 'MARGIN_RELEASE' })
+                        .where('description', 'like', `%[${sliceGroupId}]%`)
+                        .first();
+
+                      if (existingRelease) {
+                        const updatedAmount = Math.round((Number(existingRelease.amount) + excessRefund + Number.EPSILON) * 100) / 100;
+                        await trx('ledger').where({ id: existingRelease.id }).update({
+                          amount: updatedAmount,
+                          description: `Excess margin refunded on exit order ${order.symbol} [${sliceGroupId}]`
+                        });
+                      } else {
+                        await trx('ledger').insert({
+                          user_id: order.user_id,
+                          amount: excessRefund,
+                          type: 'MARGIN_RELEASE',
+                          description: `Excess margin refunded on exit order ${order.symbol} [${sliceGroupId}]`
+                        });
+                      }
+                    } else {
+                      await trx('ledger').insert({
+                        user_id: order.user_id,
+                        amount: excessRefund,
+                        type: 'MARGIN_RELEASE',
+                        description: `Excess margin refunded on exit order ${order.symbol}`
+                      });
+                    }
                   }
                 }
               } else {

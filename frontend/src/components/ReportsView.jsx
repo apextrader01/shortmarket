@@ -147,7 +147,98 @@ const LedgerStatement = () => {
     }
   };
 
-  const paginatedLedger = ledger;
+  // Consolidate consecutive sliced order ledger records (e.g. 100 slices into 1 consolidated entry)
+  const paginatedLedger = useMemo(() => {
+    if (!Array.isArray(ledger) || ledger.length === 0) return [];
+    const result = [];
+    let currentGroup = null;
+
+    const finalizeGroup = (g) => {
+      if (!g) return null;
+      if (g.sliceCount > 1) {
+        return {
+          ...g,
+          amount: Math.round((g.amount + Number.EPSILON) * 100) / 100,
+          description: g.customDesc || g.description
+        };
+      }
+      return g;
+    };
+
+    for (let i = 0; i < ledger.length; i++) {
+      const entry = ledger[i];
+      const t = String(entry.type || '').toUpperCase();
+      const desc = entry.description || '';
+
+      let groupId = null;
+      const groupMatch = desc.match(/\[(slice_[^\]]+)\]/);
+      if (groupMatch) {
+        groupId = groupMatch[1];
+      }
+
+      const isBlock = t === 'MARGIN_BLOCK';
+      const isRelease = t === 'MARGIN_RELEASE';
+      const isTaxes = t === 'TAXES';
+      const isConsolidatable = isBlock || isRelease || isTaxes;
+
+      const blockMatch = desc.match(/Margin blocked for (BUY|SELL)\s+(\d+)\s+([^\s]+)/i);
+      const releaseMatch = desc.match(/Margin release.*for.*([^\s]+)/i) || desc.match(/Excess margin refunded.*([^\s]+)/i);
+      const taxesMatch = desc.match(/Taxes & Brokerage for (BUY|SELL)\s+(\d+)\s+([^\s]+)/i);
+
+      const entryTime = new Date(entry.created_at).getTime();
+
+      let matched = false;
+      if (currentGroup && currentGroup.type === t && isConsolidatable) {
+        const timeDiff = Math.abs(currentGroup.rawTime - entryTime);
+        const sameGroupId = groupId && currentGroup.groupId === groupId;
+        const sameBlockSym = blockMatch && currentGroup.blockSide === blockMatch[1] && currentGroup.blockSym === blockMatch[3] && timeDiff < 180000;
+        const sameReleaseSym = releaseMatch && currentGroup.releaseSym === releaseMatch[1] && timeDiff < 180000;
+        const sameTaxesSym = taxesMatch && currentGroup.taxesSide === taxesMatch[1] && currentGroup.taxesSym === taxesMatch[3] && timeDiff < 180000;
+
+        if (sameGroupId || sameBlockSym || sameReleaseSym || sameTaxesSym) {
+          currentGroup.sliceCount += 1;
+          currentGroup.amount = currentGroup.amount + Number(entry.amount);
+          currentGroup.running_balance = entry.running_balance;
+          if (blockMatch) {
+            currentGroup.totalQty += (parseInt(blockMatch[2], 10) || 0);
+            currentGroup.customDesc = `Margin blocked for ${currentGroup.blockSide} ${currentGroup.totalQty.toLocaleString('en-IN')} ${currentGroup.blockSym} (${currentGroup.sliceCount} Slices)`;
+          } else if (releaseMatch) {
+            currentGroup.customDesc = `Margin released for ${currentGroup.releaseSym} (${currentGroup.sliceCount} Slices)`;
+          } else if (taxesMatch) {
+            currentGroup.totalQty += (parseInt(taxesMatch[2], 10) || 0);
+            currentGroup.customDesc = `Taxes & Brokerage for ${currentGroup.taxesSide} ${currentGroup.totalQty.toLocaleString('en-IN')} ${currentGroup.taxesSym} (${currentGroup.sliceCount} Slices)`;
+          }
+          matched = true;
+        }
+      }
+
+      if (!matched) {
+        if (currentGroup) {
+          result.push(finalizeGroup(currentGroup));
+        }
+        currentGroup = {
+          ...entry,
+          rawTime: entryTime,
+          groupId,
+          sliceCount: 1,
+          amount: Number(entry.amount) || 0,
+          totalQty: blockMatch ? (parseInt(blockMatch[2], 10) || 0) : (taxesMatch ? (parseInt(taxesMatch[2], 10) || 0) : 0),
+          blockSide: blockMatch ? blockMatch[1] : null,
+          blockSym: blockMatch ? blockMatch[3] : null,
+          releaseSym: releaseMatch ? releaseMatch[1] : null,
+          taxesSide: taxesMatch ? taxesMatch[1] : null,
+          taxesSym: taxesMatch ? taxesMatch[3] : null,
+          customDesc: null
+        };
+      }
+    }
+
+    if (currentGroup) {
+      result.push(finalizeGroup(currentGroup));
+    }
+
+    return result;
+  }, [ledger]);
 
   const isRealCashFlow = (l) => {
     const t = String(l.type || '').toUpperCase();
@@ -300,7 +391,7 @@ const LedgerStatement = () => {
         <div className="glass-panel" style={{ padding: '14px', borderRadius: '8px' }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Total Entries</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginTop: '4px' }}>
-            {totalItems} Records
+            {paginatedLedger.length < ledger.length ? `${paginatedLedger.length} Records (Consolidated)` : `${totalItems} Records`}
           </div>
         </div>
       </div>
@@ -322,8 +413,13 @@ const LedgerStatement = () => {
                       {Number(entry.amount) >= 0 ? '+' : ''}₹{Math.abs(Number(entry.amount)).toFixed(2)}
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    {entry.description || entry.type}
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span>{entry.description || entry.type}</span>
+                    {entry.sliceCount > 1 && (
+                      <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                        ⚡ {entry.sliceCount} Slices
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: 'var(--text-secondary)', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                     <span>{new Date(entry.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
@@ -372,7 +468,16 @@ const LedgerStatement = () => {
                     <td style={{ padding: '16px' }}>
                       {renderLedgerBadge(entry.type, entry.amount)}
                     </td>
-                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>{entry.description || entry.type}</td>
+                    <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span>{entry.description || entry.type}</span>
+                        {entry.sliceCount > 1 && (
+                          <span style={{ fontSize: '10.5px', background: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.35)', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                            ⚡ {entry.sliceCount} Slices
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td style={{ padding: '16px', textAlign: 'right', color: 'var(--color-green-light)' }}>
                       {Number(entry.amount) > 0 ? `₹${Number(entry.amount).toFixed(2)}` : '-'}
                     </td>
@@ -451,14 +556,57 @@ const TradesAndCharges = () => {
     });
   }, [executedOrders, filterPeriod, customStart, customEnd]);
 
-  const totalTrades = filteredOrders.length;
+  // Consolidate sliced orders so brokerage is charged once per parent order (not per slice)
+  const consolidatedOrders = useMemo(() => {
+    const groupMap = new Map();
+    const result = [];
+    for (const o of filteredOrders) {
+      let groupId = o.slice_group_id;
+      if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
+        const match = o.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) groupId = match[1];
+      }
+      if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
+        const dStr = new Date(o.created_at).toISOString().slice(0, 16);
+        groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+      }
+
+      if (groupId) {
+        if (!groupMap.has(groupId)) {
+          const parent = {
+            ...o,
+            sliceCount: 1,
+            totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
+            quantity: Number(o.quantity) || 0,
+            filled_quantity: Number(o.filled_quantity || o.quantity || 0)
+          };
+          groupMap.set(groupId, parent);
+          result.push(parent);
+        } else {
+          const parent = groupMap.get(groupId);
+          parent.sliceCount += 1;
+          const q = Number(o.quantity) || 0;
+          const p = Number(o.average_price || o.price || 0);
+          parent.quantity += q;
+          parent.filled_quantity += Number(o.filled_quantity || o.quantity || 0);
+          parent.totalTradeValue += (q * p);
+          parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : p;
+        }
+      } else {
+        result.push(o);
+      }
+    }
+    return result;
+  }, [filteredOrders]);
+
+  const totalTrades = consolidatedOrders.length;
   
   let totalBrokerage = 0;
   let totalSTT = 0;
   let totalCharges = 0;
   let totalTurnover = 0;
 
-  filteredOrders.forEach(o => {
+  consolidatedOrders.forEach(o => {
     const ch = calculateIndianCharges(o);
     totalBrokerage += ch.brokerage;
     totalSTT += ch.stt;
@@ -469,7 +617,7 @@ const TradesAndCharges = () => {
   // Date-wise Aggregation
   const dateWiseData = useMemo(() => {
     const map = {};
-    filteredOrders.forEach(o => {
+    consolidatedOrders.forEach(o => {
       const d = new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       if (!map[d]) map[d] = { date: d, rawDate: new Date(o.created_at), totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0, turnover: 0 };
       const ch = calculateIndianCharges(o);
@@ -483,12 +631,12 @@ const TradesAndCharges = () => {
       map[d].turnover += ch.tradeValue;
     });
     return Object.values(map).sort((a, b) => b.rawDate - a.rawDate);
-  }, [filteredOrders]);
+  }, [consolidatedOrders]);
 
   // Scrip-wise Aggregation
   const scripWiseData = useMemo(() => {
     const map = {};
-    filteredOrders.forEach(o => {
+    consolidatedOrders.forEach(o => {
       const sym = o.symbol || 'UNKNOWN';
       if (!map[sym]) map[sym] = { symbol: sym, totalTrades: 0, buyQty: 0, sellQty: 0, brokerage: 0, charges: 0, turnover: 0 };
       const ch = calculateIndianCharges(o);
@@ -502,7 +650,7 @@ const TradesAndCharges = () => {
       map[sym].turnover += ch.tradeValue;
     });
     return Object.values(map).sort((a, b) => b.totalTrades - a.totalTrades);
-  }, [filteredOrders]);
+  }, [consolidatedOrders]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -743,10 +891,55 @@ const ProfitAndLoss = () => {
     });
   }, [executedOrders, filterPeriod, customStart, customEnd]);
 
+  // Consolidate sliced orders for accurate charges and trade counts
+  const consolidatedOrders = useMemo(() => {
+    const groupMap = new Map();
+    const result = [];
+    for (const o of filteredOrders) {
+      let groupId = o.slice_group_id;
+      if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
+        const match = o.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) groupId = match[1];
+      }
+      if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
+        const dStr = new Date(o.created_at).toISOString().slice(0, 16);
+        groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+      }
+
+      if (groupId) {
+        if (!groupMap.has(groupId)) {
+          const parent = {
+            ...o,
+            sliceCount: 1,
+            totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
+            quantity: Number(o.quantity) || 0,
+            realized_pnl: (o.realized_pnl !== null && o.realized_pnl !== undefined) ? parseFloat(o.realized_pnl) : 0
+          };
+          groupMap.set(groupId, parent);
+          result.push(parent);
+        } else {
+          const parent = groupMap.get(groupId);
+          parent.sliceCount += 1;
+          const q = Number(o.quantity) || 0;
+          const p = Number(o.average_price || o.price || 0);
+          parent.quantity += q;
+          parent.totalTradeValue += (q * p);
+          parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : p;
+          if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
+            parent.realized_pnl += parseFloat(o.realized_pnl);
+          }
+        }
+      } else {
+        result.push(o);
+      }
+    }
+    return result;
+  }, [filteredOrders]);
+
   let totalCharges = 0;
   let realizedPnl = 0;
 
-  filteredOrders.forEach(o => {
+  consolidatedOrders.forEach(o => {
     const ch = calculateIndianCharges(o);
     totalCharges += ch.totalCharges;
     if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
@@ -759,7 +952,7 @@ const ProfitAndLoss = () => {
   // Aggregation Logic
   const monthWiseData = useMemo(() => {
     const map = {};
-    filteredOrders.forEach(o => {
+    consolidatedOrders.forEach(o => {
       const dt = new Date(o.created_at);
       const mStr = dt.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
       const ch = calculateIndianCharges(o);
@@ -771,11 +964,11 @@ const ProfitAndLoss = () => {
       map[mStr].trades += 1;
     });
     return Object.values(map).sort((a, b) => b.rawDate - a.rawDate);
-  }, [filteredOrders]);
+  }, [consolidatedOrders]);
 
   const scripWiseData = useMemo(() => {
     const map = {};
-    filteredOrders.forEach(o => {
+    consolidatedOrders.forEach(o => {
       const sym = o.symbol || 'UNKNOWN';
       const ch = calculateIndianCharges(o);
       let pnl = (o.realized_pnl !== null && o.realized_pnl !== undefined) ? parseFloat(o.realized_pnl) : 0;
@@ -786,7 +979,7 @@ const ProfitAndLoss = () => {
       map[sym].trades += 1;
     });
     return Object.values(map).sort((a, b) => (b.pnl - b.charges) - (a.pnl - a.charges));
-  }, [filteredOrders]);
+  }, [consolidatedOrders]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

@@ -737,7 +737,44 @@ export function generatePnLSummaryReport(orders = [], positions = [], user = {},
 // ─────────────────────────────────────────────────────────────────────────────
 export function generateTradesAndChargesReport(orders = [], user = {}, dateRange = 'Current Month', format = 'excel', customStart = '', customEnd = '') {
   const filtered = filterRecordsByPeriod(orders, dateRange, customStart, customEnd);
-  const executed = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+  const rawExecuted = filtered.filter(o => o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED');
+
+  // Consolidate sliced orders for reporting
+  const groupMap = new Map();
+  const executed = [];
+  for (const o of rawExecuted) {
+    let groupId = o.slice_group_id;
+    if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
+      const match = o.remarks.match(/\[(slice_[^\]]+)\]/);
+      if (match) groupId = match[1];
+    }
+    if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
+      const dStr = new Date(o.created_at).toISOString().slice(0, 16);
+      groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+    }
+    if (groupId) {
+      if (!groupMap.has(groupId)) {
+        const parent = {
+          ...o,
+          sliceCount: 1,
+          totalTradeValue: (Number(o.quantity) || 0) * (Number(o.average_price || o.price || 0)),
+          quantity: Number(o.quantity) || 0
+        };
+        groupMap.set(groupId, parent);
+        executed.push(parent);
+      } else {
+        const parent = groupMap.get(groupId);
+        parent.sliceCount += 1;
+        const q = Number(o.quantity) || 0;
+        const p = Number(o.average_price || o.price || 0);
+        parent.quantity += q;
+        parent.totalTradeValue += (q * p);
+        parent.average_price = parent.quantity > 0 ? (parent.totalTradeValue / parent.quantity) : p;
+      }
+    } else {
+      executed.push(o);
+    }
+  }
 
   let grandBrokerage = 0;
   let grandSTT = 0;
