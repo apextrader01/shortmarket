@@ -4,24 +4,48 @@ const { calculateTaxes, isDerivativeContract } = require('./taxCalculator');
 
 function normalizeSymbol(sym) {
   if (!sym || typeof sym !== 'string') return '';
-  return sym
-    .replace(/^(NSE:|BSE:|MCX:)/i, '')
-    .replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '')
-    .toUpperCase();
+  const upper = sym.toUpperCase().trim();
+  let exchange = 'NSE';
+  let ticker = upper;
+  if (upper.includes(':')) {
+    const parts = upper.split(':');
+    exchange = parts[0];
+    ticker = parts.slice(1).join(':');
+  }
+  const cleanTicker = ticker.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+  return `${exchange}:${cleanTicker}`;
 }
 
 function getCachedPrice(priceCache, symbol) {
   if (!priceCache || !symbol) return {};
   if (priceCache[symbol]) return priceCache[symbol];
-  const clean = symbol
-    .replace(/^(NSE:|BSE:|MCX:)/i, '')
-    .replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+  
+  const upper = symbol.toUpperCase().trim();
+  const hasEx = upper.includes(':');
+  const ex = hasEx ? upper.split(':')[0] : '';
+  const raw = hasEx ? upper.split(':')[1] : upper;
+  const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+
+  if (ex === 'NSE') {
+    if (priceCache[`NSE:${raw}`]) return priceCache[`NSE:${raw}`];
+    if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
+    if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
+  } else if (ex === 'BSE') {
+    if (priceCache[`BSE:${raw}`]) return priceCache[`BSE:${raw}`];
+    if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
+    if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
+    if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  } else if (ex === 'MCX') {
+    if (priceCache[`MCX:${raw}`]) return priceCache[`MCX:${raw}`];
+    if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
+  }
+
+  // Fallback if exchange not matched or symbol had no prefix
+  if (priceCache[raw]) return priceCache[raw];
   if (priceCache[clean]) return priceCache[clean];
   if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
   if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
   if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
-  if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
-  if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
   if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
   return {};
 }
@@ -123,6 +147,9 @@ class VolumeMatchingEngine {
       tgt_price: order.tgt_price,
       trail_amount: order.trail_amount,
       parent_order_id: order.parent_order_id,
+      slice_group_id: order.slice_group_id || null,
+      slice_index: order.slice_index ? Number(order.slice_index) : null,
+      slice_total: order.slice_total ? Number(order.slice_total) : null,
       created_at: order.created_at || new Date(),
       _lastFillTime: null  // Allow immediate heartbeat fill on enqueue
     };
@@ -280,13 +307,11 @@ class VolumeMatchingEngine {
       order.taxes = ordObj.taxes;
     }
 
-    // Initialize last volume tracker for this symbol from live cache if not already tracking
+    // Initialize last volume tracker for this symbol from live cache to guarantee fresh baseline
     const liveVol = Number(cached.volume || cached.vol_traded_today || cached.vol || cached.v || 0);
     if (liveVol > 0) {
       const normSym = normalizeSymbol(ordObj.symbol);
-      if (!this.lastSymbolVolume.has(normSym)) {
-        this.lastSymbolVolume.set(normSym, liveVol);
-      }
+      this.lastSymbolVolume.set(normSym, liveVol);
     }
   }
 
@@ -456,16 +481,6 @@ class VolumeMatchingEngine {
           });
         }
 
-        // Write consolidated ledger entry ONLY when order reaches EXECUTED
-        if (isComplete && accumulatedTaxes > 0) {
-          await trx('ledger').insert({
-            user_id: order.user_id,
-            amount: -accumulatedTaxes,
-            type: 'TAXES',
-            description: `Taxes & Brokerage for ${order.side} ${newFilled} ${order.symbol} (Order #${order.id})`
-          });
-        }
-
         // Safe definition of proportional slice margin accessible across all branches
         const sliceMargin = totalQty > 0 ? (sliceQtyClean / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
 
@@ -479,6 +494,60 @@ class VolumeMatchingEngine {
           status: newStatus,
           updated_at: new Date()
         });
+
+        // 1.1 Consolidated Ledger Recording:
+        // Sliced orders belonging to a slice_group_id are consolidated into ONE single ledger entry
+        // once all sibling slices in the group complete or cancel. Standalone orders write on completion.
+        let sliceGroupId = currentOrder.slice_group_id || order.slice_group_id;
+        if (!sliceGroupId && currentOrder.remarks && currentOrder.remarks.includes('[slice_')) {
+          const match = currentOrder.remarks.match(/\[(slice_[^\]]+)\]/);
+          if (match) sliceGroupId = match[1];
+        }
+
+        if (sliceGroupId) {
+          const groupOrders = await trx('orders')
+            .where({ user_id: order.user_id, slice_group_id: sliceGroupId })
+            .select('id', 'status', 'filled_quantity', 'taxes', 'quantity');
+
+          const allCompletedOrCancelled = groupOrders.length > 0 && groupOrders.every(o => o.status === 'EXECUTED' || o.status === 'CANCELLED');
+
+          if (allCompletedOrCancelled) {
+            let totalGroupFilled = 0;
+            let totalGroupTaxes = 0;
+            let totalGroupSlicesExecuted = 0;
+
+            for (const o of groupOrders) {
+              totalGroupFilled += Number(o.filled_quantity || 0);
+              totalGroupTaxes += Number(o.taxes || 0);
+              if (o.status === 'EXECUTED') totalGroupSlicesExecuted++;
+            }
+            totalGroupTaxes = Math.round((totalGroupTaxes + Number.EPSILON) * 100) / 100;
+
+            const existingLedger = await trx('ledger')
+              .where({ user_id: order.user_id, type: 'TAXES' })
+              .where('description', 'like', `%[${sliceGroupId}]%`)
+              .first();
+
+            if (!existingLedger && totalGroupTaxes > 0) {
+              await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: -totalGroupTaxes,
+                type: 'TAXES',
+                description: `Taxes & Brokerage for ${order.side} ${totalGroupFilled} ${order.symbol} (${totalGroupSlicesExecuted} Slices) [${sliceGroupId}]`
+              });
+            }
+          }
+        } else {
+          // Write consolidated ledger entry ONLY when standalone order reaches EXECUTED
+          if (isComplete && accumulatedTaxes > 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: -accumulatedTaxes,
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${newFilled} ${order.symbol} (Order #${order.id})`
+            });
+          }
+        }
 
         // 2. Incremental Position Update
         const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
@@ -969,6 +1038,67 @@ class VolumeMatchingEngine {
         remarks: `Partially filled: ${order.filled_quantity || 0} executed, ${pendingQty} cancelled`,
         updated_at: new Date()
       });
+
+      // Consolidated ledger recording for executed slices in slice group upon cancellation
+      let sliceGroupId = order.slice_group_id;
+      if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+        const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) sliceGroupId = match[1];
+      }
+
+      if (sliceGroupId) {
+        const groupOrders = await trx('orders')
+          .where({ user_id: userId, slice_group_id: sliceGroupId })
+          .select('id', 'status', 'filled_quantity', 'taxes', 'quantity');
+
+        const allCompletedOrCancelled = groupOrders.length > 0 && groupOrders.every(o => {
+          const s = o.id === order.id ? 'CANCELLED' : o.status;
+          return s === 'EXECUTED' || s === 'CANCELLED';
+        });
+
+        if (allCompletedOrCancelled) {
+          let totalGroupFilled = 0;
+          let totalGroupTaxes = 0;
+          let totalGroupSlicesExecuted = 0;
+
+          for (const o of groupOrders) {
+            totalGroupFilled += Number(o.filled_quantity || 0);
+            totalGroupTaxes += Number(o.taxes || 0);
+            if (o.status === 'EXECUTED' || (o.id === order.id && Number(order.filled_quantity || 0) > 0)) totalGroupSlicesExecuted++;
+          }
+          totalGroupTaxes = Math.round((totalGroupTaxes + Number.EPSILON) * 100) / 100;
+
+          const existingLedger = await trx('ledger')
+            .where({ user_id: userId, type: 'TAXES' })
+            .where('description', 'like', `%[${sliceGroupId}]%`)
+            .first();
+
+          if (!existingLedger && totalGroupTaxes > 0) {
+            await trx('ledger').insert({
+              user_id: userId,
+              amount: -totalGroupTaxes,
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${totalGroupFilled} ${order.symbol} (${totalGroupSlicesExecuted} Slices) [${sliceGroupId}]`
+            });
+          }
+        }
+      } else {
+        const prevFilled = Number(order.filled_quantity || 0);
+        if (prevFilled > 0 && Number(order.taxes) > 0) {
+          const existingLedger = await trx('ledger')
+            .where({ user_id: userId, type: 'TAXES' })
+            .where('description', 'like', `%Order #${order.id}%`)
+            .first();
+          if (!existingLedger) {
+            await trx('ledger').insert({
+              user_id: userId,
+              amount: -Number(order.taxes),
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${prevFilled} ${order.symbol} (Order #${order.id})`
+            });
+          }
+        }
+      }
 
       // If partially filled BO/CO is cancelled, spawn protection legs for the filled portion
       const prevFilled = Number(order.filled_quantity || 0);

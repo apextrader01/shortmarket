@@ -5521,7 +5521,10 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         filled_quantity: 0, pending_quantity: quantity, average_price: null,
         order_variety: orderVariety,
         status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
-        remarks: orderRemarks
+        remarks: orderRemarks,
+        slice_group_id: req.body.slice_group_id || null,
+        slice_index: req.body.slice_index ? Number(req.body.slice_index) : null,
+        slice_total: req.body.slice_total ? Number(req.body.slice_total) : null
       }).returning('id');
       const orderId = typeof id === 'object' ? id.id : id;
       
@@ -5531,6 +5534,9 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         order_variety: orderVariety,
         status: initialStatus, sl_price: sl_price || null, tgt_price: tgt_price || null, trigger_price: resolvedTriggerPrice, trail_amount: trail_amount || null, product_type: effectiveProductType, margin: marginToSave,
         remarks: orderRemarks,
+        slice_group_id: req.body.slice_group_id || null,
+        slice_index: req.body.slice_index ? Number(req.body.slice_index) : null,
+        slice_total: req.body.slice_total ? Number(req.body.slice_total) : null,
         isMarket,
         isAmo,
         isCas
@@ -7134,9 +7140,51 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       // Update status
       await trx('orders').where({ id: req.params.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
 
-      // If a partially filled order is cancelled, ensure consolidated tax entry exists for the filled portion
+      // If a partially filled order or slice group is cancelled, ensure consolidated tax entry exists for the filled portion
       const filledQty = parseFloat(order.filled_quantity || 0);
-      if (filledQty > 0 && Number(order.taxes) > 0) {
+      let sliceGroupId = order.slice_group_id;
+      if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+        const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) sliceGroupId = match[1];
+      }
+
+      if (sliceGroupId) {
+        const groupOrders = await trx('orders')
+          .where({ user_id: order.user_id, slice_group_id: sliceGroupId })
+          .select('id', 'status', 'filled_quantity', 'taxes', 'quantity');
+
+        const allCompletedOrCancelled = groupOrders.length > 0 && groupOrders.every(o => {
+          const s = o.id === order.id ? 'CANCELLED' : o.status;
+          return s === 'EXECUTED' || s === 'CANCELLED';
+        });
+
+        if (allCompletedOrCancelled) {
+          let totalGroupFilled = 0;
+          let totalGroupTaxes = 0;
+          let totalGroupSlicesExecuted = 0;
+
+          for (const o of groupOrders) {
+            totalGroupFilled += Number(o.filled_quantity || 0);
+            totalGroupTaxes += Number(o.taxes || 0);
+            if (o.status === 'EXECUTED' || (o.id === order.id && filledQty > 0)) totalGroupSlicesExecuted++;
+          }
+          totalGroupTaxes = Math.round((totalGroupTaxes + Number.EPSILON) * 100) / 100;
+
+          const existingTax = await trx('ledger')
+            .where({ user_id: order.user_id, type: 'TAXES' })
+            .where('description', 'like', `%[${sliceGroupId}]%`)
+            .first();
+
+          if (!existingTax && totalGroupTaxes > 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: -totalGroupTaxes,
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${totalGroupFilled} ${order.symbol} (${totalGroupSlicesExecuted} Slices) [${sliceGroupId}]`
+            });
+          }
+        }
+      } else if (filledQty > 0 && Number(order.taxes) > 0) {
         const existingTax = await trx('ledger')
           .where({ user_id: order.user_id, type: 'TAXES' })
           .where('description', 'like', `%Order #${order.id}%`)
