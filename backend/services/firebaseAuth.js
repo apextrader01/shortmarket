@@ -3,7 +3,7 @@ const fs = require('fs');
 
 let admin = null;
 let authInstance = null;
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyA3MUmCRRKbiXZUc9W37wXoHa_elo2hcUI';
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY || 'AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I';
 
 try {
   admin = require('firebase-admin');
