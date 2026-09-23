@@ -1516,6 +1516,8 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       reset_otp_expires: expires
     });
 
+    console.log(`[FORGOT PASSWORD] 🔑 Generated Reset OTP for ${normalizedEmail}: ${otp}`);
+
     // 1. Deliver the 6-digit numeric OTP directly to user's inbox
     try {
       const { sendEmailOtpViaService } = require('./services/firebaseAuth');
