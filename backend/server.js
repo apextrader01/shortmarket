@@ -1516,7 +1516,17 @@ app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
       reset_otp_expires: expires
     });
 
-    // 🚀 Dispatch official password reset email via Firebase Mail Service
+    // 1. Deliver the 6-digit numeric OTP directly to user's inbox
+    try {
+      const { sendEmailOtpViaService } = require('./services/firebaseAuth');
+      if (typeof sendEmailOtpViaService === 'function') {
+        await sendEmailOtpViaService(normalizedEmail, otp);
+      }
+    } catch (mailErr) {
+      console.warn('[FORGOT PASSWORD] Numeric email OTP dispatch note:', mailErr.message);
+    }
+
+    // 2. Dispatch official password reset email link via Firebase Mail Service
     try {
       await sendFirebasePasswordReset(normalizedEmail);
       console.log(`[FIREBASE AUTH] Password reset email successfully dispatched to ${normalizedEmail}`);

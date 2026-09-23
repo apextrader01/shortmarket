@@ -280,5 +280,6 @@ module.exports = {
   sendFirebasePasswordReset,
   syncFirebaseUserPassword,
   sendFirebaseLoginEmail,
+  sendEmailOtpViaService,
   verifyFirebasePhoneToken
 };
