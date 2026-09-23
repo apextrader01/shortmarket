@@ -56,7 +56,8 @@ const COMMODITY_FREEZE_LIMITS = {
     LEAD: 50000,
     ALUMINIUM: 50000,
     MENTHAOIL: 3600,
-    COTTON: 2500
+    COTTON: 2500,
+    NICKEL: 2500
 };
 
 function getFreezeLimit(symbol, explicitLotsize = null) {
@@ -65,8 +66,9 @@ function getFreezeLimit(symbol, explicitLotsize = null) {
 
     // 1. Commodity Check (MCX)
     if (symbol.includes('MCX') || symbol.includes('NCDEX') || isCommodityContract(symbol)) {
-        for (const [key, limit] of Object.entries(COMMODITY_FREEZE_LIMITS)) {
-            if (upper.startsWith(key)) return limit;
+        const sortedCommKeys = Object.keys(COMMODITY_FREEZE_LIMITS).sort((a, b) => b.length - a.length);
+        for (const key of sortedCommKeys) {
+            if (upper.startsWith(key)) return COMMODITY_FREEZE_LIMITS[key];
         }
         const lot = explicitLotsize || getInstantLotsize(symbol);
         return lot > 1 ? lot * 50 : 10000;
@@ -150,7 +152,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY') stampDuty = turnover * 0.00005; // 0.005% stamp duty on MF purchase
         if (side === 'SELL') stt = turnover * 0.001; // 0.1% STT on equity MF redemption
     } else if (isOption) {
-        brokerage = isExercise ? 0 : 20 * slicesCount; // Flat ₹20 per executed order/slice for Options; ₹0 on expiry exercise
+        brokerage = isExercise ? 0 : 20; // Flat ₹20 per executed order for Options; ₹0 on expiry exercise
         if (isExercise) {
             // Statutory 0.125% STT on exercised ITM options at expiry (Finance Act Section 98)
             stt = turnover * 0.00125;
@@ -161,12 +163,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
         if (side === 'BUY' && !isExercise) stampDuty = turnover * 0.00003;
         sebiCharge = turnover * 0.000001;
     } else if (isFuture) {
-        if (slicesCount > 0) {
-            const sliceTurnover = turnover / slicesCount;
-            brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
-        } else {
-            brokerage = 0;
-        }
+        brokerage = Math.min(turnover * 0.0003, 20); // Flat ₹20 or 0.03% whichever is lower per order
         if (side === 'SELL') {
             stt = turnover * (isCommodity ? 0.0001 : 0.0002); // 0.02% STT on Futures sale (revised Oct 2024)
         }
@@ -182,12 +179,7 @@ function calculateTaxes(symbol, productType, side, quantity, price, entryPrice =
             if (side === 'SELL') dpCharge = 15.93; // Standard CDSL DP charge ₹13.50 + 18% GST
         } else {
             // Intraday Equity (INT, BO, CO, MIS)
-            if (slicesCount > 0) {
-                const sliceTurnover = turnover / slicesCount;
-                brokerage = Math.min(sliceTurnover * 0.0003, 20) * slicesCount;
-            } else {
-                brokerage = 0;
-            }
+            brokerage = Math.min(turnover * 0.0003, 20); // Flat ₹20 or 0.03% whichever is lower per order
             if (side === 'SELL') stt = turnover * 0.00025; // 0.025% on sell only
             if (side === 'BUY') stampDuty = turnover * 0.00003;
         }

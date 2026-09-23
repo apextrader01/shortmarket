@@ -560,6 +560,17 @@ const TradesAndCharges = () => {
   const consolidatedOrders = useMemo(() => {
     const groupMap = new Map();
     const result = [];
+
+    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    const timeClusters = new Map();
+    for (const o of filteredOrders) {
+      if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
+      }
+    }
+
     for (const o of filteredOrders) {
       let groupId = o.slice_group_id;
       if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
@@ -567,8 +578,15 @@ const TradesAndCharges = () => {
         if (match) groupId = match[1];
       }
       if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
-        const dStr = new Date(o.created_at).toISOString().slice(0, 16);
+        const dStr = new Date(o.created_at || o.createdAt).toISOString().slice(0, 16);
         groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+      }
+      if (!groupId) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        if ((timeClusters.get(cKey) || 0) > 1) {
+          groupId = `cluster_${cKey}`;
+        }
       }
 
       if (groupId) {
@@ -895,6 +913,17 @@ const ProfitAndLoss = () => {
   const consolidatedOrders = useMemo(() => {
     const groupMap = new Map();
     const result = [];
+
+    // Pre-calculate 30-second time clusters for orders without explicit slice IDs
+    const timeClusters = new Map();
+    for (const o of filteredOrders) {
+      if (!o.slice_group_id && (!o.remarks || (!o.remarks.includes('[slice_') && !/Slice\s+\d+\/\d+/i.test(o.remarks)))) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        timeClusters.set(cKey, (timeClusters.get(cKey) || 0) + 1);
+      }
+    }
+
     for (const o of filteredOrders) {
       let groupId = o.slice_group_id;
       if (!groupId && o.remarks && o.remarks.includes('[slice_')) {
@@ -904,6 +933,13 @@ const ProfitAndLoss = () => {
       if (!groupId && o.remarks && /Slice\s+\d+\/\d+/i.test(o.remarks)) {
         const dStr = new Date(o.created_at).toISOString().slice(0, 16);
         groupId = `inferred_${o.symbol}_${o.side}_${dStr}`;
+      }
+      if (!groupId) {
+        const tSec = Math.floor(new Date(o.created_at || o.createdAt).getTime() / 30000);
+        const cKey = `${o.symbol}_${o.side}_${tSec}`;
+        if ((timeClusters.get(cKey) || 0) > 1) {
+          groupId = `cluster_${cKey}`;
+        }
       }
 
       if (groupId) {

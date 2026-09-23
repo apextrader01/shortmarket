@@ -16,7 +16,8 @@ export const COMMODITY_FREEZE_LIMITS = {
   LEAD: 50000,
   ALUMINIUM: 50000,
   MENTHAOIL: 3600,
-  COTTON: 2500
+  COTTON: 2500,
+  NICKEL: 2500
 };
 
 export const INDEX_FREEZE_LIMITS = {
@@ -36,8 +37,9 @@ export function getFreezeLimit(symbol, explicitLotsize = null) {
 
   // 1. Commodity Check (MCX)
   if (symbol.includes('MCX') || symbol.includes('NCDEX') || isCommodityContract(symbol)) {
-    for (const [key, limit] of Object.entries(COMMODITY_FREEZE_LIMITS)) {
-      if (upper.startsWith(key)) return limit;
+    const sortedCommKeys = Object.keys(COMMODITY_FREEZE_LIMITS).sort((a, b) => b.length - a.length);
+    for (const key of sortedCommKeys) {
+      if (upper.startsWith(key)) return COMMODITY_FREEZE_LIMITS[key];
     }
     const lot = explicitLotsize || getInstantLotsize(symbol);
     return lot > 1 ? lot * 50 : 10000;

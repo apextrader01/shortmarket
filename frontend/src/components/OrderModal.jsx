@@ -1018,7 +1018,7 @@ export default function OrderModal() {
                   style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '6px 8px' : '8px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '13px' : '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              {orderModal.lotsize > 1 && (
+              {orderModal.lotsize > 1 ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
                   <span style={{ color: isCappedBySlicing ? '#f59e0b' : 'var(--text-secondary)' }}>
                     Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
@@ -1043,7 +1043,27 @@ export default function OrderModal() {
                     </button>
                   )}
                 </div>
-              )}
+              ) : isCappedBySlicing ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(maxAllowedQty)}
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      color: '#f59e0b',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                    title={`Click to set maximum allowable shares (${maxAllowedQty.toLocaleString('en-IN')})`}
+                  >
+                    Set Max: {maxAllowedQty.toLocaleString('en-IN')} Shares
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {/* Price */}
@@ -1161,10 +1181,18 @@ export default function OrderModal() {
                   Order Slicing Cap Reached (Max 100 Slices):
                 </div>
                 <div style={{ color: '#d1d5db', marginTop: '2px' }}>
-                  Entered {totalQuantity.toLocaleString('en-IN')} Qty ({Number(quantity).toLocaleString('en-IN')} Lots) exceeds maximum allowed per order.
+                  {orderModal.lotsize > 1 ? (
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds maximum allowed per order.`
+                  ) : (
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds maximum allowed per order.`
+                  )}
                 </div>
                 <div style={{ color: '#fbbf24', marginTop: '2px', fontWeight: '600' }}>
-                  ⚡ Capped at {maxAllowedQty.toLocaleString('en-IN')} Qty ({maxAllowedLots.toLocaleString('en-IN')} Lots across 100 orders of {freezeLimit.toLocaleString('en-IN')}). Remaining quantity must be placed in a separate order.
+                  {orderModal.lotsize > 1 ? (
+                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots across 100 orders of ${freezeLimit.toLocaleString('en-IN')}). Remaining quantity must be placed in a separate order.`
+                  ) : (
+                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Shares across 100 orders of ${freezeLimit.toLocaleString('en-IN')}. Remaining quantity must be placed in a separate order.`
+                  )}
                 </div>
               </div>
             </div>
@@ -1183,7 +1211,7 @@ export default function OrderModal() {
             }}>
               <Zap size={14} color="#60a5fa" />
               <span>
-                Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} Qty</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
+                Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} {orderModal.lotsize > 1 ? 'Qty' : 'Shares'}</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
               </span>
             </div>
           ) : null}
@@ -1376,9 +1404,9 @@ export default function OrderModal() {
             >
               {isPlacing ? 'PLACING...' : (
                 isTrueExit ? (
-                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} Qty ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
                 ) : (
-                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} Qty ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
                 )
               )}
             </button>

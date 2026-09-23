@@ -7379,12 +7379,40 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
           if (user) {
               await trx('users').where({ id: req.user.id }).update({ balance: Math.round((parseFloat(user.balance) + refundAmount + Number.EPSILON) * 100) / 100 });
               // Write a MARGIN_RELEASE ledger entry to match the MARGIN_BLOCK written on placement
-              await trx('ledger').insert({
-                user_id: req.user.id,
-                amount: refundAmount,
-                type: 'MARGIN_RELEASE',
-                description: `Margin refunded for cancelled order: ${pendingQty} ${order.symbol} ${order.side}`
-              });
+              let sliceGroupId = order.slice_group_id;
+              if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+                const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+                if (match) sliceGroupId = match[1];
+              }
+
+              if (sliceGroupId) {
+                const existingRelease = await trx('ledger')
+                  .where({ user_id: req.user.id, type: 'MARGIN_RELEASE' })
+                  .where('description', 'like', `%[${sliceGroupId}]%`)
+                  .first();
+
+                if (existingRelease) {
+                  const updatedAmount = Math.round((Number(existingRelease.amount) + refundAmount + Number.EPSILON) * 100) / 100;
+                  await trx('ledger').where({ id: existingRelease.id }).update({
+                    amount: updatedAmount,
+                    description: `Margin refunded for cancelled orders ${order.symbol} [${sliceGroupId}]`
+                  });
+                } else {
+                  await trx('ledger').insert({
+                    user_id: req.user.id,
+                    amount: refundAmount,
+                    type: 'MARGIN_RELEASE',
+                    description: `Margin refunded for cancelled orders ${order.symbol} [${sliceGroupId}]`
+                  });
+                }
+              } else {
+                await trx('ledger').insert({
+                  user_id: req.user.id,
+                  amount: refundAmount,
+                  type: 'MARGIN_RELEASE',
+                  description: `Margin refunded for cancelled order: ${pendingQty} ${order.symbol} ${order.side}`
+                });
+              }
           }
       }
       
