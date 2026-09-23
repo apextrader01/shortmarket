@@ -145,17 +145,92 @@ async function syncFirebaseUserPassword(email, newPassword) {
   return false;
 }
 
+let nodemailer = null;
+try {
+  nodemailer = require('nodemailer');
+} catch (_) {}
+
 /**
- * Send transactional email with OTP code using configured EmailJS REST API
+ * Send branded HTML verification email via Gmail SMTP or fallback to EmailJS
  */
 async function sendEmailOtpViaService(email, code) {
+  const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  // 1. Primary: Direct Google / Gmail SMTP (₹0, 500/day free, 100% white-labeled)
+  if (nodemailer && gmailUser && gmailPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: gmailUser,
+          pass: gmailPass.replace(/\s+/g, '') // remove spaces from Google app password
+        }
+      });
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0e14; color: #ffffff; padding: 40px 20px; margin: 0;">
+          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #121721; border-radius: 12px; border: 1px solid #1f2937; overflow: hidden;">
+            <tr>
+              <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #1f2937;">
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800; color: #10b981; letter-spacing: 0.5px;">SkandX</h1>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1.5px;">Algorithmic Trading Platform</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 32px;">
+                <h2 style="margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #f3f4f6;">Identity Verification</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                  A security request was initiated for your SkandX account. Use the verification code below to complete your sign-in:
+                </p>
+                <div style="background-color: #0a0d14; border: 1px solid #10b981; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px;">
+                  <div style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #10b981; font-family: monospace;">${code}</div>
+                  <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">Valid for 10 minutes &bull; Do not share with anyone</div>
+                </div>
+                <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: #6b7280;">
+                  If you did not request this code, your credentials may be at risk. Please log in to your account and change your password immediately.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 20px 32px; background-color: #0d111a; border-top: 1px solid #1f2937; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563;">
+                  &copy; 2026 SkandX Trading Platform. All rights reserved.<br>
+                  <a href="https://skandx.in" style="color: #10b981; text-decoration: none;">https://skandx.in</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      await transporter.sendMail({
+        from: `"SkandX Security" <${gmailUser}>`,
+        to: email,
+        subject: `Your SkandX Verification Code: ${code}`,
+        text: `Your SkandX verification code is: ${code}. Valid for 10 minutes.`,
+        html: htmlContent
+      });
+
+      console.log(`[GMAIL SMTP] Verification OTP successfully dispatched to ${email} via ${gmailUser}`);
+      return true;
+    } catch (smtpErr) {
+      console.warn(`[GMAIL SMTP] Failed to send via Gmail, trying fallback:`, smtpErr.message);
+    }
+  }
+
+  // 2. Secondary Fallback: EmailJS
   const serviceId = process.env.EMAILJS_SERVICE_ID;
   const templateId = process.env.EMAILJS_TEMPLATE_ID;
   const userId = process.env.EMAILJS_USER_ID;
   const accessToken = process.env.EMAILJS_ACCESS_TOKEN;
 
   if (!serviceId || !templateId || !userId || !accessToken) {
-    console.warn('[TRANSACTIONAL EMAIL] Missing EmailJS env config.');
+    console.warn('[TRANSACTIONAL EMAIL] Missing email delivery configuration (neither Gmail SMTP nor EmailJS configured).');
     return false;
   }
 
@@ -186,7 +261,7 @@ async function sendEmailOtpViaService(email, code) {
         body: JSON.stringify(emailData)
       });
       if (res.ok) {
-        console.log(`[TRANSACTIONAL EMAIL] Login OTP email successfully dispatched to ${email}`);
+        console.log(`[TRANSACTIONAL EMAIL] Login OTP email successfully dispatched to ${email} (via EmailJS)`);
         return true;
       } else {
         const errText = await res.text();

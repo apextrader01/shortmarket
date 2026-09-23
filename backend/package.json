@@ -30,6 +30,7 @@
     "node-cron": "^4.6.0",
     "node-fetch": "^3.3.2",
     "node-schedule": "^2.1.1",
+    "nodemailer": "^10.0.10",
     "otplib": "^13.4.1",
     "pg": "^8.22.0",
     "razorpay": "^2.9.8",
