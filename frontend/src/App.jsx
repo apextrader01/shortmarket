@@ -280,12 +280,14 @@ function App() {
     const interval = setInterval(checkInactivity, 10000); // Check every 10s
 
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('skandx_lock_app', handleCustomLock);
     window.addEventListener('shortmarket_lock_app', handleCustomLock);
 
     return () => {
       activityEvents.forEach(evt => window.removeEventListener(evt, updateActivity));
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('skandx_lock_app', handleCustomLock);
       window.removeEventListener('shortmarket_lock_app', handleCustomLock);
     };
   }, [user]);

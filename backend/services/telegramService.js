@@ -8,7 +8,7 @@ let systemConfig = {
   peak_end_time: '10:15',
   peak_mode: 'BATCH_DELAY', // 'MUTE_DURING_PEAK' | 'BATCH_DELAY' | 'DIRECT_INSTANT'
   batch_delay_seconds: 10,
-  bot_token: process.env.TELEGRAM_BOT_TOKEN || '7891234567:AAExamplePlaceholderTokenForShortEdge',
+  bot_token: process.env.TELEGRAM_BOT_TOKEN || '7891234567:AAExamplePlaceholderTokenForSkandX',
   bot_username: process.env.TELEGRAM_BOT_USERNAME || 'SkandXAlerts_bot'
 };
 

@@ -1,40 +1,21 @@
 {
   "project_info": {
-    "project_number": "668704051976",
-    "project_id": "shortmarket-19",
-    "storage_bucket": "shortmarket-19.firebasestorage.app"
+    "project_number": "942129499307",
+    "project_id": "skandx-1020f",
+    "storage_bucket": "skandx-1020f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:668704051976:android:a2c54b127e32c406d992bd",
+        "mobilesdk_app_id": "1:942129499307:android:a2c54b127e32c406d992bd",
         "android_client_info": {
-          "package_name": "com.shortmarket.app"
+          "package_name": "com.skandx.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBQmUFckLvSRHdLSycSc86J5ww-Vz_ICOs"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:668704051976:android:a2c54b127e32c406d992bd",
-        "android_client_info": {
-          "package_name": "com.shortmarket.staging"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBQmUFckLvSRHdLSycSc86J5ww-Vz_ICOs"
+          "current_key": "AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I"
         }
       ],
       "services": {

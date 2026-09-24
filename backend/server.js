@@ -1224,7 +1224,7 @@ app.get('/api/user/totp/setup', authenticateToken, async (req, res) => {
 
     const { generateSecret } = require('otplib');
     const secret = generateSecret();
-    const otpauthUrl = `otpauth://totp/ShortEdge:${encodeURIComponent(user.email || user.username)}?secret=${secret}&issuer=ShortEdge`;
+    const otpauthUrl = `otpauth://totp/SkandX:${encodeURIComponent(user.email || user.username)}?secret=${secret}&issuer=SkandX`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
 
     res.json({
@@ -6228,7 +6228,7 @@ app.get('/api/telegram/settings', authenticateToken, async (req, res) => {
       telegram_alert_targets: user.telegram_alert_targets !== false,
       telegram_alert_stoploss: user.telegram_alert_stoploss !== false,
       telegram_alert_risk: user.telegram_alert_risk !== false,
-      bot_username: sysConfig.bot_username || 'ShortEdgeAlerts_bot',
+      bot_username: sysConfig.bot_username || 'SkandXAlerts_bot',
       global_enabled: sysConfig.global_enabled
     });
   } catch (err) {

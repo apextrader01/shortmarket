@@ -4,7 +4,7 @@
   "webDir": "dist",
   "server": {
     "url": "https://www.skandx.in",
-    "cleartext": true,
-    "allowNavigation": ["api-hsm.fyers.in", "*.skandx.in"]
+    "cleartext": false,
+    "allowNavigation": ["api-hsm.fyers.in", "*.skandx.in", "skandx.in"]
   }
 }

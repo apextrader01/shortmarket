@@ -17,7 +17,7 @@ try {
 } catch(e) {}
 
 webpush.setVapidDetails(
-  'mailto:support@shortedge.com',
+  'mailto:support@skandx.in',
   vapidKeys.publicKey,
   vapidKeys.privateKey
 );

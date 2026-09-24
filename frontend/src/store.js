@@ -131,6 +131,14 @@ function applySnapshot(snapshot, state, isFromWebSocket = false) {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    if (!localStorage.getItem('skandx-storage') && localStorage.getItem('shortmarket-storage')) {
+      localStorage.setItem('skandx-storage', localStorage.getItem('shortmarket-storage'));
+    }
+  }
+} catch (e) {}
+
 export const useStore = create(persist((set, get) => ({
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -147,7 +155,7 @@ export const useStore = create(persist((set, get) => ({
     preLogin: async (email, password, trustedDeviceToken = null) => {
     try {
       set({ authError: null });
-      const deviceToken = trustedDeviceToken || localStorage.getItem('shortmarket_trusted_device') || undefined;
+      const deviceToken = trustedDeviceToken || localStorage.getItem('skandx_trusted_device') || localStorage.getItem('shortmarket_trusted_device') || undefined;
       const res = await fetch(`${API}/api/auth/pre-login`, {
         credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,7 +217,7 @@ export const useStore = create(persist((set, get) => ({
       if (data.success) {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.trusted_device_token) {
-          localStorage.setItem('shortmarket_trusted_device', data.trusted_device_token);
+          localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
         }
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
@@ -249,7 +257,7 @@ export const useStore = create(persist((set, get) => ({
       if (data.success) {
         if (data.token) localStorage.setItem('token', data.token);
         if (data.trusted_device_token) {
-          localStorage.setItem('shortmarket_trusted_device', data.trusted_device_token);
+          localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
         }
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
@@ -2792,7 +2800,7 @@ export const useStore = create(persist((set, get) => ({
   },
 
 }), {
-  name: 'shortmarket-storage',
+  name: 'skandx-storage',
   partialize: (state) => ({
     watchlists:        state.watchlists,
     activeWatchlistId: state.activeWatchlistId,
