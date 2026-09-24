@@ -40,11 +40,11 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Install Android SDK Platform 35 & Accept Licenses
+      - name: Install Android SDK Platforms 35 & 36
         run: |
           sudo chown -R $USER:$USER $ANDROID_HOME
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0" "platform-tools"
 
       - name: Generate Release Keystore
         working-directory: ./frontend/android/app
@@ -63,11 +63,7 @@ jobs:
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
-          ./gradlew bundleRelease -x test --no-daemon --stacktrace 2>&1 | tee gradle-build.log || (echo "### Gradle Build Failed" >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && exit 1)
-          echo "### Gradle Build Success" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          ls -la app/build/outputs/bundle/release/ >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          ./gradlew bundleRelease -x test --no-daemon --stacktrace
 
       - name: Upload Play Store Release Bundle (.aab)
         uses: actions/upload-artifact@v4
@@ -82,3 +78,11 @@ jobs:
           name: SkandX-Release-Keystore
           path: frontend/android/app/skandx-release.keystore
           if-no-files-found: warn
+
+      - name: Upload Build Reports on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Reports
+          path: frontend/android/app/build/reports/
+          if-no-files-found: ignore
