@@ -29,7 +29,9 @@ android {
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (file("skandx-release.keystore").exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
