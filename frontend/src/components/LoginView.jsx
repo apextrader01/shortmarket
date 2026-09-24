@@ -735,6 +735,15 @@ export default function LoginView() {
               <span onClick={() => switchMode('login')} style={{ color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '600' }}>← Back to login</span>
             </div>
           )}
+          
+          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '12px', color: '#6b7280' }}>
+            By continuing, you agree to SkandX's{' '}
+            <a href="/terms" style={{ color: '#10b981', textDecoration: 'none' }}>Terms</a>
+            {' '}&bull;{' '}
+            <a href="/privacy-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Privacy Policy</a>
+            {' '}&bull;{' '}
+            <a href="/risk-policy" style={{ color: '#10b981', textDecoration: 'none' }}>Risk Disclosure</a>
+          </div>
         </div>
       </div>
     </div>

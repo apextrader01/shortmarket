@@ -55,6 +55,7 @@ const DOMLadderModal = lazyWithRetry(() => import('./components/DOMLadderModal')
 const MarketDepthModal = lazyWithRetry(() => import('./components/MarketDepthModal'));
 const ChartModal = lazyWithRetry(() => import('./components/ChartModal'));
 const MobileStockOverviewModal = lazyWithRetry(() => import('./components/MobileStockOverviewModal'));
+const LegalView = lazyWithRetry(() => import('./components/LegalView'));
 
 const TabLoader = () => (
   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px', minHeight: '300px', color: 'var(--text-secondary)' }}>
@@ -478,6 +479,27 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Public Legal & Compliance routes (Accessible without login for Google Play reviewers and search bots)
+  const currentPath = (typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '');
+  if (
+    currentPath.includes('privacy') || 
+    currentPath.includes('terms') || 
+    currentPath.includes('delete-account') || 
+    currentPath.includes('deleteaccount') || 
+    currentPath.includes('risk-policy') || 
+    currentPath.includes('riskpolicy')
+  ) {
+    const initialTab = currentPath.includes('terms') ? 'terms' : 
+                       (currentPath.includes('delete') ? 'delete-account' : 
+                       (currentPath.includes('risk') ? 'risk' : 'privacy'));
+    return (
+      <Suspense fallback={<TabLoader />}>
+        <LegalView initialTab={initialTab} />
+      </Suspense>
+    );
+  }
+
   if (!user) {
     return <LoginView />;
   }

@@ -1,4 +1,4 @@
-package com.shortmarket.app;
+package com.skandx.app;
 
 import com.getcapacitor.BridgeActivity;
 

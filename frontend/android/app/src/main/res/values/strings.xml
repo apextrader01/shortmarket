@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">SkandX</string>
     <string name="title_activity_main">SkandX</string>
-    <string name="package_name">com.shortmarket.app</string>
-    <string name="custom_url_scheme">com.shortmarket.app</string>
+    <string name="package_name">com.skandx.app</string>
+    <string name="custom_url_scheme">com.skandx.app</string>
 </resources>
