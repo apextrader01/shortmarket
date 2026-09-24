@@ -58,15 +58,16 @@ jobs:
             -keypass "SkandX@Release2026" \
             -dname "CN=SkandX, OU=Trading, O=SkandX Technologies, L=Chennai, ST=TN, C=IN"
 
-      - name: Build Release Bundle & APK
+      - name: Build Release Bundle
         working-directory: ./frontend/android
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
-          ./gradlew bundleRelease assembleRelease -x test --no-daemon --stacktrace
-          echo "=== LISTING OUTPUT FILES ==="
-          ls -la app/build/outputs/bundle/release/ || true
-          ls -la app/build/outputs/apk/release/ || true
+          ./gradlew bundleRelease -x test --no-daemon --stacktrace 2>&1 | tee gradle-build.log || (echo "### Gradle Build Failed" >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && tail -n 120 gradle-build.log >> $GITHUB_STEP_SUMMARY && echo '```' >> $GITHUB_STEP_SUMMARY && exit 1)
+          echo "### Gradle Build Success" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -la app/build/outputs/bundle/release/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Play Store Release Bundle (.aab)
         uses: actions/upload-artifact@v4
@@ -74,13 +75,6 @@ jobs:
           name: SkandX-GooglePlay-AAB
           path: frontend/android/app/build/outputs/bundle/release/
           if-no-files-found: error
-
-      - name: Upload Direct Install APK (.apk)
-        uses: actions/upload-artifact@v4
-        with:
-          name: SkandX-Release-APK
-          path: frontend/android/app/build/outputs/apk/release/
-          if-no-files-found: warn
 
       - name: Upload Signing Keystore (Keep this safe)
         uses: actions/upload-artifact@v4
