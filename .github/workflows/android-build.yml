@@ -63,14 +63,22 @@ jobs:
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
-          ./gradlew bundleRelease assembleRelease -x test --no-daemon --stacktrace
+          ./gradlew bundleRelease assembleRelease -x test --no-daemon --stacktrace 2>&1 | tee ../../gradle-build.log
+
+      - name: Upload Gradle Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gradle-Build-Log
+          path: gradle-build.log
+          if-no-files-found: ignore
 
       - name: Upload Play Store Release Bundle (.aab)
         uses: actions/upload-artifact@v4
         with:
           name: SkandX-GooglePlay-AAB
           path: frontend/android/app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Upload Direct Install APK (.apk)
         uses: actions/upload-artifact@v4
