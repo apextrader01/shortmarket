@@ -1696,13 +1696,59 @@ app.get('/api/user', authenticateToken, async (req, res) => {
 app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const [userRow, positionsRows, holdingsRows, ordersRows, sipsRows] = await Promise.all([
+    const activeOrderStatuses = [
+      'PENDING', 
+      'PARTIAL_FILLED', 
+      'PARTIALLY_FILLED', 
+      'OPEN', 
+      'TRIGGER_PENDING', 
+      'PENDING_TRIGGER', 
+      'AMO_PENDING', 
+      'AMO_REQ_RECEIVED'
+    ];
+
+    // Compute start of today in IST (Asia/Kolkata timezone: UTC+5:30)
+    const istFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = istFormatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    const todayStartIST = new Date(`${year}-${month}-${day}T00:00:00+05:30`);
+
+    const [userRow, positionsRows, holdingsRows, sipsRows, activeOrders, todayOrders, recentOrders] = await Promise.all([
       db('users').where({ id: userId }).first(),
       db('positions').where({ user_id: userId }),
       db('holdings').where({ user_id: userId }).whereNot({ quantity: 0 }).orderBy('id', 'desc'),
-      db('orders').where({ user_id: userId }).orderBy('created_at', 'desc').limit(100),
-      db('sips').where({ user_id: userId })
+      db('sips').where({ user_id: userId }),
+      // 1. ALL active/open/pending orders - ZERO truncation, guarantee 100% presence
+      db('orders')
+        .where({ user_id: userId })
+        .whereIn('status', activeOrderStatuses)
+        .orderBy('created_at', 'desc'),
+      // 2. ALL orders created or updated today in IST (preserves all multi-sliced trades of today)
+      db('orders')
+        .where({ user_id: userId })
+        .where(function() {
+          this.where('created_at', '>=', todayStartIST)
+            .orWhere('updated_at', '>=', todayStartIST);
+        })
+        .orderBy('created_at', 'desc'),
+      // 3. Fallback recent orders (up to 200) so order history is available before today's first trade
+      db('orders')
+        .where({ user_id: userId })
+        .orderBy('created_at', 'desc')
+        .limit(200)
     ]);
+
+    // Merge and deduplicate by order ID
+    const ordersMap = new Map();
+    (activeOrders || []).forEach(o => ordersMap.set(o.id, o));
+    (todayOrders || []).forEach(o => ordersMap.set(o.id, o));
+    (recentOrders || []).forEach(o => {
+      if (!ordersMap.has(o.id)) ordersMap.set(o.id, o);
+    });
+
+    const ordersRows = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     if (!userRow) return res.status(404).json({ error: 'User not found' });
 
@@ -4860,7 +4906,26 @@ app.get('/api/options/futures/:symbol', async (req, res) => {
 app.get('/api/orders', authenticateToken, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5000;
-    const orders = await db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit);
+    const activeOrderStatuses = [
+      'PENDING', 
+      'PARTIAL_FILLED', 
+      'PARTIALLY_FILLED', 
+      'OPEN', 
+      'TRIGGER_PENDING', 
+      'PENDING_TRIGGER', 
+      'AMO_PENDING', 
+      'AMO_REQ_RECEIVED'
+    ];
+    const [activeOrders, recentOrders] = await Promise.all([
+      db('orders').where({ user_id: req.user.id }).whereIn('status', activeOrderStatuses).orderBy('created_at', 'desc'),
+      db('orders').where({ user_id: req.user.id }).orderBy('created_at', 'desc').limit(limit)
+    ]);
+    const ordersMap = new Map();
+    (activeOrders || []).forEach(o => ordersMap.set(o.id, o));
+    (recentOrders || []).forEach(o => {
+      if (!ordersMap.has(o.id)) ordersMap.set(o.id, o);
+    });
+    const orders = Array.from(ordersMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     res.json(orders);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -5630,11 +5695,21 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
         ? 'Pre-Market CAS order placed! Will be matched at discovered equilibrium opening price at 09:08 AM.'
         : 'After Market Order (AMO) placed! Will be executed via realistic volume matching at market open.';
 
-      sendPushNotification(req.user.id, {
-        title: `${isCasOrder ? 'CAS' : 'AMO'} Order Placed: ${side} ${quantity} ${symbol}`,
-        body: msg,
-        url: '/orders'
-      }).catch(() => {});
+      const isSlicedChild = Boolean(req.body.slice_group_id && (Number(req.body.slice_total || 1) > 1));
+      const isFirstSlice = Number(req.body.slice_index || 1) === 1;
+
+      if (!isSlicedChild || isFirstSlice) {
+        const displayQty = isSlicedChild ? (req.body.total_quantity || (quantity * Number(req.body.slice_total || 1))) : quantity;
+        const sliceSuffix = isSlicedChild ? ` (${req.body.slice_total} Slices)` : '';
+        const pushTag = req.body.slice_group_id ? `order_group_${req.body.slice_group_id}` : `order_${ord.id}`;
+
+        sendPushNotification(req.user.id, {
+          title: `${isCasOrder ? 'CAS' : 'AMO'} Order Placed: ${side} ${displayQty} ${symbol}${sliceSuffix}`,
+          body: msg,
+          url: '/orders',
+          tag: pushTag
+        }).catch(() => {});
+      }
 
       return res.json({
         success: true,
@@ -5712,21 +5787,31 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
     const finalStatus = ord.status || 'PENDING';
     const finalPrice = ord.price || price;
 
-    // Send instant push & Telegram notification asynchronously (non-blocking)
-    sendPushNotification(req.user.id, {
-      title: `Order Placed: ${side} ${quantity} ${symbol}`,
-      body: `Status: ${finalStatus} (${product_type || 'INT'})`,
-      url: '/orders'
-    }).catch(() => {});
+    // Send instant push & Telegram notification asynchronously (consolidate sliced orders into 1 single notification)
+    const isSlicedChild = Boolean(req.body.slice_group_id && (Number(req.body.slice_total || 1) > 1));
+    const isFirstSlice = Number(req.body.slice_index || 1) === 1;
 
-    if (finalStatus === 'EXECUTED' || finalStatus === 'COMPLETE') {
-      sendTelegramAlert(req.user.id, 'ORDER', {
-        symbol,
-        side,
-        quantity,
-        price: finalPrice,
-        product_type
+    if (!isSlicedChild || isFirstSlice) {
+      const displayQty = isSlicedChild ? (req.body.total_quantity || (quantity * Number(req.body.slice_total || 1))) : quantity;
+      const sliceSuffix = isSlicedChild ? ` (${req.body.slice_total} Slices)` : '';
+      const pushTag = req.body.slice_group_id ? `order_group_${req.body.slice_group_id}` : `order_${ord.id}`;
+
+      sendPushNotification(req.user.id, {
+        title: `Order Placed: ${side} ${displayQty} ${symbol}${sliceSuffix}`,
+        body: `Status: ${finalStatus} (${product_type || 'INT'})`,
+        url: '/orders',
+        tag: pushTag
       }).catch(() => {});
+
+      if (finalStatus === 'EXECUTED' || finalStatus === 'COMPLETE') {
+        sendTelegramAlert(req.user.id, 'ORDER', {
+          symbol,
+          side,
+          quantity: displayQty,
+          price: finalPrice,
+          product_type
+        }).catch(() => {});
+      }
     }
 
     res.json({ success: true, orderId: ord.id, status: finalStatus });

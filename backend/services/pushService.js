@@ -92,9 +92,11 @@ async function sendPushNotification(userId, payload) {
         body: payload.body || 'You have a new market update',
         icon: payload.icon || '/favicon.ico',
         badge: payload.badge || '/favicon.ico',
+        tag: payload.tag || undefined,
         data: {
           url: safeUrl,
           timestamp: Date.now(),
+          tag: payload.tag || undefined,
           ...(payload.data || {})
         }
       });

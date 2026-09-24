@@ -26,7 +26,7 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/favicon.ico',
     badge: data.badge || '/favicon.ico',
     vibrate: [200, 100, 200],
-    tag: data.tag || 'skandx-alert-' + Date.now(),
+    tag: data.tag || data.data?.tag || ('skandx-alert-' + Date.now()),
     renotify: true,
     data: {
       url: data.data?.url || data.url || '/orders',

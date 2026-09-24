@@ -1394,6 +1394,7 @@ export const useStore = create(persist((set, get) => ({
           const childPayload = {
             ...normalizedPayload,
             quantity: sliceQty,
+            total_quantity: quantity,
             slice_group_id: sliceGroupId,
             slice_index: index + 1,
             slice_total: slices.length
