@@ -48,6 +48,43 @@ let dirtySymbols = new Set(); // Track symbols that changed in the last 300ms
 let clientViewerLastSeen = new Map(); // Track timestamp when an active client last pinged/viewed a symbol
 let symbolLastSeen = new Map(); // Global GC timestamp map for Fyers SDK keepalive
 
+function isExpiredContract(symbol) {
+    if (!symbol || typeof symbol !== 'string') return false;
+    try {
+        const { parseExpiryDate } = require('./autoSquareOff');
+        const expDate = parseExpiryDate(symbol);
+        if (expDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return expDate < today;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function purgeExpiredSubscriptions() {
+    const toRemove = [];
+    for (const sym of clientSubscriptions) {
+        if (isExpiredContract(sym)) {
+            toRemove.push(sym);
+        }
+    }
+    if (toRemove.length > 0) {
+        toRemove.forEach(s => {
+            clientSubscriptions.delete(s);
+            const fSym = toFyersSymbol(s);
+            if (fSym) {
+                delete globalFyersToRequested[fSym];
+                if (wsInstance && isFyersConnected) {
+                    try { wsInstance.unsubscribe([fSym]); } catch (e) {}
+                }
+            }
+        });
+        console.log(`🧹 [Fyers] Purged ${toRemove.length} expired subscriptions from live stream.`);
+    }
+    return toRemove.length;
+}
+
 // The global map of ALL subscriptions we care about (used by PM2 master);
 
 const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
@@ -370,6 +407,7 @@ async function initFyers(io, pc, isMaster = true) {
 const DataSocket = require("fyers-api-v3").fyersDataSocket;
 
 function startLiveWebSocket() {
+    purgeExpiredSubscriptions();
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -624,6 +662,7 @@ function addSubscriptionBatch(symbols) {
         let s = typeof item === 'string' ? item : item?.symbol;
         if (!s || typeof s !== 'string') return;
         if (s.endsWith('-MF')) { mfSubscriptions.add(s); return; }
+        if (isExpiredContract(s)) return;
         
         // FIX: Update symbolLastSeen so GC doesn't kill manually subscribed symbols.
         // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
@@ -660,7 +699,7 @@ function handlePingSubscriptions(symbols) {
     const newSymbols = [];
     
     symbols.forEach(s => {
-        if (!s || typeof s !== 'string' || s.endsWith('-MF')) return;
+        if (!s || typeof s !== 'string' || s.endsWith('-MF') || isExpiredContract(s)) return;
         
         symbolLastSeen.set(s, now);
         clientViewerLastSeen.set(s, now);
@@ -781,7 +820,7 @@ async function fetchBatchLTPs(symbols) {
     if (!Array.isArray(symbols) || symbols.length === 0) return {};
     
     const isMfSymbol = s => typeof s === 'string' && (s.endsWith('-MF') || /^\d{5,6}$/.test(s) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(s));
-    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !isMfSymbol(s));
+    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !isMfSymbol(s) && !isExpiredContract(s));
     const mfSymbols = symbols.filter(isMfSymbol);
     
     const mfResults = {};
@@ -909,16 +948,17 @@ async function fetchBatchLTPs(symbols) {
                         isFyersConnected = false;
                     }
                     if (response.code !== -15 && response.code !== -17) {
-                        for (let j = 0; j < chunk.length; j++) {
-                            const fSym = chunk[j];
-                            try {
-                                await new Promise(r => setTimeout(r, 150));
-                                const indRes = await fyers.getQuotes([fSym]);
-                                if (indRes && indRes.s === 'ok') {
-                                    processQuotesResponse(indRes);
-                                }
-                            } catch(indErr) {}
-                        }
+                        // Fast parallel retry with strict 1.5s timeout cap (eliminates the 28-second stall)
+                        const validChunk = chunk.filter(fSym => !isExpiredContract(fSym));
+                        const retryPromises = validChunk.map(fSym => 
+                            fyers.getQuotes([fSym]).then(indRes => {
+                                if (indRes && indRes.s === 'ok') processQuotesResponse(indRes);
+                            }).catch(() => {})
+                        );
+                        await Promise.race([
+                            Promise.allSettled(retryPromises),
+                            new Promise(resolve => setTimeout(resolve, 1500))
+                        ]);
                     }
                 }
             } catch(chunkErr) {
@@ -1120,7 +1160,9 @@ module.exports = {
     getFyersStatus,
     isAnyTradingSessionOpen,
     toFyersSymbol,
-    fromFyersSymbol
+    fromFyersSymbol,
+    purgeExpiredSubscriptions,
+    isExpiredContract
 };
 
 // Background task to poll mutual fund NAVs from mfapi.in

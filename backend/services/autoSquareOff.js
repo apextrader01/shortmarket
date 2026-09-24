@@ -383,17 +383,24 @@ async function runIntradaySquareOff(exchangeFilter) {
 
 async function runWatchlistCleanup() {
     const lockKey = 'cron_watchlist_cleanup';
-    const lockRes = await db.raw('SELECT pg_try_advisory_lock(hashtext(?)) as locked', [lockKey]).catch(() => null);
-    if (lockRes && lockRes.rows && lockRes.rows[0] && !lockRes.rows[0].locked) {
-        console.log('[Watchlist Cleanup] Already running on another cluster worker. Skipping.');
-        return;
-    }
+    let connection = null;
+    let isLocked = false;
 
     console.log(`\n=========================================`);
-    console.log(`🧹 Midnight Watchlist Cleanup Initiated`);
+    console.log(`🧹 Watchlist Cleanup Initiated`);
     console.log(`=========================================\n`);
 
     try {
+        if (db.client && db.client.acquireConnection) {
+            connection = await db.client.acquireConnection();
+            const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+            isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+            if (!isLocked) {
+                console.log('[Watchlist Cleanup] Already running on another cluster worker. Skipping.');
+                return;
+            }
+        }
+
         const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
         const parts = formatter.formatToParts(new Date());
         const yearPart = parts.find(p => p.type === 'year').value;
@@ -424,7 +431,6 @@ async function runWatchlistCleanup() {
                     if (!expiryDateObj) return true; // Keep non-expiring assets
 
                     // If the expiry date is strictly before today's midnight, it is expired
-                    // E.g., if it expired yesterday, its midnight is < today's midnight
                     if (expiryDateObj.getTime() < istTime.getTime()) {
                         return false; // Remove it
                     }
@@ -446,22 +452,21 @@ async function runWatchlistCleanup() {
     } catch (err) {
         console.error('❌ Watchlist Cleanup Error:', err);
     } finally {
-        await db.raw('SELECT pg_advisory_unlock(hashtext(?))', [lockKey]).catch(() => {});
+        if (connection) {
+            try {
+                if (isLocked) {
+                    await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                }
+            } finally {
+                await db.client.releaseConnection(connection).catch(() => {});
+            }
+        }
     }
 }
 
 function startSquareOffJobs() {
-    // Note: Automated EOD sweeps and intraday/BO/CO square-offs (15:15, 15:19, 15:20 EQ / 22:50, 22:59, 23:00 MCX)
-    // are exclusively and atomically handled by cronJobs.js via db transactions (to prevent duplicate order execution,
-    // double RMS penalties, or reverse short position races).
-    // Expiry settlements are handled by positionsEngine.js.
-
-    // MIDNIGHT WATCHLIST CLEANUP (12:00 AM IST)
-    schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
-        runWatchlistCleanup();
-    });
-
-    // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
+    // Daily watchlist cleanup is scheduled at 8:37 AM IST in cronJobs.js.
+    // Run watchlist cleanup once immediately on startup to clear any stragglers
     runWatchlistCleanup();
 
     console.log('✅ Watchlist daily cleanup schedule initialized (EOD square-offs unified under cronJobs.js).');

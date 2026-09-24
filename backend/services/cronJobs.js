@@ -947,8 +947,8 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     }, TZ);
 
-    // --- 1:00 AM Expired Watchlist Cleanup ---
-    cron.schedule('0 1 * * *', async () => {
+    // --- 8:37 AM Daily Expired Watchlist & Subscriptions Cleanup ---
+    cron.schedule('37 8 * * *', async () => {
         const lockKey = 'cron_watchlist_cleanup';
         let connection = null;
         let isLocked = false;
@@ -958,41 +958,72 @@ function initCronJobs(priceCache, triggerEngine) {
                 const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
                 isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
                 if (!isLocked) {
-                    console.log('[CRON] 1:00 AM Watchlist cleanup already running on another cluster worker. Skipping.');
+                    console.log('[CRON] 8:37 AM Watchlist cleanup already running on another cluster worker. Skipping.');
                     return;
                 }
             }
 
-            console.log('[CRON] 1:00 AM: Cleaning expired symbols from all user watchlists...');
+            console.log('⏰ [CRON 8:37 AM] Cleaning expired symbols from all user watchlists and Fyers live stream...');
             const db = require('../database/db');
-            const now = new Date().getTime();
-            const expiredInstruments = await db('instruments').whereNotNull('expiry_timestamp').where('expiry_timestamp', '<', now).select('unique_symbol');
-            if (expiredInstruments.length > 0) {
-                const expiredSet = new Set(expiredInstruments.map(i => i.unique_symbol));
-                let usersUpdated = 0;
-                const users = await db('users').whereNotNull('watchlists');
-                
-                for (const user of users) {
-                    let changed = false;
-                    let watchlists = user.watchlists;
-                    if (typeof watchlists === 'string') { try { watchlists = JSON.parse(watchlists); } catch(e) { continue; } }
-                    
-                    if (Array.isArray(watchlists)) {
-                        watchlists.forEach(wl => {
-                            if (Array.isArray(wl.symbols)) {
-                                const originalLen = wl.symbols.length;
-                                wl.symbols = wl.symbols.filter(sym => !expiredSet.has(sym));
-                                if (wl.symbols.length !== originalLen) changed = true;
-                            }
-                        });
-                    }
-                    if (changed) {
-                        await db('users').where({ id: user.id }).update({ watchlists: typeof user.watchlists === 'string' ? JSON.stringify(watchlists) : watchlists });
-                        usersUpdated++;
-                    }
-                }
-                console.log(`[CRON] Watchlist cleanup complete. Removed expired symbols for ${usersUpdated} users.`);
+            const { parseExpiryDate } = require('./autoSquareOff');
+            const { purgeExpiredSubscriptions } = require('./fyers');
+
+            // 1. Purge expired contracts from live Fyers WebSocket subscriptions
+            if (typeof purgeExpiredSubscriptions === 'function') {
+                purgeExpiredSubscriptions();
             }
+
+            // 2. Identify expired contracts using DB table AND algorithmic name parser
+            const now = new Date().getTime();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const expiredInstruments = await db('instruments')
+                .whereNotNull('expiry_timestamp')
+                .where('expiry_timestamp', '<', now)
+                .select('unique_symbol')
+                .catch(() => []);
+            const expiredSet = new Set((expiredInstruments || []).map(i => i.unique_symbol));
+
+            const isExpired = (sym) => {
+                if (!sym || typeof sym !== 'string') return false;
+                if (expiredSet.has(sym)) return true;
+                try {
+                    const expDate = parseExpiryDate(sym);
+                    if (expDate) {
+                        return expDate < today;
+                    }
+                } catch (e) {}
+                return false;
+            };
+
+            let usersUpdated = 0;
+            let totalRemoved = 0;
+            const users = await db('users').whereNotNull('watchlists');
+            
+            for (const user of users) {
+                let changed = false;
+                let watchlists = user.watchlists;
+                if (typeof watchlists === 'string') { try { watchlists = JSON.parse(watchlists); } catch(e) { continue; } }
+                
+                if (Array.isArray(watchlists)) {
+                    watchlists.forEach(wl => {
+                        if (Array.isArray(wl.symbols)) {
+                            const originalLen = wl.symbols.length;
+                            wl.symbols = wl.symbols.filter(sym => !isExpired(sym));
+                            if (wl.symbols.length !== originalLen) {
+                                totalRemoved += (originalLen - wl.symbols.length);
+                                changed = true;
+                            }
+                        }
+                    });
+                }
+                if (changed) {
+                    await db('users').where({ id: user.id }).update({ watchlists: typeof user.watchlists === 'string' ? JSON.stringify(watchlists) : watchlists });
+                    usersUpdated++;
+                }
+            }
+            console.log(`✅ [CRON 8:37 AM] Watchlist cleanup complete. Removed ${totalRemoved} expired symbol(s) across ${usersUpdated} user(s).`);
 
             // Purge stale user sessions older than 30 days to prevent table bloat and protect DB indexes
             try {

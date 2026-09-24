@@ -6000,8 +6000,9 @@ app.post('/api/ltp-batch', async (req, res) => {
         _inFlightLtpRequests.set(cacheKey, fetchPromise);
       }
       
-      // All concurrent requests for this same symbol set await the SAME promise
-      const data = await fetchPromise;
+      // All concurrent requests for this same symbol set await the SAME promise with a strict 2.0s timeout cap
+      const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({}), 2000));
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
       for (const [sym, ltpData] of Object.entries(data)) {
         if (ltpData && ltpData.ltp > 0) {
           result[sym] = ltpData;
