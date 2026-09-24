@@ -63,28 +63,23 @@ jobs:
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
-          ./gradlew bundleRelease assembleRelease -x test --no-daemon --stacktrace 2>&1 | tee ../../gradle-build.log
-
-      - name: Upload Gradle Build Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Gradle-Build-Log
-          path: gradle-build.log
-          if-no-files-found: ignore
+          ./gradlew bundleRelease assembleRelease -x test --no-daemon --stacktrace
+          echo "=== LISTING OUTPUT FILES ==="
+          ls -la app/build/outputs/bundle/release/ || true
+          ls -la app/build/outputs/apk/release/ || true
 
       - name: Upload Play Store Release Bundle (.aab)
         uses: actions/upload-artifact@v4
         with:
           name: SkandX-GooglePlay-AAB
-          path: frontend/android/app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: warn
+          path: frontend/android/app/build/outputs/bundle/release/
+          if-no-files-found: error
 
       - name: Upload Direct Install APK (.apk)
         uses: actions/upload-artifact@v4
         with:
           name: SkandX-Release-APK
-          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          path: frontend/android/app/build/outputs/apk/release/
           if-no-files-found: warn
 
       - name: Upload Signing Keystore (Keep this safe)

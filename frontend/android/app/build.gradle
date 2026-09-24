@@ -18,20 +18,15 @@ android {
     }
     signingConfigs {
         release {
-            def keystoreFile = file("skandx-release.keystore")
-            if (keystoreFile.exists()) {
-                storeFile keystoreFile
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: "SkandX@Release2026"
-                keyAlias System.getenv("KEY_ALIAS") ?: "skandx"
-                keyPassword System.getenv("KEY_PASSWORD") ?: "SkandX@Release2026"
-            }
+            storeFile file("skandx-release.keystore")
+            storePassword "SkandX@Release2026"
+            keyAlias "skandx"
+            keyPassword "SkandX@Release2026"
         }
     }
     buildTypes {
         release {
-            if (file("skandx-release.keystore").exists()) {
-                signingConfig signingConfigs.release
-            }
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
