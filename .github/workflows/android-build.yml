@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build SkandX Android App
 
 on:
   push:
@@ -34,29 +34,47 @@ jobs:
         working-directory: ./frontend
         run: npx cap sync android
 
-      - name: Configure Android Package for Staging
-        if: github.ref_name == 'development'
-        working-directory: ./frontend
-        run: |
-          sed -i 's/applicationId "com.shortmarket.app"/applicationId "com.shortmarket.staging"/g' android/app/build.gradle
-          sed -i 's/<string name="app_name">shortmarket<\/string>/<string name="app_name">ShortMarket (Staging)<\/string>/g' android/app/src/main/res/values/strings.xml
-
       - name: Setup Java JDK
         uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Build APK
+      - name: Generate Release Keystore
+        run: |
+          keytool -genkeypair -v -keystore frontend/android/app/skandx-release.keystore \
+            -alias skandx \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "SkandX@Release2026" \
+            -keypass "SkandX@Release2026" \
+            -dname "CN=SkandX, OU=Trading, O=SkandX Technologies, L=Chennai, ST=TN, C=IN"
+
+      - name: Build Release Bundle & APK
         working-directory: ./frontend/android
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew bundleRelease assembleRelease --no-daemon
 
-      - name: Upload APK Artifact
+      - name: Upload Play Store Release Bundle (.aab)
         uses: actions/upload-artifact@v4
         with:
-          name: ShortMarket-Android-App-${{ github.ref_name }}
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          name: SkandX-GooglePlay-AAB
+          path: frontend/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
 
+      - name: Upload Direct Install APK (.apk)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkandX-Release-APK
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+
+      - name: Upload Signing Keystore (Keep this safe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkandX-Release-Keystore
+          path: frontend/android/app/skandx-release.keystore
+          if-no-files-found: warn
