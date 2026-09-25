@@ -1005,6 +1005,41 @@ function initCronJobs(priceCache, triggerEngine) {
         }
     }, TZ);
 
+    // 🌅 08:05 AM IST: Morning Order Lifecycle Automation
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 1. Purge CANCELLED & REJECTED orders older than 30 days (0-value clutter).
+    // 2. Archive EXECUTED orders older than 30 days to orders_archive table.
+    cron.schedule('5 8 * * *', async () => {
+        console.log('\n🌅 [CRON 08:05 AM] Morning Order Lifecycle starting...');
+        const lockKey = 'cron_morning_order_lifecycle_805';
+        let connection = null;
+        let isLocked = false;
+        try {
+            if (db.client && db.client.acquireConnection) {
+                connection = await db.client.acquireConnection();
+                const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+                isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+                if (!isLocked) {
+                    console.log('[CRON 08:05 AM] Already running on another cluster worker. Skipping.');
+                    return;
+                }
+            }
+
+            await runOrderLifecycleArchive(30);
+            console.log('✅ [CRON 08:05 AM] Morning Order Lifecycle completed successfully.');
+        } catch (err) {
+            console.error('❌ [CRON 08:05 AM] Morning Order Lifecycle failed:', err.message);
+        } finally {
+            if (connection) {
+                try {
+                    if (isLocked) await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                } finally {
+                    await db.client.releaseConnection(connection).catch(() => {});
+                }
+            }
+        }
+    }, TZ);
+
     // --- 8:37 AM Daily Expired Watchlist & Subscriptions Cleanup ---
     cron.schedule('37 8 * * *', async () => {
         const lockKey = 'cron_watchlist_cleanup';
@@ -1127,6 +1162,114 @@ function initCronJobs(priceCache, triggerEngine) {
     }, TZ);
 }
 
+/**
+ * Run the Morning Order Lifecycle Purge & Archive (Executes at 08:05 AM IST every morning).
+ * 1. Purge CANCELLED & REJECTED orders older than cutoffDays (default 30 days).
+ * 2. Archive EXECUTED orders older than cutoffDays to orders_archive table.
+ */
+async function runOrderLifecycleArchive(cutoffDays = 30) {
+    try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - cutoffDays);
+
+        // Step 1: Permanently delete CANCELLED & REJECTED orders older than cutoffDays
+        const purgedCount = await db('orders')
+            .whereIn('status', ['CANCELLED', 'REJECTED'])
+            .where('created_at', '<', cutoffDate)
+            .del();
+
+        console.log(`🧹 [CRON 08:05 AM] Step 1: Purged ${purgedCount || 0} stale CANCELLED & REJECTED orders (> ${cutoffDays} days).`);
+
+        // Step 2: Archive EXECUTED orders older than cutoffDays in batches
+        let totalArchived = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+            const oldOrders = await db('orders')
+                .where({ status: 'EXECUTED' })
+                .where('created_at', '<', cutoffDate)
+                .orderBy('id', 'asc')
+                .limit(batchSize);
+
+            if (!oldOrders || oldOrders.length === 0) {
+                hasMore = false;
+                break;
+            }
+
+            const orderIds = oldOrders.map(o => o.id);
+            const now = new Date();
+            const archiveRecords = oldOrders.map(ord => ({
+                ...ord,
+                archived_at: now
+            }));
+
+            await db.transaction(async (trx) => {
+                // Ensure orders_archive table exists
+                const hasArchiveTable = await trx.schema.hasTable('orders_archive');
+                if (!hasArchiveTable) {
+                    await trx.schema.createTable('orders_archive', table => {
+                        table.integer('id').primary();
+                        table.integer('user_id').unsigned().notNullable();
+                        table.string('symbol').notNullable();
+                        table.string('type').notNullable();
+                        table.string('side').notNullable();
+                        table.string('product_type').notNullable().defaultTo('DEL');
+                        table.string('trigger_type').notNullable().defaultTo('REGULAR');
+                        table.decimal('quantity', 14, 4).notNullable();
+                        table.decimal('price', 14, 2);
+                        table.string('status').notNullable().defaultTo('EXECUTED');
+                        table.decimal('trigger_price', 14, 2);
+                        table.decimal('sl_price', 14, 2);
+                        table.decimal('tgt_price', 14, 2);
+                        table.decimal('trail_amount', 14, 2);
+                        table.decimal('margin', 14, 2).defaultTo(0);
+                        table.decimal('realized_pnl', 14, 2).defaultTo(0);
+                        table.decimal('taxes', 14, 2).defaultTo(0);
+                        table.integer('parent_order_id');
+                        table.integer('linked_order_id');
+                        table.decimal('filled_quantity', 14, 4).defaultTo(0);
+                        table.decimal('pending_quantity', 14, 4);
+                        table.decimal('average_price', 14, 2);
+                        table.string('order_variety').defaultTo('REGULAR');
+                        table.string('remarks').defaultTo('');
+                        table.datetime('archived_at').defaultTo(trx.fn.now());
+                        table.timestamps(true, true);
+                        table.index(['user_id', 'created_at']);
+                    });
+                }
+
+                // Insert into orders_archive (ignore conflicts if already archived)
+                await trx('orders_archive')
+                    .insert(archiveRecords)
+                    .onConflict('id')
+                    .ignore();
+
+                // Break foreign key self-references before deleting to avoid constraint errors
+                await trx('orders')
+                    .whereIn('id', orderIds)
+                    .update({ parent_order_id: null, linked_order_id: null });
+
+                // Delete from active orders
+                await trx('orders')
+                    .whereIn('id', orderIds)
+                    .del();
+            });
+
+            totalArchived += oldOrders.length;
+            if (oldOrders.length < batchSize) {
+                hasMore = false;
+            }
+        }
+
+        console.log(`📦 [CRON 08:05 AM] Step 2: Archived ${totalArchived} EXECUTED orders (> ${cutoffDays} days) to orders_archive.`);
+        return { purged: purgedCount || 0, archived: totalArchived };
+    } catch (err) {
+        console.error('❌ [CRON 08:05 AM] runOrderLifecycleArchive error:', err.message);
+        throw err;
+    }
+}
+
 module.exports = {
     initCronJobs,
     isIntradayBlocked,
@@ -1134,5 +1277,6 @@ module.exports = {
     isCommodityIntradayBlocked: () => isCommodityIntradayBlocked,
     executeAmoOrders,
     executeCasOpeningMatch,
-    updateWeeklyCasStocksList
+    updateWeeklyCasStocksList,
+    runOrderLifecycleArchive
 };

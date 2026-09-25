@@ -348,6 +348,41 @@ async function initSchema() {
       }
     }
 
+    // 3.1 Orders Archive Table (for archiving executed orders older than 30 days)
+    const hasOrdersArchive = await db.schema.hasTable('orders_archive');
+    if (!hasOrdersArchive) {
+      await db.schema.createTable('orders_archive', table => {
+        table.integer('id').primary(); // Preserves exact original order ID
+        table.integer('user_id').unsigned().notNullable();
+        table.string('symbol').notNullable();
+        table.string('type').notNullable();
+        table.string('side').notNullable();
+        table.string('product_type').notNullable().defaultTo('DEL');
+        table.string('trigger_type').notNullable().defaultTo('REGULAR');
+        table.decimal('quantity', 14, 4).notNullable();
+        table.decimal('price', 14, 2);
+        table.string('status').notNullable().defaultTo('EXECUTED');
+        table.decimal('trigger_price', 14, 2);
+        table.decimal('sl_price', 14, 2);
+        table.decimal('tgt_price', 14, 2);
+        table.decimal('trail_amount', 14, 2);
+        table.decimal('margin', 14, 2).defaultTo(0);
+        table.decimal('realized_pnl', 14, 2).defaultTo(0);
+        table.decimal('taxes', 14, 2).defaultTo(0);
+        table.integer('parent_order_id');
+        table.integer('linked_order_id');
+        table.decimal('filled_quantity', 14, 4).defaultTo(0);
+        table.decimal('pending_quantity', 14, 4);
+        table.decimal('average_price', 14, 2);
+        table.string('order_variety').defaultTo('REGULAR');
+        table.string('remarks').defaultTo('');
+        table.datetime('archived_at').defaultTo(db.fn.now());
+        table.timestamps(true, true);
+        table.index(['user_id', 'created_at']);
+      });
+      console.log('Created orders_archive table');
+    }
+
     // 3.5 Holdings Table
     const hasHoldings = await db.schema.hasTable('holdings');
     if (!hasHoldings) {
