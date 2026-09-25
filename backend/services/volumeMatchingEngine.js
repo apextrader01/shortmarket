@@ -1144,6 +1144,7 @@ class VolumeMatchingEngine {
     if (!orderId) return;
     const ordObj = this.activeOrders.get(orderId.toString());
     if (ordObj && updates) {
+      if (updates.type !== undefined) ordObj.type = updates.type;
       if (updates.quantity !== undefined) ordObj.quantity = Number(updates.quantity);
       if (updates.pending_quantity !== undefined) ordObj.pending_quantity = Number(updates.pending_quantity);
       if (updates.price !== undefined) ordObj.price = updates.price ? Number(updates.price) : null;

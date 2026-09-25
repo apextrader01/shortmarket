@@ -18,9 +18,14 @@ export default function EditOrderModal() {
   const [isMarket, setIsMarket] = useState(false);
 
   const symbol = order ? order.symbol : null;
-  const priceData = useStore(state => symbol ? state.prices[symbol] : null);
-  const isUp = priceData ? priceData.pct >= 0 : true;
-  const livePrice = priceData ? priceData.ltp || 0 : 0;
+  const exchange = symbol ? (symbol.startsWith('MCX:') ? 'MCX' : symbol.startsWith('BSE:') ? 'BSE' : 'NSE') : 'NSE';
+  const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+  const priceData = useStore(state => {
+    if (!symbol) return null;
+    return state.prices[symbol] || state.prices[cleanSym] || state.prices[`NSE:${cleanSym}`] || state.prices[`BSE:${cleanSym}`] || state.prices[`MCX:${cleanSym}`] || null;
+  });
+  const isUp = priceData ? (priceData.pct !== undefined ? priceData.pct >= 0 : (priceData.change !== undefined ? priceData.change >= 0 : true)) : true;
+  const livePrice = (priceData && priceData.ltp) ? Number(priceData.ltp) : (parseFloat(order?.price) || parseFloat(order?.trigger_price) || 0);
 
   // Determine if BO or CO (handles both Parent Open Orders and Child Pending Legs)
   const isBOParent = order ? !!(order.sl_price && order.tgt_price) : false;
@@ -34,20 +39,25 @@ export default function EditOrderModal() {
 
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
-      setQuantity(order.quantity);
+      const rawQty = Number(order.quantity);
+      setQuantity(isNaN(rawQty) ? 1 : Math.round(rawQty));
+
       const trg = order.trigger_price ?? order.triggerPrice;
       const prc = order.price ?? order.limitPrice;
       setTriggerPrice(trg ? parseFloat(trg).toFixed(2) : '');
+
+      const isInitiallyMarket = order.type === 'MARKET';
+      setIsMarket(isInitiallyMarket);
+
       if (isPendingTrigger) {
         setPrice(order.type === 'SL-M' ? (trg ? parseFloat(trg).toFixed(2) : '') : (prc ? parseFloat(prc).toFixed(2) : (trg ? parseFloat(trg).toFixed(2) : '')));
       } else {
-        setPrice(prc ? parseFloat(prc).toFixed(2) : '');
+        setPrice(prc ? parseFloat(prc).toFixed(2) : (livePrice > 0 ? livePrice.toFixed(2) : ''));
       }
       const prod = order.productType || order.product_type || 'INT';
       setProductType(prod);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
-      setIsMarket(false);
     }
   }, [editOrderModal.isOpen, order]);
 
@@ -67,8 +77,8 @@ export default function EditOrderModal() {
     } else {
       const rawPrice = parseFloat(price) || livePrice || 0;
       const contractValue = (Number(quantity) || 0) * rawPrice;
-      const cleanSym = String(order.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
-      const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+      const cleanSymUpper = String(order.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+      const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSymUpper);
       const isLeveraged = ['INT', 'INTRADAY', 'MIS', 'CO', 'BO'].includes(effectiveProductType);
       let newMargin = contractValue;
       if (isOption && order.side === 'BUY') {
@@ -90,13 +100,13 @@ export default function EditOrderModal() {
       return;
     }
 
-    const finalPrice = isPendingTrigger && isMarket ? 0 : parseFloat(price);
+    const marketFlag = isMarket;
+    const finalPrice = marketFlag ? (livePrice > 0 ? livePrice : (parseFloat(price) || 0)) : parseFloat(price);
     const sl = slPrice ? parseFloat(slPrice) : null;
     const tgt = tgtPrice ? parseFloat(tgtPrice) : null;
-    const marketFlag = isPendingTrigger ? isMarket : false;
     const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
 
-    const requiresLimitPrice = !marketFlag && (order.type === 'LIMIT' || order.type === 'SL' || order.type === 'SL-L');
+    const requiresLimitPrice = !marketFlag && (order.type === 'LIMIT' || order.type === 'SL' || order.type === 'SL-L' || !isPendingTrigger);
     if (requiresLimitPrice && (isNaN(finalPrice) || finalPrice <= 0)) {
       alert('Please enter a valid limit price greater than 0.');
       return;
@@ -132,21 +142,40 @@ export default function EditOrderModal() {
         {/* Header */}
         <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>{symbol.split('-')[0]}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', padding: '2px 7px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>
+                {exchange}
+              </span>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>
+                {symbol ? (symbol.includes(':') ? symbol.split(':')[1].split('-')[0] : symbol.split('-')[0]) : ''}
+              </h2>
+              <span style={{ 
+                fontSize: '11px', 
+                fontWeight: '700', 
+                padding: '2px 7px', 
+                borderRadius: '4px', 
+                background: isBuy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', 
+                color: isBuy ? '#00E676' : '#FF3B30' 
+              }}>
+                {isBuy ? 'BUY' : 'SELL'}
+              </span>
               {isBO && <span style={{ fontSize: '10px', background: '#f59e0b', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>BO</span>}
               {isCO && <span style={{ fontSize: '10px', background: '#8b5cf6', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>CO</span>}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                <input type="radio" checked readOnly style={{ accentColor: 'var(--color-blue)' }} />
-                <span>NSE <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{livePrice.toFixed(2)} {isUp ? '▲' : '▼'}</span></span>
-              </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isUp ? '#00E676' : '#FF3B30', display: 'inline-block' }} />
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Market Price (LTP):</span>
+              <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '700', fontSize: '13.5px' }}>
+                ₹{livePrice.toFixed(2)}
+              </span>
+              <span style={{ fontSize: '11.5px', fontWeight: '600', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+                {isUp ? '▲' : '▼'} {priceData?.pct !== undefined ? `${priceData.pct >= 0 ? '+' : ''}${Number(priceData.pct).toFixed(2)}%` : ''}
+              </span>
             </div>
           </div>
 
-            <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
-          </div>
+          <button onClick={closeEditOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
+        </div>
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
@@ -162,7 +191,7 @@ export default function EditOrderModal() {
                   style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-blue)' }} 
                 />
                 <label htmlFor="marketCheck" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  Execute immediately at Market Price
+                  Execute immediately at Market Price (₹{livePrice.toFixed(2)})
                 </label>
               </div>
 
@@ -170,7 +199,18 @@ export default function EditOrderModal() {
                 <div style={{ display: 'grid', gridTemplateColumns: order.type === 'SL' ? '1fr 1fr' : '1fr', gap: '12px' }}>
                   {order.type === 'SL' && (
                     <div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Limit Price</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Limit Price</span>
+                        {livePrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPrice(livePrice.toFixed(2))}
+                            style={{ background: 'rgba(37, 99, 235, 0.15)', border: '1px solid rgba(37, 99, 235, 0.35)', color: '#38bdf8', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                          >
+                            Use LTP
+                          </button>
+                        )}
+                      </div>
                       <input 
                         type="text" 
                         value={price} 
@@ -180,7 +220,21 @@ export default function EditOrderModal() {
                     </div>
                   )}
                   <div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>Trigger Price</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--color-yellow)', fontWeight: '600' }}>Trigger Price</span>
+                      {livePrice > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTriggerPrice(livePrice.toFixed(2));
+                            if (order.type !== 'SL') setPrice(livePrice.toFixed(2));
+                          }}
+                          style={{ background: 'rgba(234, 179, 8, 0.15)', border: '1px solid rgba(234, 179, 8, 0.35)', color: '#EAB308', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Use LTP
+                        </button>
+                      )}
+                    </div>
                     <input 
                       type="text" 
                       value={order.type === 'SL' ? triggerPrice : (triggerPrice || price)} 
@@ -196,6 +250,52 @@ export default function EditOrderModal() {
             </div>
           ) : (
             <>
+              {/* Order Type Toggle: LIMIT vs MARKET */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>Order Type</div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsMarket(false)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${!isMarket ? '#2563eb' : 'var(--border-color)'}`,
+                      background: !isMarket ? 'rgba(37, 99, 235, 0.15)' : 'var(--bg-panel)',
+                      color: !isMarket ? '#38bdf8' : 'var(--text-secondary)',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    LIMIT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMarket(true);
+                      if (livePrice > 0) setPrice(livePrice.toFixed(2));
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isMarket ? '#2563eb' : 'var(--border-color)'}`,
+                      background: isMarket ? 'rgba(37, 99, 235, 0.15)' : 'var(--bg-panel)',
+                      color: isMarket ? '#38bdf8' : 'var(--text-secondary)',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    MARKET
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 
                 {/* Product Type (Read-Only) */}
@@ -209,21 +309,72 @@ export default function EditOrderModal() {
                 {/* Quantity */}
                 <div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
-                  <input type="number" min={1} max={10000000} value={quantity} onChange={e => {
-                    const val = e.target.value;
-                    if (val === '') { setQuantity(''); return; }
-                    const n = parseInt(val, 10);
-                    if (!isNaN(n)) setQuantity(Math.min(10000000, Math.max(1, n)));
-                  }} onBlur={e => {
-                    const n = parseInt(e.target.value, 10);
-                    setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
-                  }} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                  <input 
+                    type="number" 
+                    min={1} 
+                    max={10000000} 
+                    value={quantity} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') { setQuantity(''); return; }
+                      const n = parseInt(val, 10);
+                      if (!isNaN(n)) setQuantity(Math.min(10000000, Math.max(1, n)));
+                    }} 
+                    onBlur={e => {
+                      const n = parseInt(e.target.value, 10);
+                      setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
+                    }} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                  />
                 </div>
 
                 {/* Price */}
                 <div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
-                  <input type="text" value={price} onChange={e => setPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Price</span>
+                    {!isMarket && livePrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setPrice(livePrice.toFixed(2))}
+                        title="Set price to live market price"
+                        style={{
+                          background: 'rgba(37, 99, 235, 0.15)',
+                          border: '1px solid rgba(37, 99, 235, 0.35)',
+                          color: '#38bdf8',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Use LTP
+                      </button>
+                    )}
+                  </div>
+                  {isMarket ? (
+                    <div style={{ 
+                      padding: '8px 10px', 
+                      background: 'rgba(37, 99, 235, 0.1)', 
+                      border: '1px solid rgba(37, 99, 235, 0.35)', 
+                      borderRadius: '4px', 
+                      textAlign: 'center', 
+                      fontSize: '12.5px', 
+                      fontWeight: '700', 
+                      color: '#38bdf8',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      Market (₹{livePrice.toFixed(2)})
+                    </div>
+                  ) : (
+                    <input 
+                      type="text" 
+                      value={price} 
+                      onChange={e => setPrice(e.target.value)} 
+                      placeholder={livePrice > 0 ? livePrice.toFixed(2) : '0.00'}
+                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                    />
+                  )}
                 </div>
 
               </div>
@@ -231,8 +382,26 @@ export default function EditOrderModal() {
               {/* Stop-Loss Trigger Price (if SL order) */}
               {(order.type === 'SL' || order.type === 'SL-M' || order.trigger_price) && (
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>
-                    Trigger Price
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--color-yellow)', fontWeight: '600' }}>Trigger Price</span>
+                    {livePrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setTriggerPrice(livePrice.toFixed(2))}
+                        style={{
+                          background: 'rgba(234, 179, 8, 0.15)',
+                          border: '1px solid rgba(234, 179, 8, 0.35)',
+                          color: '#EAB308',
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Use LTP
+                      </button>
+                    )}
                   </div>
                   <input 
                     type="text" 
