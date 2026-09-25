@@ -103,10 +103,10 @@ export default function PositionsView() {
           existing.average_price = Math.abs(weightedAvg);
           existing.side = totalQty < 0 ? 'SELL' : 'BUY';
         } else if (!mergedHoldingsMap[key]) {
-          const key = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;
+          const itemKey = `pos-del-${p.id || p.symbol}-${p.product_type || 'DEL'}`;
           mergedHoldingsMap[key] = {
             ...p,
-            id: p.id || key,
+            id: p.id || itemKey,
             displaySymbol: cleanSym,
             isOvernightPos: true,
             quantity: qty,
@@ -1308,9 +1308,24 @@ export default function PositionsView() {
                           {(viewMode === 'OPEN' || viewMode === 'HOLDINGS') && (
                             <span 
                               onClick={(e) => {
+                                e.stopPropagation();
                                 if (isMf && viewMode === 'HOLDINGS') {
-                                  e.stopPropagation();
                                   handleMfAction(pos, 'REDEEM');
+                                } else if (viewMode === 'HOLDINGS') {
+                                  const exitSide = isShort ? 'BUY' : 'SELL';
+                                  const exitQty = Math.abs(rawQty || 1);
+                                  useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);
+                                } else if (viewMode === 'OPEN') {
+                                  if (pos.unencumberedQty === 0) {
+                                    alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
+                                    return;
+                                  }
+                                  setPartialExitPos(pos);
+                                  setPartialExitIsAmo(false);
+                                  const ls = pos.lotSize || 1;
+                                  setPartialExitQty((Math.abs(pos.unencumberedQty) / ls).toString());
+                                  setPartialExitType('MARKET');
+                                  setPartialExitPrice(pos.ltp > 0 ? pos.ltp.toFixed(2) : '');
                                 }
                               }}
                               style={{ 

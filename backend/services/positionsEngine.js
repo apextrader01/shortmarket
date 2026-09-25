@@ -526,6 +526,29 @@ class PositionsEngine {
                         await trx.raw('SELECT pg_advisory_xact_lock(?)', [item.user_id]);
                         if (isHolding) {
                             await trx('holdings').where({ id: item.id }).del();
+                            const entryPrice = Math.abs(parseFloat(item.average_price) || 0);
+                            const realizedPnl = item.quantity > 0 ? -entryPrice * orderQty : entryPrice * orderQty;
+                            await trx('positions').insert({
+                                user_id: item.user_id,
+                                symbol: item.symbol,
+                                quantity: 0,
+                                closed_quantity: orderQty,
+                                average_price: entryPrice,
+                                exit_price: 0,
+                                margin: 0,
+                                realized_pnl: realizedPnl,
+                                product_type: 'DEL',
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                            if (realizedPnl !== 0) {
+                                await trx('ledger').insert({
+                                    user_id: item.user_id,
+                                    amount: realizedPnl,
+                                    type: 'REALIZED_PNL',
+                                    description: `Realized loss on expired worthless holding contract: ${item.symbol}`
+                                });
+                            }
                         } else {
                             const entryPrice = Math.abs(parseFloat(item.average_price) || 0);
                             const realizedPnl = item.quantity > 0 ? -entryPrice * orderQty : entryPrice * orderQty;
@@ -589,6 +612,7 @@ class PositionsEngine {
                     status: 'PENDING',
                     product_type: prodType,
                     is_rms: false, // Natural contract expiry: zero penalty
+                    is_exit: true,
                     remarks: settlementRemark,
                     created_at: new Date(),
                     updated_at: new Date()

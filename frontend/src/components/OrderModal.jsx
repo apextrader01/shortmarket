@@ -638,7 +638,9 @@ export default function OrderModal() {
       lotsize: orderModal.lotsize || 1,
       order_variety: isAmo ? 'AMO' : 'REGULAR',
       variety: isAmo ? 'AMO' : 'REGULAR',
-      is_amo: isAmo
+      is_amo: isAmo,
+      is_exit: Boolean(isTrueExit),
+      remarks: isTrueExit ? (isDelSellFromHoldings ? 'Exit Holding' : 'Exit Position') : undefined
     };
 
     try {

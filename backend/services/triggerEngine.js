@@ -461,7 +461,7 @@ class TriggerEngine {
             const handleRemainingPos = async (trx, remainingQty, execPrice, customMargin = undefined) => {
                 const isDeriv = isDerivativeSymbol(order.symbol);
 
-                if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0) {
+                if ((order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') && remainingQty < 0) {
                     const holding = await trx('holdings')
                         .where({ user_id: order.user_id })
                         .where(builder => {
@@ -532,7 +532,7 @@ class TriggerEngine {
                 if (remainingQty !== 0) {
                     // SAFEGUARD: For Cash Equity Delivery (DEL/CNC), negative quantities (naked shorts) are strictly prohibited.
                     // Derivatives (Options and Futures) are permitted to have negative (short) quantities.
-                    if ((order.product_type === 'DEL' || order.product_type === 'CNC') && remainingQty < 0 && !isDeriv) {
+                    if ((order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY') && remainingQty < 0 && !isDeriv) {
                         console.warn(`[SAFEGUARD] Blocked negative DEL cash equity position for user ${order.user_id}, symbol ${order.symbol}, qty: ${remainingQty}`);
                         return; // Do NOT insert negative DEL position for cash equities!
                     }
