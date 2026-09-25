@@ -24,6 +24,7 @@ const compression = require('compression');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const db = require('./database/db');
 const fs = require('fs');
@@ -599,7 +600,43 @@ if (!isMaster) {
   else cacheSubClient.on('ready', setupCacheSync);
 }
 
-app.use(cors({ origin: true, credentials: true }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: false // Managed at reverse proxy / frontend layer
+}));
+
+const allowedOrigins = [
+  'https://skandx.in',
+  'https://www.skandx.in',
+  'https://shortmarket-staging.web.app',
+  'https://shortmarket-staging.firebaseapp.com',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'https://localhost'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Mobile apps, server-to-server calls, Postman, curl have no origin header
+    if (!origin) return callback(null, true);
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.skandx.in') ||
+      origin.endsWith('.web.app') ||
+      origin.endsWith('.firebaseapp.com') ||
+      origin.endsWith('.sslip.io') ||
+      /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
+      /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin) ||
+      process.env.NODE_ENV !== 'production' ||
+      process.env.CORS_ALLOW_ALL === 'true'
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked: Origin ${origin} not authorized by SkandX security policy`));
+  },
+  credentials: true
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -774,6 +811,15 @@ const orderLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 120, // limit each user/IP to 120 orders per minute
   message: { error: 'Order rate limit exceeded (max 120/min)' },
+  keyGenerator: (req) => {
+    return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
+  }
+});
+
+const walletLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 15, // limit each user to 15 wallet transactions per minute
+  message: { error: 'Wallet transaction rate limit exceeded. Please wait a minute.' },
   keyGenerator: (req) => {
     return req.user?.id ? `user_${req.user.id}` : (req.ip || 'ip_unknown');
   }
@@ -1901,7 +1947,8 @@ app.post('/api/payment/verify', authenticateToken, async (req, res) => {
       .update(body.toString())
       .digest('hex');
       
-    const isAuthentic = expectedSignature === razorpay_signature;
+    const isAuthentic = expectedSignature.length === razorpay_signature.length &&
+      crypto.timingSafeEqual(Buffer.from(expectedSignature, 'utf8'), Buffer.from(razorpay_signature, 'utf8'));
     if (isAuthentic) {
       await db.transaction(async (trx) => {
         const user = await trx('users').where({ id: req.user.id }).forUpdate().first();
@@ -2105,7 +2152,7 @@ const handleUpdateUserDetails = async (req, res) => {
 app.post('/api/user/details', authenticateToken, handleUpdateUserDetails);
 app.put('/api/user/details', authenticateToken, handleUpdateUserDetails);
 
-app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
+app.post('/api/wallet/deposit', authenticateToken, walletLimiter, async (req, res) => {
   try {
     const { amount } = req.body;
     const parsedAmount = parseFloat(amount);
@@ -2136,7 +2183,7 @@ app.post('/api/wallet/deposit', authenticateToken, async (req, res) => {
 });
 
 // Defect 44: Transactional Trading Wallet Withdrawal Route
-app.post('/api/wallet/withdraw', authenticateToken, async (req, res) => {
+app.post('/api/wallet/withdraw', authenticateToken, walletLimiter, async (req, res) => {
   try {
     const { amount } = req.body;
     const parsedAmount = parseFloat(amount);

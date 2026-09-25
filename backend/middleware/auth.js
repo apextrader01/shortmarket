@@ -2,7 +2,16 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../database/db');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_shortmarket_key_2026';
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || (process.env.NODE_ENV === 'production' && JWT_SECRET === 'super_secret_shortmarket_key_2026')) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 [SECURITY ALERT] JWT_SECRET is missing or using default development key in production! Generating secure ephemeral key.');
+    JWT_SECRET = crypto.randomBytes(64).toString('hex');
+  } else {
+    JWT_SECRET = 'super_secret_shortmarket_key_2026';
+  }
+}
+
 
 // In-memory cache for ban checks and session sync throttling (eliminates 70%+ of auth DB queries)
 const banCache = new Map(); // userId -> { is_banned: boolean, ts: number }
