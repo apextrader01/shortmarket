@@ -7647,7 +7647,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           return res.status(400).json({ error: 'Quantity must be a positive whole integer' });
         }
       }
-      if (price !== undefined && price !== null && price !== '') {
+      if (!isMarket && price !== undefined && price !== null && price !== '') {
         const parsedP = parseFloat(price);
         if (isNaN(parsedP) || parsedP <= 0 || !isFinite(parsedP)) {
           return res.status(400).json({ error: 'Price must be a positive number greater than 0' });
@@ -7795,12 +7795,14 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
             } else if (Number(quantity) === Number(order.quantity)) {
               newMargin = 0;
             } else if (!order.parent_order_id) {
-              const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
-              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
+              const livePriceForMargin = getLtpFromPriceCache(order.symbol) || parseFloat(order.price || 0);
+              const effectivePrice = (!isMarket && price !== undefined && !isNaN(parseFloat(price)) && parseFloat(price) > 0) ? parseFloat(price) : (trigger_price !== undefined && !isNaN(parseFloat(trigger_price)) && parseFloat(trigger_price) > 0 ? parseFloat(trigger_price) : livePriceForMargin);
+              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(newQty), effectivePrice);
             }
           } else if (!order.parent_order_id) {
-              const effectivePrice = price !== undefined && !isNaN(parseFloat(price)) ? parseFloat(price) : (trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(order.price || 0));
-              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(quantity), effectivePrice);
+              const livePriceForMargin = getLtpFromPriceCache(order.symbol) || parseFloat(order.price || 0);
+              const effectivePrice = (!isMarket && price !== undefined && !isNaN(parseFloat(price)) && parseFloat(price) > 0) ? parseFloat(price) : (trigger_price !== undefined && !isNaN(parseFloat(trigger_price)) && parseFloat(trigger_price) > 0 ? parseFloat(trigger_price) : livePriceForMargin);
+              newMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, Number(newQty), effectivePrice);
           }
 
           const marginDifference = newMargin - oldMargin;
@@ -7846,14 +7848,27 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
               updateObj.status = 'EXECUTED';
           }
 
-          if (price !== undefined && price !== null && !isNaN(parseFloat(price))) {
-              updateObj.price = parseFloat(price);
+          if (isMarket) {
+              updateObj.type = 'MARKET';
+              const liveLtp = getLtpFromPriceCache(order.symbol) || (price !== undefined && !isNaN(parseFloat(price)) && parseFloat(price) > 0 ? parseFloat(price) : null);
+              updateObj.price = liveLtp || null;
+              if (order.status === 'PENDING_TRIGGER') {
+                  updateObj.trigger_price = null;
+              }
+          } else {
+              if (order.type === 'MARKET' && price !== undefined && !isNaN(parseFloat(price)) && parseFloat(price) > 0) {
+                  updateObj.type = 'LIMIT';
+              }
+              if (price !== undefined && price !== null && !isNaN(parseFloat(price)) && parseFloat(price) > 0) {
+                  updateObj.price = parseFloat(price);
+              }
           }
-          if (trigger_price !== undefined && trigger_price !== null && !isNaN(parseFloat(trigger_price))) {
+
+          if (!isMarket && trigger_price !== undefined && trigger_price !== null && !isNaN(parseFloat(trigger_price))) {
               updateObj.trigger_price = parseFloat(trigger_price);
           }
 
-          if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M') {
+          if (order.status === 'PENDING_TRIGGER' && order.type === 'SL-M' && !isMarket) {
               updateObj.trigger_price = trigger_price !== undefined ? parseFloat(trigger_price) : parseFloat(price);
               updateObj.price = null; // SL-M is a market order when triggered
           }
@@ -7929,12 +7944,20 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
             try {
                 const volumeMatchingEngine = require('./services/volumeMatchingEngine');
                 volumeMatchingEngine.updateOrder(updatedOrder.id, {
+                    type: updatedOrder.type,
                     quantity: updatedOrder.quantity,
                     pending_quantity: updatedOrder.pending_quantity,
                     price: updatedOrder.price,
                     margin: updatedOrder.margin,
                     status: updatedOrder.status
                 });
+
+                if (updatedOrder.type === 'MARKET' && (updatedOrder.status === 'PENDING' || updatedOrder.status === 'PARTIAL_FILLED')) {
+                    const baseLtp = getLtpFromPriceCache(updatedOrder.symbol) || parseFloat(updatedOrder.price) || 0;
+                    if (baseLtp > 0) {
+                        await volumeMatchingEngine.submitOrder(updatedOrder, baseLtp).catch(e => console.error('Volume matching submission error:', e));
+                    }
+                }
             } catch(e) {}
         }
         for (const child of updatedChildOrders) {

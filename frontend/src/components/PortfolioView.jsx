@@ -590,18 +590,18 @@ export default function PortfolioView() {
           </Suspense>
         </div>
       ) : (
-        <div style={{ padding: isMobile ? '10px 12px 100px' : '16px 20px 100px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ padding: isMobile ? '10px 12px 100px' : '16px 20px 100px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           
           {/* Top 4 Key Metric Cards (Optimized High-Density Layout) */}
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', 
-            gap: isMobile ? '8px' : '12px' 
+            gap: isMobile ? '8px' : '10px' 
           }}>
             
             {/* Card 1: Total Portfolio Current Value */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '8px 10px' : '10px 14px',
+              padding: isMobile ? '8px 10px' : '8px 12px',
               borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
@@ -621,18 +621,18 @@ export default function PortfolioView() {
                   PORTFOLIO
                 </span>
               </div>
-              <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', letterSpacing: '-0.3px', color: 'var(--text-primary)' }}>
+              <div style={{ fontSize: isMobile ? '16px' : '19px', fontWeight: '700', letterSpacing: '-0.3px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                 {formatCurrency(totalCurrent)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Invested:</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{formatCurrency(totalInvested)}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(totalInvested)}</span>
               </div>
             </div>
 
             {/* Card 2: Overall Gain / Return */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '8px 10px' : '10px 14px',
+              padding: isMobile ? '8px 10px' : '8px 12px',
               borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
@@ -660,16 +660,17 @@ export default function PortfolioView() {
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '16px' : '20px', 
+                fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.3px',
-                color: isGain ? '#00E676' : '#FF3B30'
+                letterSpacing: '-0.3px', 
+                color: isGain ? '#00E676' : '#FF3B30',
+                fontVariantNumeric: 'tabular-nums'
               }}>
                 {isGain ? '+' : ''}{formatCurrency(overallGain)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Return ROI:</span>
-                <span style={{ color: isGain ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
+                <span style={{ color: isGain ? '#00E676' : '#FF3B30', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
                   {isGain ? '+' : ''}{overallPct.toFixed(2)}%
                 </span>
               </div>
@@ -677,7 +678,7 @@ export default function PortfolioView() {
 
             {/* Card 3: Unrealized P&L (Live) */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '8px 10px' : '10px 14px',
+              padding: isMobile ? '8px 10px' : '8px 12px',
               borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
@@ -699,10 +700,11 @@ export default function PortfolioView() {
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '16px' : '20px', 
+                fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.3px',
-                color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30'
+                letterSpacing: '-0.3px', 
+                color: unrealizedPnl >= 0 ? '#00E676' : '#FF3B30',
+                fontVariantNumeric: 'tabular-nums'
               }}>
                 {unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(unrealizedPnl)}
               </div>
@@ -713,7 +715,7 @@ export default function PortfolioView() {
 
             {/* Card 4: Today's Realized P&L */}
             <div className="glass-panel" style={{
-              padding: isMobile ? '8px 10px' : '10px 14px',
+              padding: isMobile ? '8px 10px' : '8px 12px',
               borderRadius: '10px',
               border: '1px solid var(--border-color)',
               background: 'var(--bg-panel)',
@@ -734,16 +736,17 @@ export default function PortfolioView() {
                 </span>
               </div>
               <div style={{ 
-                fontSize: isMobile ? '16px' : '20px', 
+                fontSize: isMobile ? '16px' : '19px', 
                 fontWeight: '700', 
-                letterSpacing: '-0.3px',
-                color: todayRealizedPnl >= 0 ? '#00E676' : '#FF3B30'
+                letterSpacing: '-0.3px', 
+                color: todayRealizedPnl >= 0 ? '#00E676' : '#FF3B30',
+                fontVariantNumeric: 'tabular-nums'
               }}>
                 {todayRealizedPnl >= 0 ? '+' : ''}{formatCurrency(todayRealizedPnl)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Closed Trades:</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{todayTradesCount}</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>{todayTradesCount}</span>
               </div>
             </div>
 
@@ -1303,10 +1306,10 @@ export default function PortfolioView() {
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Avg Price</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Live LTP / NAV</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Day Change</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested Value</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current Value</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 20px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '130px', minWidth: '130px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1364,12 +1367,12 @@ export default function PortfolioView() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                               {pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: '#2563eb', fontVariantNumeric: 'tabular-nums' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                               {pos.isMf ? (
                                 <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
                                   Daily NAV
@@ -1385,9 +1388,9 @@ export default function PortfolioView() {
                                 </>
                               )}
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
-                            <td style={{ padding: '9px 10px', textAlign: 'right' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(pos.invested)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(pos.current)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                               <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}
                               </div>
@@ -1395,8 +1398,8 @@ export default function PortfolioView() {
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '9px 10px', textAlign: 'center' }}>
-                              <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                            <td style={{ padding: '9px 20px 9px 10px', textAlign: 'center', width: '130px', minWidth: '130px' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
