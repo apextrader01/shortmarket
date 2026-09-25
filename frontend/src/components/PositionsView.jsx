@@ -470,10 +470,11 @@ export default function PositionsView() {
     let failed = 0;
     let lastError = '';
     const results = await Promise.allSettled(openPositions.map(async (pos) => {
-      // Cancel any resting pending orders or trigger orders for this symbol first
+      // Cancel any resting pending, trigger, or partially filled orders for this symbol first
       const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const cancellableStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
       const restingOrders = (store.orders || []).filter(o => {
-        if (o.status !== 'PENDING' && o.status !== 'PENDING_TRIGGER') return false;
+        if (!cancellableStatuses.includes(o.status)) return false;
         const oClean = (o.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
         return o.symbol === pos.symbol || oClean === cleanSym;
       });
@@ -1487,6 +1488,20 @@ export default function PositionsView() {
                     if (!partialExitIsAmo && !session.open) {
                       alert(session.closedMessage || "Market is closed. Regular orders can only be placed during trading hours (09:15 AM - 03:30 PM). Please select AMO to place an After Market Order.");
                       return;
+                    }
+
+                    // If exiting full remaining position, cancel any prior resting/partial orders for this symbol first
+                    if (qtyToExit >= maxQty) {
+                      const cleanSym = (partialExitPos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+                      const cancellableStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
+                      const restingOrders = (store.orders || []).filter(o => {
+                        if (!cancellableStatuses.includes(o.status)) return false;
+                        const oClean = (o.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+                        return o.symbol === partialExitPos.symbol || oClean === cleanSym;
+                      });
+                      for (const ord of restingOrders) {
+                        await store.cancelOrder(ord.id).catch(() => {});
+                      }
                     }
 
                     const ok = await useStore.getState().placeOrder({

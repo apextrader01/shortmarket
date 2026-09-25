@@ -83,7 +83,7 @@ class VolumeMatchingEngine {
       const pending = await db('orders')
         .whereIn('status', ['PARTIAL_FILLED', 'PARTIALLY_FILLED'])
         .orWhere(builder => {
-          builder.where({ status: 'PENDING', type: 'MARKET' });
+          builder.whereIn('status', ['PENDING', 'OPEN']).where({ type: 'MARKET' });
         });
 
       const symbolsToSubscribe = new Set();
@@ -396,37 +396,42 @@ class VolumeMatchingEngine {
 
         // Determine lot size for contract compliance
         const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
-        const { getLotSizes, resolveSingleLotSize } = require('./instrumentsCache');
+        const { getLotSizes, resolveSingleLotSize, isCommodityContract } = require('./instrumentsCache');
         const lotsize = resolveSingleLotSize(order.symbol);
+        const isCommodity = isCommodityContract(order.symbol);
 
         let fillQty = 0;
+        let consumedVol = 0;
+
         if (lotsize > 1) {
-          // Derivatives and Commodities trade strictly in whole lots (no artificial lot capping).
-          // Orders match up to real available whole lots from exchange volume ticks.
-          const maxLotsFromVol = Math.floor(availableVol / lotsize);
-          if (maxLotsFromVol >= 1) {
-            const rawCap = Math.min(order.pending_quantity, availableVol);
-            fillQty = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-            fillQty = Math.min(order.pending_quantity, fillQty);
-            fillQty = Math.floor(fillQty / lotsize) * lotsize;
-          } else if (order.pending_quantity < lotsize && availableVol >= order.pending_quantity) {
-            // Non-standard partial residual strictly smaller than 1 lot
+          // On MCX commodities and exchange derivative feeds, volume is disseminated in
+          // Number of Contracts (Lots), NOT raw underlying units (e.g. 1 lot, 4 lots).
+          // Convert contract delta into underlying order units (e.g. 4 lots * 10 = 40 barrels).
+          const isContractVol = isCommodity || availableVol < lotsize;
+          const availableUnits = isContractVol ? (availableVol * lotsize) : availableVol;
+
+          const rawCap = Math.min(order.pending_quantity, availableUnits);
+          fillQty = Math.floor(rawCap / lotsize) * lotsize;
+          if (fillQty === 0 && order.pending_quantity < lotsize && availableUnits >= order.pending_quantity) {
             fillQty = order.pending_quantity;
           }
-          // else: not enough real volume for even 1 lot — wait for more ticks
+
+          if (fillQty > 0) {
+            consumedVol = isContractVol ? Math.ceil(fillQty / lotsize) : fillQty;
+          }
         } else {
           // Equities (lot = 1): NO artificial capping.
           // Orders match real volume 1:1 against whatever volume executed on the real exchange.
-          // (e.g. 500 real volume -> 500 fill; 15k real volume -> 15k fill; 2 Lakh real volume -> full 1 Lakh fill)
           fillQty = Math.min(order.pending_quantity, availableVol);
+          consumedVol = fillQty;
         }
 
         if (fillQty > 0) {
           order._lastFillTime = now;
           if (isBuy) {
-            availableBuyVol -= fillQty;
+            availableBuyVol -= consumedVol;
           } else {
-            availableSellVol -= fillQty;
+            availableSellVol -= consumedVol;
           }
           await this.processSliceFill(order, fillQty, ltp);
           if (order.pending_quantity <= 0) {
@@ -755,6 +760,13 @@ class VolumeMatchingEngine {
                     }
                   }
                 }
+
+                // If this exit order closed the position completely, cancel any remaining pending quantity on this order
+                newPending = 0;
+                newStatus = newFilled >= totalQty ? 'EXECUTED' : 'CANCELLED';
+                order.pending_quantity = 0;
+                order.status = newStatus;
+                this.dequeueOrder(order.id, order.symbol);
               } else {
                 const revSide = order.side === 'BUY' ? 1 : -1;
                 const revPosQty = revSide * leftoverQty;
@@ -991,19 +1003,34 @@ class VolumeMatchingEngine {
             const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
             if (isExitOrder) {
               console.warn(`[SAFEGUARD] Blocked exit order ${order.id} (${order.symbol}) from opening a new position since position is already closed.`);
-              if (sliceMargin > 0) {
-                const user = await trx('users').where({ id: order.user_id }).first();
+              const totalOrdQty = Number(order.quantity || 0);
+              const filledOrdQty = Number(currentOrder.filled_quantity || 0);
+              const unexecutedQty = Math.max(0, totalOrdQty - filledOrdQty);
+              const excessRefund = totalOrdQty > 0 ? Math.round(((unexecutedQty / totalOrdQty) * Number(order.margin || 0) + Number.EPSILON) * 100) / 100 : 0;
+              if (excessRefund > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
                 if (user) {
-                  await trx('users').where({ id: order.user_id }).increment('balance', sliceMargin);
+                  await trx('users').where({ id: order.user_id }).update({
+                    balance: Math.round((Number(user.balance) + excessRefund + Number.EPSILON) * 100) / 100
+                  });
                   await trx('ledger').insert({
                     user_id: order.user_id,
-                    amount: sliceMargin,
+                    amount: excessRefund,
                     type: 'MARGIN_RELEASE',
-                    description: `Refund for excess exit slice: ${sliceQtyClean} ${order.symbol}`
+                    description: `Refund for excess exit order: ${unexecutedQty} ${order.symbol}`
                   });
                 }
               }
+
+              // Persist CANCELLED status to database so the order leaves Open Orders immediately
+              await trx('orders').where({ id: order.id }).update({
+                status: 'CANCELLED',
+                pending_quantity: 0,
+                updated_at: new Date()
+              });
+
               order.status = 'CANCELLED';
+              order.pending_quantity = 0;
               this.dequeueOrder(order.id, order.symbol);
               return;
             }
@@ -1317,30 +1344,34 @@ class VolumeMatchingEngine {
             if (!order._lastFillTime || (now - order._lastFillTime >= 4500)) {
               order._lastFillTime = now;
               const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
-              const { getLotSizes } = require('./instrumentsCache');
+              const { getLotSizes, isCommodityContract } = require('./instrumentsCache');
               const lotSizes = getLotSizes([order.symbol, cleanSym]);
               const lotsize = lotSizes[order.symbol] || lotSizes[cleanSym] || 1;
+              const isCommodity = isCommodityContract(order.symbol);
 
               let slice = 0;
+              let consumed = 0;
               if (lotsize > 1) {
-                // Fill proportional to real volume delta (strictly whole lots, no artificial lot capping)
-                const maxLotsFromVol = Math.floor(volDelta / lotsize);
-                if (maxLotsFromVol >= 1 && order.pending_quantity >= lotsize) {
-                  const rawCap = Math.min(order.pending_quantity, volDelta);
-                  slice = Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize);
-                  slice = Math.min(order.pending_quantity, slice);
-                  slice = Math.floor(slice / lotsize) * lotsize;
-                } else if (order.pending_quantity < lotsize && volDelta >= order.pending_quantity) {
-                  // Non-standard partial residual strictly smaller than 1 lot
+                const isContractVol = isCommodity || volDelta < lotsize;
+                const availableUnits = isContractVol ? (volDelta * lotsize) : volDelta;
+
+                const rawCap = Math.min(order.pending_quantity, availableUnits);
+                slice = Math.floor(rawCap / lotsize) * lotsize;
+                if (slice === 0 && order.pending_quantity < lotsize && availableUnits >= order.pending_quantity) {
                   slice = order.pending_quantity;
+                }
+
+                if (slice > 0) {
+                  consumed = isContractVol ? Math.ceil(slice / lotsize) : slice;
                 }
               } else {
                 slice = Math.min(order.pending_quantity, volDelta);
+                consumed = slice;
               }
 
               if (slice > 0) {
                 await this.processSliceFill(order, slice, ltp);
-                volDelta -= slice;
+                volDelta -= consumed;
                 if (order.pending_quantity <= 0) {
                   this.dequeueOrder(order.id, order.symbol);
                 }

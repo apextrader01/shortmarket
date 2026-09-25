@@ -596,6 +596,16 @@ export const useStore = create(persist((set, get) => ({
     if (positions && positions.length > 0) {
       positions.forEach(p => symbols.add(p.symbol));
     }
+
+    const orders = get().orders;
+    if (orders && orders.length > 0) {
+      const activeOrderStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
+      orders.forEach(o => {
+        if (o.symbol && activeOrderStatuses.includes(o.status)) {
+          symbols.add(o.symbol);
+        }
+      });
+    }
     
     const holdings = get().holdings;
     if (holdings && holdings.length > 0) {

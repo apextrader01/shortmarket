@@ -771,7 +771,7 @@ async function garbageCollectSubscriptions() {
             if (volumeMatchingEngine && typeof volumeMatchingEngine.getActiveSymbols === 'function') {
                 volumeMatchingEngine.getActiveSymbols().forEach(protectSymbol);
             }
-            const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED']).distinct('symbol').catch(()=>[]);
+            const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING']).distinct('symbol').catch(()=>[]);
             ordRows.forEach(r => protectSymbol(r.symbol));
         } catch (_) {}
             
