@@ -176,10 +176,6 @@ export default function PortfolioView() {
       return p.symbol === sym || pClean === cleanSym;
     });
 
-    // Derivative contracts (CE, PE, FUT) are never persistent holdings; only show if active positive open position
-    if (isDerivativeContract(sym)) {
-      if (!matchingPos || Number(matchingPos.quantity) === 0) return;
-    }
 
     if (!allMergedHoldingsMap[key]) {
       allMergedHoldingsMap[key] = { 

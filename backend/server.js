@@ -47,48 +47,33 @@ adapterPubClient.connect().catch((err) => console.error('[Redis Adapter Pub] Con
 adapterSubClient.connect().catch((err) => console.error('[Redis Adapter Sub] Connect failed:', err.message));
 
 
-// --- RETROACTIVE REALIZED P&L PATCH FOR TODAY'S CLOSING ORDERS ---
-(async function patchTodayRealizedPnl() {
+// --- RETROACTIVE CLEANUP FOR MISTAKENLY STAMPED REALIZED P&L ON ENTRY ORDERS ---
+(async function cleanupMistakenEntryOrderPnl() {
     try {
         const db = require('./database/db');
         if (!db || typeof db !== 'function') return;
         
-        const todayStart = new Date();
-        todayStart.setHours(0,0,0,0);
-        
-        const executedOrders = await db('orders')
-            .whereIn('status', ['EXECUTED', 'COMPLETED', 'COMPLETE'])
-            .where('created_at', '>=', todayStart)
+        // Reset realized_pnl on entry BUY orders that are not exit orders
+        const cleaned = await db('orders')
+            .where('side', 'BUY')
             .where(function() {
-                this.whereNull('realized_pnl').orWhere('realized_pnl', 0);
-            });
+                this.whereNull('is_exit').orWhere('is_exit', false);
+            })
+            .where(function() {
+                this.whereNull('remarks')
+                    .orWhere(function() {
+                        this.whereNot('remarks', 'like', '%Exit%')
+                            .whereNot('remarks', 'like', '%Square-Off%')
+                            .whereNot('remarks', 'like', '%Auto-Square-Off%');
+                    });
+            })
+            .where(function() {
+                this.whereNotNull('realized_pnl').andWhere('realized_pnl', '!=', 0);
+            })
+            .update({ realized_pnl: 0 });
             
-        let patched = 0;
-        for (const o of executedOrders) {
-            const ledger = await db('ledger')
-                .where('user_id', o.user_id)
-                .whereIn('type', ['REALIZED_PNL', 'TRADE_PROFIT', 'TRADE_LOSS'])
-                .where('description', 'like', '%' + o.symbol + '%')
-                .where('created_at', '>=', todayStart)
-                .orderBy('created_at', 'desc')
-                .first();
-                
-            if (ledger && Number(ledger.amount) !== 0) {
-                await db('orders').where({ id: o.id }).update({ realized_pnl: ledger.amount });
-                patched++;
-            } else {
-                const closedPos = await db('positions')
-                    .where({ user_id: o.user_id, symbol: o.symbol, quantity: 0 })
-                    .where('updated_at', '>=', todayStart)
-                    .first();
-                if (closedPos && Number(closedPos.realized_pnl) !== 0) {
-                    await db('orders').where({ id: o.id }).update({ realized_pnl: closedPos.realized_pnl });
-                    patched++;
-                }
-            }
-        }
-        if (patched > 0) {
-            console.log(`[HOTFIX] Successfully retroactively patched ${patched} executed orders with their correct Realized P&L.`);
+        if (cleaned > 0) {
+            console.log(`[CLEANUP] Successfully reset realized_pnl to 0 on ${cleaned} entry BUY orders.`);
         }
     } catch (e) {
         // fail silently
@@ -1796,7 +1781,7 @@ app.get('/api/user/bootstrap', authenticateToken, async (req, res) => {
       return false;
     };
 
-    const formattedHoldings = (holdingsRows || []).filter(h => !isDerivContract(h.symbol));
+    const formattedHoldings = (holdingsRows || []).filter(h => Number(h.quantity) > 0);
     for (const h of formattedHoldings) {
       if (LEGACY_FIX_MAP[h.symbol] && Math.round(Number(h.average_price)) === 100) {
         const item = LEGACY_FIX_MAP[h.symbol];
@@ -3696,7 +3681,7 @@ app.get('/api/holdings', authenticateToken, async (req, res) => {
       .whereNot({ quantity: 0 })
       .orderBy('id', 'desc');
 
-    const holdings = rawHoldings.filter(h => !isDerivContract(h.symbol) && Number(h.quantity) > 0);
+    const holdings = rawHoldings.filter(h => Number(h.quantity) > 0);
 
     // Auto-align legacy MF holdings (EDEL, MIRA, NIPP) with real AMFI NAVs and calculate correct units
     const LEGACY_FIX_MAP = {

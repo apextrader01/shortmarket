@@ -18,7 +18,11 @@ export default function PositionsView() {
   };
 
   const isOvernightDelivery = (p) => {
-    return isDeliveryPosition(p);
+    if (!p) return false;
+    if (!isDeliveryPosition(p)) return false;
+    const dateToCheck = p.created_at || p.updated_at;
+    if (dateToCheck && isToday(dateToCheck)) return false;
+    return true;
   };
   const [viewMode, setViewMode] = useState('OPEN'); // 'OPEN' | 'CLOSED' | 'HOLDINGS'
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);

@@ -66,11 +66,16 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
   });
   const dbClosedKeys = new Set(dbClosed.map(p => `${normalizeSym(p.symbol)}-${normalizeProd(p.product_type)}`));
   
-  // Track all actively OPEN position keys so open positions are NEVER duplicated into closed
+  // Track all actively OPEN position keys and symbols so open positions are NEVER duplicated into closed
   const openPositionsKeys = new Set(
     (positions || [])
       .filter(p => Number(p.quantity) !== 0)
       .map(p => `${normalizeSym(p.symbol)}-${normalizeProd(p.product_type)}`)
+  );
+  const openSymbols = new Set(
+    (positions || [])
+      .filter(p => Number(p.quantity) !== 0)
+      .map(p => normalizeSym(p.symbol))
   );
 
   // 2. Synthesize closed positions from executed orders ONLY if NOT already recorded in dbClosed AND NOT currently open
@@ -78,14 +83,18 @@ export const getTodayClosedPositions = (positions = [], orders = []) => {
   (orders || []).forEach(o => {
     const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
     const orderPnl = Number(o.realized_pnl || 0);
-    const isExitOrder = (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off') || o.remarks.includes('Auto-Square-Off'))) 
-      || (o.realized_pnl !== null && o.realized_pnl !== undefined && orderPnl !== 0)
-      || (o.closed_quantity && Number(o.closed_quantity) > 0);
+    const hasExitRemarks = Boolean(
+      (o.remarks && /exit|square-off|auto-square-off|close/i.test(o.remarks)) ||
+      o.is_exit
+    );
+    const isExitOrder = o.side === 'SELL' 
+      ? (hasExitRemarks || (orderPnl !== 0) || (Number(o.closed_quantity || 0) > 0))
+      : (hasExitRemarks || (Number(o.closed_quantity || 0) > 0));
     const normSym = normalizeSym(o.symbol);
     const prod = normalizeProd(o.product_type);
     const key = `${normSym}-${prod}`;
 
-    if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key)) {
+    if (isExecuted && isExitOrder && isToday(o.updated_at || o.created_at) && !dbClosedKeys.has(key) && !openPositionsKeys.has(key) && !openSymbols.has(normSym)) {
       const orderQty = Math.abs(Number(o.quantity || 1));
       const exitPrice = Math.abs(Number(o.average_price || o.price || 0));
       const entrySide = o.side === 'SELL' ? 'BUY' : 'SELL';

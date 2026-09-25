@@ -637,13 +637,9 @@ async function ensureCriticalColumns() {
     await db.raw('UPDATE orders SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
     await db.raw('UPDATE positions SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
     await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
-    // 🛡️ Purge derivative contracts and non-positive quantities from holdings table (derivatives belong in positions)
+    // Clean up zero or non-positive quantities from holdings table
     await db('holdings')
       .where('quantity', '<=', 0)
-      .orWhere('symbol', 'like', '%CE')
-      .orWhere('symbol', 'like', '%PE')
-      .orWhere('symbol', 'like', '%FUT%')
-      .orWhereIn('asset_class', ['OPTIONS', 'DERIVATIVE', 'FUTURES'])
       .del()
       .catch(() => {});
 

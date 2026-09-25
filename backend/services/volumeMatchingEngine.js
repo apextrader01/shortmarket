@@ -847,7 +847,7 @@ class VolumeMatchingEngine {
               await trx('holdings').where({ id: holdingRecord.id }).update({ quantity: newHQty, updated_at: new Date() });
             }
           }
-        } else if ((order.side === 'SELL' || order.side === 'BUY') && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+        } else if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
           // Offsetting overnight delivery shares from holdings table
           const holding = await trx('holdings')
             .where({ user_id: order.user_id })

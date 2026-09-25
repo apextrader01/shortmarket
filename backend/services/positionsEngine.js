@@ -655,11 +655,9 @@ class PositionsEngine {
                 const deliveryPositions = await query;
 
                 for (const pos of deliveryPositions) {
-                    // Exclude derivative contracts from migrating into equity stock holdings
-                    if (isDerivativeSymbol(pos.symbol)) continue;
-
                     const isCommodity = isCommoditySymbol(pos.symbol);
-                    const assetClass = isCommodity ? 'COMMODITY' : 'STOCK';
+                    const isDeriv = isDerivativeSymbol(pos.symbol);
+                    const assetClass = isCommodity ? 'COMMODITY' : (isDeriv ? 'DERIVATIVE' : 'STOCK');
 
                     // Check if holding already exists (prefix-tolerant)
                     const cleanSym = pos.symbol.includes(':') ? pos.symbol.split(':')[1] : pos.symbol;
@@ -707,7 +705,7 @@ class PositionsEngine {
                 }
 
                 // 2. Mark migrated delivery positions as settled (quantity = 0) to preserve audit trails without data deletion
-                const migratedIds = deliveryPositions.filter(p => !isDerivativeSymbol(p.symbol)).map(p => p.id);
+                const migratedIds = deliveryPositions.map(p => p.id);
                 if (migratedIds.length > 0) {
                     await trx('positions')
                         .whereIn('id', migratedIds)
