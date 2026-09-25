@@ -146,92 +146,189 @@ export default function PortfolioView() {
     return `${sign}₹${abs.toFixed(0)}`;
   };
 
-  let totalInvested = 0;
-  let totalCurrent = 0;
-  let totalInvestedStocks = 0;
-  let totalInvestedETFs = 0;
-  let totalInvestedDerivatives = 0;
-  let totalInvestedMutualFunds = 0;
-  let countStocks = 0;
-  let countETFs = 0;
-  let countDerivatives = 0;
-  let countMutualFunds = 0;
-  let unrealizedPnl = 0;
+  // ⚡ Performance: subscribe exclusively to prices of held assets
+  const portfolioSymbols = useMemo(() => {
+    const syms = new Set();
+    (holdings || []).forEach(h => { if (h.symbol) syms.add(h.symbol); });
+    (positions || []).forEach(p => { if (p.symbol) syms.add(p.symbol); });
+    return Array.from(syms);
+  }, [holdings, positions]);
 
-  // Merge T+1 holdings and T+0 open delivery positions
-  const allMergedHoldingsMap = {};
+  const portfolioPrices = useStore(
+    useShallow(state => {
+      if (portfolioSymbols.length === 0) return EMPTY_PRICES;
+      const map = {};
+      for (const sym of portfolioSymbols) {
+        if (state.prices[sym]) map[sym] = state.prices[sym];
+      }
+      return map;
+    })
+  );
 
-  (holdings || []).forEach(h => {
-    if (!h) return;
-    const sym = h.symbol;
-    const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-    const key = cleanSym || sym;
-    const hQty = Number(h.quantity) || 0;
-    const hPrice = Math.abs(Number(h.average_price) || 0);
-    if (hQty <= 0) return;
+  const {
+    deliveryPositions,
+    totalInvested,
+    totalCurrent,
+    totalInvestedStocks,
+    totalInvestedETFs,
+    totalInvestedDerivatives,
+    totalInvestedMutualFunds,
+    countStocks,
+    countETFs,
+    countDerivatives,
+    countMutualFunds,
+    unrealizedPnl
+  } = useMemo(() => {
+    let investedSum = 0;
+    let currentSum = 0;
+    let invStocks = 0;
+    let invETFs = 0;
+    let invDerivatives = 0;
+    let invMF = 0;
+    let cntStocks = 0;
+    let cntETFs = 0;
+    let cntDeriv = 0;
+    let cntMF = 0;
+    let uPnl = 0;
 
-    // Check if matching position exists in positions table
-    const matchingPos = (positions || []).find(p => {
-      const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-      return p.symbol === sym || pClean === cleanSym;
-    });
+    // Merge T+1 holdings and T+0 open delivery positions
+    const allMergedHoldingsMap = {};
 
-
-    if (!allMergedHoldingsMap[key]) {
-      allMergedHoldingsMap[key] = { 
-        ...h, 
-        quantity: hQty, 
-        average_price: hPrice,
-        side: h.side || (hQty < 0 ? 'SELL' : 'BUY')
-      };
-    } else {
-      const existing = allMergedHoldingsMap[key];
-      const prevQty = Number(existing.quantity) || 0;
-      const prevPrice = Math.abs(Number(existing.average_price) || 0);
-      const totalQty = prevQty + hQty;
-      const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
-      const absTotalQty = Math.abs(totalQty);
-      const weightedAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
-      existing.quantity = totalQty;
-      existing.average_price = Math.abs(weightedAvg);
-      existing.side = totalQty < 0 ? 'SELL' : 'BUY';
-    }
-  });
-
-  (positions || []).forEach(p => {
-    const isDelivery = (p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY');
-    const isMF = (p.symbol?.endsWith('-MF') || p.symbol?.includes('MUTUALFUND') || p.asset_class === 'MUTUAL_FUND');
-    if ((isDelivery || isMF) && Math.abs(Number(p.quantity)) > 0) {
-      const sym = p.symbol;
+    (holdings || []).forEach(h => {
+      if (!h) return;
+      const sym = h.symbol;
       const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
       const key = cleanSym || sym;
-      const pQty = Number(p.quantity) || 0;
-      const pPrice = Math.abs(Number(p.average_price) || 0);
+      const hQty = Number(h.quantity) || 0;
+      const hPrice = Math.abs(Number(h.average_price) || 0);
+      if (hQty <= 0) return;
+
       if (!allMergedHoldingsMap[key]) {
         allMergedHoldingsMap[key] = { 
-          ...p, 
-          quantity: pQty, 
-          average_price: pPrice, 
-          side: p.side || (pQty < 0 ? 'SELL' : 'BUY'),
-          isT0: true 
+          ...h, 
+          quantity: hQty, 
+          average_price: hPrice,
+          side: h.side || (hQty < 0 ? 'SELL' : 'BUY')
         };
       } else {
         const existing = allMergedHoldingsMap[key];
         const prevQty = Number(existing.quantity) || 0;
         const prevPrice = Math.abs(Number(existing.average_price) || 0);
-        const totalQty = prevQty + pQty;
-        const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(pQty) * pPrice);
+        const totalQty = prevQty + hQty;
+        const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(hQty) * hPrice);
         const absTotalQty = Math.abs(totalQty);
-        const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+        const weightedAvg = absTotalQty > 0 ? (totalCost / absTotalQty) : prevPrice;
         existing.quantity = totalQty;
         existing.average_price = Math.abs(weightedAvg);
         existing.side = totalQty < 0 ? 'SELL' : 'BUY';
       }
-    }
-  });
+    });
 
-  const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => Math.abs(Number(h.quantity)) > 0);
-  const deliveryPositions = allMergedHoldings;
+    (positions || []).forEach(p => {
+      const isDelivery = (p.product_type === 'DEL' || p.product_type === 'CNC' || p.product_type === 'DELIVERY');
+      const isMF = (p.symbol?.endsWith('-MF') || p.symbol?.includes('MUTUALFUND') || p.asset_class === 'MUTUAL_FUND');
+      if ((isDelivery || isMF) && Math.abs(Number(p.quantity)) > 0) {
+        const sym = p.symbol;
+        const cleanSym = (sym || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const key = cleanSym || sym;
+        const pQty = Number(p.quantity) || 0;
+        const pPrice = Math.abs(Number(p.average_price) || 0);
+        if (!allMergedHoldingsMap[key]) {
+          allMergedHoldingsMap[key] = { 
+            ...p, 
+            quantity: pQty, 
+            average_price: pPrice, 
+            side: p.side || (pQty < 0 ? 'SELL' : 'BUY'),
+            isT0: true 
+          };
+        } else {
+          const existing = allMergedHoldingsMap[key];
+          const prevQty = Number(existing.quantity) || 0;
+          const prevPrice = Math.abs(Number(existing.average_price) || 0);
+          const totalQty = prevQty + pQty;
+          const totalCost = (Math.abs(prevQty) * prevPrice) + (Math.abs(pQty) * pPrice);
+          const absTotalQty = Math.abs(totalQty);
+          const weightedAvg = absTotalQty !== 0 ? (totalCost / absTotalQty) : prevPrice;
+          existing.quantity = totalQty;
+          existing.average_price = Math.abs(weightedAvg);
+          existing.side = totalQty < 0 ? 'SELL' : 'BUY';
+        }
+      }
+    });
+
+    const allMergedHoldings = Object.values(allMergedHoldingsMap).filter(h => Math.abs(Number(h.quantity)) > 0);
+
+    const calcPosPnL = (pos, isHolding = false) => {
+      if (!pos) return;
+      const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+      const priceData = portfolioPrices[pos.symbol] 
+        || portfolioPrices[cleanSym] 
+        || portfolioPrices[`NSE:${cleanSym}`] 
+        || portfolioPrices[`BSE:${cleanSym}`] 
+        || portfolioPrices[`MCX:${cleanSym}`] 
+        || {};
+      const avg = Math.abs(parseFloat(pos.average_price) || 0);
+      const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
+      const qty = Math.abs(Number(pos.quantity) || 0);
+      const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
+      
+      const invested = avg * qty;
+      const current = ltp * qty;
+      
+      let pnl = 0;
+      if (isShort) {
+        pnl = invested - current;
+      } else {
+        pnl = current - invested;
+      }
+      uPnl += pnl;
+
+      // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)
+      if (isHolding) {
+        investedSum += invested;
+        currentSum += current;
+
+        const symbolStr = pos.symbol || '';
+        const cleanSymbolStr = symbolStr.replace(/^(NSE:|BSE:|MCX:)/i, '');
+        
+        if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
+          invETFs += invested;
+          cntETFs++;
+        } else if (symbolStr.includes('-MF') || symbolStr.includes('MUTUALFUND')) {
+          invMF += invested;
+          cntMF++;
+        } else if (
+          symbolStr.includes('-MCX') || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSymbolStr) ||
+          /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSymbolStr) || cleanSymbolStr.endsWith('-FUT') ||
+          ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSymbolStr.startsWith(c))
+        ) {
+          invDerivatives += invested;
+          cntDeriv++;
+        } else {
+          invStocks += invested;
+          cntStocks++;
+        }
+      }
+    };
+
+    allMergedHoldings.forEach(h => calcPosPnL(h, true));
+    (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC' && p.product_type !== 'DELIVERY').forEach(p => calcPosPnL(p, false));
+
+    return {
+      deliveryPositions: allMergedHoldings,
+      totalInvested: investedSum,
+      totalCurrent: currentSum,
+      totalInvestedStocks: invStocks,
+      totalInvestedETFs: invETFs,
+      totalInvestedDerivatives: invDerivatives,
+      totalInvestedMutualFunds: invMF,
+      countStocks: cntStocks,
+      countETFs: cntETFs,
+      countDerivatives: cntDeriv,
+      countMutualFunds: cntMF,
+      unrealizedPnl: uPnl
+    };
+  }, [holdings, positions, portfolioPrices]);
 
   useEffect(() => {
     const symbols = (deliveryPositions || []).map(p => p.symbol).filter(s => isMutualFund(s));
@@ -263,81 +360,7 @@ export default function PortfolioView() {
     .catch(() => {});
   }, [deliveryPositions]);
 
-  // ⚡ Performance: subscribe exclusively to prices of held assets
-  const portfolioSymbols = useMemo(() => {
-    const syms = new Set();
-    (holdings || []).forEach(h => { if (h.symbol) syms.add(h.symbol); });
-    (positions || []).forEach(p => { if (p.symbol) syms.add(p.symbol); });
-    return Array.from(syms);
-  }, [holdings, positions]);
-
-  const portfolioPrices = useStore(
-    useShallow(state => {
-      if (portfolioSymbols.length === 0) return EMPTY_PRICES;
-      const map = {};
-      for (const sym of portfolioSymbols) {
-        if (state.prices[sym]) map[sym] = state.prices[sym];
-      }
-      return map;
-    })
-  );
-
-  const calculatePnL = (pos, isHolding = false) => {
-    if (!pos) return;
-    const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
-    const priceData = portfolioPrices[pos.symbol] 
-      || portfolioPrices[cleanSym] 
-      || portfolioPrices[`NSE:${cleanSym}`] 
-      || portfolioPrices[`BSE:${cleanSym}`] 
-      || portfolioPrices[`MCX:${cleanSym}`] 
-      || {};
-    const avg = Math.abs(parseFloat(pos.average_price) || 0);
-    const ltp = (typeof priceData.ltp === 'number' && priceData.ltp > 0) ? priceData.ltp : avg;
-    const qty = Math.abs(Number(pos.quantity) || 0);
-    const isShort = Number(pos.quantity) < 0 || pos.side === 'SELL';
-    
-    const invested = avg * qty;
-    const current = ltp * qty;
-    
-    let pnl = 0;
-    if (isShort) {
-      pnl = invested - current;
-    } else {
-      pnl = current - invested;
-    }
-    unrealizedPnl += pnl;
-
-    // For portfolio breakdown, ONLY include T+1 Holdings (Condition 8)
-    if (isHolding) {
-      totalInvested += invested;
-      totalCurrent += current;
-
-      const symbolStr = pos.symbol || '';
-      const cleanSym = symbolStr.replace(/^(NSE:|BSE:|MCX:)/i, '');
-      
-      if (symbolStr.includes('ETF') || symbolStr.includes('BEES') || symbolStr.includes('LIQUID')) {
-        totalInvestedETFs += invested;
-        countETFs++;
-      } else if (symbolStr.includes('-MF') || symbolStr.includes('MUTUALFUND')) {
-        totalInvestedMutualFunds += invested;
-        countMutualFunds++;
-      } else if (
-        symbolStr.includes('-MCX') || /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym) ||
-        /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(cleanSym) || cleanSym.endsWith('-FUT') ||
-        ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => cleanSym.startsWith(c))
-      ) {
-        totalInvestedDerivatives += invested;
-        countDerivatives++;
-      } else {
-        totalInvestedStocks += invested;
-        countStocks++;
-      }
-    }
-  };
-
-  allMergedHoldings.forEach(h => calculatePnL(h, true));
-  (positions || []).filter(p => p.product_type !== 'DEL' && p.product_type !== 'CNC' && p.product_type !== 'DELIVERY').forEach(p => calculatePnL(p, false));
-
+  // ⚡ Performance: IST date comparisons use timeZone: 'Asia/Kolkata' via getTodayRealizedMetrics
   const { todayRealizedPnl, todayTradesCount } = useMemo(() => {
     return getTodayRealizedMetrics(positions, orders);
   }, [positions, orders]);
@@ -555,24 +578,24 @@ export default function PortfolioView() {
           </Suspense>
         </div>
       ) : activeTab === 'Heatmap' ? (
-        <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
+        <div style={{ padding: isMobile ? '12px' : '20px', paddingBottom: '100px' }}>
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading calendar heatmap...</div>}>
-            <TradingJournalView initialTab="CALENDAR" onBack={() => handleTabClick('Overview')} />
+            <TradingJournalView mode="CALENDAR" />
           </Suspense>
         </div>
       ) : activeTab === 'Journal' ? (
-        <div style={{ padding: isMobile ? '12px' : '24px', paddingBottom: '100px' }}>
+        <div style={{ padding: isMobile ? '12px' : '20px', paddingBottom: '100px' }}>
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading trade journal log...</div>}>
-            <TradingJournalView initialTab="JOURNAL" onBack={() => handleTabClick('Overview')} />
+            <TradingJournalView mode="JOURNAL" />
           </Suspense>
         </div>
       ) : (
-        <div style={{ padding: isMobile ? '8px 12px' : '12px 20px', paddingBottom: '100px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ padding: isMobile ? '10px 12px 100px' : '16px 20px 100px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           
           {/* Top 4 Key Metric Cards (Optimized High-Density Layout) */}
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', 
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))', 
             gap: isMobile ? '8px' : '12px' 
           }}>
             
@@ -1272,18 +1295,18 @@ export default function PortfolioView() {
                 </div>
               ) : (
                 /* 🖥️ Modern Desktop Holdings Table */
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '12.5px' }}>
                   <thead style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35 }}>
                     <tr style={{ background: '#0d1527', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Symbol / Scheme</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Qty / Units</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Avg Price</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Live LTP / NAV</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Day Change</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested Value</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current Value</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '11px 14px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 12px', fontWeight: '600', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Symbol / Scheme</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Qty / Units</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Avg Price</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Live LTP / NAV</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Day Change</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested Value</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current Value</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1309,22 +1332,22 @@ export default function PortfolioView() {
                               transition: 'background 0.15s ease'
                             }}
                           >
-                            <td style={{ padding: '12px 14px', fontWeight: '700' }}>
+                            <td style={{ padding: '9px 12px', fontWeight: '700' }}>
                               {pos.isMf ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{pos.displayName}</span>
+                                    <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{pos.displayName}</span>
                                     <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
                                       MUTUAL FUND
                                     </span>
                                   </div>
-                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>
+                                  <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                                     Code: {safeSymbol}
                                   </span>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ color: 'var(--text-primary)' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
+                                  <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{safeSymbol.split(':')[1] ? safeSymbol.split(':')[1].split('-')[0] : safeSymbol.split('-')[0]}</span>
                                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '2px 5px', borderRadius: '4px', fontWeight: '600' }}>
                                     {safeSymbol.split(':')[0] || 'NSE'}
                                   </span>
@@ -1341,14 +1364,14 @@ export default function PortfolioView() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary)' }}>
                               {pos.isMf ? Number(pos.qty).toFixed(4) : pos.qty}
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>₹{(parseFloat(pos.average_price) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '600', color: '#2563eb' }}>₹{(parseFloat(pos.ltp) || 0).toFixed(2)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                               {pos.isMf ? (
-                                <div style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
+                                <div style={{ color: 'var(--text-secondary)', fontSize: '11.5px', fontWeight: '500' }}>
                                   Daily NAV
                                 </div>
                               ) : (
@@ -1356,24 +1379,24 @@ export default function PortfolioView() {
                                   <div style={{ color: (pos.chg || 0) >= 0 ? '#00E676' : '#FF3B30', fontWeight: '600' }}>
                                     {(pos.chg || 0) >= 0 ? '+' : ''}₹{(pos.chg || 0).toFixed(2)}
                                   </div>
-                                  <div style={{ fontSize: '11px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                                  <div style={{ fontSize: '10.5px', color: (pos.chgp || 0) >= 0 ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
                                     {(pos.chgp || 0) >= 0 ? '+' : ''}{(pos.chgp || 0).toFixed(2)}%
                                   </div>
                                 </>
                               )}
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(pos.invested)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(pos.current)}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                               <div style={{ color: pos.isProfit ? '#00E676' : '#FF3B30', fontWeight: '700' }}>
                                 {pos.isProfit ? '+' : ''}{formatCurrency(pos.pnl)}
                               </div>
-                              <div style={{ fontSize: '11px', color: pos.isProfit ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
+                              <div style={{ fontSize: '10.5px', color: pos.isProfit ? '#00E676' : '#FF3B30', opacity: 0.85, fontWeight: '600' }}>
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
@@ -1383,9 +1406,9 @@ export default function PortfolioView() {
                                         background: 'rgba(168, 85, 247, 0.1)',
                                         color: '#a855f7',
                                         border: '1px solid rgba(168, 85, 247, 0.3)',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
+                                        padding: '3px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease'
@@ -1400,9 +1423,9 @@ export default function PortfolioView() {
                                         background: 'rgba(255, 59, 48, 0.1)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
+                                        padding: '3px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease'
@@ -1420,9 +1443,9 @@ export default function PortfolioView() {
                                         background: 'rgba(0, 230, 118, 0.1)',
                                         color: '#00E676',
                                         border: '1px solid rgba(0, 230, 118, 0.3)',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
+                                        padding: '3px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease'
@@ -1442,9 +1465,9 @@ export default function PortfolioView() {
                                         background: 'rgba(255, 59, 48, 0.1)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '4px 10px',
-                                        borderRadius: '6px',
-                                        fontSize: '11px',
+                                        padding: '3px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease'

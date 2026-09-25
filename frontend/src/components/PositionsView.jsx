@@ -1361,6 +1361,18 @@ export default function PositionsView() {
       {partialExitPos && (() => {
         const isExitShort = Number(partialExitPos.qty) < 0 || partialExitPos.side === 'SELL';
         const exitSide = isExitShort ? 'BUY' : 'SELL';
+        const isCommodity = isCommodityContract(partialExitPos.symbol);
+        const effProd = (partialExitPos.product_type === 'BO' || partialExitPos.product_type === 'CO') ? 'INT' : (partialExitPos.product_type || 'DEL');
+        const currentStore = useStore.getState();
+        const currentSession = getMarketSession({
+          symbol: partialExitPos.symbol,
+          productType: effProd,
+          isCommodity,
+          marketStatus: currentStore.marketStatus,
+          marketCalendar: currentStore.marketCalendar
+        });
+        const isMarketOpen = currentSession.open;
+
         return (
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -1381,33 +1393,35 @@ export default function PositionsView() {
                   {partialExitPos.symbol}
                 </div>
 
-                {/* Regular vs AMO Selector */}
-                <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
-                  <button
-                    type="button"
-                    onClick={() => setPartialExitIsAmo(false)}
-                    style={{
-                      flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                      background: !partialExitIsAmo ? '#2563eb' : 'transparent',
-                      color: !partialExitIsAmo ? '#ffffff' : 'var(--text-secondary)',
-                      fontSize: '12px', fontWeight: '600', transition: 'all 0.15s ease'
-                    }}
-                  >
-                    Regular
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPartialExitIsAmo(true)}
-                    style={{
-                      flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                      background: partialExitIsAmo ? '#f59e0b' : 'transparent',
-                      color: partialExitIsAmo ? '#000000' : 'var(--text-secondary)',
-                      fontSize: '12px', fontWeight: '700', transition: 'all 0.15s ease'
-                    }}
-                  >
-                    🌙 AMO
-                  </button>
-                </div>
+                {/* Regular vs AMO Selector - Only displayed if market is closed */}
+                {!isMarketOpen && (
+                  <div style={{ display: 'flex', background: 'var(--bg-hover)', borderRadius: '6px', padding: '3px', marginBottom: '16px', border: '1px solid var(--border-color)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPartialExitIsAmo(false)}
+                      style={{
+                        flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                        background: !partialExitIsAmo ? '#2563eb' : 'transparent',
+                        color: !partialExitIsAmo ? '#ffffff' : 'var(--text-secondary)',
+                        fontSize: '12px', fontWeight: '600', transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Regular
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPartialExitIsAmo(true)}
+                      style={{
+                        flex: 1, padding: '6px 12px', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                        background: partialExitIsAmo ? '#f59e0b' : 'transparent',
+                        color: partialExitIsAmo ? '#000000' : 'var(--text-secondary)',
+                        fontSize: '12px', fontWeight: '700', transition: 'all 0.15s ease'
+                      }}
+                    >
+                      🌙 AMO (After-Market)
+                    </button>
+                  </div>
+                )}
                 
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ flex: 1 }}>

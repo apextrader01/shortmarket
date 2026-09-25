@@ -28,7 +28,7 @@ export const EMOTION_TAGS = [
   '😨 Panic Exit (Fear)'
 ];
 
-export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
+export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mode }) {
   const { user, positions, orders } = useStore(useShallow(state => ({
     user: state.user,
     positions: state.positions,
@@ -48,14 +48,17 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
     }
   });
 
-  const [activeViewTab, setActiveViewTab] = useState(initialTab); // 'JOURNAL' | 'CALENDAR'
+  const [activeViewTab, setActiveViewTab] = useState(mode || initialTab); // 'JOURNAL' | 'CALENDAR'
+  const currentTab = mode || activeViewTab;
   const [calendarDate, setCalendarDate] = useState(new Date());
 
   useEffect(() => {
-    if (initialTab) {
+    if (mode) {
+      setActiveViewTab(mode);
+    } else if (initialTab) {
       setActiveViewTab(initialTab);
     }
-  }, [initialTab]);
+  }, [mode, initialTab]);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
 
   const [selectedTradeForShare, setSelectedTradeForShare] = useState(null);
@@ -425,62 +428,64 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL' }) {
   const firstDayOfWeek = new Date(calendarYear, calendarMonth, 1).getDay(); // 0 = Sun
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
-      {/* View Switcher: Journal vs Calendar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '4px', gap: '4px' }}>
-          <button
-            onClick={() => setActiveViewTab('JOURNAL')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeViewTab === 'JOURNAL' ? 'var(--color-blue)' : 'transparent',
-              color: activeViewTab === 'JOURNAL' ? '#ffffff' : 'var(--text-secondary)',
-              fontSize: '12.5px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s'
-            }}
-          >
-            <BookOpen size={15} /> Trade Journal Log
-          </button>
-          <button
-            onClick={() => setActiveViewTab('CALENDAR')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: activeViewTab === 'CALENDAR' ? 'var(--color-blue)' : 'transparent',
-              color: activeViewTab === 'CALENDAR' ? '#ffffff' : 'var(--text-secondary)',
-              fontSize: '12.5px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s'
-            }}
-          >
-            <CalendarDays size={15} /> P&L Calendar Heatmap
-          </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+      {/* View Switcher: Journal vs Calendar (only shown if mode is not specified) */}
+      {!mode && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '4px', gap: '4px' }}>
+            <button
+              onClick={() => setActiveViewTab('JOURNAL')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentTab === 'JOURNAL' ? 'var(--color-blue)' : 'transparent',
+                color: currentTab === 'JOURNAL' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              <BookOpen size={15} /> Trade Journal Log
+            </button>
+            <button
+              onClick={() => setActiveViewTab('CALENDAR')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentTab === 'CALENDAR' ? 'var(--color-blue)' : 'transparent',
+                color: currentTab === 'CALENDAR' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              <CalendarDays size={15} /> P&L Calendar Heatmap
+            </button>
+          </div>
+
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="btn btn-secondary"
+              style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '8px' }}
+            >
+              &larr; Back to Dashboard
+            </button>
+          )}
         </div>
+      )}
 
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="btn btn-secondary"
-            style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '8px' }}
-          >
-            &larr; Back to Dashboard
-          </button>
-        )}
-      </div>
-
-      {activeViewTab === 'JOURNAL' ? (
+      {currentTab === 'JOURNAL' ? (
         <>
       {/* Header Summary Cards */}
       <div style={{
