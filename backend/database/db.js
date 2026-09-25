@@ -1,5 +1,7 @@
 const knex = require('knex');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true, override: true });
+require('dotenv').config({ path: path.join(__dirname, '../../.env'), quiet: true, override: true });
 
 // Determine environment
 const isProduction = !!process.env.DATABASE_URL;
@@ -13,7 +15,14 @@ if (!isProduction) {
 const dbConfig = {
   client: 'pg',
   connection: process.env.DATABASE_URL || 'postgres://dummy:dummy@localhost:5432/dummy',
-  pool: { min: 2, max: 10 }
+  pool: { 
+    min: 2, 
+    max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 25,
+    idleTimeoutMillis: 30000,
+    createTimeoutMillis: 5000,
+    acquireTimeoutMillis: 10000,
+    propagateCreateError: true
+  }
 };
 
 const db = knex(dbConfig);
@@ -40,6 +49,12 @@ async function initSchema() {
         table.string('kyc_pan_url');
         table.string('kyc_aadhar_url');
         table.boolean('is_admin').defaultTo(false);
+        table.string('subscription_tier').defaultTo('BASIC');
+        table.datetime('subscription_expires');
+        table.string('upi_id');
+        table.string('bank_account_no');
+        table.string('bank_ifsc');
+        table.text('address');
         table.timestamps(true, true); // created_at, updated_at
       });
       console.log('Created users table');
@@ -75,6 +90,25 @@ async function initSchema() {
         });
         console.log('Added client details and KYC columns to users table');
       }
+
+      const hasBankDetails = await db.schema.hasColumn('users', 'upi_id');
+      if (!hasBankDetails) {
+        await db.schema.alterTable('users', table => {
+          table.string('upi_id');
+          table.string('bank_account_no');
+          table.string('bank_ifsc');
+        });
+        console.log('Added Bank & UPI columns to users table');
+      }
+
+      const hasAddress = await db.schema.hasColumn('users', 'address');
+      if (!hasAddress) {
+        await db.schema.alterTable('users', table => {
+          table.text('address');
+        });
+        console.log('Added address column to users table');
+      }
+
       const hasIsAdmin = await db.schema.hasColumn('users', 'is_admin');
       if (!hasIsAdmin) {
         await db.schema.alterTable('users', table => {
@@ -86,6 +120,26 @@ async function initSchema() {
         
         console.log('Added is_admin to users table');
       }
+
+      const hasSubscription = await db.schema.hasColumn('users', 'subscription_tier');
+      if (!hasSubscription) {
+        await db.schema.alterTable('users', table => {
+          table.string('subscription_tier').defaultTo('BASIC');
+          table.datetime('subscription_expires');
+        });
+        console.log('Added subscription columns to users table');
+      }
+
+      const hasTotpSecret = await db.schema.hasColumn('users', 'totp_secret');
+      if (!hasTotpSecret) {
+        await db.schema.alterTable('users', table => {
+          table.text('totp_secret');
+          table.boolean('totp_enabled').defaultTo(false);
+          table.string('login_email_otp');
+          table.datetime('login_email_otp_expires');
+        });
+        console.log('Added totp and login email otp columns to users table');
+      }
     }
 
     // 2. Positions Table
@@ -95,8 +149,8 @@ async function initSchema() {
         table.increments('id').primary();
         table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
         table.string('symbol').notNullable();
-        table.integer('quantity').notNullable().defaultTo(0);
-        table.integer('closed_quantity').defaultTo(0);
+        table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
+        table.decimal('closed_quantity', 14, 4).defaultTo(0);
         table.decimal('average_price', 14, 2).notNullable();
         table.decimal('exit_price', 14, 2).nullable();
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
@@ -158,7 +212,7 @@ async function initSchema() {
         table.string('side').notNullable(); // BUY, SELL
         table.string('product_type').notNullable().defaultTo('DEL'); // INT, DEL
         table.string('trigger_type').notNullable().defaultTo('REGULAR'); // REGULAR, CO, BO
-        table.integer('quantity').notNullable();
+        table.decimal('quantity', 14, 4).notNullable();
         table.decimal('price', 14, 2); // Nullable for MARKET orders
         table.string('status').notNullable().defaultTo('PENDING'); // PENDING, EXECUTED, CANCELLED, REJECTED
         table.decimal('trigger_price', 14, 2);
@@ -170,6 +224,10 @@ async function initSchema() {
         table.decimal('taxes', 14, 2).defaultTo(0);
         table.integer('parent_order_id').unsigned().references('id').inTable('orders').onDelete('CASCADE');
         table.integer('linked_order_id').unsigned().references('id').inTable('orders').onDelete('SET NULL');
+        table.decimal('filled_quantity', 14, 4).defaultTo(0);
+        table.decimal('pending_quantity', 14, 4);
+        table.decimal('average_price', 14, 2);
+        table.string('order_variety').defaultTo('REGULAR'); // REGULAR, AMO, CAS
         table.string('remarks').defaultTo('');
         table.timestamps(true, true);
       });
@@ -190,22 +248,6 @@ async function initSchema() {
         });
         console.log('Added trigger_type to orders table');
       }
-
-      const hasHoldings = await db.schema.hasTable('holdings');
-      if (!hasHoldings) {
-        await db.schema.createTable('holdings', table => {
-          table.increments('id').primary();
-          table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
-          table.string('symbol').notNullable();
-          table.integer('quantity').notNullable().defaultTo(0);
-          table.decimal('average_price', 14, 2).notNullable();
-          table.string('asset_class').notNullable().defaultTo('STOCK');
-          table.timestamps(true, true);
-        });
-        console.log('Created holdings table');
-      }
-
-      console.log('Database initialization complete.');
 
       const hasMargin = await db.schema.hasColumn('orders', 'margin');
       if (!hasMargin) {
@@ -286,6 +328,82 @@ async function initSchema() {
         });
         console.log('Added linked_order_id to orders table');
       }
+
+      const hasFilledQuantity = await db.schema.hasColumn('orders', 'filled_quantity');
+      if (!hasFilledQuantity) {
+        await db.schema.alterTable('orders', table => {
+          table.decimal('filled_quantity', 14, 4).defaultTo(0);
+          table.decimal('pending_quantity', 14, 4);
+          table.decimal('average_price', 14, 2);
+        });
+        console.log('Added partial fill columns to orders table');
+      }
+
+      const hasOrderVariety = await db.schema.hasColumn('orders', 'order_variety');
+      if (!hasOrderVariety) {
+        await db.schema.alterTable('orders', table => {
+          table.string('order_variety').defaultTo('REGULAR');
+        });
+        console.log('Added order_variety to orders table');
+      }
+    }
+
+    // 3.1 Orders Archive Table (for archiving executed orders older than 30 days)
+    const hasOrdersArchive = await db.schema.hasTable('orders_archive');
+    if (!hasOrdersArchive) {
+      await db.schema.createTable('orders_archive', table => {
+        table.integer('id').primary(); // Preserves exact original order ID
+        table.integer('user_id').unsigned().notNullable();
+        table.string('symbol').notNullable();
+        table.string('type').notNullable();
+        table.string('side').notNullable();
+        table.string('product_type').notNullable().defaultTo('DEL');
+        table.string('trigger_type').notNullable().defaultTo('REGULAR');
+        table.decimal('quantity', 14, 4).notNullable();
+        table.decimal('price', 14, 2);
+        table.string('status').notNullable().defaultTo('EXECUTED');
+        table.decimal('trigger_price', 14, 2);
+        table.decimal('sl_price', 14, 2);
+        table.decimal('tgt_price', 14, 2);
+        table.decimal('trail_amount', 14, 2);
+        table.decimal('margin', 14, 2).defaultTo(0);
+        table.decimal('realized_pnl', 14, 2).defaultTo(0);
+        table.decimal('taxes', 14, 2).defaultTo(0);
+        table.integer('parent_order_id');
+        table.integer('linked_order_id');
+        table.decimal('filled_quantity', 14, 4).defaultTo(0);
+        table.decimal('pending_quantity', 14, 4);
+        table.decimal('average_price', 14, 2);
+        table.string('order_variety').defaultTo('REGULAR');
+        table.string('remarks').defaultTo('');
+        table.datetime('archived_at').defaultTo(db.fn.now());
+        table.timestamps(true, true);
+        table.index(['user_id', 'created_at']);
+      });
+      console.log('Created orders_archive table');
+    }
+
+    // 3.5 Holdings Table
+    const hasHoldings = await db.schema.hasTable('holdings');
+    if (!hasHoldings) {
+      await db.schema.createTable('holdings', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('symbol').notNullable();
+        table.decimal('quantity', 14, 4).notNullable().defaultTo(0);
+        table.decimal('average_price', 14, 2).notNullable();
+        table.string('asset_class').notNullable().defaultTo('STOCK');
+        table.timestamps(true, true);
+      });
+      console.log('Created holdings table');
+    } else {
+      const hasAssetClass = await db.schema.hasColumn('holdings', 'asset_class');
+      if (!hasAssetClass) {
+        await db.schema.alterTable('holdings', table => {
+          table.string('asset_class').notNullable().defaultTo('STOCK');
+        });
+        console.log('Added asset_class to holdings table');
+      }
     }
 
     // 4. Ledger Table
@@ -315,28 +433,660 @@ async function initSchema() {
       console.log('Created deposit_requests table');
     }
 
-    // Check if we need to migrate existing better-sqlite3 data?
+    // 6. SIPs Table
+    const hasSips = await db.schema.hasTable('sips');
+    if (!hasSips) {
+      await db.schema.createTable('sips', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('symbol').notNullable();
+        table.decimal('amount', 14, 2).notNullable();
+        table.string('frequency').notNullable().defaultTo('MONTHLY'); 
+        table.date('next_execution_date').notNullable();
+        table.string('status').notNullable().defaultTo('ACTIVE'); // ACTIVE, CANCELLED
+        table.timestamps(true, true);
+      });
+      console.log('Created sips table');
+    }
+
+    // 7. System Configs Table (For Token Persistence)
+    const hasSystemConfigs = await db.schema.hasTable('system_configs');
+    if (!hasSystemConfigs) {
+      await db.schema.createTable('system_configs', table => {
+        table.string('key').primary();
+        table.json('value').notNullable();
+        table.timestamps(true, true);
+      });
+      console.log('Created system_configs table');
+    }
+
+    // 8. Instruments Table (For Memory Optimization)
+    const hasInstruments = await db.schema.hasTable('instruments');
+    if (!hasInstruments) {
+      await db.schema.createTable('instruments', table => {
+        table.string('token').primary();
+        table.string('symbol').notNullable().index();
+        table.string('name');
+        table.string('exchange');
+        table.integer('lotsize').defaultTo(1);
+        table.string('unique_symbol').index();
+        table.bigInteger('expiry_timestamp');
+        table.string('search_string').index(); // Simple B-tree index for ILIKE fallback or perfect matching
+        table.boolean('is_cas_illiquid').defaultTo(false);
+        table.decimal('average_volume_5d', 16, 2).defaultTo(0);
+        table.timestamps(true, true);
+      });
+      console.log('Created instruments table');
+    } else {
+      const hasIsCasIlliquid = await db.schema.hasColumn('instruments', 'is_cas_illiquid');
+      if (!hasIsCasIlliquid) {
+        await db.schema.alterTable('instruments', table => {
+          table.boolean('is_cas_illiquid').defaultTo(false);
+          table.decimal('average_volume_5d', 16, 2).defaultTo(0);
+        });
+        console.log('Added is_cas_illiquid and average_volume_5d to instruments table');
+      }
+    }
+    // 9. User Profiles Table for KYC/Onboarding
+    const hasUserProfiles = await db.schema.hasTable('user_profiles');
+    if (!hasUserProfiles) {
+      await db.schema.createTable('user_profiles', table => {
+        table.increments('id').primary();
+        table.integer('user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+        table.string('dob');
+        table.string('gender');
+        table.string('state');
+        table.string('city');
+        table.string('occupation');
+        table.string('annual_income');
+        table.string('financial_goal');
+        table.string('trading_experience');
+        table.string('preferred_segment');
+        table.string('trading_style');
+        table.string('primary_strategy');
+        table.string('hear_about_us');
+        table.timestamps(true, true);
+      });
+      console.log('Created user_profiles table');
+    }
+
+    // Add is_onboarded to users
+    const hasIsOnboarded = await db.schema.hasColumn('users', 'is_onboarded');
+    if (!hasIsOnboarded) {
+      await db.schema.alterTable('users', table => {
+        table.boolean('is_onboarded').defaultTo(false);
+      });
+      console.log('Added is_onboarded to users table');
+
+    }
+      // 10. Referrals Table
+      const hasReferrals = await db.schema.hasTable('referrals');
+      if (!hasReferrals) {
+        await db.schema.createTable('referrals', table => {
+          table.increments('id').primary();
+          table.integer('referrer_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+          table.integer('referred_user_id').unsigned().notNullable().references('id').inTable('users').onDelete('CASCADE');
+          table.string('status').defaultTo('pending');
+          table.decimal('reward_amount', 14, 2).defaultTo(0);
+          table.timestamps(true, true);
+        });
+        console.log('Created referrals table');
+      }
+
+      // Check if we need to migrate existing better-sqlite3 data?
     // For simplicity, we just rely on the new schema since they were using mock_trader anyway.
   } catch (error) {
     console.error('Failed to initialize database schema:', error);
   }
 }
 
-// Raw SQL fallback — guarantees critical columns exist even if Knex migration missed them
+// Raw SQL fallback — guarantees critical tables and columns exist even if Knex migration missed them
 async function ensureCriticalColumns() {
   try {
+    // 1. Ensure essential tables exist (guaranteed raw DDL)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS holdings (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol VARCHAR(255) NOT NULL,
+        quantity DECIMAL(14,4) NOT NULL DEFAULT 0,
+        average_price DECIMAL(14,2) NOT NULL,
+        asset_class VARCHAR(50) NOT NULL DEFAULT 'STOCK',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS ledger (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS deposit_requests (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS sips (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol VARCHAR(255) NOT NULL,
+        amount DECIMAL(14,2) NOT NULL,
+        frequency VARCHAR(50) NOT NULL DEFAULT 'MONTHLY',
+        next_execution_date DATE NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+        anchor_day INTEGER,
+        failure_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS instruments (
+        token VARCHAR(255) PRIMARY KEY,
+        symbol VARCHAR(255) NOT NULL,
+        name VARCHAR(255),
+        exchange VARCHAR(50),
+        lotsize INTEGER DEFAULT 1,
+        unique_symbol VARCHAR(255),
+        expiry_timestamp BIGINT,
+        search_string VARCHAR(255),
+        is_cas_illiquid BOOLEAN DEFAULT FALSE,
+        average_volume_5d DECIMAL(16,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 2. Orders table critical columns (Guaranteed raw DDL fallback)
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS filled_quantity DECIMAL(14,4) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ALTER COLUMN filled_quantity SET DEFAULT 0').catch(() => {});
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS pending_quantity DECIMAL(14,4)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_variety VARCHAR(50) DEFAULT \'REGULAR\'');
+    await db.raw('ALTER TABLE orders ALTER COLUMN order_variety SET DEFAULT \'REGULAR\'').catch(() => {});
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS taxes DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(50) DEFAULT \'REGULAR\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS parent_order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS linked_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS remarks TEXT DEFAULT \'\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS margin DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT \'DEL\'');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trigger_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS sl_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tgt_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trail_amount DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_index INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_total INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS basket_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS high_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS low_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_trailing BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE');
+
+    // 3. Positions table critical columns
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity DECIMAL(14,4) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS margin DECIMAL(14,2) DEFAULT 0');
+    await db.raw('ALTER TABLE positions ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT \'DEL\'');
+
+    // 4. Holdings & Instruments columns
+    await db.raw('ALTER TABLE holdings ADD COLUMN IF NOT EXISTS asset_class VARCHAR(50) DEFAULT \'STOCK\'');
+    await db.raw('ALTER TABLE instruments ADD COLUMN IF NOT EXISTS is_cas_illiquid BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE instruments ADD COLUMN IF NOT EXISTS average_volume_5d DECIMAL(16,2) DEFAULT 0');
+
+    // 5. Drop any legacy restrictive check constraints that block AMO, trailing stops, or bracket legs
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_type_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_side_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_product_type_check').catch(() => {});
+    await db.raw('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_trigger_type_check').catch(() => {});
+    await db.raw('ALTER TABLE ledger DROP CONSTRAINT IF EXISTS ledger_type_check').catch(() => {});
+    await db.raw('ALTER TABLE deposit_requests DROP CONSTRAINT IF EXISTS deposit_requests_status_check').catch(() => {});
+
+    // 6. Backfill nulls for data consistency
+    await db.raw('UPDATE orders SET pending_quantity = quantity - COALESCE(filled_quantity, 0) WHERE pending_quantity IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET filled_quantity = 0 WHERE filled_quantity IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET order_variety = \'REGULAR\' WHERE order_variety IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET trigger_type = \'REGULAR\' WHERE trigger_type IS NULL').catch(() => {});
+    await db.raw('UPDATE orders SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
+    await db.raw('UPDATE positions SET product_type = \'DEL\' WHERE product_type IS NULL').catch(() => {});
+    await db.raw('UPDATE holdings SET asset_class = \'STOCK\' WHERE asset_class IS NULL').catch(() => {});
+    // Clean up zero or non-positive quantities from holdings table
+    await db('holdings')
+      .where('quantity', '<=', 0)
+      .del()
+      .catch(() => {});
+
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS closed_quantity INTEGER DEFAULT 0`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS client_id VARCHAR(10)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DECIMAL(14,2)`);
     await db.raw(`ALTER TABLE positions ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(14,2) DEFAULT 0`);
     await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture_url TEXT`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_onboarded BOOLEAN DEFAULT FALSE`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip VARCHAR(50)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_ip VARCHAR(50)`);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_users_last_ip ON users(last_ip)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_users_registration_ip ON users(registration_ip)');
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS device_model VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS os_name VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS browser_name VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
+    await db.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100)`);
     await db.raw(`ALTER TABLE users ALTER COLUMN profile_picture_url TYPE TEXT`).catch(()=>console.log('Ignore alter error on sqlite'));
+    
+    // Ensure banned_entities table exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS banned_entities (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(20) NOT NULL,
+        value VARCHAR(100) NOT NULL,
+        reason TEXT,
+        banned_by INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw(`CREATE INDEX IF NOT EXISTS idx_banned_type_val ON banned_entities(type, value)`);
     await db.raw(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_rms BOOLEAN DEFAULT FALSE`);
-    console.log('✅ Critical columns verified on positions, users, and orders tables');
+    
+    // Fix integer quantities to support fractional SIP units
+    await db.raw(`ALTER TABLE orders ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE positions ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE positions ALTER COLUMN closed_quantity TYPE DECIMAL(14,4) USING closed_quantity::numeric`).catch(()=>null);
+    await db.raw(`ALTER TABLE holdings ALTER COLUMN quantity TYPE DECIMAL(14,4) USING quantity::numeric`).catch(()=>null);
+    
+    // Ensure system_configs exists even if migration skipped
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS system_configs (
+        key VARCHAR(255) PRIMARY KEY,
+        value JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+
+    // Ensure referrals table always exists (guaranteed path - no migration needed)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS referrals (
+        id SERIAL PRIMARY KEY,
+        referrer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        referred_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'pending',
+        reward_amount DECIMAL(14,2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure push_subscriptions table always exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_push_sub_user_id ON push_subscriptions(user_id)');
+
+    // Ensure fcm_device_tokens table exists for Android & iOS native mobile push
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS fcm_device_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20) DEFAULT 'android',
+        device_name VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_fcm_token_user_id ON fcm_device_tokens(user_id)');
+
+    // Risk Guardian & Trader Journal Columns
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_loss DECIMAL(14,2)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS max_daily_trades INTEGER');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS risk_guardian_active BOOLEAN DEFAULT false');
+
+    // Bank & UPI details columns for users
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS upi_id VARCHAR(255)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(255)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(50)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT');
+
+    // Telegram Trade Alerts columns
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alerts_enabled BOOLEAN DEFAULT FALSE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_orders BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_targets BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_stoploss BOOLEAN DEFAULT TRUE');
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_alert_risk BOOLEAN DEFAULT TRUE');
+
+    // Ensure reward_withdrawals table always exists
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS reward_withdrawals (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(14,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'PENDING',
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_reward_withdrawals_user_id ON reward_withdrawals(user_id)');
+    await db.raw('ALTER TABLE reward_withdrawals ADD COLUMN IF NOT EXISTS remarks TEXT');
+    await db.raw('ALTER TABLE reward_withdrawals ADD COLUMN IF NOT EXISTS utr VARCHAR(100)');
+
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS average_price DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS tag VARCHAR(50)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_index INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS slice_total INTEGER');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS basket_group_id VARCHAR(100)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS trail_amount DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS high_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS low_water_mark DECIMAL(14,2)');
+    await db.raw('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_trailing BOOLEAN DEFAULT FALSE');
+
+    // Retroactively assign professional client IDs to existing users who don't have one
+    const usersWithoutClientId = await db('users').whereNull('client_id');
+    for (const u of usersWithoutClientId) {
+      const clientId = 'SE' + Number(u.id).toString(36).toUpperCase().padStart(6, '0');
+      await db('users').where({ id: u.id }).update({ client_id: clientId });
+    }
+
+    // Performance: Add critical composite indexes to prevent full table scans at scale (100k+ users)
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_symbol ON orders(symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_slice_group_id ON orders(slice_group_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_basket_group_id ON orders(basket_group_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_status_created ON orders(user_id, status, created_at DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_symbol ON positions(user_id, symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_product ON positions(user_id, product_type)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_quantity ON positions(quantity)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_created_at ON positions(created_at)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_created ON ledger(user_id, created_at DESC, id DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_id ON holdings(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_holdings_user_symbol ON holdings(user_id, symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_user_id ON sips(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_sips_status_next_exec ON sips(status, next_execution_date)');
+    await db.raw('ALTER TABLE sips ADD COLUMN IF NOT EXISTS failure_count INTEGER DEFAULT 0').catch(()=>null);
+    await db.raw('ALTER TABLE sips ADD COLUMN IF NOT EXISTS anchor_day INTEGER').catch(()=>null);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_user_id ON deposit_requests(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_deposit_requests_status ON deposit_requests(status, created_at DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_expires ON trusted_devices(expires_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_created_at ON user_sessions(created_at)').catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_date ON journal_trades(user_id, trade_date DESC)').catch(() => {});
+    
+    // System Settings Table (for Admin market toggles, maintenance mode, etc.)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Contests & Tournaments Table
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS contests (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_date TIMESTAMP,
+        prize_1st VARCHAR(255) DEFAULT '₹500 Cash + 1-Month Free PRO',
+        prize_2nd VARCHAR(255) DEFAULT '₹250 Cash + 1-Month Free PRO',
+        prize_3rd VARCHAR(255) DEFAULT '₹100 Cash + Free PRO',
+        status VARCHAR(50) DEFAULT 'ACTIVE',
+        segment VARCHAR(50) DEFAULT 'ALL',
+        winner_1st_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        winner_2nd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        winner_3rd_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_contests_status ON contests(status)');
+    await db.raw("ALTER TABLE contests ADD COLUMN IF NOT EXISTS segment VARCHAR(50) DEFAULT 'ALL'").catch(() => {});
+    await db.raw("UPDATE contests SET segment = 'ALL' WHERE segment IS NULL").catch(() => {});
+    // Auto-expire past contests where end_date has passed
+    await db.raw("UPDATE contests SET status = 'ENDED', updated_at = CURRENT_TIMESTAMP WHERE status = 'ACTIVE' AND end_date < CURRENT_TIMESTAMP").catch(() => {});
+
+    // Seed default monthly contest if table empty
+    const contestCount = await db('contests').count('id as count').first();
+    if (!contestCount || parseInt(contestCount.count || 0, 10) === 0) {
+      const now = new Date();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthName = monthNames[now.getMonth()];
+      await db('contests').insert({
+        title: `🏆 ${monthName} Premier Trader Championship ${now.getFullYear()}`,
+        description: `Official monthly intraday & F&O championship. Trade, scale up profits, and top the leaderboard to win real cash prizes and free PRO memberships!`,
+        start_date: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0),
+        end_date: endOfMonth,
+        prize_1st: '₹500 Cash + 1-Month Free PRO',
+        prize_2nd: '₹250 Cash + 1-Month Free PRO',
+        prize_3rd: '₹100 Cash + Free PRO',
+        status: 'ACTIVE',
+        segment: 'ALL'
+      });
+      console.log('Seeded initial monthly trading contest');
+    }
+
+    // User Sessions Table (Session & Device Security Manager)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        device_model VARCHAR(100),
+        browser_name VARCHAR(100),
+        os_name VARCHAR(100),
+        ip_address VARCHAR(50),
+        city VARCHAR(100),
+        state VARCHAR(100),
+        last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash)');
+
+    // Trusted Devices Table (30-Day Device Trust & Remember Me)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trusted_devices (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        device_token_hash VARCHAR(64) NOT NULL UNIQUE,
+        device_name VARCHAR(100),
+        browser_name VARCHAR(100),
+        os_name VARCHAR(100),
+        ip_address VARCHAR(50),
+        expires_at TIMESTAMP NOT NULL,
+        last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_trusted_devices_lookup ON trusted_devices(user_id, device_token_hash)').catch(() => {});
+
+    // Ensure TOTP and Email OTP columns on users table
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_email_otp VARCHAR(64)').catch(() => {});
+    await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS login_email_otp_expires TIMESTAMP').catch(() => {});
+
+    // Seed default market controls if not exist
+    const hasEq = await db('system_settings').where({ key: 'equity_market_status' }).first();
+    if (!hasEq) {
+      await db('system_settings').insert({ key: 'equity_market_status', value: 'AUTO' });
+    }
+    const hasMcx = await db('system_settings').where({ key: 'commodity_market_status' }).first();
+    // Market Calendar Table (for scheduled trading days, holidays, special sessions, custom hours)
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS market_calendar (
+        id SERIAL PRIMARY KEY,
+        date VARCHAR(10) NOT NULL UNIQUE,
+        equity_status VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+        commodity_status VARCHAR(20) NOT NULL DEFAULT 'DEFAULT',
+        equity_start_time VARCHAR(10),
+        equity_end_time VARCHAR(10),
+        commodity_start_time VARCHAR(10),
+        commodity_end_time VARCHAR(10),
+        reason VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_market_calendar_date ON market_calendar(date)');
+
+    // ── Trade Diary & Trading Journal Tables ──
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS journal_trades (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        trade_id VARCHAR(100),
+        symbol VARCHAR(100) NOT NULL,
+        trade_type VARCHAR(20) DEFAULT 'BUY',
+        product_type VARCHAR(20) DEFAULT 'INT',
+        market_segment VARCHAR(20) DEFAULT 'Indian',
+        entry_price DECIMAL(14, 2) DEFAULT 0,
+        exit_price DECIMAL(14, 2) DEFAULT 0,
+        quantity INTEGER DEFAULT 1,
+        realized_pnl DECIMAL(14, 2) DEFAULT 0,
+        charges DECIMAL(14, 2) DEFAULT 0,
+        net_pnl DECIMAL(14, 2) DEFAULT 0,
+        roi_percentage DECIMAL(8, 2) DEFAULT 0,
+        strategy VARCHAR(100),
+        emotion VARCHAR(100),
+        mistake VARCHAR(100),
+        setup_rating INTEGER DEFAULT 5,
+        trade_date VARCHAR(20),
+        notes TEXT,
+        tags JSONB,
+        screenshot_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_user_id ON journal_trades(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_journal_trades_trade_date ON journal_trades(trade_date)');
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_checklists (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date VARCHAR(20) NOT NULL,
+        pre_market_data JSONB DEFAULT '{}',
+        post_market_data JSONB DEFAULT '{}',
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT uq_user_checklist_date UNIQUE (user_id, date)
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_mistakes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mistake_name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'EXECUTION',
+        loss_incurred DECIMAL(14, 2) DEFAULT 0,
+        frequency INTEGER DEFAULT 1,
+        lessons_learned TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_strategies (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        strategy_name VARCHAR(255) NOT NULL,
+        description TEXT,
+        win_rate DECIMAL(6, 2) DEFAULT 0,
+        total_trades INTEGER DEFAULT 0,
+        net_pnl DECIMAL(14, 2) DEFAULT 0,
+        color VARCHAR(20) DEFAULT '#3b82f6',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.raw(`
+      CREATE TABLE IF NOT EXISTS trading_rules (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        rule_text VARCHAR(500) NOT NULL,
+        category VARCHAR(50) DEFAULT 'RISK',
+        is_active BOOLEAN DEFAULT TRUE,
+        times_followed INTEGER DEFAULT 0,
+        times_broken INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // High-Performance Query Indexes to eliminate full table scans & slash CPU/RAM
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_id ON positions(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_positions_user_symbol ON positions(user_id, symbol)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_id ON ledger(user_id)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_created_at ON ledger(created_at)');
+    await db.raw('CREATE INDEX IF NOT EXISTS idx_ledger_user_created ON ledger(user_id, created_at DESC, id DESC)');
+
+    console.log('✅ Critical columns, high-performance indexes, system_settings, contests, user_sessions, market_calendar, and journal tables verified on tables');
   } catch (e) {
     console.error('ensureCriticalColumns error (non-fatal):', e.message);
   }
 }
 
-initSchema().then(() => ensureCriticalColumns());
+initSchema()
+  .catch(err => console.error('initSchema error:', err?.message || err))
+  .then(() => ensureCriticalColumns())
+  .catch(err => console.error('ensureCriticalColumns error:', err?.message || err));
+
+db.ensureCriticalColumns = ensureCriticalColumns;
+db.initSchema = initSchema;
 
 module.exports = db;
+

@@ -1,83 +1,300 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { io } from 'socket.io-client';
+import { getInstantLotsize } from './utils/lotsizeHelper';
+import { fetchClientPublicInfo, getCachedPublicIp, syncClientTelemetry } from './utils/clientTelemetry';
+import { calculateOrderSlices, getFreezeLimit } from './utils/freezeLimits';
+import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound, playRiskAlertSound } from './utils/soundManager';
 
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
   API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
 }
 
-// Global HTTP Fetch Interceptor to support Token-based authentication
-// when third-party cookies are blocked by browser settings (e.g. Incognito or Safari)
+// Global HTTP Fetch Interceptor to support Token-based authentication and real IP propagation
 const originalFetch = window.fetch;
 window.fetch = async function (url, options = {}) {
   const token = localStorage.getItem('token');
+  const clientIp = getCachedPublicIp();
+  const headers = { ...(options.headers || {}) };
+
   // Only add Authorization header when token is a valid non-empty string
-  // (prevents sending 'Bearer null' or 'Bearer undefined' before login)
   if (token && token.length > 10 && typeof url === 'string' && url.includes('/api/')) {
-    options.headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    };
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  // Inject client public IP header for accurate GeoIP & device security audit
+  if (clientIp && typeof url === 'string' && url.includes('/api/')) {
+    headers['X-Client-Public-IP'] = clientIp;
+  }
+
+  options.headers = headers;
   return originalFetch(url, options);
 };
 
-export const socket = io(API, { withCredentials: false });
+export const socket = io(API, { 
+  withCredentials: false,
+  transports: ['websocket'] // Force websocket to bypass PM2 cluster long-polling issues
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const temporaryOptionSubscriptions = new Set();
 
 /** Merge a price snapshot object into the current prices map, tagging each tick direction */
-function applySnapshot(snapshot, state) {
-  const newPrices = { ...state.prices };
-  for (const [symbol, data] of Object.entries(snapshot)) {
-    const old = newPrices[symbol];
+function applySnapshot(snapshot, state, isFromWebSocket = false) {
+  let hasChanges = false;
+  let newPrices = null;
+  const now = Date.now();
+
+  for (const [symbol, rawData] of Object.entries(snapshot)) {
+    // Data Compression logic: Decompress Array to Object if needed
+    let data = rawData;
+    if (Array.isArray(rawData)) {
+      // [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan]
+      data = {
+        symbol: symbol,
+        ltp: rawData[0],
+        ch: rawData[1],
+        change: rawData[1],
+        chp: rawData[2],
+        pct: rawData[2],
+        timestamp: rawData[3],
+        open: rawData[4],
+        high: rawData[5],
+        low: rawData[6],
+        close: rawData[7],
+        vol: rawData[8],
+        totBuyQuan: rawData[9],
+        totSellQuan: rawData[10],
+        upper_circuit: rawData[11] || 0,
+        lower_circuit: rawData[12] || 0
+      };
+    }
+
+    const old = (newPrices || state.prices)[symbol];
+    
+    // Ignore REST API updates if the WebSocket has successfully updated this symbol in the last 4 seconds.
+    if (!isFromWebSocket && old && old.lastWsUpdate && (now - old.lastWsUpdate < 4000)) {
+        continue;
+    }
+
+    // Block stale data: Never overwrite a newer price with an older price based on backend timestamp.
+    if (old && old.timestamp && data.timestamp && data.timestamp < old.timestamp) {
+        continue;
+    }
+
+    // ⚡ Value Equality Guard: If prices, volume, and change are identical, skip re-allocation
+    if (
+      old &&
+      old.ltp === data.ltp &&
+      old.ch === data.ch &&
+      old.vol === data.vol &&
+      (!data.timestamp || old.timestamp === data.timestamp)
+    ) {
+      if (isFromWebSocket) {
+        old.lastWsUpdate = now;
+      }
+      continue;
+    }
+
+    if (!newPrices) {
+      newPrices = { ...state.prices };
+    }
+    hasChanges = true;
+    
     const tick = old
       ? data.ltp > old.ltp ? 'up' : data.ltp < old.ltp ? 'down' : 'flat'
       : 'flat';
-    newPrices[symbol] = { ...data, tick };
+    
+    newPrices[symbol] = { ...old, ...data, tick };
+    
+    if (isFromWebSocket) {
+        newPrices[symbol].lastWsUpdate = now;
+    }
+
+    // ⚡ Dual-key prices with and without exchange prefix so watchlists always find the price
+    if (symbol.includes(':')) {
+        const rawSym = symbol.split(':')[1];
+        newPrices[rawSym] = { ...newPrices[rawSym], ...data, tick };
+    } else {
+        const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'].some(c => symbol.startsWith(c)) || symbol.includes('-MCX');
+        if (isCommodity) {
+            newPrices[`MCX:${symbol}`] = { ...newPrices[`MCX:${symbol}`], ...data, tick };
+        } else {
+            newPrices[`NSE:${symbol}`] = { ...newPrices[`NSE:${symbol}`], ...data, tick };
+            newPrices[`BSE:${symbol}`] = { ...newPrices[`BSE:${symbol}`], ...data, tick };
+        }
+    }
   }
-  return newPrices;
+
+  return hasChanges ? newPrices : state.prices;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
+
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    if (!localStorage.getItem('skandx-storage') && localStorage.getItem('shortmarket-storage')) {
+      localStorage.setItem('skandx-storage', localStorage.getItem('shortmarket-storage'));
+    }
+  }
+} catch (e) {}
 
 export const useStore = create(persist((set, get) => ({
 
   // ── Auth ────────────────────────────────────────────────────────────────────
   user:      null,
+  hasSkippedOnboarding: localStorage.getItem("hasSkippedOnboarding") === "true",
+  skipOnboarding: async () => {
+    localStorage.setItem("hasSkippedOnboarding", "true");
+    set({ hasSkippedOnboarding: true });
+    try { await fetch(`${API}/api/auth/skip-onboarding`, { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }); } catch (e) {}
+  },
   
   authError: null,
 
-  login: async (email, password) => {
+    preLogin: async (email, password, trustedDeviceToken = null) => {
     try {
       set({ authError: null });
-      const res  = await fetch(`${API}/api/auth/login`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+      const deviceToken = trustedDeviceToken || localStorage.getItem('skandx_trusted_device') || localStorage.getItem('shortmarket_trusted_device') || undefined;
+      const res = await fetch(`${API}/api/auth/pre-login`, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, trusted_device_token: deviceToken })
       });
       const data = await res.json();
       if (data.success) {
-        if (data.token) localStorage.setItem('token', data.token);
-        if (data.user?.id) socket.emit('register_user', data.user.id);
-        set({
-          user:       data.user,
-          
-          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
-        });
-        get().fetchUserData();
-      } else {
-        set({ authError: data.error });
+        if (data.trusted && data.token && data.user) {
+          localStorage.setItem('token', data.token);
+          if (data.user?.id) socket.emit('register_user', data.user.id);
+          set({
+            token: data.token,
+            user: data.user,
+            watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+          });
+          get().fetchUserData();
+          syncClientTelemetry(API, true);
+          return { success: true, trusted: true, user: data.user };
+        }
+        return {
+          success: true,
+          trusted: false,
+          phone: data.phone,
+          email: data.email,
+          totp_enabled: data.totp_enabled
+        };
       }
+      set({ authError: data.error });
+      return { success: false, error: data.error };
     } catch (err) {
       set({ authError: err.message });
+      return { success: false, error: err.message };
     }
   },
 
-  register: async (username, email, password) => {
+  sendLoginEmailOtp: async (email, password) => {
+    try {
+      const res = await fetch(`${API}/api/auth/send-login-email-otp`, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  verify2FA: async ({ email, password, method, code, trust_device = false, device_name = '' }) => {
     try {
       set({ authError: null });
+      const res = await fetch(`${API}/api/auth/verify-2fa`, {
+        credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, method, code, trust_device, device_name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.trusted_device_token) {
+          localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
+        }
+        if (data.user?.id) socket.emit('register_user', data.user.id);
+        set({
+          token: data.token,
+          user: data.user,
+          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+        });
+        get().fetchUserData();
+        syncClientTelemetry(API, true);
+        return { success: true, user: data.user };
+      }
+      set({ authError: data.error });
+      return { success: false, error: data.error };
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  login: async (email, password, options = {}) => {
+    try {
+      set({ authError: null });
+      const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
+      const payload = {
+        email,
+        password,
+        trust_device: options.trust_device || false,
+        device_name: options.device_name || undefined,
+        client_ip: publicInfo?.ip || undefined,
+        client_city: publicInfo?.city || undefined,
+        client_state: publicInfo?.state || undefined
+      };
+      const res  = await fetch(`${API}/api/auth/login`, { credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.trusted_device_token) {
+          localStorage.setItem('skandx_trusted_device', data.trusted_device_token);
+        }
+        if (data.user?.id) socket.emit('register_user', data.user.id);
+        set({
+          token: data.token,
+          user:       data.user,
+          watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
+        });
+        get().fetchUserData();
+        syncClientTelemetry(API, true);
+        return { success: true };
+      } else {
+        set({ authError: data.error });
+        return { success: false, error: data.error };
+      }
+    } catch (err) {
+      set({ authError: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  register: async (username, email, phone, password, firebaseToken = null) => {
+    try {
+      set({ authError: null });
+      const publicInfo = await fetchClientPublicInfo().catch(() => ({ ip: null, city: '', state: '' }));
+      const payload = {
+        username,
+        email,
+        phone,
+        password,
+        firebase_token: firebaseToken || undefined,
+        referral_code: localStorage.getItem('referral_code'),
+        client_ip: publicInfo?.ip || undefined,
+        client_city: publicInfo?.city || undefined,
+        client_state: publicInfo?.state || undefined
+      };
       const res  = await fetch(`${API}/api/auth/register`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, email, password }),
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -85,10 +302,10 @@ export const useStore = create(persist((set, get) => ({
         if (data.user?.id) socket.emit('register_user', data.user.id);
         set({
           user:       data.user,
-          
           watchlists: data.user.watchlists || [{ id: 1, name: 'Watchlist 1', symbols: [] }],
         });
         get().fetchUserData();
+        syncClientTelemetry(API, true);
       } else {
         set({ authError: data.error });
       }
@@ -101,6 +318,19 @@ export const useStore = create(persist((set, get) => ({
     try {
       const res = await fetch(`${API}/api/auth/forgot-password`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  verifyResetOtp: async (email, otp) => {
+    try {
+      const res = await fetch(`${API}/api/auth/verify-reset-otp`, { credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, otp })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -127,7 +357,14 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Watchlists ──────────────────────────────────────────────────────────────
   watchlists:       [{ id: 1, name: 'Watchlist 1', symbols: [] }],
-  activeWatchlistId: 1,
+  activeWatchlistId: (function() {
+    try {
+      const saved = localStorage.getItem('active_watchlist_id');
+      if (saved) return saved;
+    } catch(e) {}
+    return 1;
+  })(),
+  lastWatchlistEdit: 0, // Timestamp to prevent background fetchUserData from overwriting optimistic UI
 
   createWatchlist: (name) => {
     if (get().watchlists.some(w => w.name.toLowerCase() === name.toLowerCase())) {
@@ -135,7 +372,7 @@ export const useStore = create(persist((set, get) => ({
       return;
     }
     const newWatchlists = [...get().watchlists, { id: Date.now(), name, symbols: [] }];
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
   },
 
@@ -145,46 +382,55 @@ export const useStore = create(persist((set, get) => ({
       return;
     }
     const newWatchlists = get().watchlists.map(w => String(w.id) === String(id) ? { ...w, name: newName } : w);
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
   },
 
   deleteWatchlist: (id) => {
     let newWatchlists = get().watchlists.filter(w => String(w.id) !== String(id));
     if (newWatchlists.length === 0) newWatchlists = [{ id: 1, name: 'Watchlist 1', symbols: [] }];
+    const nextActiveId = String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId;
+    try { localStorage.setItem('active_watchlist_id', String(nextActiveId)); } catch(e) {}
     set({
       watchlists:        newWatchlists,
-      activeWatchlistId: String(get().activeWatchlistId) === String(id) ? newWatchlists[0].id : get().activeWatchlistId,
+      activeWatchlistId: nextActiveId,
+      lastWatchlistEdit: Date.now()
     });
     get().syncWatchlists(newWatchlists);
   },
 
-  setActiveWatchlist: (id) => set({ activeWatchlistId: id }),
+  setActiveWatchlist: (id) => {
+    try { localStorage.setItem('active_watchlist_id', String(id)); } catch(e) {}
+    set({ activeWatchlistId: id });
+    get().pingSubscriptions();
+  },
 
   addStockToWatchlist: (watchlistId, uniqueSymbol) => {
+    const targetWlId = String(watchlistId);
     const newWatchlists = get().watchlists.map(w => {
-      if (String(w.id) === String(watchlistId) && !w.symbols.includes(uniqueSymbol)) {
-        return { ...w, symbols: [...w.symbols, uniqueSymbol] };
+      if (String(w.id) === targetWlId && !(w.symbols || []).includes(uniqueSymbol)) {
+        return { ...w, symbols: [...(w.symbols || []), uniqueSymbol] };
       }
       return w;
     });
-    set({ watchlists: newWatchlists });
-    socket.emit('subscribe', uniqueSymbol);
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
+
+    // ⚡ Immediately subscribe via WebSocket using canonical uniqueSymbol
+    socket.emit('subscribe', uniqueSymbol);
+    get().pingSubscriptions();
+    get().fetchBatchPrices([uniqueSymbol], true);
   },
 
   removeStockFromWatchlist: (watchlistId, uniqueSymbol) => {
+    const targetWlId = String(watchlistId);
     const newWatchlists = get().watchlists.map(w => {
-      if (w.id === watchlistId) return { ...w, symbols: w.symbols.filter(s => s !== uniqueSymbol) };
+      if (String(w.id) === targetWlId) return { ...w, symbols: (w.symbols || []).filter(s => s !== uniqueSymbol) };
       return w;
     });
-    set({ watchlists: newWatchlists });
+    set({ watchlists: newWatchlists, lastWatchlistEdit: Date.now() });
     get().syncWatchlists(newWatchlists);
-    // Unsubscribe if not used in any other watchlist
-    setTimeout(() => {
-      const isUsedElsewhere = get().watchlists.some(w => w.symbols.includes(uniqueSymbol));
-      if (!isUsedElsewhere) socket.emit('unsubscribe', uniqueSymbol);
-    }, 100);
+    get().pingSubscriptions();
   },
 
   // ── Order Modal ─────────────────────────────────────────────────────────────
@@ -208,12 +454,21 @@ export const useStore = create(persist((set, get) => ({
   chartModalSymbol: null,
   setChartModalSymbol: (symbol) => set({ chartModalSymbol: symbol }),
 
+  mobileStockOverviewSymbol: null,
+  setMobileStockOverviewSymbol: (symbol) => set({ mobileStockOverviewSymbol: symbol }),
+
   marketDepthModal: { isOpen: false, symbol: null, lotsize: 1 },
-  openMarketDepthModal: (symbol, lotsize) => set({ marketDepthModal: { isOpen: true, symbol, lotsize: lotsize || 1 } }),
+  openMarketDepthModal: (symbol, lotsize) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ marketDepthModal: { isOpen: true, symbol, lotsize: effectiveLotsize } });
+  },
   closeMarketDepthModal: () => set({ marketDepthModal: { isOpen: false, symbol: null, lotsize: 1 } }),
 
   domLadderModal: { isOpen: false, symbol: null, lotsize: 1 },
-  openDomLadderModal: (symbol, lotsize) => set({ domLadderModal: { isOpen: true, symbol, lotsize: lotsize || 1 } }),
+  openDomLadderModal: (symbol, lotsize) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ domLadderModal: { isOpen: true, symbol, lotsize: effectiveLotsize } });
+  },
   closeDomLadderModal: () => set({ domLadderModal: { isOpen: false, symbol: null, lotsize: 1 } }),
 
   marketDepthData: { symbol: null, bids: [], asks: [] },
@@ -228,10 +483,9 @@ export const useStore = create(persist((set, get) => ({
     alerts: state.alerts.map(a => a.id === id ? { ...a, ...updates } : a) 
   })),
   clearOldAlerts: () => set((state) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Only purge alerts that have already been triggered. Active/pending alerts remain intact.
     return {
-      alerts: state.alerts.filter(a => new Date(a.createdAt).getTime() >= today.getTime())
+      alerts: state.alerts.filter(a => !a.triggered && a.status !== 'TRIGGERED')
     };
   }),
   
@@ -258,27 +512,33 @@ export const useStore = create(persist((set, get) => ({
   })),
 
   placeBasketOrder: async (basketPayload) => {
-    
     try {
-      const res = await fetch(`${API}/api/basket-order`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const res = await fetch(`${API}/api/basket-order`, {
+        credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(basketPayload),
       });
       const data = await res.json();
-      if (data.success) { 
+      if (res.ok && data.success) { 
         get().fetchUserData(); 
         get().clearBasket();
         get().setBasketModalOpen(false);
-        return true; 
+        return { success: true, orders: data.orders }; 
       }
-      return false;
-    } catch (_) { return false; }
+      return { success: false, error: data.error || data.message || 'Failed to place basket order' };
+    } catch (err) {
+      return { success: false, error: err.message || 'Network error while placing basket order' };
+    }
   },
 
-  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' },
-
-  openOrderModal:  (symbol, type = 'BUY', lotsize = 1, productType = 'INT') => set({ orderModal: { isOpen: true, symbol, type, lotsize, productType } }),
-  closeOrderModal: ()                      => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT' } }),
+  orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null },
+  openOrderModal: (symbol, type = 'BUY', lotsize = 1, productType = 'INT', isExit = false, totalExitQty = 0, initialPrice = null) => {
+    const effectiveLotsize = (lotsize && Number(lotsize) > 1) ? Number(lotsize) : getInstantLotsize(symbol);
+    set({ orderModal: { isOpen: true, symbol, type, lotsize: effectiveLotsize, productType, isExit, totalExitQty, initialPrice } });
+  },
+  setOrderModalLotsize: (lotsize) => set(state => ({ orderModal: { ...state.orderModal, lotsize } })),
+  closeOrderModal: () => set({ orderModal: { isOpen: false, symbol: null, type: 'BUY', lotsize: 1, productType: 'INT', isExit: false, totalExitQty: 0, initialPrice: null } }),
 
   editOrderModal: { isOpen: false, order: null },
   openEditOrderModal: (order) => set({ editOrderModal: { isOpen: true, order } }),
@@ -289,8 +549,10 @@ export const useStore = create(persist((set, get) => ({
   stocks:         [],
   positions:      [],
   holdings:       [],
+  sips:           [],
   orders:         [],
-  selectedSymbol: 'RELIANCE-NSE',
+  selectedSymbol: localStorage.getItem('lastSelectedSymbol') || 'NSE:NIFTY50-INDEX',
+  isConnected: false,
 
   setSelectedSymbol: (symbol) => {
     set({ selectedSymbol: symbol });
@@ -300,11 +562,72 @@ export const useStore = create(persist((set, get) => ({
   subscribeToSymbol: (symbol) => socket.emit('subscribe', symbol),
   unsubscribeFromSymbol: (symbol) => socket.emit('unsubscribe', symbol),
   subscribeToOption: (data) => socket.emit('subscribe', data),
-  subscribeToOptionBatch: (dataArray) => socket.emit('subscribe_batch', dataArray),
-  unsubscribeFromOption: (data) => socket.emit('unsubscribe', data),
-  unsubscribeFromOptionBatch: (dataArray) => {
+  subscribeToOptionBatch: (dataArray) => {
     if(Array.isArray(dataArray)) {
-      dataArray.forEach(data => socket.emit('unsubscribe', data));
+      dataArray.forEach(data => temporaryOptionSubscriptions.add(data.uniqueSymbol || data.symbol || data.token));
+      get().pingSubscriptions();
+    }
+  },
+  unsubscribeFromOptionBatch: (dataArray) => {
+    if (Array.isArray(dataArray)) {
+      const symbolsToLeave = [];
+      dataArray.forEach(data => {
+        const sym = data.uniqueSymbol || data.symbol || data.token;
+        if (sym) {
+          temporaryOptionSubscriptions.delete(sym);
+          symbolsToLeave.push(sym);
+        }
+      });
+      if (socket && socket.connected && symbolsToLeave.length > 0) {
+        socket.emit('unsubscribe', symbolsToLeave);
+      }
+      get().pingSubscriptions();
+    }
+  },
+  pingSubscriptions: () => {
+    const { watchlists, activeWatchlistId, positions, selectedSymbol } = get();
+    const activeWl = watchlists.find(w => String(w.id) === String(activeWatchlistId)) || watchlists[0];
+    
+    const symbols = new Set();
+    if (activeWl?.symbols) {
+      activeWl.symbols.forEach(s => symbols.add(s));
+    }
+    
+    if (positions && positions.length > 0) {
+      positions.forEach(p => symbols.add(p.symbol));
+    }
+
+    const orders = get().orders;
+    if (orders && orders.length > 0) {
+      const activeOrderStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
+      orders.forEach(o => {
+        if (o.symbol && activeOrderStatuses.includes(o.status)) {
+          symbols.add(o.symbol);
+        }
+      });
+    }
+    
+    const holdings = get().holdings;
+    if (holdings && holdings.length > 0) {
+      holdings.forEach(h => symbols.add(h.symbol));
+    }
+
+    if (selectedSymbol) {
+      symbols.add(selectedSymbol);
+    }
+    
+    // Add temporary options
+    temporaryOptionSubscriptions.forEach(s => symbols.add(s));
+    
+    // Add indices — MUST use exact Fyers-format symbols (not the old aliases)
+    symbols.add('NSE:NIFTY50-INDEX');
+    symbols.add('NSE:NIFTYBANK-INDEX');
+    symbols.add('BSE:SENSEX-INDEX');
+    
+    const symbolsArray = Array.from(symbols).filter(Boolean);
+    
+    if (symbolsArray.length > 0) {
+        socket.emit('ping_subscriptions', symbolsArray);
     }
   },
 
@@ -329,11 +652,18 @@ export const useStore = create(persist((set, get) => ({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const candles = await res.json();
       if (!Array.isArray(candles)) throw new Error('Invalid candle data');
-      set((state) => ({
-        candleData:       { ...state.candleData, [symbol]: candles },
-        isLoadingCandles: false,
-        candleError:      null,
-      }));
+      set((state) => {
+        const nextCandleData = { ...state.candleData, [symbol]: candles };
+        const keys = Object.keys(nextCandleData);
+        if (keys.length > 5) {
+          delete nextCandleData[keys[0]];
+        }
+        return {
+          candleData:       nextCandleData,
+          isLoadingCandles: false,
+          candleError:      null,
+        };
+      });
     } catch (err) {
       set({ isLoadingCandles: false, candleError: err.message });
     }
@@ -343,10 +673,101 @@ export const useStore = create(persist((set, get) => ({
   _lastPriceFetchTime: 0,
 
   initSocket: () => {
+    // FIX: Use separate event for initial snapshot vs live ticks.
+    // The initial snapshot on connect is OLD CACHE DATA — it must NOT block REST fallback.
+    // Only real live ticks from the 100ms batch interval tag symbols as "fresh WebSocket".
+    socket.off('price_init');
+    socket.on('price_init', (snapshot) => {
+      // isFromWebSocket = false so REST can still override stale cache values
+      set((state) => ({ prices: applySnapshot(snapshot, state, false) }));
+    });
+
+    let pendingSnapshots = {};
+    let snapshotThrottleTimer = null;
+
+    const flushSnapshots = () => {
+      if (Object.keys(pendingSnapshots).length > 0) {
+        const batch = pendingSnapshots;
+        pendingSnapshots = {};
+        set((state) => {
+          const next = applySnapshot(batch, state, true);
+          return next === state.prices ? {} : { prices: next };
+        });
+      }
+      snapshotThrottleTimer = null;
+    };
+
     socket.off('price_snapshot');
     socket.on('price_snapshot', (snapshot) => {
-      set((state) => ({ prices: applySnapshot(snapshot, state) }));
+      // isFromWebSocket = true — these are real live ticks, block REST for 4s
+      window._lastWsTick = Date.now();
+      Object.assign(pendingSnapshots, snapshot);
+      if (!snapshotThrottleTimer) {
+        // ⚡ When tab is hidden/minimized, throttle to 3000ms to slash background CPU & battery drain by 85%.
+        // When tab is active, run at smooth 200ms (~5 FPS).
+        const delay = (typeof document !== 'undefined' && document.hidden) ? 3000 : 200;
+        snapshotThrottleTimer = setTimeout(flushSnapshots, delay);
+      }
     });
+
+    if (typeof document !== 'undefined' && !window._hasWsVisibilityHandler) {
+      window._hasWsVisibilityHandler = true;
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          get().pingSubscriptions();
+          if (Object.keys(pendingSnapshots).length > 0) {
+            if (snapshotThrottleTimer) {
+              clearTimeout(snapshotThrottleTimer);
+              snapshotThrottleTimer = null;
+            }
+            flushSnapshots();
+          }
+          if (batchTimeout) {
+            clearTimeout(batchTimeout);
+            batchTimeout = null;
+          }
+          if (Object.keys(batchedPrices).length > 0) {
+            set((state) => {
+              const nextPrices = { ...state.prices };
+              for (const sym in batchedPrices) {
+                const d = batchedPrices[sym];
+                const old = nextPrices[sym];
+                const tick = old ? (d.ltp > old.ltp ? 'up' : d.ltp < old.ltp ? 'down' : 'flat') : 'flat';
+                nextPrices[sym] = { ...old, ...d, tick };
+              }
+              batchedPrices = {};
+              return { prices: nextPrices };
+            });
+          }
+        }
+      });
+    }
+
+    // Polling fallback: Force sync only active/held symbols from REST API every 15s
+    // ONLY if the WebSocket is disconnected, to prevent flickering between REST and WS prices
+    if (!window._forceSyncInterval) {
+      window._forceSyncInterval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        if (!get().isConnected) {
+          const { watchlists, activeWatchlistId, positions, holdings, selectedSymbol } = get();
+          const activeWl = (watchlists || []).find(w => String(w.id) === String(activeWatchlistId)) || watchlists?.[0];
+          const allSymbols = new Set([
+            'NSE:NIFTY50-INDEX',
+            'NSE:NIFTYBANK-INDEX',
+            'BSE:SENSEX-INDEX',
+            ...(activeWl?.symbols || []),
+            ...(positions || []).map(p => p.symbol),
+            ...(holdings || []).map(h => h.symbol),
+            ...(selectedSymbol ? [selectedSymbol] : []),
+            ...temporaryOptionSubscriptions
+          ]);
+          const arr = [...allSymbols].filter(Boolean);
+          if (arr.length > 0) {
+            get().fetchBatchPrices(arr, false);
+          }
+        }
+      }, 15000);
+    }
 
     let batchedPrices = {};
     let batchTimeout = null;
@@ -355,6 +776,7 @@ export const useStore = create(persist((set, get) => ({
     socket.on('market_data', (data) => {
       batchedPrices[data.symbol] = data;
       if (!batchTimeout) {
+        const delay = (typeof document !== 'undefined' && document.hidden) ? 3000 : 150;
         batchTimeout = setTimeout(() => {
           set((state) => {
             const nextPrices = { ...state.prices };
@@ -368,7 +790,7 @@ export const useStore = create(persist((set, get) => ({
             batchTimeout = null;
             return { prices: nextPrices };
           });
-        }, 150); // Batch state updates to ~6 FPS to prevent UI lag
+        }, delay); // Batch state updates to ~6 FPS to prevent UI lag (3s when tab is hidden)
       }
     });
 
@@ -377,66 +799,104 @@ export const useStore = create(persist((set, get) => ({
       get().setMarketDepthData(data);
     });
 
+    let syncUserDataTimer = null;
     socket.off('sync_user_data');
     socket.on('sync_user_data', () => {
-      get().fetchUserData();
+      if (syncUserDataTimer) clearTimeout(syncUserDataTimer);
+      syncUserDataTimer = setTimeout(() => {
+        get().fetchUserData();
+      }, 150);
+    });
+
+    socket.off('market_status_updated');
+    socket.on('market_status_updated', (data) => {
+      set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
+    });
+
+    socket.off('market_calendar_updated');
+    socket.on('market_calendar_updated', () => {
+      get().fetchMarketCalendar();
+      get().fetchTodayMarketSchedule();
+    });
+
+    socket.off('announcement_update');
+    socket.on('announcement_update', (data) => {
+      set({ announcement: data || null });
+    });
+
+    socket.off('trade_alert');
+    socket.on('trade_alert', (data) => {
+      if (!data) return;
+      if (data.event === 'TARGET_HIT') {
+        playTargetHitSound();
+      } else if (data.event === 'SL_HIT') {
+        playStopLossHitSound();
+      } else if (data.event === 'EXECUTED') {
+        playOrderExecutedSound();
+      }
     });
 
     const onConnect = () => {
-      console.log('Socket connected, refreshing and resubscribing...');
+      set({ isConnected: true });
       const currentUser = get().user;
       if (currentUser?.id) {
         socket.emit('register_user', currentUser.id);
       }
+      get().fetchMarketStatus();
+      get().fetchMarketCalendar();
+      get().fetchTodayMarketSchedule();
+      get().fetchAnnouncement();
       // Force a fresh REST price fetch on every socket connect/reconnect
-      // (bypass the throttle so we always get fresh prices after reconnect)
       get().refreshPrices(true);
       
-      // Helper to determine exchange from a uniqueSymbol
-      const getExchange = (sym) => {
-        const dashIdx = sym.lastIndexOf('-');
-        if (dashIdx > 0) {
-          return sym.substring(dashIdx + 1);
-        }
-        // No dash — try to detect type from symbol pattern
-        if (/\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2}/.test(sym)) return 'NFO';
-        return 'NSE';
-      };
+      // FIX: Ping immediately to re-join rooms for already-loaded symbols
+      get().pingSubscriptions();
       
-      // Resubscribe to ALL watchlists (not just active)
-      const { watchlists, subscribeToOptionBatch, positions } = get();
+      // A single 3s safety re-verify on initial connect
+      setTimeout(() => { if (get().isConnected) get().pingSubscriptions(); }, 3000);
       
-      const tokensToSub = [];
-      const seenSymbols = new Set();
-      
-      for (const wl of watchlists) {
-        if (!wl?.symbols) continue;
-        for (const sym of wl.symbols) {
-          if (seenSymbols.has(sym)) continue;
-          seenSymbols.add(sym);
-          tokensToSub.push({ symbol: sym, exchange: getExchange(sym) });
-        }
-      }
-      
-      // Resubscribe to positions
-      if (positions && positions.length > 0) {
-        positions.forEach(pos => {
-          if (seenSymbols.has(pos.symbol)) return;
-          seenSymbols.add(pos.symbol);
-          tokensToSub.push({ symbol: pos.symbol, exchange: getExchange(pos.symbol) });
-        });
-      }
-      
-      if (tokensToSub.length > 0) {
-        subscribeToOptionBatch(tokensToSub);
+      // Background-aware heartbeat: 15s when active; throttled to 45s when tab is hidden/minimized
+      // (Fyers server GC window is 60s, so 45s preserves keepalive while cutting idle socket requests by 78%)
+      if (!get().subscriptionPingInterval) {
+          let lastPingTime = Date.now();
+          const interval = setInterval(() => {
+              if (!get().isConnected) return;
+              const isHidden = typeof document !== 'undefined' && document.hidden;
+              const elapsed = Date.now() - lastPingTime;
+              if (isHidden && elapsed < 45000) return;
+              lastPingTime = Date.now();
+              get().pingSubscriptions();
+          }, 15000);
+          set({ subscriptionPingInterval: interval });
       }
     };
 
     socket.off('connect');
     socket.on('connect', onConnect);
+    
+    // ── Disconnect handler: start fallback REST polling ──
+    socket.off('disconnect');
+    socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected:', reason);
+      set({ isConnected: false });
+      const interval = get().subscriptionPingInterval;
+      if (interval) {
+          clearInterval(interval);
+          set({ subscriptionPingInterval: null });
+      }
+    });
+    
+    socket.off('connect_error');
+    socket.on('connect_error', (err) => {
+      console.warn('⚠️ Socket connect error:', err.message);
+      set({ isConnected: false });
+    });
+    
     if (socket.connected) {
       onConnect();
     }
+    
+    // ── Heartbeat: Periodic REST price polling as safety net ──
   },
 
   // ── Price Fetching ───────────────────────────────────────────────────────────
@@ -445,27 +905,41 @@ export const useStore = create(persist((set, get) => ({
     // Throttle: skip if last fetch was < 2s ago (unless forced by socket reconnect)
     if (!force && (now - get()._lastPriceFetchTime) < 2000) return;
 
+    // To prevent flicker, if WebSocket has ticked recently (within 5s), do NOT fetch REST.
+    // Only fetch REST as a true fallback when WebSocket is totally dead or not ticking.
+    if (!force && window._lastWsTick && (now - window._lastWsTick < 5000)) return;
+
     try {
-      const res      = await fetch(`${API}/api/prices`, { credentials: 'include' });
-      const snapshot = await res.json();
-      if (snapshot && Object.keys(snapshot).length > 0) {
-        set((state) => ({ prices: applySnapshot(snapshot, state), _lastPriceFetchTime: now }));
+      const { watchlists, activeWatchlistId, positions, holdings, selectedSymbol } = get();
+      const activeWl = (watchlists || []).find(w => String(w.id) === String(activeWatchlistId)) || watchlists?.[0];
+      const symbolsSet = new Set([
+        'NSE:NIFTY50-INDEX',
+        'NSE:NIFTYBANK-INDEX',
+        'BSE:SENSEX-INDEX',
+        ...(activeWl?.symbols || []),
+        ...(positions || []).map(p => p.symbol),
+        ...(holdings || []).map(h => h.symbol),
+        ...(selectedSymbol ? [selectedSymbol] : []),
+        ...temporaryOptionSubscriptions
+      ]);
+      const symbols = [...symbolsSet].filter(Boolean);
+      if (symbols.length > 0) {
+        await get().fetchBatchPrices(symbols, force);
+        set({ _lastPriceFetchTime: now });
       }
     } catch (_) {}
   },
 
-  fetchBatchPrices: async (symbols) => {
+  fetchBatchPrices: async (symbols, force = false) => {
     try {
       const res = await fetch(`${API}/api/ltp-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ symbols }),
+        body: JSON.stringify({ symbols, force }),
       });
-      const snapshot = await res.json();
-      if (snapshot && Object.keys(snapshot).length > 0) {
-        set((state) => ({ prices: applySnapshot(snapshot, state) }));
-      }
+      if (!res.ok) return;
+      const data = await res.json();
+      set((state) => ({ prices: applySnapshot(data, state) }));
     } catch (_) {}
   },
 
@@ -482,57 +956,121 @@ export const useStore = create(persist((set, get) => ({
 
   // ── User Data ────────────────────────────────────────────────────────────────
   fetchUserData: async () => {
-    
-    
-    try {
-      const headers = {  };
-      const [posRes, ordRes, userRes, holdRes] = await Promise.all([
-        fetch(`${API}/api/positions`, { credentials: 'include', headers }),
-        fetch(`${API}/api/orders`, { credentials: 'include', headers }),
-        fetch(`${API}/api/user`, { credentials: 'include', headers }),
-        fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
-      ]);
-      const [positions, orders, user, holdData] = await Promise.all([
-        posRes.json().catch(() => ({})), 
-        ordRes.json().catch(() => ({})), 
-        userRes.json().catch(() => ({})),
-        holdRes.json().catch(() => ({}))
-      ]);
-      
-      if (userRes.status === 401 || userRes.status === 403 || user?.error) {
-        console.error("Auth failed during fetchUserData, logging out.", user?.error);
-        get().logout();
-        return;
+    if (window._activeFetchUserDataPromise) return window._activeFetchUserDataPromise;
+    window._activeFetchUserDataPromise = (async () => {
+      try {
+        syncClientTelemetry(API).catch(() => {});
+        const token = localStorage.getItem('token') || get().token;
+        const headers = {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+
+        let positions, orders, user, holdData, sipsList;
+        let authFailed = false;
+
+        try {
+          const bootRes = await fetch(`${API}/api/user/bootstrap`, { credentials: 'include', headers });
+          if (bootRes.status === 401 || bootRes.status === 403) {
+            authFailed = true;
+          } else if (bootRes.ok) {
+            const data = await bootRes.json();
+            user = data.user;
+            positions = data.positions;
+            orders = data.orders;
+            holdData = data.holdings;
+            sipsList = data.sips;
+          }
+        } catch (_) {
+          // Network or parsing error on bootstrap, will fallback below
+        }
+
+        // Graceful Fallback to individual requests if bootstrap endpoint fails
+        if (!user && !authFailed) {
+          const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
+            fetch(`${API}/api/positions`, { credentials: 'include', headers }),
+            fetch(`${API}/api/orders`, { credentials: 'include', headers }),
+            fetch(`${API}/api/user`, { credentials: 'include', headers }),
+            fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
+            fetch(`${API}/api/sips`, { credentials: 'include', headers }),
+          ]);
+          const [pData, oData, uData, hData, sData] = await Promise.all([
+            posRes.json().catch(() => ({})), 
+            ordRes.json().catch(() => ({})), 
+            userRes.json().catch(() => ({})),
+            holdRes.json().catch(() => ({})),
+            sipsRes.json().catch(() => ({}))
+          ]);
+          if (userRes.status === 401 || userRes.status === 403 || uData?.error) {
+            authFailed = true;
+          } else {
+            positions = pData;
+            orders = oData;
+            user = uData;
+            holdData = hData;
+            sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
+          }
+        }
+        
+        if (authFailed || user?.error) {
+          console.error("Auth failed during fetchUserData, logging out.", user?.error);
+          get().logout();
+          return;
+        }
+        
+        if (!get().user && !user) return;
+        
+        const now = Date.now();
+        const shouldUpdateWatchlists = (user && !user.error && user.watchlists && (now - get().lastWatchlistEdit > 3000));
+        
+        set({
+          positions: Array.isArray(positions) ? positions : get().positions, 
+          holdings: Array.isArray(holdData) ? holdData : get().holdings,
+          sips: Array.isArray(sipsList) ? sipsList : get().sips,
+          orders: Array.isArray(orders) ? orders : get().orders, 
+          user: (user && !user.error) ? user : get().user,
+          watchlists: shouldUpdateWatchlists ? user.watchlists : get().watchlists
+        });
+        
+        const posSymbols = get().positions.map(p => p.symbol);
+        const holdSymbols = get().holdings.map(h => h.symbol);
+        const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
+        if (allSymbolsToSubscribe.length > 0) {
+          if (!window._subscribedUserSymbols) window._subscribedUserSymbols = new Set();
+          const newSymbols = allSymbolsToSubscribe.filter(sym => !window._subscribedUserSymbols.has(sym));
+          
+          if (newSymbols.length > 0) {
+            newSymbols.forEach(sym => {
+              window._subscribedUserSymbols.add(sym);
+              socket.emit('subscribe', sym);
+            });
+            const missingPriceSyms = newSymbols.filter(sym => !get().prices[sym]?.ltp);
+            if (missingPriceSyms.length > 0) {
+              get().fetchBatchPrices(missingPriceSyms);
+            }
+          }
+        }
+        
+        // Fetch restricted stocks (cached for 15m to stop 30s polling churn)
+        get().fetchRestrictedStocks();
+        // No initial search; let MutualFundsView handle empty state
+      } catch (_) {
+      } finally {
+        window._activeFetchUserDataPromise = null;
       }
-      
-      if (!get().user) return;
-      set({
-        positions: Array.isArray(positions) ? positions : (positions.error ? [] : get().positions), 
-        holdings: holdData.success ? holdData.holdings : get().holdings,
-        orders: Array.isArray(orders) ? orders : (orders.error ? [] : get().orders), 
-        user: (user && !user.error) ? user : get().user 
-      });
-      
-      const posSymbols = (positions || []).map(p => p.symbol);
-      const holdSymbols = (holdData.holdings || []).map(h => h.symbol);
-      const allSymbolsToSubscribe = [...new Set([...posSymbols, ...holdSymbols])];
-      if (allSymbolsToSubscribe.length > 0) {
-        get().fetchBatchPrices(allSymbolsToSubscribe);
-        allSymbolsToSubscribe.forEach(sym => socket.emit('subscribe', sym));
-      }
-      
-      // Also fetch restricted stocks on load
-      get().fetchRestrictedStocks();
-      // No initial search; let MutualFundsView handle empty state
-    } catch (_) {}
+    })();
+    return window._activeFetchUserDataPromise;
   },
   
   restrictedStocks: [],
   fetchRestrictedStocks: async () => {
+      const now = Date.now();
+      if (get()._lastRestrictedFetch && (now - get()._lastRestrictedFetch < 15 * 60 * 1000) && get().restrictedStocks.length > 0) {
+          return;
+      }
       try {
           const res = await fetch(`${API}/api/restricted-stocks`, { credentials: 'include' });
           const data = await res.json();
-          if (Array.isArray(data)) set({ restrictedStocks: data });
+          if (Array.isArray(data)) set({ restrictedStocks: data, _lastRestrictedFetch: now });
       } catch (_) {}
   },
 
@@ -596,22 +1134,23 @@ export const useStore = create(persist((set, get) => ({
       } catch (_) {}
   },
 
-  updateOrder: async (id, quantity, price, sl_price, tgt_price) => {
+  updateOrder: async (id, quantity, price, sl_price, tgt_price, isMarket = false, trigger_price = null) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/api/order/${id}`, { credentials: 'include', method: 'PUT',
         headers: { 
-          
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ quantity, price, sl_price, tgt_price })
+        body: JSON.stringify({ quantity, price, sl_price, tgt_price, isMarket, trigger_price })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Failed to update order');
       await get().fetchUserData();
-      return true;
+      return { success: true };
     } catch (err) {
       set({ authError: err.message });
-      return false;
+      return { success: false, error: err.message };
     }
   },
 
@@ -693,13 +1232,13 @@ export const useStore = create(persist((set, get) => ({
     } catch (err) { return { success: false, error: err.message }; }
   },
 
-  updateUserDetails: async (details) => {
-    
-    
+  saveProfile: async (profileData) => {
     try {
-      const res = await fetch(`${API}/api/user/details`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
-        body: JSON.stringify(details)
+      const res = await fetch(`${API}/api/auth/profile`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
       });
       const data = await res.json();
       if (data.success) { 
@@ -707,7 +1246,123 @@ export const useStore = create(persist((set, get) => ({
         return { success: true }; 
       }
       return { success: false, error: data.error };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { 
+      return { success: false, error: err.message }; 
+    }
+  },
+
+  updateUserDetails: async (details) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/user/details`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(details),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        set({ user: { ...get().user, ...details } });
+        if (get().fetchUserData) get().fetchUserData();
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Failed to update profile details' };
+      }
+    } catch(err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  updateBankDetails: async (details) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/user/bank_details`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(details),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        set({ user: { ...get().user, ...details } });
+        if (get().fetchUserData) get().fetchUserData();
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to save bank details');
+      }
+    } catch(err) {
+      throw err;
+    }
+  },
+
+  requestWithdrawal: async (amount) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/withdrawals/request`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (get().fetchUserData) get().fetchUserData();
+        return data;
+      } else {
+        throw new Error(data.error || 'Withdrawal request failed');
+      }
+    } catch(err) {
+      throw err;
+    }
+  },
+
+  fetchAdminWithdrawals: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
+    try {
+      let url = `${API}/api/admin/withdrawals?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (res.ok) return { success: true, ...data };
+      return { success: false, withdrawals: [], total: 0, totalPages: 1 };
+    } catch (e) {
+      console.error(e);
+      return { success: false, withdrawals: [], total: 0, totalPages: 1 };
+    }
+  },
+
+  processAdminWithdrawal: async (id, status, remarks = '', utr = '') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/withdrawals/${id}/process`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status, remarks, utr }),
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      return data;
+    } catch(err) {
+      throw err;
+    }
   },
 
   updateKycDocuments: async (kycDocs) => {
@@ -729,41 +1384,229 @@ export const useStore = create(persist((set, get) => ({
 
   // ── Orders ───────────────────────────────────────────────────────────────────
   placeOrder: async (orderPayload) => {
-    
     try {
-      const res  = await fetch(`${API}/api/order`, { credentials: 'include', method:  'POST',
-        headers: { 'Content-Type': 'application/json', },
-        body:    JSON.stringify(orderPayload),
+      const normalizedPayload = {
+        ...orderPayload,
+        type: orderPayload.type || orderPayload.orderType || 'MARKET',
+        product_type: orderPayload.product_type || orderPayload.productType || 'INT'
+      };
+      const { symbol, quantity, lotsize } = normalizedPayload;
+      const slices = calculateOrderSlices(symbol, quantity, lotsize);
+
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      if (slices && slices.length > 1) {
+        // Multi-slice execution for large orders exceeding freeze limits
+        const sliceGroupId = `slice_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const slicePromises = slices.map((sliceQty, index) => {
+          const childPayload = {
+            ...normalizedPayload,
+            quantity: sliceQty,
+            total_quantity: quantity,
+            slice_group_id: sliceGroupId,
+            slice_index: index + 1,
+            slice_total: slices.length
+          };
+          return fetch(`${API}/api/order`, {
+            credentials: 'include',
+            method: 'POST',
+            headers,
+            body: JSON.stringify(childPayload)
+          }).then(r => r.json()).catch(e => ({ success: false, error: e.message }));
+        });
+
+        const results = await Promise.all(slicePromises);
+        const successful = results.filter(r => r && r.success);
+        
+        get().fetchUserData().catch(() => {});
+        if (successful.length === slices.length) {
+          playOrderExecutedSound();
+          return {
+            success: true,
+            status: successful[0]?.status || 'EXECUTED',
+            isSliced: true,
+            slicesCount: slices.length,
+            message: `Successfully placed ${slices.length} sliced orders (${quantity} total qty)`
+          };
+        } else if (successful.length > 0) {
+          playOrderExecutedSound();
+          const totalPlacedQty = results.reduce((sum, r, idx) => (r && r.success ? sum + (Number(slices[idx]) || 0) : sum), 0);
+          const failedResults = results.filter(r => !r || !r.success);
+          const firstErr = failedResults[0]?.error || 'Some order slices failed to execute';
+          return {
+            success: false,
+            partialSuccess: true,
+            status: 'PARTIAL',
+            placedCount: successful.length,
+            totalSlices: slices.length,
+            placedQty: totalPlacedQty,
+            totalQty: quantity,
+            isSliced: true,
+            slicesCount: slices.length,
+            error: `Partial fill: ${successful.length}/${slices.length} slices placed (${totalPlacedQty}/${quantity} qty). Failed remainder: ${firstErr}`,
+            message: `Partial fill: Placed ${successful.length} of ${slices.length} slices (${totalPlacedQty}/${quantity} qty). Remaining failed: ${firstErr}`
+          };
+        } else {
+          const firstErr = results[0]?.error || 'Order placement failed';
+          return { success: false, error: firstErr };
+        }
+      }
+
+      const res = await fetch(`${API}/api/order`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers,
+        body: JSON.stringify(normalizedPayload),
       });
       const data = await res.json();
-      if (data.success) { get().fetchUserData(); return true; }
+      if (data.success) {
+        playOrderExecutedSound();
+        // Sync user data non-blockingly in background for sub-100ms instant execution
+        get().fetchUserData().catch(() => {});
+        return data;
+      }
       console.error('[placeOrder FAILED]', data);
-      set({ authError: data.error || 'Order failed' });
-      return false;
+      return { success: false, error: data.error || 'Order failed' };
     } catch (err) { 
       console.error('[placeOrder ERROR]', err);
-      return false;
+      return { success: false, error: err.message || 'Network error occurred while placing order.' };
+    }
+  },
+
+  setupSip: async (sipPayload) => {
+    try {
+      const res = await fetch(`${API}/api/sip`, { credentials: 'include', method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sipPayload)
+      });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return data; }
+      console.error('[setupSip FAILED]', data);
+      return data;
+    } catch (err) {
+      console.error('[setupSip ERROR]', err);
+      return null;
+    }
+  },
+
+  // Defect 42: Create SIP action for MutualFundModal and general SIP creation
+  createSip: async (sipPayload) => {
+    try {
+      const symbol = String(sipPayload.scheme_code || sipPayload.symbol || '');
+      const symWithSuffix = symbol.endsWith('-MF') ? symbol : `${symbol}-MF`;
+      const payload = {
+        symbol: symWithSuffix,
+        amount: Number(sipPayload.amount),
+        frequency: sipPayload.frequency || 'MONTHLY',
+        anchor_day: sipPayload.sip_day || sipPayload.anchor_day,
+        name: sipPayload.scheme_name || sipPayload.name
+      };
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/sip`, {
+        credentials: 'include',
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData().catch(() => {});
+        return data;
+      }
+      return { success: false, error: data.error || 'Failed to create SIP' };
+    } catch (err) {
+      console.error('[createSip ERROR]', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  // Defect 41: Lumpsum Mutual Fund Purchase action
+  buyMutualFund: async (schemeCode, amount) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API}/api/mutual-funds/buy`, {
+        credentials: 'include',
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ scheme_code: schemeCode, amount: Number(amount) })
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData().catch(() => {});
+        return data;
+      }
+      return { success: false, error: data.error || 'Mutual fund purchase failed' };
+    } catch (err) {
+      console.error('[buyMutualFund ERROR]', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  executeSipNow: async (id) => {
+    try {
+      const res = await fetch(`${API}/api/sip/${id}/execute-now`, {
+        credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        get().fetchUserData();
+      }
+      return data;
+    } catch (err) {
+      console.error('[executeSipNow ERROR]', err);
+      return { success: false, error: err.message };
+    }
+  },
+  cancelSip: async (id) => {
+    try {
+      const res = await fetch(`${API}/api/sip/${id}`, { credentials: 'include', method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) { get().fetchUserData(); return data; }
+      return data;
+    } catch (err) {
+      console.error('[cancelSip ERROR]', err);
+      return null;
     }
   },
 
   cancelOrder: async (orderId) => {
-    
     try {
-      const res  = await fetch(`${API}/api/order/${orderId}/cancel`, { credentials: 'include', method:  'POST',
+      const token = localStorage.getItem('token');
+      const res  = await fetch(`${API}/api/order/${orderId}/cancel`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
       });
       const data = await res.json();
       if (data.success) { get().fetchUserData(); return true; }
+      if (data.error) set({ authError: data.error });
       return false;
     } catch (_) { return false; }
   },
 
   // ── Wallet / Deposits ───────────────────────────────────────────────────────
   requestDeposit: async (amount) => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/wallet/deposit`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/wallet/deposit`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ amount })
       });
       const data = await res.json();
@@ -773,17 +1616,34 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  resetAccount: async () => {
+  resetAccount: async (amount) => {
     const { user } = get();
     if (!user) return { success: false };
     try {
-      const res = await fetch(`${API}/api/user/reset`, { credentials: 'include', method: 'POST'
+      const token = localStorage.getItem('token') || user.token;
+      const res = await fetch(`${API}/api/user/reset`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ amount: amount ? parseFloat(amount) : undefined })
       });
       const data = await res.json();
       if (data.success) {
-        // Optimistically update local state to reflect the wipe
-        set({ positions: [], orders: [], pendingTriggers: [], alerts: [], user: { ...user, balance: 1000000.0 } });
-        return { success: true };
+        const newBal = data.balance !== undefined ? data.balance : (parseFloat(amount) || 1000000.0);
+        // Optimistically update local state to reflect the wipe and new balance
+        set({ 
+          positions: [], 
+          orders: [], 
+          holdings: [], 
+          sips: [], 
+          pendingTriggers: [], 
+          alerts: [], 
+          user: { ...user, balance: newBal } 
+        });
+        return { success: true, balance: newBal, message: data.message };
       }
       return { success: false, error: data.error };
     } catch (e) {
@@ -820,10 +1680,11 @@ export const useStore = create(persist((set, get) => ({
 
   // ─── Admin ───────────────────────────────────────────────────────────────
   fetchAdminAnalytics: async () => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/admin/analytics`, { credentials: 'include'
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/analytics`, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
       if (res.ok) {
         const data = await res.json();
@@ -835,11 +1696,17 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminOrders: async () => {
-    
-    
+  fetchAdminOrders: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/orders`, { credentials: 'include' });
+      let url = `${API}/api/admin/orders?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -847,11 +1714,17 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminPositions: async () => {
-    
-    
+  fetchAdminPositions: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
     try {
-      const res = await fetch(`${API}/api/admin/positions`, { credentials: 'include' });
+      let url = `${API}/api/admin/positions?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -859,11 +1732,47 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchAdminLedger: async () => {
-    
-    
+  fetchAdminTelemetry: async (timeframe = 'all') => {
     try {
-      const res = await fetch(`${API}/api/admin/ledger`, { credentials: 'include' });
+      const res = await fetch(`${API}/api/admin/telemetry?timeframe=${timeframe}`, { credentials: 'omit' });
+      const data = await res.json();
+      if (data && !data.error) {
+        set({ adminTelemetry: data });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to load telemetry:', err);
+    }
+  },
+
+  resetAdminTelemetry: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telemetry/reset`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data.success) {
+        set({ adminTelemetry: { api: [], users: [] } });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchAdminLedger: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
+    try {
+      let url = `${API}/api/admin/ledger?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const token = localStorage.getItem('token');
+      const res = await fetch(url, { 
+        credentials: 'include',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
       const data = await res.json();
       return data;
     } catch (err) {
@@ -872,11 +1781,15 @@ export const useStore = create(persist((set, get) => ({
   },
 
   forceCloseUserPosition: async (positionId) => {
-    
-    
     try {
-      const res = await fetch(`${API}/api/admin/force-close`, { credentials: 'include', method: 'POST',
-        headers: { 'Content-Type': 'application/json', },
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/force-close`, { 
+        credentials: 'include', 
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ positionId })
       });
       const data = await res.json();
@@ -887,19 +1800,60 @@ export const useStore = create(persist((set, get) => ({
   },
 
   // ── Admin ───────────────────────────────────────────────────────────────────
-  fetchAdminUsers: async () => {
-    
-    
+  toggleUserBan: async (userId) => {
     try {
-      const res = await fetch(`${API}/api/admin/users`, { credentials: 'include'
+      const res = await fetch(`${API}/api/admin/users/${userId}/toggle_ban`, {
+        method: 'POST',
+        credentials: 'include'
       });
+      const data = await res.json();
       if (res.ok) {
-        const users = await res.json();
-        return { success: true, users };
+        // Refresh admin users list after ban status changes
+        get().fetchAdminUsers();
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to toggle ban');
       }
-      return { success: false, error: 'Unauthorized' };
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
+  },
+
+  
+  adminMasterSquareOff: async () => {
+    try {
+      const res = await fetch(`${API}/api/admin/master_square_off`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return data;
+      } else {
+        throw new Error(data.error || 'Failed to trigger Master Square-Off');
+      }
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
+  },
+
+  fetchAdminUsers: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
+    try {
+      let url = `${API}/api/admin/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, ...data }; // returns { success, users, total, page, totalPages }
+      }
+      return { success: false };
     } catch (err) {
-      return { success: false, error: err.message };
+      console.error(err);
+      return { success: false };
     }
   },
 
@@ -916,9 +1870,17 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
+  adminDeleteUser: async (userId) => {
+    try {
+      const res = await fetch(`${API}/api/admin/user/${userId}`, { credentials: 'include', method: 'DELETE' });
+      const data = await res.json();
+      return data.success ? { success: true } : { success: false, error: data.error };
+    } catch (e) {
+      return { success: false, error: 'Network error' };
+    }
+  },
+
   updateUserBalance: async (userId, balance) => {
-    
-    
     try {
       const res = await fetch(`${API}/api/admin/user/${userId}/balance`, { credentials: 'include', method: 'POST',
         headers: { 'Content-Type': 'application/json', },
@@ -931,15 +1893,34 @@ export const useStore = create(persist((set, get) => ({
     }
   },
 
-  fetchDepositRequests: async () => {
-    
-    
+  adminUpdateUserDetails: async (userId, details) => {
     try {
-      const res = await fetch(`${API}/api/admin/deposits`, { credentials: 'include'
+      const res = await fetch(`${API}/api/admin/user/${userId}`, { 
+        credentials: 'include', 
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(details)
       });
       if (res.ok) {
+        return { success: true };
+      }
+      const data = await res.json();
+      return { success: false, error: data.error };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  fetchDepositRequests: async (page = 1, limit = 50, search = '', startDate = '', endDate = '', isExport = false) => {
+    try {
+      let url = `${API}/api/admin/deposits?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+      if (isExport) url += `&export=true`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.ok) {
         const data = await res.json();
-        return { success: true, deposits: data.deposits };
+        return { success: true, ...data };
       }
       return { success: false, error: 'Unauthorized' };
     } catch (err) {
@@ -965,12 +1946,143 @@ export const useStore = create(persist((set, get) => ({
   setUser:  (user)  => set({ user }),
   logout: () => {
     localStorage.removeItem('token');
-    set({ user: null, positions: [], orders: [] });
+    localStorage.removeItem('hasSkippedOnboarding');
+    set({
+      hasSkippedOnboarding: false,
+      token: null,
+      user: null,
+      positions: [],
+      orders: [],
+      holdings: [],
+      sips: [],
+      pendingTriggers: [],
+      alerts: [],
+      basketItems: []
+    });
     fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(()=>{});
   },
   
+  // ── Mutual Fund Watchlist ──────────────────────────────────────────────────
+  mfWatchlist: (() => {
+    try {
+      const saved = localStorage.getItem('mfWatchlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  })(),
+
+  mfWatchlistFunds: (() => {
+    try {
+      const saved = localStorage.getItem('mfWatchlistFunds');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  })(),
+
+  fetchMfWatchlistFunds: async () => {
+    const list = get().mfWatchlist || [];
+    if (!Array.isArray(list) || list.length === 0) return;
+    try {
+      const res = await fetch(`${API}/api/mf/by-ids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: list })
+      });
+      if (!res.ok) return;
+      const funds = await res.json();
+      if (Array.isArray(funds) && funds.length > 0) {
+        const updated = { ...(get().mfWatchlistFunds || {}) };
+        funds.forEach(f => {
+          if (f && f.id) {
+            const cleanId = String(f.id).replace('-MF', '');
+            updated[cleanId] = f;
+            updated[`${cleanId}-MF`] = f;
+          }
+        });
+        set({ mfWatchlistFunds: updated });
+        try { localStorage.setItem('mfWatchlistFunds', JSON.stringify(updated)); } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('Failed to fetch mf watchlist funds:', err);
+    }
+  },
+  
+  toggleMfWatchlist: (fundOrSymbol) => {
+    let current = get().mfWatchlist || [];
+    let currentFunds = { ...(get().mfWatchlistFunds || {}) };
+
+    let id = fundOrSymbol;
+    let fundObj = null;
+
+    if (fundOrSymbol && typeof fundOrSymbol === 'object') {
+      id = fundOrSymbol.id;
+      fundObj = fundOrSymbol;
+    }
+
+    const symStr = String(id);
+    const cleanId = symStr.replace('-MF', '');
+
+    if (current.some(s => String(s) === symStr || String(s).replace('-MF', '') === cleanId)) {
+      // Remove from watchlist
+      current = current.filter(s => String(s) !== symStr && String(s).replace('-MF', '') !== cleanId);
+      delete currentFunds[symStr];
+      delete currentFunds[cleanId];
+      delete currentFunds[`${cleanId}-MF`];
+    } else {
+      // Add to watchlist
+      current = [...current, cleanId];
+      if (!fundObj) {
+        fundObj = (get().mutualFunds || []).find(f => String(f.id) === cleanId || String(f.id) === symStr);
+      }
+      if (fundObj) {
+        currentFunds[cleanId] = fundObj;
+        currentFunds[`${cleanId}-MF`] = fundObj;
+      }
+    }
+
+    set({ mfWatchlist: current, mfWatchlistFunds: currentFunds });
+    try {
+      localStorage.setItem('mfWatchlist', JSON.stringify(current));
+      localStorage.setItem('mfWatchlistFunds', JSON.stringify(currentFunds));
+    } catch (e) {}
+
+    // If added without full object, fetch details from backend
+    if (!fundObj && current.some(s => String(s).replace('-MF', '') === cleanId)) {
+      get().fetchMfWatchlistFunds();
+    }
+  },
+
   // ── Theme ───────────────────────────────────────────────────────────────────
   theme: 'dark', // default to dark
+  fontSize: 'medium',
+  accessibilityMode: false,
+  setFontSize: (size) => set((state) => {
+    document.body.classList.remove('font-small', 'font-medium', 'font-large');
+    document.body.classList.add('font-' + size);
+    
+    // Direct DOM manipulation for instant scaling bypassing CSS cache
+    if (size === 'small') {
+      document.body.style.zoom = '0.85';
+      document.documentElement.style.setProperty('--app-scale', '0.85');
+      document.body.style.MozTransform = 'scale(0.85)';
+      document.body.style.MozTransformOrigin = 'top left';
+    } else if (size === 'large') {
+      document.body.style.zoom = '1.1';
+      document.documentElement.style.setProperty('--app-scale', '1.1');
+      document.body.style.MozTransform = 'scale(1.1)';
+      document.body.style.MozTransformOrigin = 'top left';
+    } else {
+      document.body.style.zoom = '1';
+      document.documentElement.style.setProperty('--app-scale', '1');
+      document.body.style.MozTransform = 'scale(1)';
+      document.body.style.MozTransformOrigin = 'top left';
+    }
+    
+    return { fontSize: size };
+  }),
+  setAccessibilityMode: (mode) => set({ accessibilityMode: mode }),
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'dark' ? 'light' : 'dark';
     if (newTheme === 'light') {
@@ -981,10 +2093,13 @@ export const useStore = create(persist((set, get) => ({
     return { theme: newTheme };
   }),
   setTheme: (newTheme) => set((state) => {
-    if (newTheme === 'light') {
-      document.body.classList.add('light-mode');
-    } else {
-      document.body.classList.remove('light-mode');
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', newTheme);
+      if (newTheme === 'light') {
+        document.body.classList.add('light-mode');
+      } else {
+        document.body.classList.remove('light-mode');
+      }
     }
     return { theme: newTheme };
   }),
@@ -995,17 +2110,732 @@ export const useStore = create(persist((set, get) => ({
   setOneClickMode: (val) => set({ oneClickMode: val }),
   setOneClickMultiplier: (val) => set({ oneClickMultiplier: val }),
 
+  // ── Leaderboard ─────────────────────────────────────────────────────────────
+  leaderboard: [],
+  leaderboardLoading: false,
+  leaderboardSegment: 'ALL',
+  fetchLeaderboard: async (params = {}) => {
+    try {
+      set({ leaderboardLoading: true });
+      const queryParams = new URLSearchParams();
+      if (params.contest_id) queryParams.set('contest_id', params.contest_id);
+      if (params.segment && params.segment !== 'ALL') queryParams.set('segment', params.segment);
+      if (params.timeframe) queryParams.set('timeframe', params.timeframe);
+
+      const url = `${API}/api/leaderboard${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const res = await fetch(url, { credentials: 'omit' });
+      const data = await res.json();
+      if (data?.success) {
+        set({
+          leaderboard: data.leaderboard || [],
+          leaderboardSegment: data.segment || 'ALL',
+          leaderboardLoading: false
+        });
+      } else {
+        set({ leaderboardLoading: false });
+      }
+      return data;
+    } catch (err) {
+      set({ leaderboardLoading: false });
+      return { success: false, error: err.message };
+    }
+  },
+
+  // ── Announcements ───────────────────────────────────────────────────────────
+  announcement: null,
+  fetchAnnouncement: async () => {
+    try {
+      const res = await fetch(`${API}/api/announcement`, { credentials: 'omit' });
+      const data = await res.json();
+      if (data?.success) {
+        set({ announcement: data.announcement });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch announcement:', err);
+    }
+  },
+  setAdminAnnouncement: async (text, type = 'info') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/announcement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text, type })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        set({ announcement: data.announcement || null });
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+  setAnnouncement: (announcement) => set({ announcement }),
+
+  bannedEntities: [],
+  fetchBannedEntities: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/banned`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data?.bans) {
+        set({ bannedEntities: data.bans });
+      }
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch banned entities:', err);
+      return { bans: [] };
+    }
+  },
+
+  banEntity: async (type, value, reason = '') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/ban`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ type, value, reason })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        get().fetchBannedEntities();
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  unbanEntity: async ({ id, type, value }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/unban`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ id, type, value })
+      });
+      const data = await res.json();
+      if (data?.success) {
+        get().fetchBannedEntities();
+      }
+      return data;
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  // ── Market Status & Fyers Health ───────────────────────────────────────────
+  marketStatus: { equity: 'AUTO', commodity: 'AUTO' },
+  fyersStatus: null,
+
+  fetchMarketStatus: async () => {
+    try {
+      const res = await fetch(`${API}/api/market-status`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketStatus: { equity: data.equity || 'AUTO', commodity: data.commodity || 'AUTO' } });
+      }
+    } catch (e) {}
+  },
+
+  fetchFyersStatus: async () => {
+    try {
+      const res = await fetch(`${API}/api/fyers/status`);
+      const data = await res.json();
+      set({ fyersStatus: data });
+      return data;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  updateMarketStatus: async (equity, commodity) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ equity, commodity })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketStatus: { equity: data.equity, commodity: data.commodity } });
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to update market status' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Market Calendar & Scheduled Holidays ───────────────────────────────────
+  marketCalendar: [],
+  todayMarketSchedule: null,
+
+  fetchMarketCalendar: async (month) => {
+    try {
+      const url = month ? `${API}/api/market-calendar?month=${month}` : `${API}/api/market-calendar`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ marketCalendar: data.calendar || [] });
+        return data.calendar || [];
+      }
+    } catch (e) {
+      console.error('fetchMarketCalendar error', e);
+    }
+    return [];
+  },
+
+  fetchTodayMarketSchedule: async () => {
+    try {
+      const res = await fetch(`${API}/api/market-calendar/today`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ todayMarketSchedule: data });
+        return data;
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  saveMarketCalendarDate: async (entry) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(entry)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to save calendar rule' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  deleteMarketCalendarDate: async (date) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar/${date}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to delete calendar rule' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  seedMarketHolidays: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/market-calendar/bulk-holidays`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchMarketCalendar();
+        get().fetchTodayMarketSchedule();
+        return { success: true, count: data.count };
+      }
+      return { success: false, error: data?.error || 'Failed to seed holidays' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Contests & Tournaments ────────────────────────────────────────────────
+  activeContest: null,
+  activeContests: [],
+  pastContests: [],
+  activeContestLoading: false,
+  adminContests: [],
+
+  fetchActiveContest: async () => {
+    try {
+      set({ activeContestLoading: true });
+      const res = await fetch(`${API}/api/contests/active`);
+      const data = await res.json();
+      if (data && data.success) {
+        const contests = data.contests || (data.contest ? [data.contest] : []);
+        set({
+          activeContests: contests,
+          activeContest: data.contest || contests[0] || null,
+          activeContestTop: data.topContenders || []
+        });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchActiveContest error:', e);
+    } finally {
+      set({ activeContestLoading: false });
+    }
+    return null;
+  },
+
+  fetchPastContests: async () => {
+    try {
+      const res = await fetch(`${API}/api/contests/past`);
+      const data = await res.json();
+      if (data && data.success) {
+        set({ pastContests: data.contests || [] });
+        return data.contests || [];
+      }
+    } catch (e) {
+      console.error('fetchPastContests error:', e);
+    }
+    return [];
+  },
+
+  selectActiveContest: (contest) => {
+    set({ activeContest: contest });
+  },
+
+  fetchAdminContests: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ adminContests: data.contests || [] });
+        return data.contests || [];
+      }
+    } catch (e) {
+      console.error('fetchAdminContests error:', e);
+    }
+    return [];
+  },
+
+  saveContest: async (contestData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(contestData)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        get().fetchPastContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to save contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  deleteContest: async (contestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests/${contestId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        get().fetchPastContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to delete contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  awardContest: async (contestId, awardData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/contests/${contestId}/award`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(awardData)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchActiveContest();
+        get().fetchAdminContests();
+        get().fetchPastContests();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to award contest' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Session & Device Security Manager ─────────────────────────────────────
+  userSessions: [],
+  userSessionsLoading: false,
+
+  fetchUserSessions: async () => {
+    try {
+      set({ userSessionsLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ userSessions: data.sessions || [] });
+        return data.sessions || [];
+      }
+    } catch (e) {
+      console.error('fetchUserSessions error:', e);
+    } finally {
+      set({ userSessionsLoading: false });
+    }
+    return [];
+  },
+
+  revokeOtherSessions: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions/revoke-others`, {
+        method: 'POST',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchUserSessions();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke other sessions' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  revokeSession: async (sessionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchUserSessions();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke session' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Google Authenticator (TOTP) & 30-Day Device Trust ──────────────────────
+  totpLoading: false,
+  trustedDevices: [],
+  trustedDevicesLoading: false,
+
+  fetchTotpSetup: async () => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/setup`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success && !data.qrCode && data.otpauth_url) {
+        data.qrCode = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.otpauth_url)}`;
+      }
+      return data;
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  enableTotp: async (secret, code) => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/enable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ secret, code })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (get().user) set({ user: { ...get().user, totp_enabled: true } });
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to enable Google Authenticator' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  disableTotp: async (password) => {
+    try {
+      set({ totpLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/totp/disable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (get().user) set({ user: { ...get().user, totp_enabled: false } });
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to disable Google Authenticator' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    } finally {
+      set({ totpLoading: false });
+    }
+  },
+
+  fetchTrustedDevices: async () => {
+    try {
+      set({ trustedDevicesLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/trusted-devices`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ trustedDevices: data.devices || [] });
+        return data.devices || [];
+      }
+    } catch (e) {
+      console.error('fetchTrustedDevices error:', e);
+    } finally {
+      set({ trustedDevicesLoading: false });
+    }
+    return [];
+  },
+
+  revokeTrustedDevice: async (deviceId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/user/trusted-devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTrustedDevices();
+        return { success: true };
+      }
+      return { success: false, error: data?.error || 'Failed to revoke device trust' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // ── Telegram Live Trade & Risk Alerts ─────────────────────────────────────
+  telegramSettings: null,
+  telegramSettingsLoading: false,
+
+  fetchTelegramSettings: async () => {
+    try {
+      set({ telegramSettingsLoading: true });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/settings`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ telegramSettings: data });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchTelegramSettings error:', e);
+    } finally {
+      set({ telegramSettingsLoading: false });
+    }
+    return null;
+  },
+
+  saveTelegramSettings: async (settings) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(settings)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTelegramSettings();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to save Telegram settings' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  sendTelegramTest: async (chatId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/telegram/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ chat_id: chatId })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to send test message' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Admin Telegram Traffic & Peak Protection
+  telegramAdminConfig: null,
+  fetchTelegramAdminConfig: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/config`, {
+        headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        set({ telegramAdminConfig: data });
+        return data;
+      }
+    } catch (e) {
+      console.error('fetchTelegramAdminConfig error:', e);
+    }
+    return null;
+  },
+
+  updateTelegramAdminConfig: async (config) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(config)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        get().fetchTelegramAdminConfig();
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data?.error || 'Failed to update Telegram admin config' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  broadcastTelegramMessage: async (message) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/admin/telegram/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
 }), {
-  name: 'shortmarket-storage',
+  name: 'skandx-storage',
   partialize: (state) => ({
     watchlists:        state.watchlists,
     activeWatchlistId: state.activeWatchlistId,
     token:             state.token,
     user:              state.user,
     theme:             state.theme,
+      fontSize:          state.fontSize,
+      accessibilityMode: state.accessibilityMode,
     pendingTriggers:   state.pendingTriggers,
     oneClickMode:      state.oneClickMode,
     oneClickMultiplier: state.oneClickMultiplier,
     alerts:            state.alerts,
   }),
 }));
+
+
+
+
+
+
+
+
+
+
+
+
+

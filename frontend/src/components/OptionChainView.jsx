@@ -1,9 +1,11 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore, API } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 import OptionsStrategyBuilder from './OptionsStrategyBuilder';
 import OptionChainRow from './OptionChainRow';
-import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, BarChart2, List, AlignLeft, Bell, Info, Clock, ChevronLeft } from 'lucide-react';
 
 // Custom Searchable Dropdown
 const SymbolDropdown = ({ value, options, onChange }) => {
@@ -62,7 +64,7 @@ const SymbolDropdown = ({ value, options, onChange }) => {
   );
 };
 
-const OptionChainView = () => {
+const OptionChainViewInternal = () => {
   const [symbol, setSymbol] = useState('NIFTY');
   const [availableSymbols, setAvailableSymbols] = useState([]);
   const [expiry, setExpiry] = useState('');
@@ -98,7 +100,7 @@ const OptionChainView = () => {
   const basketMode = useStore((state) => state.basketMode);
   const setBasketMode = useStore((state) => state.setBasketMode);
   const addToBasket = useStore((state) => state.addToBasket);
-  const { basketItems, setBasketModalOpen, oneClickMode, oneClickMultiplier, placeOrder } = useStore();
+  const { basketItems, setBasketModalOpen, oneClickMode, oneClickMultiplier, placeOrder } = useStore(useShallow(state => ({ basketItems: state.basketItems, setBasketModalOpen: state.setBasketModalOpen, oneClickMode: state.oneClickMode, oneClickMultiplier: state.oneClickMultiplier, placeOrder: state.placeOrder })));
   const setChartModalSymbol = useStore((state) => state.setChartModalSymbol);
   const setAlertModalSymbol = useStore((state) => state.setAlertModalSymbol);
   const openMarketDepthModal = useStore((state) => state.openMarketDepthModal);
@@ -134,7 +136,7 @@ const OptionChainView = () => {
         if (futRes.ok) {
           futDataResult = await futRes.json();
           setFutureData(futDataResult);
-          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          const futKey = futDataResult.symbol;
           setFutureTokenKey(futKey);
           
           // For commodities, now that we have the futures symbol/exchange, fetch its price
@@ -152,7 +154,7 @@ const OptionChainView = () => {
         if (idxKey && storeState[idxKey]?.ltp > 0) {
           resolvedSpotPrice = storeState[idxKey].ltp;
         } else if (isCommodity && futDataResult) {
-          const futKey = `${futDataResult.symbol}-${futDataResult.exchange}`;
+          const futKey = futDataResult.symbol;
           if (storeState[futKey]?.ltp > 0) {
             resolvedSpotPrice = storeState[futKey].ltp;
           }
@@ -246,11 +248,14 @@ const OptionChainView = () => {
 
     const tokensToSub = [];
 
-    if (initialSpotPrice !== null) {
-      const allStrikes = Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b);
-      if (allStrikes.length > 0) {
+    const allStrikes = optionsData[expiry] ? Object.keys(optionsData[expiry]).map(Number).sort((a, b) => a - b) : [];
+    const effectiveSpotPrice = initialSpotPrice !== null 
+      ? initialSpotPrice 
+      : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
+
+    if (effectiveSpotPrice !== null && allStrikes.length > 0) {
         let atmStrike = allStrikes.reduce((prev, curr) => 
-          Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+          Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
         );
         
         const atmIndex = allStrikes.indexOf(atmStrike);
@@ -273,19 +278,18 @@ const OptionChainView = () => {
           const uniqueSymbolsToFetch = [];
           if (indexKey) uniqueSymbolsToFetch.push(indexKey);
           uniqueSymbolsToFetch.push('INDIA VIX-NSE');
-          if (futureData) uniqueSymbolsToFetch.push(`${futureData.symbol}-${futureData.exchange}`);
+          if (futureData) uniqueSymbolsToFetch.push(futureData.symbol);
 
           visibleStrikes.forEach((strike) => {
             const data = optionsData[expiry]?.[strike];
-            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: `${data.CE.symbol}-${data.CE.exch_seg}`, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
-            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: `${data.PE.symbol}-${data.PE.exch_seg}`, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
+            if (data?.CE) uniqueSymbolsToFetch.push({ symbol: data.CE.symbol, token: data.CE.token, exchange: data.CE.exch_seg, lotsize: data.CE.lotsize });
+            if (data?.PE) uniqueSymbolsToFetch.push({ symbol: data.PE.symbol, token: data.PE.token, exchange: data.PE.exch_seg, lotsize: data.PE.lotsize });
           });
 
           if (uniqueSymbolsToFetch.length > 0) {
             useStore.getState().fetchBatchPrices(uniqueSymbolsToFetch);
           }
         }
-      }
     }
 
     setHasScrolled(false); // Reset scroll on expiry change
@@ -303,12 +307,15 @@ const OptionChainView = () => {
   }, [expiry, optionsData, symbol, futureData, initialSpotPrice, indexKey, subscribeToOptionBatch, unsubscribeFromOptionBatch, subscribeToSymbol, unsubscribeFromSymbol]);
 
   const chain = optionsData[expiry] || {};
+  const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  const effectiveSpotPrice = initialSpotPrice !== null 
+    ? initialSpotPrice 
+    : (allStrikes.length > 0 ? allStrikes[Math.floor(allStrikes.length / 2)] : null);
   
   let strikes = [];
-  if (initialSpotPrice !== null && Object.keys(chain).length > 0) {
-    const allStrikes = Object.keys(chain).map(Number).sort((a, b) => a - b);
+  if (effectiveSpotPrice !== null && allStrikes.length > 0) {
     let atmStrike = allStrikes.reduce((prev, curr) => 
-      Math.abs(curr - initialSpotPrice) < Math.abs(prev - initialSpotPrice) ? curr : prev
+      Math.abs(curr - effectiveSpotPrice) < Math.abs(prev - effectiveSpotPrice) ? curr : prev
     );
     const atmIndex = allStrikes.indexOf(atmStrike);
     const startIndex = Math.max(0, atmIndex - 15);
@@ -339,8 +346,8 @@ const OptionChainView = () => {
   const handleTrade = (opt, type, optionType, iv) => {
     if (!opt) return;
     
-    // Construct unique symbol with exchange suffix (e.g. SENSEX2672378000CE-BFO)
-    const optKey = opt.symbol.includes('-') ? opt.symbol : `${opt.symbol}-${opt.exch_seg}`;
+    // Construct unique symbol
+    const optKey = opt.symbol;
     
     // Add to strategy builder if in strategy mode
     if (strategyMode) {
@@ -352,7 +359,8 @@ const OptionChainView = () => {
         strike: parseFloat(opt.strike),
         price: parseFloat(price),
         side: type === 'BUY' ? 'BUY' : 'SELL',
-        quantity: opt.lotsize ? parseInt(opt.lotsize) : 1,
+        quantity: 1,
+        lotsize: opt.lotsize ? parseInt(opt.lotsize) : 1,
         iv: iv || 0,
         symbol: optKey
       }]);
@@ -436,6 +444,7 @@ const OptionChainView = () => {
         optionType: type,
         side,
         quantity: 1,
+        lotsize: getInstantLotsize(legData.symbol),
         price: legData.ltp,
         iv: legData.iv || 0.2
       };
@@ -507,8 +516,37 @@ const OptionChainView = () => {
     }
   };
 
+  // Defect 49: Calculate Aggregate Open Interest (OI) and Put-Call Ratio (PCR)
+  const formatOI = (oi) => {
+    if (!oi || isNaN(Number(oi)) || Number(oi) === 0) return '0';
+    const n = Number(oi);
+    if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
+    if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n.toLocaleString('en-IN');
+  };
+
+  const { totalCallOI, totalPutOI, pcrRatio } = useMemo(() => {
+    let callOi = 0;
+    let putOi = 0;
+    (strikes || []).forEach(s => {
+      const c = chain[s]?.CE;
+      const p = chain[s]?.PE;
+      const cKey = c ? (c.symbol.includes('-') ? c.symbol : `${c.symbol}-${c.exch_seg}`) : null;
+      const pKey = p ? (p.symbol.includes('-') ? p.symbol : `${p.symbol}-${p.exch_seg}`) : null;
+      const cData = cKey ? prices[cKey] : null;
+      const pData = pKey ? prices[pKey] : null;
+      const cVal = Number(cData?.oi ?? c?.oi ?? 0);
+      const pVal = Number(pData?.oi ?? p?.oi ?? 0);
+      if (cVal > 0) callOi += cVal;
+      if (pVal > 0) putOi += pVal;
+    });
+    const pcr = callOi > 0 ? (putOi / callOi).toFixed(2) : (putOi > 0 ? '∞' : '1.00');
+    return { totalCallOI: callOi, totalPutOI: putOi, pcrRatio: pcr };
+  }, [strikes, chain, prices]);
+
   return (
-    <div className="option-chain-container">
+    <div className="option-chain-container glass-panel">
       {/* Header */}
       <div className="option-chain-top-bar">
         {/* Section 1: Search & Spot */}
@@ -570,6 +608,19 @@ const OptionChainView = () => {
               {vixChange > 0 ? '+' : ''}{vixChange.toFixed(2)}
             </span>
           )}
+        </div>
+
+        <div className="top-bar-divider"></div>
+
+        {/* Section 5: PCR (Defect 49) */}
+        <div className="top-bar-section">
+          <span className="top-bar-label">PCR (OI)</span>
+          <span className="top-bar-value" style={{ fontWeight: '700', color: Number(pcrRatio) >= 1 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            {pcrRatio}
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>
+            ({formatOI(totalPutOI)}P / {formatOI(totalCallOI)}C)
+          </span>
         </div>
 
         <div className="top-bar-divider"></div>
@@ -647,7 +698,7 @@ const OptionChainView = () => {
 
       {/* Strategy Builder Modal */}
       {strategyModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '24px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '24px' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '1200px', maxHeight: '90vh', overflowY: 'auto', position: 'relative', background: 'var(--bg-dark)' }}>
             <button 
               onClick={() => setStrategyModalOpen(false)}
@@ -663,11 +714,14 @@ const OptionChainView = () => {
               onExecute={() => {
                 if (strategyLegs.length === 0) return;
                 strategyLegs.forEach(leg => {
+                  const effectiveLotsize = leg.lotsize || getInstantLotsize(leg.symbol) || 1;
                   placeOrder({
                     symbol: leg.symbol,
                     side: leg.side,
-                    quantity: leg.quantity,
+                    quantity: (Number(leg.quantity) || 1) * effectiveLotsize,
+                    type: 'MARKET',
                     orderType: 'MARKET',
+                    product_type: 'INT',
                     price: ''
                   });
                 });
@@ -691,18 +745,20 @@ const OptionChainView = () => {
           </div>
         ) : expiries.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>No option chain data available for {symbol}</div>
-        ) : initialSpotPrice === null ? (
-          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Waiting for market data...</div>
+        ) : strikes.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary)' }}>Waiting for option chain data...</div>
         ) : (
         <table className="option-chain-table">
           <thead>
             <tr>
-              <th className="header-call" colSpan="8">CALL</th>
+              <th className="header-call" colSpan="10">CALL</th>
               <th className="header-strike"></th>
-              <th className="header-put" colSpan="8">PUT</th>
+              <th className="header-put" colSpan="10">PUT</th>
             </tr>
             <tr>
               {/* Calls */}
+              <th className="center">OI</th>
+              <th className="center">OI Chg</th>
               <th className="center">Delta</th>
               <th className="center">Theta</th>
               <th className="center">Vega</th>
@@ -722,6 +778,8 @@ const OptionChainView = () => {
               <th className="center">Vega</th>
               <th className="center">Theta</th>
               <th className="center">Delta</th>
+              <th className="center">OI Chg</th>
+              <th className="center">OI</th>
             </tr>
           </thead>
           <tbody>
@@ -753,4 +811,35 @@ const OptionChainView = () => {
   );
 };
 
+const OPTIONS_ENABLED = false;
+
+const ComingSoonScreen = ({ setActiveTab }) => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4 bg-[#0b0e14]">
+    <div className="bg-[#111620] p-8 rounded-2xl border border-slate-800 shadow-xl max-w-md w-full">
+      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#E2E8F0', padding: '20px 0', alignSelf: 'flex-start', width: '100%', maxWidth: '800px', margin: '0 auto' }} onClick={() => setActiveTab('ClientData')}><ChevronLeft size={20} style={{ marginRight: '8px' }} /><span style={{ fontSize: '16px', fontWeight: '600' }}>Back to Account</span></div>
+        <div className="flex justify-center mb-6">
+        <div className="p-4 bg-blue-500/10 rounded-full">
+          <Clock className="w-12 h-12 text-blue-400" />
+        </div>
+      </div>
+      <h2 className="text-2xl font-bold text-white mb-3">Options Trading</h2>
+      <p className="text-slate-400 text-lg mb-6">
+        This feature is currently under development and will be coming soon.
+      </p>
+      <div className="text-sm text-slate-500">
+        We're working hard to bring you a seamless options trading experience.
+      </div>
+    </div>
+  </div>
+);
+
+const OptionChainView = (props) => {
+  if (!OPTIONS_ENABLED) {
+    return <ComingSoonScreen setActiveTab={props.setActiveTab} />;
+  }
+  return <OptionChainViewInternal {...props} />;
+};
+
 export default OptionChainView;
+
+

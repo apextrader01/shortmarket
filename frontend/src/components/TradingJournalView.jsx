@@ -1,0 +1,1367 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useStore, API } from '../store';
+import { useShallow } from 'zustand/react/shallow';
+import { 
+  BookOpen, Plus, Tag, Smile, Frown, Sparkles, Filter, Search, 
+  Share2, Star, Edit3, Trash2, Check, X, TrendingUp, TrendingDown, 
+  AlertTriangle, ShieldCheck, Flame, Zap, Award, BarChart3, ChevronRight,
+  Calendar, ChevronLeft, CalendarDays, ListFilter
+} from 'lucide-react';
+import PnLShareCardModal from './PnLShareCardModal';
+
+export const STRATEGY_TAGS = [
+  '🔥 Breakout',
+  '⚡ Scalping',
+  '🎯 Trend Follow',
+  '🔄 Mean Reversion',
+  '📊 Support & Resistance',
+  '⚡ Option Buying (Momentum)',
+  '🛡️ Option Selling (Theta Decay)'
+];
+
+export const EMOTION_TAGS = [
+  '🎯 Disciplined Execution',
+  '🛡️ Plan Followed',
+  '⚠️ FOMO Entry',
+  '😡 Revenge Trade',
+  '⏳ Greed (Late Exit)',
+  '😨 Panic Exit (Fear)'
+];
+
+export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mode }) {
+  const { user, positions, orders } = useStore(useShallow(state => ({
+    user: state.user,
+    positions: state.positions,
+    orders: state.orders
+  })));
+
+  const userId = user?.id || 'default';
+  const storageKey = `shortmarket_journal_${userId}`;
+
+  // Journal entries stored in localStorage: { [tradeId]: { strategy, emotion, notes, rating, updatedAt } }
+  const [journalEntries, setJournalEntries] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const [activeViewTab, setActiveViewTab] = useState(mode || initialTab); // 'JOURNAL' | 'CALENDAR'
+  const currentTab = mode || activeViewTab;
+  const [calendarDate, setCalendarDate] = useState(new Date());
+
+  useEffect(() => {
+    if (mode) {
+      setActiveViewTab(mode);
+    } else if (initialTab) {
+      setActiveViewTab(initialTab);
+    }
+  }, [mode, initialTab]);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState(null);
+
+  const [selectedTradeForShare, setSelectedTradeForShare] = useState(null);
+  const [editingTrade, setEditingTrade] = useState(null); // trade object being edited
+  const [editForm, setEditForm] = useState({ strategy: '', emotion: '', notes: '', rating: 5 });
+
+  const [filterStrategy, setFilterStrategy] = useState('ALL');
+  const [filterEmotion, setFilterEmotion] = useState('ALL');
+  const [filterResult, setFilterResult] = useState('ALL'); // 'ALL' | 'WIN' | 'LOSS'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Defect 48: Load and synchronize journal entries with backend on mount
+  useEffect(() => {
+    const syncJournalFromBackend = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${API}/api/journal/trades?limit=500`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.trades)) {
+          setJournalEntries(prev => {
+            const merged = { ...prev };
+            data.trades.forEach(t => {
+              const key = t.trade_id || `trade-${t.id}`;
+              if (key) {
+                merged[key] = {
+                  strategy: t.strategy || '',
+                  emotion: t.emotion || '',
+                  notes: t.notes || '',
+                  rating: t.setup_rating || 5,
+                  updatedAt: t.updated_at || t.created_at,
+                  backendId: t.id
+                };
+              }
+            });
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('Journal backend sync unavailable, using local cache:', err.message);
+      }
+    };
+    syncJournalFromBackend();
+  }, [userId, storageKey]);
+
+  const saveJournalEntry = (tradeId, data) => {
+    const updated = {
+      ...journalEntries,
+      [tradeId]: {
+        ...data,
+        updatedAt: new Date().toISOString()
+      }
+    };
+    setJournalEntries(updated);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to save journal entry to localStorage', e);
+    }
+
+    // Defect 48: Persist journal tags, notes, and emotions to backend database
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const trade = (tradesList || []).find(t => t.id === tradeId || t.rawId === tradeId);
+        fetch(`${API}/api/journal/trades`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            trade_id: String(tradeId),
+            symbol: trade?.symbol || 'TRADE',
+            trade_type: trade?.side || 'BUY',
+            product_type: trade?.product_type || 'INT',
+            entry_price: trade?.avg || 0,
+            exit_price: trade?.exit_price || trade?.avg || 0,
+            quantity: trade?.qty || 1,
+            realized_pnl: trade?.pnl || 0,
+            strategy: data.strategy || '',
+            emotion: data.emotion || '',
+            notes: data.notes || '',
+            setup_rating: data.rating || 5,
+            trade_date: trade?.time ? new Date(trade.time).toISOString() : new Date().toISOString()
+          })
+        }).catch(err => console.warn('Background journal sync error:', err.message));
+      }
+    } catch (err) {
+      console.warn('Failed to dispatch journal sync:', err);
+    }
+  };
+
+  // Compile executed/closed trades list from positions and orders
+  const tradesList = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+    const closedPosSignatures = new Set();
+
+    // 1. Closed positions (represent completed round-trip trades)
+    (positions || []).forEach(p => {
+      const pnl = Number(p.realized_pnl || 0);
+      const isClosed = Number(p.quantity) === 0 && (Number(p.closed_quantity) > 0 || p.updated_at || pnl !== 0);
+      const key = `pos-${p.id || p.symbol}`;
+      if (isClosed && !seen.has(key)) {
+        seen.add(key);
+        if (p.id) closedPosSignatures.add(`pos_id_${p.id}`);
+        const timeBucket = p.updated_at ? Math.floor(new Date(p.updated_at).getTime() / 30000) : 0;
+        if (timeBucket > 0) {
+          closedPosSignatures.add(`${p.symbol}_${Math.round(pnl * 100)}_${timeBucket}`);
+        }
+        let entrySide = p.side;
+        if (!entrySide) {
+          const closingOrder = (orders || []).find(o => (o.position_id === p.id || o.symbol === p.symbol) && (o.status === 'COMPLETED' || o.status === 'EXECUTED') && (o.closed_quantity > 0 || (o.remarks && (o.remarks.includes('Exit') || o.remarks.includes('Square-Off')))));
+          if (closingOrder) {
+            entrySide = closingOrder.side === 'BUY' ? 'SELL' : 'BUY';
+          } else if (p.exit_price && p.average_price && p.exit_price !== p.average_price) {
+            const longPnl = (Number(p.exit_price) - Number(p.average_price)) * Number(p.closed_quantity || 1);
+            entrySide = Math.abs(pnl - longPnl) < 1 ? 'BUY' : 'SELL';
+          } else {
+            entrySide = 'BUY';
+          }
+        }
+
+        list.push({
+          id: key,
+          rawId: p.id,
+          symbol: p.symbol,
+          product_type: p.product_type || 'INT',
+          side: entrySide,
+          qty: Math.abs(p.closed_quantity || 1),
+          avg: Math.abs(Number(p.average_price || 0)),
+          exit_price: Math.abs(Number(p.exit_price || p.average_price || 0)),
+          pnl: pnl,
+          date: p.updated_at ? new Date(p.updated_at).toLocaleDateString('en-IN') : 'Today',
+          rawDate: p.updated_at || p.created_at || new Date().toISOString()
+        });
+      }
+    });
+
+    // 2. Executed Orders: only add exit orders with realized P&L if not already captured in closed positions
+    (orders || []).forEach(o => {
+      const isExecuted = o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED';
+      const pnl = (o.realized_pnl !== null && o.realized_pnl !== undefined) ? Number(o.realized_pnl) : null;
+      if (!isExecuted || pnl === null || isNaN(pnl)) return;
+
+      if (o.position_id && closedPosSignatures.has(`pos_id_${o.position_id}`)) return;
+      const timeBucket = o.created_at ? Math.floor(new Date(o.created_at).getTime() / 30000) : 0;
+      if (timeBucket > 0 && closedPosSignatures.has(`${o.symbol}_${Math.round(pnl * 100)}_${timeBucket}`)) return;
+
+      const key = `ord-${o.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const originalEntrySide = o.side === 'SELL' ? 'BUY' : 'SELL';
+        const exitPrice = Math.abs(Number(o.average_price || o.price || 0));
+        const qty = Math.abs(Number(o.closed_quantity || o.quantity || 1));
+        let entryPrice = exitPrice;
+        if (qty > 0 && pnl !== null && !isNaN(pnl)) {
+          if (originalEntrySide === 'BUY') {
+            entryPrice = exitPrice - (pnl / qty);
+          } else {
+            entryPrice = exitPrice + (pnl / qty);
+          }
+        }
+
+        list.push({
+          id: key,
+          rawId: o.id,
+          symbol: o.symbol,
+          product_type: o.product_type || 'INT',
+          side: originalEntrySide,
+          qty: qty,
+          avg: Number(entryPrice.toFixed(2)),
+          exit_price: Number(exitPrice.toFixed(2)),
+          pnl: pnl,
+          date: o.created_at ? new Date(o.created_at).toLocaleDateString('en-IN') : 'Today',
+          rawDate: o.created_at || new Date().toISOString()
+        });
+      }
+    });
+
+    // Sort newest first
+    list.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+    return list;
+  }, [positions, orders]);
+
+  // Merge journal metadata into trades
+  const enrichedTrades = useMemo(() => {
+    return tradesList.map(t => {
+      const entry = journalEntries[t.id] || {};
+      return {
+        ...t,
+        strategy: entry.strategy || '🔥 Breakout',
+        emotion: entry.emotion || (t.pnl >= 0 ? '🎯 Disciplined Execution' : '🛡️ Plan Followed'),
+        notes: entry.notes || '',
+        rating: entry.rating || 5,
+        isJournaled: Boolean(journalEntries[t.id])
+      };
+    });
+  }, [tradesList, journalEntries]);
+
+  // Apply filters
+  const filteredTrades = useMemo(() => {
+    return enrichedTrades.filter(t => {
+      if (filterStrategy !== 'ALL' && t.strategy !== filterStrategy) return false;
+      if (filterEmotion !== 'ALL' && t.emotion !== filterEmotion) return false;
+      if (filterResult === 'WIN' && t.pnl <= 0) return false;
+      if (filterResult === 'LOSS' && t.pnl >= 0) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const sym = t.symbol.toLowerCase();
+        const notes = (t.notes || '').toLowerCase();
+        if (!sym.includes(q) && !notes.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [enrichedTrades, filterStrategy, filterEmotion, filterResult, searchQuery]);
+
+  // Analytics Stats
+  const stats = useMemo(() => {
+    let totalPnl = 0;
+    let wins = 0;
+    let losses = 0;
+    const strategyCounts = {};
+    const strategyPnls = {};
+    const emotionCounts = {};
+
+    tradesList.forEach(t => {
+      totalPnl += t.pnl;
+      if (t.pnl > 0) wins++;
+      else if (t.pnl < 0) losses++;
+
+      const entry = journalEntries[t.id] || {};
+      const strat = entry.strategy || '🔥 Breakout';
+      const emo = entry.emotion || '🎯 Disciplined Execution';
+
+      strategyCounts[strat] = (strategyCounts[strat] || 0) + 1;
+      strategyPnls[strat] = (strategyPnls[strat] || 0) + t.pnl;
+      emotionCounts[emo] = (emotionCounts[emo] || 0) + 1;
+    });
+
+    const totalTrades = tradesList.length;
+    const completedTrades = wins + losses;
+    const winRate = completedTrades > 0 ? ((wins / completedTrades) * 100).toFixed(1) : '0.0';
+
+    // Best strategy
+    let bestStrat = 'None';
+    let bestStratPnl = -Infinity;
+    Object.entries(strategyPnls).forEach(([strat, pnl]) => {
+      if (pnl > bestStratPnl) {
+        bestStratPnl = pnl;
+        bestStrat = strat;
+      }
+    });
+
+    return {
+      totalTrades,
+      wins,
+      losses,
+      totalPnl,
+      winRate,
+      bestStrat: bestStratPnl > -Infinity ? bestStrat : 'Breakout',
+      journaledCount: Object.keys(journalEntries).length
+    };
+  }, [tradesList, journalEntries]);
+
+  // Calendar Month Aggregation
+  const calendarYear = calendarDate.getFullYear();
+  const calendarMonth = calendarDate.getMonth(); // 0-indexed
+
+  const calendarDailyMap = useMemo(() => {
+    const map = {};
+    tradesList.forEach(trade => {
+      if (!trade.rawDate) return;
+      const d = new Date(trade.rawDate);
+      if (isNaN(d.getTime())) return;
+      const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      if (!map[key]) {
+        map[key] = { pnl: 0, tradesCount: 0, wins: 0, losses: 0, trades: [] };
+      }
+      map[key].pnl += Number(trade.pnl || 0);
+      map[key].tradesCount += 1;
+      if (Number(trade.pnl || 0) > 0) map[key].wins += 1;
+      else if (Number(trade.pnl || 0) < 0) map[key].losses += 1;
+      map[key].trades.push(trade);
+    });
+    return map;
+  }, [tradesList]);
+
+  // Monthly stats for the selected calendar month
+  const monthStats = useMemo(() => {
+    let netPnl = 0;
+    let tradingDays = 0;
+    let greenDays = 0;
+    let redDays = 0;
+    let bestDayPnl = -Infinity;
+    let worstDayPnl = Infinity;
+
+    Object.entries(calendarDailyMap).forEach(([dateStr, data]) => {
+      const [y, m] = dateStr.split('-').map(Number);
+      if (y === calendarYear && m === calendarMonth + 1) {
+        netPnl += data.pnl;
+        tradingDays += 1;
+        if (data.pnl > 0) greenDays += 1;
+        else if (data.pnl < 0) redDays += 1;
+        if (data.pnl > bestDayPnl) bestDayPnl = data.pnl;
+        if (data.pnl < worstDayPnl) worstDayPnl = data.pnl;
+      }
+    });
+
+    return {
+      netPnl,
+      tradingDays,
+      greenDays,
+      redDays,
+      winRate: tradingDays > 0 ? ((greenDays / tradingDays) * 100).toFixed(1) : '0.0',
+      bestDay: bestDayPnl > -Infinity ? bestDayPnl : 0,
+      worstDay: worstDayPnl < Infinity ? worstDayPnl : 0
+    };
+  }, [calendarDailyMap, calendarYear, calendarMonth]);
+
+  const handleOpenEdit = (trade) => {
+    setEditingTrade(trade);
+    const existing = journalEntries[trade.id] || {};
+    setEditForm({
+      strategy: existing.strategy || '🔥 Breakout',
+      emotion: existing.emotion || (trade.pnl >= 0 ? '🎯 Disciplined Execution' : '🛡️ Plan Followed'),
+      notes: existing.notes || '',
+      rating: existing.rating || 5
+    });
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    if (!editingTrade) return;
+    saveJournalEntry(editingTrade.id, editForm);
+    setEditingTrade(null);
+  };
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const handlePrevMonth = () => {
+    setCalendarDate(new Date(calendarYear, calendarMonth - 1, 1));
+    setSelectedCalendarDay(null);
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate(new Date(calendarYear, calendarMonth + 1, 1));
+    setSelectedCalendarDay(null);
+  };
+
+  const handleTodayMonth = () => {
+    setCalendarDate(new Date());
+    setSelectedCalendarDay(null);
+  };
+
+  // Generate days array for calendar grid
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(calendarYear, calendarMonth, 1).getDay(); // 0 = Sun
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+      {/* View Switcher: Journal vs Calendar (only shown if mode is not specified) */}
+      {!mode && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '4px', gap: '4px' }}>
+            <button
+              onClick={() => setActiveViewTab('JOURNAL')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentTab === 'JOURNAL' ? 'var(--color-blue)' : 'transparent',
+                color: currentTab === 'JOURNAL' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              <BookOpen size={15} /> Trade Journal Log
+            </button>
+            <button
+              onClick={() => setActiveViewTab('CALENDAR')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentTab === 'CALENDAR' ? 'var(--color-blue)' : 'transparent',
+                color: currentTab === 'CALENDAR' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              <CalendarDays size={15} /> P&L Calendar Heatmap
+            </button>
+          </div>
+
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="btn btn-secondary"
+              style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '8px' }}
+            >
+              &larr; Back to Dashboard
+            </button>
+          )}
+        </div>
+      )}
+
+      {currentTab === 'JOURNAL' ? (
+        <>
+      {/* Header Summary Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '14px'
+      }}>
+        {/* Total PnL Card */}
+        <div style={{
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>TOTAL REALIZED P&L</div>
+          <div style={{
+            fontSize: '22px',
+            fontWeight: '800',
+            color: stats.totalPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)',
+            marginTop: '4px'
+          }}>
+            {stats.totalPnl >= 0 ? '+' : ''}₹{stats.totalPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            {stats.wins} Wins • {stats.losses} Losses
+          </div>
+        </div>
+
+        {/* Win Rate Card */}
+        <div style={{
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>JOURNAL WIN RATE</div>
+          <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8', marginTop: '4px' }}>
+            {stats.winRate}%
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            {stats.totalTrades} Total Closed Setups
+          </div>
+        </div>
+
+        {/* Best Strategy Card */}
+        <div style={{
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>TOP STRATEGY EDGE</div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#fbbf24', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {stats.bestStrat}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Highest Profit Generator
+          </div>
+        </div>
+
+        {/* Journaled Ratio Card */}
+        <div style={{
+          background: 'var(--bg-panel)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600' }}>LOGGED LESSONS</div>
+          <div style={{ fontSize: '22px', fontWeight: '800', color: '#a855f7', marginTop: '4px' }}>
+            {stats.journaledCount} / {stats.totalTrades}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Trades with Notes & Tags
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: '14px 18px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '12px',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
+          <Search size={15} color="var(--text-secondary)" />
+          <input
+            type="text"
+            placeholder="Search by symbol, setups, notes..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-primary)',
+              fontSize: '12px',
+              outline: 'none',
+              width: '100%'
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Result Filter */}
+          <select
+            value={filterResult}
+            onChange={e => setFilterResult(e.target.value)}
+            style={{
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11.5px',
+              fontWeight: '600'
+            }}
+          >
+            <option value="ALL">All Outcomes</option>
+            <option value="WIN">Profitable Trades (Wins)</option>
+            <option value="LOSS">Losing Trades (Losses)</option>
+          </select>
+
+          {/* Strategy Filter */}
+          <select
+            value={filterStrategy}
+            onChange={e => setFilterStrategy(e.target.value)}
+            style={{
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11.5px',
+              fontWeight: '600'
+            }}
+          >
+            <option value="ALL">All Strategies</option>
+            {STRATEGY_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          {/* Emotion Filter */}
+          <select
+            value={filterEmotion}
+            onChange={e => setFilterEmotion(e.target.value)}
+            style={{
+              background: 'var(--bg-hover)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11.5px',
+              fontWeight: '600'
+            }}
+          >
+            <option value="ALL">All Mindsets</option>
+            {EMOTION_TAGS.map(em => <option key={em} value={em}>{em}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Trades Journal List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {filteredTrades.length === 0 ? (
+          <div style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: 'var(--bg-panel)',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)'
+          }}>
+            <BookOpen size={36} color="var(--text-secondary)" style={{ margin: '0 auto 12px auto', opacity: 0.6 }} />
+            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              No Trades in Journal
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Execute or close trades to log your strategy, lessons, and generate social P&L cards.
+            </div>
+          </div>
+        ) : (
+          filteredTrades.map(trade => {
+            const isProfit = trade.pnl >= 0;
+            const displaySymbol = trade.symbol.includes(':') ? trade.symbol.split(':')[1] : trade.symbol;
+
+            return (
+              <div
+                key={trade.id}
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '14px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  transition: 'border-color 0.15s ease',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}
+              >
+                {/* Row 1: Instrument & Tags (Left) | PnL & Action (Right) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                      {displaySymbol}
+                    </span>
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: trade.side === 'BUY' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                      color: trade.side === 'BUY' ? 'var(--color-green-light)' : 'var(--color-red-light)',
+                      fontWeight: '700'
+                    }}>
+                      {trade.side}
+                    </span>
+                    <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'var(--bg-hover)', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                      {trade.product_type}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      • {trade.date}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        fontSize: '15px',
+                        fontWeight: '800',
+                        color: isProfit ? 'var(--color-green-light)' : 'var(--color-red-light)'
+                      }}>
+                        {isProfit ? '+' : ''}₹{Number(trade.pnl).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                        Qty: {trade.qty} • Avg: ₹{trade.avg.toFixed(2)}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTradeForShare(trade)}
+                      title="Generate Social P&L Card"
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '8px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        color: '#38bdf8',
+                        fontSize: '11.5px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <Share2 size={13} /> Share P&L
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 2: Strategy & Psychology Badges */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    color: '#60a5fa',
+                    fontWeight: '600'
+                  }}>
+                    {trade.strategy}
+                  </span>
+
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    background: trade.emotion.includes('⚠️') || trade.emotion.includes('😡') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                    border: trade.emotion.includes('⚠️') || trade.emotion.includes('😡') ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(34, 197, 94, 0.25)',
+                    color: trade.emotion.includes('⚠️') || trade.emotion.includes('😡') ? '#f87171' : '#4ade80',
+                    fontWeight: '600'
+                  }}>
+                    {trade.emotion}
+                  </span>
+
+                  {/* Rating Stars */}
+                  <div style={{ display: 'flex', gap: '2px', marginLeft: 'auto' }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star
+                        key={star}
+                        size={12}
+                        fill={trade.rating >= star ? '#fbbf24' : 'none'}
+                        color={trade.rating >= star ? '#fbbf24' : 'var(--text-secondary)'}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Row 3: Notes Log & Edit Button */}
+                <div style={{
+                  background: 'var(--bg-hover)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  fontSize: '12px',
+                  color: trade.notes ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ fontStyle: trade.notes ? 'normal' : 'italic', flex: 1, whiteSpace: 'pre-wrap' }}>
+                    {trade.notes || 'No notes added yet. Click edit to log strategy reasoning, SL adherence, and takeaways.'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(trade)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--color-blue)',
+                      cursor: 'pointer',
+                      fontSize: '11.5px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      flexShrink: 0
+                    }}
+                  >
+                    <Edit3 size={13} /> {trade.notes ? 'Edit Notes' : 'Add Notes'}
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      </>
+      ) : (
+        /* CALENDAR HEATMAP VIEW */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Monthly Highlights Bar */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '14px'
+          }}>
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
+                {monthNames[calendarMonth]} Net P&L
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: '900', color: monthStats.netPnl >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)', marginTop: '4px' }}>
+                {monthStats.netPnl >= 0 ? '+' : ''}₹{monthStats.netPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                {monthStats.greenDays} Profitable Days • {monthStats.redDays} Loss Days
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
+                Monthly Win Rate
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: '900', color: '#38bdf8', marginTop: '4px' }}>
+                {monthStats.winRate}%
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Out of {monthStats.tradingDays} active trading days
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
+                Best Trading Day
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#34d399', marginTop: '4px' }}>
+                +₹{monthStats.bestDay.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Max Single-Day Gain
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>
+                Max Day Drawdown
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#f87171', marginTop: '4px' }}>
+                {monthStats.worstDay < 0 ? '-' : ''}₹{Math.abs(monthStats.worstDay).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Max Single-Day Loss
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Month Navigation Header */}
+          <div style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={handlePrevMonth}
+                style={{
+                  background: 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: 'var(--text-primary)', minWidth: '180px', textAlign: 'center' }}>
+                {monthNames[calendarMonth]} {calendarYear}
+              </h3>
+              <button
+                onClick={handleNextMonth}
+                style={{
+                  background: 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                onClick={handleTodayMonth}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  color: 'var(--color-blue-light)',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                Current Month
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(16, 185, 129, 0.6)' }}></span> Profit
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: 'rgba(239, 68, 68, 0.6)' }}></span> Loss
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 7-Column Calendar Heatmap Grid */}
+          <div style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '16px',
+            overflowX: 'auto'
+          }}>
+            {/* Weekday Headers */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+              {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+                <div key={day} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', padding: '4px 0' }}>
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Day Tiles */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))', gap: '8px' }}>
+              {/* Empty leading slots before firstDayOfWeek */}
+              {Array.from({ length: firstDayOfWeek }).map((_, idx) => (
+                <div key={`empty-${idx}`} style={{ minHeight: '85px', borderRadius: '8px', opacity: 0.2 }}></div>
+              ))}
+
+              {/* Month Days */}
+              {Array.from({ length: daysInMonth }).map((_, idx) => {
+                const dayNum = idx + 1;
+                const dateKey = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const dayData = calendarDailyMap[dateKey];
+                const hasTrades = !!dayData;
+                const isProfit = hasTrades && dayData.pnl > 0;
+                const isLoss = hasTrades && dayData.pnl < 0;
+                const isSelected = selectedCalendarDay === dateKey;
+
+                let tileBg = 'rgba(255, 255, 255, 0.02)';
+                let tileBorder = 'var(--border-color)';
+                if (isProfit) {
+                  tileBg = 'linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.12) 100%)';
+                  tileBorder = 'rgba(16, 185, 129, 0.45)';
+                } else if (isLoss) {
+                  tileBg = 'linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.12) 100%)';
+                  tileBorder = 'rgba(239, 68, 68, 0.45)';
+                } else if (hasTrades) {
+                  tileBg = 'rgba(255, 255, 255, 0.08)';
+                }
+
+                if (isSelected) {
+                  tileBorder = '2px solid var(--color-blue)';
+                }
+
+                return (
+                  <div
+                    key={dateKey}
+                    onClick={() => hasTrades && setSelectedCalendarDay(isSelected ? null : dateKey)}
+                    style={{
+                      minHeight: '85px',
+                      background: tileBg,
+                      border: `1px solid ${tileBorder}`,
+                      borderRadius: '8px',
+                      padding: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      cursor: hasTrades ? 'pointer' : 'default',
+                      transition: 'all 0.15s',
+                      boxShadow: isSelected ? '0 0 12px rgba(59, 130, 246, 0.4)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '800', color: hasTrades ? '#ffffff' : 'var(--text-secondary)' }}>
+                        {dayNum}
+                      </span>
+                      {hasTrades && (
+                        <span style={{ fontSize: '9.5px', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.3)', padding: '2px 5px', borderRadius: '4px' }}>
+                          {dayData.tradesCount}T
+                        </span>
+                      )}
+                    </div>
+
+                    {hasTrades ? (
+                      <div style={{ marginTop: 'auto' }}>
+                        <div style={{
+                          fontSize: '12.5px',
+                          fontWeight: '900',
+                          color: isProfit ? '#34d399' : isLoss ? '#f87171' : 'var(--text-primary)'
+                        }}>
+                          {dayData.pnl >= 0 ? '+' : ''}₹{dayData.pnl.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </div>
+                        <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {dayData.wins}W • {dayData.losses}L
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '10px', color: 'var(--text-secondary)', opacity: 0.4, textAlign: 'center', marginTop: 'auto' }}>
+                        -
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Date Trades Breakdown */}
+          {selectedCalendarDay && calendarDailyMap[selectedCalendarDay] && (
+            <div style={{
+              background: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={18} color="var(--color-blue)" />
+                    Trades for {selectedCalendarDay}
+                  </h3>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Day Net P&L: <strong style={{ color: calendarDailyMap[selectedCalendarDay].pnl >= 0 ? '#34d399' : '#f87171' }}>
+                      {calendarDailyMap[selectedCalendarDay].pnl >= 0 ? '+' : ''}₹{calendarDailyMap[selectedCalendarDay].pnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </strong> ({calendarDailyMap[selectedCalendarDay].tradesCount} closed trades)
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCalendarDay(null)}
+                  style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', borderRadius: '6px', padding: '6px 12px', fontSize: '11.5px', cursor: 'pointer' }}
+                >
+                  Close Day View
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {calendarDailyMap[selectedCalendarDay].trades.map((trade, idx) => {
+                  const entry = journalEntries[trade.id] || {};
+                  const isWin = Number(trade.pnl || 0) >= 0;
+                  return (
+                    <div
+                      key={trade.id || idx}
+                      style={{
+                        background: 'var(--bg-hover)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>{trade.symbol}</span>
+                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: trade.side === 'BUY' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: trade.side === 'BUY' ? '#34d399' : '#f87171', fontWeight: '700' }}>
+                            {trade.side}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Qty: {trade.qty}</span>
+                        </div>
+                        {entry.strategy && (
+                          <div style={{ fontSize: '11px', color: '#fbbf24', marginTop: '2px' }}>
+                            Setup: {entry.strategy} {entry.emotion ? `• ${entry.emotion}` : ''}
+                          </div>
+                        )}
+                        {entry.notes && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '4px', fontStyle: 'italic' }}>
+                            "{entry.notes}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '900', color: isWin ? '#34d399' : '#f87171' }}>
+                            {isWin ? '+' : ''}₹{Number(trade.pnl || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                            Avg: ₹{trade.avg?.toFixed(2)} &rarr; Exit: ₹{trade.exit_price?.toFixed(2)}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedTradeForShare(trade)}
+                          style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: 'var(--color-blue-light)', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Share2 size={12} /> Share Card
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(trade)}
+                          style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Edit3 size={12} /> Notes
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Note / Journal Editor Modal */}
+      {editingTrade && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            maxWidth: '480px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800' }}>
+                  Journal Trade: {editingTrade.symbol}
+                </h3>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  Log your execution psychology and technical thesis
+                </div>
+              </div>
+              <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setEditingTrade(null)} />
+            </div>
+
+            <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Strategy Tag Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                  Trading Setup / Strategy
+                </label>
+                <select
+                  value={editForm.strategy}
+                  onChange={e => setEditForm({ ...editForm, strategy: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  {STRATEGY_TAGS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Psychology Tag Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                  Execution Psychology / Mindset
+                </label>
+                <select
+                  value={editForm.emotion}
+                  onChange={e => setEditForm({ ...editForm, emotion: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}
+                >
+                  {EMOTION_TAGS.map(em => <option key={em} value={em}>{em}</option>)}
+                </select>
+              </div>
+
+              {/* Rating */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                  Execution Discipline Score (1 to 5 Stars)
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, rating: star })}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      <Star
+                        size={22}
+                        fill={editForm.rating >= star ? '#fbbf24' : 'none'}
+                        color={editForm.rating >= star ? '#fbbf24' : 'var(--text-secondary)'}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes Textarea */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                  Trade Notes & Lessons Learned
+                </label>
+                <textarea
+                  rows={4}
+                  value={editForm.notes}
+                  onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                  placeholder="e.g. Waited for 15-min candle confirmation above VWAP. Exited when price rejected 200 EMA..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingTrade(null)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    background: 'transparent',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    background: 'var(--color-blue)',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Social PnL Card Modal */}
+      {selectedTradeForShare && (
+        <PnLShareCardModal
+          trade={selectedTradeForShare}
+          onClose={() => setSelectedTradeForShare(null)}
+        />
+      )}
+    </div>
+  );
+}

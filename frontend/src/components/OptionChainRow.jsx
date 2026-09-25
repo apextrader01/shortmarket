@@ -3,6 +3,15 @@ import { useStore } from '../store';
 import { calculateIV, calculateGreeks } from '../utils/blackScholes';
 import { BarChart2, List, AlignLeft, Bell } from 'lucide-react';
 
+const formatOI = (oi) => {
+  if (!oi || isNaN(Number(oi)) || Number(oi) === 0) return '-';
+  const n = Number(oi);
+  if (n >= 10000000) return (n / 10000000).toFixed(2) + 'Cr';
+  if (n >= 100000) return (n / 100000).toFixed(2) + 'L';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n.toLocaleString('en-IN');
+};
+
 const OptionChainRow = React.memo(({
   strike,
   call,
@@ -29,20 +38,33 @@ const OptionChainRow = React.memo(({
   const cLtp = callPriceData?.ltp || 0;
   const pLtp = putPriceData?.ltp || 0;
 
-  // Calculate IV
-  let cIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r) : 0;
-  let pIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r) : 0;
+  const isCommodity = Boolean((callKey && (callKey.includes('MCX') || callKey.includes('COMMODITY'))) || 
+                              (putKey && (putKey.includes('MCX') || putKey.includes('COMMODITY'))) || 
+                              (call?.exch_seg === 'MCX') || (put?.exch_seg === 'MCX'));
+
+  // Calculate IV (using Black-76 for commodities)
+  let cIV = (cLtp > 0 && basePrice > 0) ? calculateIV('CE', cLtp, basePrice, strike, T, r, isCommodity) : 0;
+  let pIV = (pLtp > 0 && basePrice > 0) ? calculateIV('PE', pLtp, basePrice, strike, T, r, isCommodity) : 0;
 
   // Put-Call Parity Fallback: Deep ITM options often violate strict Spot intrinsic bounds due to Futures pricing.
   if (cIV === 0 && pIV > 0) cIV = pIV;
   if (pIV === 0 && cIV > 0) pIV = cIV;
 
   // Calculate Greeks
-  const cGreeks = (cIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, cIV) : { delta: 0, theta: 0, vega: 0 };
-  const pGreeks = (pIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, pIV) : { delta: 0, theta: 0, vega: 0 };
+  const cGreeks = (cIV > 0) ? calculateGreeks('CE', basePrice, strike, T, r, cIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
+  const pGreeks = (pIV > 0) ? calculateGreeks('PE', basePrice, strike, T, r, pIV, isCommodity) : { delta: 0, theta: 0, vega: 0 };
 
   const isCallITM = basePrice > 0 && strike < basePrice;
   const isPutITM = basePrice > 0 && strike > basePrice;
+
+  // Open Interest calculations (Defect 49)
+  const cOi = Number(callPriceData?.oi ?? call?.oi ?? 0);
+  const cPrevOi = Number(callPriceData?.pOI ?? callPriceData?.prev_oi ?? 0);
+  const cOiChg = Number(callPriceData?.oi_change ?? (cPrevOi > 0 ? cOi - cPrevOi : 0));
+
+  const pOi = Number(putPriceData?.oi ?? put?.oi ?? 0);
+  const pPrevOi = Number(putPriceData?.pOI ?? putPriceData?.prev_oi ?? 0);
+  const pOiChg = Number(putPriceData?.oi_change ?? (pPrevOi > 0 ? pOi - pPrevOi : 0));
 
   const cBreakeven = cLtp > 0 ? strike + cLtp : 0;
   const pBreakeven = pLtp > 0 ? strike - pLtp : 0;
@@ -54,6 +76,10 @@ const OptionChainRow = React.memo(({
   return (
     <tr ref={strike === atmStrike ? atmRowRef : null} className={`transition-colors ${atmClass}`}>
       {/* Calls */}
+      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{cOi > 0 ? formatOI(cOi) : '-'}</td>
+      <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ fontSize: '11px', color: cOiChg >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+        {cOiChg !== 0 ? `${cOiChg > 0 ? '+' : ''}${formatOI(cOiChg)}` : '-'}
+      </td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.delta.toFixed(2) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.theta.toFixed(2) : '-'}</td>
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`} style={{ color: 'var(--text-secondary)' }}>{cIV > 0 ? cGreeks.vega.toFixed(2) : '-'}</td>
@@ -72,7 +98,7 @@ const OptionChainRow = React.memo(({
       <td className={`center ${isCallITM ? 'bg-itm-call' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
           <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <span className="ltp-value" style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            <span className={`ltp-value ${callPriceData?.change >= 0 ? 'neon-text-green' : 'neon-text-red'}`} style={{ fontWeight: '600', color: callPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               {cLtp > 0 ? cLtp.toFixed(2) : '-'}
             </span>
             <div className="action-buttons">
@@ -94,7 +120,9 @@ const OptionChainRow = React.memo(({
                 <button onClick={() => setAlertModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
                 <button onClick={() => setChartModalSymbol(callKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
                 <button onClick={() => openMarketDepthModal(callKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(callKey, parseInt(call.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                {openDomLadderModal && (
+                  <button onClick={() => openDomLadderModal(callKey, call?.lotsize)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                )}
               </>
             )}
           </div>
@@ -133,12 +161,14 @@ const OptionChainRow = React.memo(({
                 <button onClick={() => setAlertModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-yellow)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Set Price Alert"><Bell size={14} /></button>
                 <button onClick={() => setChartModalSymbol(putKey)} style={{ background: 'none', border: 'none', color: 'var(--color-blue)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="View Chart"><BarChart2 size={14} /></button>
                 <button onClick={() => openMarketDepthModal(putKey)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="Market Depth"><AlignLeft size={14} /></button>
-                <button onClick={() => openDomLadderModal(putKey, parseInt(put.lotsize) || 1)} style={{ background: 'none', border: 'none', color: 'var(--color-purple)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                {openDomLadderModal && (
+                  <button onClick={() => openDomLadderModal(putKey, put?.lotsize)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }} title="DOM Ladder"><List size={14} /></button>
+                )}
               </>
             )}
           </div>
           <div className="ltp-container" style={{ width: 'auto', flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <span className="ltp-value" style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+            <span className={`ltp-value ${putPriceData?.change >= 0 ? 'neon-text-green' : 'neon-text-red'}`} style={{ fontWeight: '600', color: putPriceData?.change >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
               {pLtp > 0 ? pLtp.toFixed(2) : '-'}
             </span>
             <div className="action-buttons">
@@ -171,6 +201,10 @@ const OptionChainRow = React.memo(({
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.vega.toFixed(2) : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.theta.toFixed(2) : '-'}</td>
       <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ color: 'var(--text-secondary)' }}>{pIV > 0 ? pGreeks.delta.toFixed(2) : '-'}</td>
+      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontSize: '11px', color: pOiChg >= 0 ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
+        {pOiChg !== 0 ? `${pOiChg > 0 ? '+' : ''}${formatOI(pOiChg)}` : '-'}
+      </td>
+      <td className={`center ${isPutITM ? 'bg-itm-put' : ''}`} style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{pOi > 0 ? formatOI(pOi) : '-'}</td>
     </tr>
   );
 }, (prev, next) => {
@@ -186,3 +220,5 @@ const OptionChainRow = React.memo(({
 });
 
 export default OptionChainRow;
+
+

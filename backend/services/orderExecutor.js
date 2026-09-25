@@ -7,8 +7,21 @@ function initOrderExecutor(priceCache) {
   setInterval(async () => {
     if (isExecuting) return;
     isExecuting = true;
-    try {
-      // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
+      // ⚡ Skip DB scan if all markets (Equities & MCX) are completely closed (nights / weekends)
+      const now = new Date();
+      const istParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(now);
+      const istH = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+      const istM = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+      const istDay = istParts.find(p => p.type === 'weekday')?.value;
+      const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
+      const isMarketHours = !isWeekend && ((istH > 9 || (istH === 9 && istM >= 0)) && (istH < 23 || (istH === 23 && istM <= 30)));
+      if (!isMarketHours) {
+        isExecuting = false;
+        return;
+      }
+
+      try {
+        // Only handle MARKET orders here. LIMIT and PENDING_TRIGGER (SL/TP/CO/BO) orders
       // are owned by triggerEngine.js (in-memory, evaluated on every WS price tick) to
       // avoid double-execution races between the two engines.
       const pendingOrders = await db('orders').where({ status: 'PENDING', type: 'MARKET' });
@@ -20,70 +33,46 @@ function initOrderExecutor(priceCache) {
       for (const order of pendingOrders) {
         const ltp = priceCache[order.symbol]?.ltp;
         if (!ltp) continue; // No live price available yet
-
-        let shouldExecute = false;
-
-        // --- GTT / SL Trigger Logic ---
-        if (order.trigger_price) {
-           const trigger = Number(order.trigger_price);
-           if (order.side === 'BUY') {
-              // Buy SL triggers when price goes UP to/above trigger.
-              // Buy Target/GTT triggers when price goes DOWN to/below trigger.
-              if (order.type.startsWith('SL')) {
-                  if (ltp >= trigger) shouldExecute = true;
-              } else {
-                  if (ltp <= trigger) shouldExecute = true;
-              }
-           } else if (order.side === 'SELL') {
-              // Sell SL triggers when price goes DOWN to/below trigger.
-              // Sell Target/GTT triggers when price goes UP to/above trigger.
-              if (order.type.startsWith('SL')) {
-                  if (ltp <= trigger) shouldExecute = true;
-              } else {
-                  if (ltp >= trigger) shouldExecute = true;
-              }
-           }
-        } else if (order.type === 'LIMIT') {
-           const limitPrice = Number(order.price);
-           if (order.side === 'BUY' && ltp <= limitPrice) shouldExecute = true;
-           if (order.side === 'SELL' && ltp >= limitPrice) shouldExecute = true;
-        } else if (order.type === 'MARKET') {
-           shouldExecute = true;
-        }
-
-        if (shouldExecute) {
-           await executeOrder(order, ltp);
-        }
+        await executeOrder(order, ltp);
       }
     } catch (err) {
       console.error('OrderExecutor Error:', err.message);
     } finally {
       isExecuting = false;
     }
-  }, 2000); // Check every 2 seconds
+  }, 60000); // Check every 60 seconds (Fallback only, MARKET orders now instantly execute)
 }
 
 const { calculateTaxes } = require('./taxCalculator');
 
-async function spawnBracketOrders(trx, order) {
+async function spawnBracketOrders(trx, order, childQty) {
   // Check if SL or Target prices were provided on the parent order
   const hasSL = order.sl_price !== null && order.sl_price !== undefined && Number(order.sl_price) > 0;
   const hasTgt = order.tgt_price !== null && order.tgt_price !== undefined && Number(order.tgt_price) > 0;
   
-  if (!hasSL && !hasTgt) return; // Not a bracket order
+  if (!hasSL && !hasTgt) return []; // Not a bracket order
+
+  const finalQty = childQty !== undefined ? childQty : order.quantity;
+  if (!finalQty || Number(finalQty) <= 0) return []; // No child orders if position is closed or invalid quantity
   
   // The side of the child orders is OPPOSITE to the parent order's side
   const childSide = order.side === 'BUY' ? 'SELL' : 'BUY';
-
   const triggerEngine = require('./triggerEngine');
   
+  let slOrder = null;
+  let tgtOrder = null;
+
   if (hasSL) {
-    const slOrder = {
+    slOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
       type: 'SL-M', // Stop Loss Market
       side: childSide,
-      quantity: order.quantity,
+      quantity: finalQty,
+      filled_quantity: 0,
+      pending_quantity: finalQty,
+      average_price: null,
+      order_variety: 'REGULAR',
       price: null,
       status: 'PENDING_TRIGGER',
       trigger_price: order.sl_price,
@@ -91,189 +80,78 @@ async function spawnBracketOrders(trx, order) {
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,
-      margin: 0
+      margin: 0,
+      created_at: new Date(),
+      updated_at: new Date()
     };
     const [slId] = await trx('orders').insert(slOrder).returning('id');
     slOrder.id = typeof slId === 'object' ? slId.id : slId;
-    triggerEngine.addOrderToMemory(slOrder);
   }
 
   if (hasTgt) {
-    const tgtOrder = {
+    tgtOrder = {
       user_id: order.user_id,
       symbol: order.symbol,
       type: 'LIMIT',
       side: childSide,
-      quantity: order.quantity,
+      quantity: finalQty,
+      filled_quantity: 0,
+      pending_quantity: finalQty,
+      average_price: null,
+      order_variety: 'REGULAR',
       price: order.tgt_price,
       status: 'PENDING_TRIGGER',
       trigger_price: order.tgt_price,
       product_type: order.product_type,
       trigger_type: order.trigger_type || (order.product_type === 'BO' ? 'BO' : order.product_type === 'CO' ? 'CO' : 'REGULAR'),
       parent_order_id: order.id,
-      margin: 0
+      margin: 0,
+      created_at: new Date(),
+      updated_at: new Date()
     };
     const [tgtId] = await trx('orders').insert(tgtOrder).returning('id');
     tgtOrder.id = typeof tgtId === 'object' ? tgtId.id : tgtId;
-    triggerEngine.addOrderToMemory(tgtOrder);
   }
+
+  // Mutually link the Stop-Loss and Target orders for OCO tracking
+  if (slOrder && tgtOrder) {
+    slOrder.linked_order_id = tgtOrder.id;
+    tgtOrder.linked_order_id = slOrder.id;
+    await trx('orders').where({ id: slOrder.id }).update({ linked_order_id: tgtOrder.id });
+    await trx('orders').where({ id: tgtOrder.id }).update({ linked_order_id: slOrder.id });
+  }
+
+  const spawned = [];
+  if (slOrder) spawned.push(slOrder);
+  if (tgtOrder) spawned.push(tgtOrder);
+
+  // Hook into transaction completion to add orders to in-memory trigger engine
+  // This guarantees that if the transaction rolls back, ghost orders are NOT added to memory
+  if (trx && typeof trx.on === 'function') {
+    trx.on('commit', async () => {
+      for (const ord of spawned) {
+        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+      }
+    });
+  } else if (trx && typeof trx.executionPromise?.then === 'function') {
+    trx.executionPromise.then(async () => {
+      for (const ord of spawned) {
+        await triggerEngine.addOrderToMemory(ord).catch(() => {});
+      }
+    }).catch(() => {});
+  } else {
+    for (const ord of spawned) {
+      await triggerEngine.addOrderToMemory(ord).catch(() => {});
+    }
+  }
+
+  return spawned;
 }
 
 async function executeOrder(order, execPrice) {
   try {
-    await db.transaction(async (trx) => {
-      // Serialize order executions on a per-user basis to prevent position/ledger race conditions
-      await trx.raw('SELECT pg_advisory_xact_lock(?)', [order.user_id]);
-
-      // Verify order is still pending in DB before executing to prevent double execution race conditions
-      const dbOrder = await trx('orders').where({ id: order.id }).first();
-      if (!dbOrder || (dbOrder.status !== 'PENDING' && dbOrder.status !== 'PENDING_TRIGGER')) {
-          return;
-      }
-
-      // Calculate Taxes
-      const taxesObj = calculateTaxes(order.symbol, order.product_type, order.side, Number(order.quantity), execPrice);
-      const totalTaxes = taxesObj.totalTaxes;
-      let realizedPnl = 0;
-
-      // 1. Mark as executed
-      await trx('orders').where({ id: order.id }).update({ 
-        status: 'EXECUTED',
-        price: execPrice,
-        taxes: totalTaxes
-      });
-
-      // 2. Update Positions
-      // Only find open positions (quantity != 0) — closed position records must not be reused
-      const effectiveProductType = order.product_type || 'DEL';
-      const existingPos = await trx('positions').where({ user_id: order.user_id, symbol: order.symbol, product_type: effectiveProductType }).whereNot({ quantity: 0 }).first();
-      const qtyChange = order.side === 'BUY' ? Number(order.quantity) : -Number(order.quantity);
-      
-      if (existingPos) {
-        const newQty = existingPos.quantity + qtyChange;
-        let newAvgPrice = existingPos.average_price;
-        let newMargin = parseFloat(existingPos.margin) || 0;
-        let marginRefund = 0;
-        
-        // Average up/down only if we are increasing the position on the SAME side
-        if ((existingPos.quantity > 0 && order.side === 'BUY') || (existingPos.quantity < 0 && order.side === 'SELL')) {
-            const currentTotal = Math.abs(existingPos.quantity) * existingPos.average_price;
-            const newTotal = Number(order.quantity) * execPrice;
-            newAvgPrice = (currentTotal + newTotal) / Math.abs(newQty);
-            // In a real execution engine, executing an automated entry order would use margin.
-            // But since the margin was locked when placing the order, we add it to the position.
-            newMargin += Number(order.margin || 0);
-        }
-
-        // Are we CLOSING a position?
-        let isPartialClose = false;
-        if ((existingPos.quantity > 0 && order.side === 'SELL') || (existingPos.quantity < 0 && order.side === 'BUY')) {
-             isPartialClose = true;
-             if (existingPos.quantity > 0) {
-                 realizedPnl = (execPrice - existingPos.average_price) * Number(order.quantity);
-             } else {
-                 realizedPnl = (existingPos.average_price - execPrice) * Number(order.quantity);
-             }
-             
-             const proportionClosed = Math.abs(Number(order.quantity)) / Math.abs(existingPos.quantity);
-             marginRefund = (existingPos.margin || 0) * proportionClosed;
-             newMargin -= marginRefund;
-        }
-
-        if (newQty === 0) {
-            // Position closed! Instead of deleting, just set qty=0, closed_quantity=original, exit_price=execPrice
-            await trx('positions').where({ id: existingPos.id }).update({ 
-               quantity: 0, 
-               closed_quantity: (parseInt(existingPos.closed_quantity) || 0) + Math.abs(parseInt(existingPos.quantity)), 
-               exit_price: execPrice, 
-               margin: 0,
-               realized_pnl: (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl
-            });
-            // Cancel any dangling pending orders (SL/Target/Limit) for this symbol
-            await trx('orders')
-              .where({ user_id: order.user_id, symbol: order.symbol, status: 'PENDING' })
-              .update({ status: 'CANCELLED' });
-        } else {
-            const updateObj = { quantity: newQty, average_price: newAvgPrice, margin: newMargin };
-            if (isPartialClose) {
-               updateObj.closed_quantity = (parseInt(existingPos.closed_quantity) || 0) + Math.abs(Number(order.quantity));
-               updateObj.exit_price = execPrice;
-               updateObj.realized_pnl = (parseFloat(existingPos.realized_pnl) || 0) + realizedPnl;
-            }
-            await trx('positions').where({ id: existingPos.id }).update(updateObj);
-        }
-        
-        // 3. Update User Balance & Ledger
-        const user = await trx('users').where({ id: order.user_id }).first();
-        let balanceChange = -totalTaxes;
-        
-        await trx('ledger').insert({
-            user_id: order.user_id,
-            amount: -totalTaxes,
-            type: 'TAXES',
-            description: `Taxes & Charges for ${order.side} ${order.quantity} ${order.symbol}`
-        });
-
-        if (realizedPnl !== 0) {
-            balanceChange += realizedPnl;
-            await trx('orders').where({ id: order.id }).update({ realized_pnl: realizedPnl });
-            await trx('ledger').insert({
-                user_id: order.user_id,
-                amount: realizedPnl,
-                type: 'REALIZED_PNL',
-                description: `Realized P&L for closing ${order.quantity} ${order.symbol}`
-            });
-        }
-        if (marginRefund > 0) {
-            balanceChange += marginRefund;
-            await trx('ledger').insert({
-                user_id: order.user_id,
-                amount: marginRefund,
-                type: 'MARGIN_RELEASE',
-                description: `Margin released for closing ${order.quantity} ${order.symbol}`
-           });
-        }
-        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) + balanceChange });
-        
-      } else {
-        // Create new position
-        await trx('positions').insert({
-          user_id: order.user_id,
-          symbol: order.symbol,
-          quantity: qtyChange,
-          average_price: execPrice,
-          product_type: order.product_type || 'DEL',
-          margin: Number(order.margin || 0)
-        });
-        
-        // Update user balance to deduct taxes for this new position
-        const user = await trx('users').where({ id: order.user_id }).first();
-        await trx('users').where({ id: order.user_id }).update({ balance: Number(user.balance) - totalTaxes });
-        
-        await trx('ledger').insert({
-            user_id: order.user_id,
-            amount: -totalTaxes,
-            type: 'TAXES',
-            description: `Taxes & Charges for ${order.side} ${order.quantity} ${order.symbol}`
-        });
-      }
-
-      // Spawning Brackets if any (only applies to parent orders)
-      await spawnBracketOrders(trx, order);
-      
-      // OCO (One Cancels Other) Logic
-      if (order.parent_order_id) {
-        // This is a child bracket order. Cancel its sibling!
-        await trx('orders')
-          .where({ parent_order_id: order.parent_order_id, status: 'PENDING' })
-          .whereNot({ id: order.id }) // Don't cancel itself
-          .update({ status: 'CANCELLED' });
-          
-        console.log(`Bracket OCO: Order ${order.id} executed, cancelled siblings for parent ${order.parent_order_id}`);
-      }
-
-      console.log(`Executed Order ${order.id} for ${order.symbol} at ${execPrice} | PnL: ${realizedPnl} | Taxes: ${totalTaxes}`);
-    });
+    const triggerEngine = require('./triggerEngine');
+    await triggerEngine.executeOrder(order, execPrice);
   } catch (err) {
     console.error(`Failed to execute order ${order.id}:`, err);
   }

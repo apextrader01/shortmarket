@@ -1,0 +1,1206 @@
+const fyersModel = require("fyers-api-v3").fyersModel;
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ quiet: true });
+
+// 🛡️ Hotpatch Fyers SDK v3 unhandled TypeError: Cannot read properties of undefined (reading 'prepareData')
+try {
+    const HSWebSocket = require('fyers-api-v3/HSM_Package/hslib.js');
+    if (HSWebSocket && HSWebSocket.prototype && HSWebSocket.prototype.connect && !HSWebSocket.prototype._patchedForPrepareData) {
+        const origConnect = HSWebSocket.prototype.connect;
+        HSWebSocket.prototype.connect = function(...args) {
+            const res = origConnect.apply(this, args);
+            if (this.ws) {
+                const origOnMessage = this.ws.onmessage;
+                this.ws.onmessage = function(event) {
+                    try {
+                        if (origOnMessage) return origOnMessage.call(this, event);
+                    } catch (err) {
+                        if (err && err.message && err.message.includes('prepareData')) {
+                            // Safely swallow unmapped topic binary tick frames during subscription handshake
+                            return;
+                        }
+                        console.error('⚠️ [Fyers WebSocket onmessage error]:', err.message);
+                    }
+                };
+            }
+            return res;
+        };
+        HSWebSocket.prototype._patchedForPrepareData = true;
+    }
+} catch (e) {
+    console.warn('⚠️ Could not patch Fyers SDK HSWebSocket:', e.message);
+}
+
+let global_io = null;
+let sharedPriceCache = null;
+let wsInstance = null;
+let clientSubscriptions = new Set();
+let mfSubscriptions = new Set();
+let watchdogInterval = null;
+let reconnectAttempts = 0;
+let reconnectTimer = null;
+let lastDataSocketError = null;
+let lastTickTime = Date.now();
+let isMasterNode = false;
+
+let dirtySymbols = new Set(); // Track symbols that changed in the last 300ms
+let clientViewerLastSeen = new Map(); // Track timestamp when an active client last pinged/viewed a symbol
+let symbolLastSeen = new Map(); // Global GC timestamp map for Fyers SDK keepalive
+
+function isExpiredContract(symbol) {
+    if (!symbol || typeof symbol !== 'string') return false;
+    try {
+        const { parseExpiryDate } = require('./autoSquareOff');
+        const expDate = parseExpiryDate(symbol);
+        if (expDate) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return expDate < today;
+        }
+    } catch (e) {}
+    return false;
+}
+
+function purgeExpiredSubscriptions() {
+    const toRemove = [];
+    for (const sym of clientSubscriptions) {
+        if (isExpiredContract(sym)) {
+            toRemove.push(sym);
+        }
+    }
+    if (toRemove.length > 0) {
+        toRemove.forEach(s => {
+            clientSubscriptions.delete(s);
+            const fSym = toFyersSymbol(s);
+            if (fSym) {
+                delete globalFyersToRequested[fSym];
+                if (wsInstance && isFyersConnected) {
+                    try { wsInstance.unsubscribe([fSym]); } catch (e) {}
+                }
+            }
+        });
+        console.log(`🧹 [Fyers] Purged ${toRemove.length} expired subscriptions from live stream.`);
+    }
+    return toRemove.length;
+}
+
+// The global map of ALL subscriptions we care about (used by PM2 master);
+
+const fyers = new fyersModel({ "path": path.join(__dirname, '../logs'), "enableLogging": false });
+
+// Set Fyers Credentials
+const APP_ID = process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+const SECRET_ID = process.env.FYERS_SECRET_ID || 'bBPHCtnZiGzWdeuD';
+const REDIRECT_URL = process.env.REDIRECT_URL || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/+$/, '')}/api/fyers/callback` : 'https://skandx.in/api/fyers/callback');
+
+fyers.setAppId(APP_ID);
+fyers.setRedirectUrl(REDIRECT_URL);
+
+// Keep track of the active access token
+let activeAccessToken = null;
+let activeAppId = APP_ID;
+let isFyersConnected = false;
+
+// Global map to ensure Fyers symbols map perfectly back to the exact requested frontend symbol
+const globalFyersToRequested = {};
+
+// Fallback name-based map for indices whose exchange symbol requires mapping (e.g. POWER-BSE)
+let nameToFyers = {};
+
+try {
+    const fyersMap = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/fyers_map.json'), 'utf8'));
+    if (fyersMap.nameToFyers) nameToFyers = fyersMap.nameToFyers;
+} catch (e) {
+    console.error("Error loading fyers_map.json:", e);
+}
+
+// Canonical symbol resolution map for BSE & NSE symbols from stocks master
+const canonicalStockMap = new Map();
+try {
+    const stocksList = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/stocks.json'), 'utf8'));
+    stocksList.forEach(s => {
+        if (s.symbol && s.exchange) {
+            const clean = s.symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+            canonicalStockMap.set(`${s.exchange}:${clean}`, s.symbol);
+            canonicalStockMap.set(`${s.exchange}:${clean.toUpperCase()}`, s.symbol);
+            if (s.name) {
+                canonicalStockMap.set(`${s.exchange}:${s.name}`, s.symbol);
+                canonicalStockMap.set(`${s.exchange}:${s.name.toUpperCase()}`, s.symbol);
+            }
+        }
+    });
+} catch(e) {
+    console.error("Error loading stocks.json for canonical mapping:", e);
+}
+
+
+// ── O(1) reverse lookup: fyersSymbol → our platform symbol (built once at boot) ──
+// The fromFyersSymbol() function was doing O(n) for-loop over nameToFyers on EVERY tick.
+// For 200 subscribed symbols × 10 ticks/sec = 200,000 iterations/sec. This Map makes it O(1).
+const fyersToNameMap = new Map(Object.entries(nameToFyers).map(([k, v]) => [v, k]));
+
+// ── Pre-require triggerEngine and volumeMatchingEngine at module level so it's not re-required in every tick ──
+let triggerEngine = null;
+try { triggerEngine = require('./triggerEngine'); } catch(e) {}
+let volumeMatchingEngine = null;
+try { volumeMatchingEngine = require('./volumeMatchingEngine'); } catch(e) {}
+let gcInterval = null;
+
+
+// Convert our platform's unique symbols to Fyers Symbols (guaranteeing valid exchange prefix)
+function toFyersSymbol(symbol) {
+    if (typeof symbol === 'object' && symbol !== null) symbol = symbol.symbol;
+    if (!symbol) return null;
+
+    // 1. If symbol has an exchange prefix (e.g. BSE:KITEX, NSE:KITEX, MCX:CRUDEOIL),
+    // check canonicalStockMap first to respect the specified exchange
+    if (symbol.includes(':')) {
+        if (canonicalStockMap.has(symbol)) return canonicalStockMap.get(symbol);
+        const [ex, symPart] = symbol.split(':');
+        const clean = symPart.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+        if (canonicalStockMap.has(`${ex}:${clean}`)) return canonicalStockMap.get(`${ex}:${clean}`);
+        if (nameToFyers[symbol]) return nameToFyers[symbol];
+        return symbol;
+    }
+
+    // 2. Unprefixed symbol: check nameToFyers or canonical maps
+    if (nameToFyers[symbol]) return nameToFyers[symbol];
+    if (canonicalStockMap.has(`NSE:${symbol}`)) return canonicalStockMap.get(`NSE:${symbol}`);
+    if (canonicalStockMap.has(`BSE:${symbol}`)) return canonicalStockMap.get(`BSE:${symbol}`);
+
+    // Auto-resolve exchange prefix for derivatives/equities passed without prefix
+    if (/(GOLD|SILVER|CRUDEOIL|NATURALGAS|COPPER|ZINC|NICKEL|ALUMINIUM|LEAD|COTTON|MENTHAOIL|STEELREBAR)/i.test(symbol)) {
+        return `MCX:${symbol}`;
+    }
+    if (/^(SENSEX|BANKEX)/i.test(symbol) || symbol.endsWith('-BSE') || symbol.endsWith('-A') || symbol.endsWith('-B')) {
+        return `BSE:${symbol}`;
+    }
+    return `NSE:${symbol}`;
+}
+
+// Convert Fyers Symbols back to our platform's unique symbols — O(1) Map lookup
+function fromFyersSymbol(fyersSymbol) {
+    if (!fyersSymbol) return null;
+    // Use O(1) Map lookup instead of O(n) for-loop
+    const mapped = fyersToNameMap.get(fyersSymbol);
+    if (mapped) return mapped;
+    return fyersSymbol; // Since we are now Fyers native, the symbol IS the Fyers symbol
+}
+
+// ─── AUTHENTICATION ─────────────────────────────────────────────────────────
+
+function getFyersAuthURL() {
+    return fyers.generateAuthCode();
+}
+
+async function verifyFyersAuth(auth_code, customSecretKey = null, customAppId = null) {
+    try {
+        const clientId = customAppId || APP_ID;
+        activeAppId = clientId;
+        fyers.setAppId(clientId);
+
+        const response = await fyers.generate_access_token({
+            client_id: clientId,
+            secret_key: customSecretKey || SECRET_ID,
+            auth_code: auth_code
+        });
+
+        if (response.s === 'ok' && response.access_token) {
+            activeAccessToken = response.access_token;
+            fyers.setAccessToken(activeAccessToken);
+            isFyersConnected = true;
+            
+            // Save token to disk so it survives restarts for the rest of the day
+            fs.writeFileSync(path.join(__dirname, '../fyers_token.txt'), activeAccessToken);
+            if (customAppId) {
+                try {
+                    fs.writeFileSync(path.join(__dirname, '../fyers_appid.txt'), customAppId);
+                } catch(e) {}
+            }
+            
+            // Publish to Redis so all PM2 workers reload the token
+            try {
+                const { pubClient } = require('./redisClient');
+                if (pubClient) {
+                    pubClient.publish('fyers_token_updated', 'updated').catch(e => {});
+                }
+            } catch (err) {}
+            
+            return { success: true };
+        } else {
+            console.error("Fyers Auth Error:", response);
+            return { success: false, error: response.message };
+        }
+    } catch (e) {
+        console.error("Fyers Verify Exception:", e);
+        return { success: false, error: e.message };
+    }
+}
+
+// JWT and Token validation helpers
+function decodeFyersJwt(token) {
+    if (!token || typeof token !== 'string') return null;
+    try {
+        const parts = token.split('.');
+        if (parts.length >= 2) {
+            const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
+            return payload;
+        }
+    } catch (e) {}
+    return null;
+}
+
+function isTokenExpired(token) {
+    if (!token || typeof token !== 'string') return true;
+    const payload = decodeFyersJwt(token);
+    if (payload && payload.exp) {
+        return Date.now() >= payload.exp * 1000;
+    }
+    return false;
+}
+
+// On boot, try to load token from disk
+function loadTokenFromDisk() {
+    try {
+        const pAppId = path.join(__dirname, '../fyers_appid.txt');
+        if (fs.existsSync(pAppId)) {
+            const appIdFromFile = fs.readFileSync(pAppId, 'utf8');
+            if (appIdFromFile && appIdFromFile.trim().length > 3) {
+                activeAppId = appIdFromFile.trim();
+                fyers.setAppId(activeAppId);
+            }
+        }
+
+        const p = path.join(__dirname, '../fyers_token.txt');
+        if (fs.existsSync(p)) {
+            const token = fs.readFileSync(p, 'utf8');
+            if (token && token.trim().length > 20) {
+                activeAccessToken = token.trim();
+                fyers.setAccessToken(activeAccessToken);
+                if (isTokenExpired(activeAccessToken)) {
+                    isFyersConnected = false;
+                    lastDataSocketError = 'Token Expired: Daily Fyers token has expired. Please reconnect via Connect Web.';
+                    console.warn("⚠️ Fyers token on disk is EXPIRED. Please connect via Admin Dashboard.");
+                    return false;
+                }
+                isFyersConnected = true;
+                console.log("🔌 Loaded valid Fyers token from disk.");
+                return true;
+            }
+        }
+    } catch (e) {}
+    return false;
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+
+function isAnyTradingSessionOpen() {
+    const istTimeParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(new Date());
+    const istH = parseInt(istTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const istM = parseInt(istTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const istDay = istTimeParts.find(p => p.type === 'weekday')?.value;
+    if (istDay === 'Sat' || istDay === 'Sun') return false;
+    const currentMins = istH * 60 + istM;
+    return currentMins >= 540 && currentMins <= 1410; // 09:00 AM to 23:30 PM IST (Equities + MCX)
+}
+
+async function initFyers(io, pc, isMaster = true) {
+    global_io = io;
+    sharedPriceCache = pc;
+    isMasterNode = isMaster;
+    
+    if (loadTokenFromDisk()) {
+        if (isMaster) {
+            startLiveWebSocket();
+        } else {
+            console.log("🔌 Loaded Fyers token for Worker instance. REST API enabled.");
+        }
+    } else {
+        console.warn("⚠️ Fyers is not authenticated. Please visit Admin Dashboard to connect.");
+    }
+    
+    // Start interval to broadcast LTPs to clients — BATCHED (1 message for ALL symbols)
+    // This is far more efficient than 1 message per symbol (N messages) for multi-user scenarios.
+    if (isMasterNode) {
+        setInterval(() => {
+            if (dirtySymbols.size === 0 || !global_io) return;
+
+            // ⚡ Off-Market Deep Sleep: If it is night or weekend and all trading sessions are closed, skip broadcast
+            if (!isAnyTradingSessionOpen()) {
+                dirtySymbols.clear();
+                return;
+            }
+
+            // Build one batch object with ALL updated prices — slimmed to essential fields
+            // to slash network egress bandwidth and Redis loopback traffic by >80%
+            const batchUpdate = {};
+            dirtySymbols.forEach(uniqueSymbol => {
+                const priceObj = sharedPriceCache[uniqueSymbol];
+                if (priceObj) {
+                    batchUpdate[uniqueSymbol] = {
+                        symbol: priceObj.symbol,
+                        timestamp: priceObj.timestamp,
+                        ltp: priceObj.ltp,
+                        open: priceObj.open,
+                        high: priceObj.high,
+                        low: priceObj.low,
+                        close: priceObj.close,
+                        volume: priceObj.volume,
+                        change: priceObj.change,
+                        pct: priceObj.pct,
+                        totBuyQuan: priceObj.totBuyQuan,
+                        totSellQuan: priceObj.totSellQuan,
+                        upper_circuit: priceObj.upper_circuit || 0,
+                        lower_circuit: priceObj.lower_circuit || 0
+                    };
+                }
+            });
+            dirtySymbols.clear();
+
+            if (Object.keys(batchUpdate).length > 0) {
+                // Send targeted updates to specific symbol rooms ONLY if an active user is viewing it
+                const now = Date.now();
+                for (const sym of Object.keys(batchUpdate)) {
+                    const room = global_io.sockets?.adapter?.rooms?.get(sym);
+                    const lastPingTime = clientViewerLastSeen.get(sym) || 0;
+                    // Active viewer if pinged within last 60s or connected locally
+                    const hasActiveViewers = (now - lastPingTime <= 60000) || (room && room.size > 0);
+                    if (hasActiveViewers) {
+                        const p = batchUpdate[sym];
+                        // Emit compact 13-element array: [ltp, ch, chp, timestamp, open, high, low, close, vol, totBuyQuan, totSellQuan, upper_circuit, lower_circuit]
+                        global_io.to(sym).emit('price_snapshot', {
+                            [sym]: [
+                                p.ltp,
+                                p.change,
+                                p.pct,
+                                p.timestamp,
+                                p.open,
+                                p.high,
+                                p.low,
+                                p.close,
+                                p.volume,
+                                p.totBuyQuan,
+                                p.totSellQuan,
+                                p.upper_circuit || 0,
+                                p.lower_circuit || 0
+                            ]
+                        });
+                    }
+                }
+
+                // Also batch-sync this updated cache to Worker nodes via Redis (this stays batched)
+                try {
+                    const { pubClient } = require('./redisClient');
+                    if (pubClient) {
+                        pubClient.publish('price_cache_batch_sync', JSON.stringify(batchUpdate)).catch(e => {});
+                    }
+                } catch(e) {}
+            }
+        }, 1000); // 1000ms (1 update per sec) to drastically save Egress Bandwidth costs for 100k users
+    }
+}
+
+// ─── WEBSOCKET ──────────────────────────────────────────────────────────────
+
+const DataSocket = require("fyers-api-v3").fyersDataSocket;
+
+function startLiveWebSocket() {
+    purgeExpiredSubscriptions();
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    if (wsInstance) { try { if (wsInstance.close) wsInstance.close(); if (wsInstance.disconnect) wsInstance.disconnect(); } catch(e) {} }
+    // With fyers-api-v3, we MUST use getInstance() instead of new DataSocket
+    // to prevent 'Only one instance of DataSocket is allowed' errors during reconnects.
+    // If wsInstance exists, we just let it be, but we will call connect() later.
+    
+    // Fyers V3 DataSocket requires access_token in APPID:ACCESS_TOKEN format
+    const effectiveAppId = activeAppId || process.env.FYERS_APP_ID || 'HBIQP0RPMK-200';
+    
+    try {
+        const logPath = path.join(__dirname, '../logs');
+        if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
+        wsInstance = DataSocket.getInstance(`${effectiveAppId}:${activeAccessToken.trim()}`, logPath, false);
+        lastDataSocketError = null;
+    } catch(err) {
+        lastDataSocketError = err.stack || err.message || err.toString();
+        console.error("🚨 Failed to initialize Fyers DataSocket:", err);
+        return;
+    }
+    
+    if (wsInstance.FullMode) {
+        wsInstance.mode(wsInstance.FullMode);
+    }
+    
+    // Always remove old listeners and re-attach fresh ones.
+    // The singleton pattern means we get the same object back, but after a token change
+    // or pm2 restart we MUST re-register handlers so the new code takes effect.
+    try { if (wsInstance.removeAllListeners) wsInstance.removeAllListeners(); } catch(e) {}
+    wsInstance.hasListenersAttached = true;
+    
+    wsInstance.on('connect', () => {
+        console.log('✅ Fyers WebSocket Connected!');
+        lastTickTime = Date.now();
+        isFyersConnected = true;
+        reconnectAttempts = 0;
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+        if (global_io) {
+            global_io.emit('market_feed_status', { connected: true, lastTickTime });
+        }
+        
+        // CRITICAL: Always enable autoreconnect unconditionally so Fyers can
+        // recover from hourly session drops even when no clients are connected at boot.
+        if (wsInstance) wsInstance.autoreconnect();
+        
+        // Re-subscribe to all existing client subscriptions
+        if (clientSubscriptions.size > 0) {
+            const fyersSymbols = Array.from(clientSubscriptions)
+                .map(toFyersSymbol)
+                .filter(Boolean);
+            
+                  (async () => {
+                      const chunkSize = 25;
+                      for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+                          if (!wsInstance) break;
+                          const chunk = fyersSymbols.slice(i, i + chunkSize);
+                          wsInstance.subscribe(chunk);
+                          await new Promise(r => setTimeout(r, 300));
+                      }
+                  })();
+        }
+        
+        // Watchdog — only trigger if we've been running for more than 2 minutes.
+        // This prevents false restarts during PM2 boot when no clients have connected yet.
+        const bootGracePeriodMs = 120000; // 2 minutes
+        if (watchdogInterval) clearInterval(watchdogInterval);
+        watchdogInterval = setInterval(() => {
+            const staleSec = (Date.now() - lastTickTime) / 1000;
+            const uptimeSec = process.uptime();
+            
+            // Timezone-safe IST calculation
+            const istTimeParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: 'numeric', weekday: 'short', hour12: false }).formatToParts(new Date());
+            const istH = parseInt(istTimeParts.find(p => p.type === 'hour')?.value || '0', 10);
+            const istM = parseInt(istTimeParts.find(p => p.type === 'minute')?.value || '0', 10);
+            const istDay = istTimeParts.find(p => p.type === 'weekday')?.value;
+            const isWeekend = (istDay === 'Sat' || istDay === 'Sun');
+
+            // Verify if any active subscription is in a currently open trading session
+            const hasActiveMarketSubscriptions = Array.from(clientSubscriptions).some(sym => {
+                const isCom = sym.includes('MCX') || ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM'].some(c => sym.includes(c));
+                if (isCom) {
+                    return (istH >= 9 && (istH < 23 || (istH === 23 && istM <= 30)));
+                } else {
+                    return ((istH > 9 || (istH === 9 && istM >= 15)) && (istH < 15 || (istH === 15 && istM <= 30)));
+                }
+            });
+
+            if (!isWeekend && staleSec > 60 && hasActiveMarketSubscriptions && uptimeSec > 90) {
+                console.warn(`🐛 WATCHDOG: No Fyers ticks for ${staleSec.toFixed(0)}s! SDK stuck during active market hours. Forcing PM2 restart...`);
+                process.exit(0);
+            }
+        }, 15000);
+    });
+    
+    wsInstance.on('message', (message) => {
+        lastTickTime = Date.now();
+        const data = Array.isArray(message) ? message : [message];
+        
+        data.forEach(tick => {
+            if (!tick || !tick.symbol) return;
+            
+            let syms = globalFyersToRequested[tick.symbol];
+            if (!syms || syms.length === 0) {
+                const mapped = fromFyersSymbol(tick.symbol);
+                if (mapped) syms = [mapped];
+            }
+            if (!syms || syms.length === 0) return;
+            
+            // Fyers WebSocket v3 sends tick data as an object
+            // ltp, ch, chp, vol, bid, ask, etc.
+            // Tick types: 'dp'=Depth, 'if'=IndexFull, 'sf'=SymFull(Lite), 'of'=SymFull(Full)
+            // We accept ALL types that have an ltp - do not whitelist by type string
+            // because Fyers may send 'of' or other types depending on mode/symbol.
+            
+            if (tick.ltp !== undefined) {
+                const ltp = tick.ltp;
+                if (ltp === undefined) return;
+                
+                let bids = [];
+                let asks = [];
+                
+                if (tick.bids) {
+                    bids = tick.bids.map(b => ({ price: b.price.toFixed(2), qty: b.volume, orders: b.ord }));
+                }
+                if (tick.asks) {
+                    asks = tick.asks.map(a => ({ price: a.price.toFixed(2), qty: a.volume, orders: a.ord }));
+                }
+                
+                syms.forEach(uniqueSymbol => {
+                    let oldPriceObj = sharedPriceCache[uniqueSymbol] || {};
+                    
+                    const prev = tick.prev_close_price !== undefined ? tick.prev_close_price : (oldPriceObj.close !== undefined ? oldPriceObj.close : ltp);
+                    let change = tick.ch !== undefined ? tick.ch : (ltp - prev);
+                    let pct = tick.chp !== undefined ? tick.chp : (prev > 0 ? (change / prev) * 100 : 0);
+                    if ((!change || change === 0) && prev && prev > 0 && ltp > 0 && ltp !== prev) {
+                        change = ltp - prev;
+                        pct = (change / prev) * 100;
+                    }
+                    
+                    const priceObj = {
+                        symbol: uniqueSymbol,
+                        timestamp: Date.now(),
+                        ltp: ltp,
+                        open: tick.open_price !== undefined ? tick.open_price : (oldPriceObj.open || null),
+                        high: tick.high_price !== undefined ? tick.high_price : (oldPriceObj.high || null),
+                        low: tick.low_price !== undefined ? tick.low_price : (oldPriceObj.low || null),
+                        close: prev || null,
+                        volume: tick.vol_traded_today !== undefined ? tick.vol_traded_today : (oldPriceObj.volume || 0),
+                        ltt: tick.last_traded_time ? tick.last_traded_time * 1000 : (oldPriceObj.ltt || null),
+                        change: change,
+                        pct: pct,
+                        bids: bids.length > 0 ? bids : (oldPriceObj.bids || []),
+                        asks: asks.length > 0 ? asks : (oldPriceObj.asks || []),
+                        totBuyQuan: tick.tot_buy_qty !== undefined ? tick.tot_buy_qty : (oldPriceObj.totBuyQuan || 0),
+                        totSellQuan: tick.tot_sell_qty !== undefined ? tick.tot_sell_qty : (oldPriceObj.totSellQuan || 0),
+                        upper_circuit: tick.upper_ckt !== undefined ? Number(tick.upper_ckt) : (oldPriceObj.upper_circuit || null),
+                        lower_circuit: tick.lower_ckt !== undefined ? Number(tick.lower_ckt) : (oldPriceObj.lower_circuit || null)
+                    };
+                    
+                    sharedPriceCache[uniqueSymbol] = priceObj;
+                    if (uniqueSymbol.includes(':')) {
+                        const parts = uniqueSymbol.split(':');
+                        const ex = parts[0];
+                        const raw = parts[1];
+                        sharedPriceCache[raw] = priceObj;
+                        const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+                        sharedPriceCache[clean] = priceObj;
+                        sharedPriceCache[`${ex}:${clean}`] = priceObj;
+                    }
+                    dirtySymbols.add(uniqueSymbol); // Broadcast canonical uniqueSymbol (cuts duplicate emissions)
+                    
+                    // Evaluate triggers on the master node using pre-cached reference (no require() on each tick)
+                    if (triggerEngine) {
+                        triggerEngine.evaluateTick(uniqueSymbol, ltp).catch(() => {});
+                    }
+
+                    // Feed tick into realistic volume and market depth matching engine
+                    if (volumeMatchingEngine) {
+                        volumeMatchingEngine.onTick(uniqueSymbol, priceObj).catch(() => {});
+                    }
+                });
+            }
+        });
+    });
+    
+    wsInstance.on('error', (err) => {
+        console.error("Fyers WS Error:", err);
+        const errMsg = (err && (err.message || err.toString())) || '';
+        if (errMsg.toLowerCase().includes('token') || errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('unauthorized')) {
+            console.warn("🚨 Fyers token expired or unauthorized. Please re-authenticate Fyers via Admin Settings / API.");
+        }
+    });
+    
+    wsInstance.on('close', (reason) => {
+        console.log("Fyers WS Closed — resetting state and scheduling reconnect.", reason || '');
+        isFyersConnected = false;
+        if (global_io) {
+            global_io.emit('market_feed_status', { connected: false, lastTickTime });
+        }
+        
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+
+        reconnectAttempts++;
+        // Exponential backoff: 5s, 7.5s, 11.2s, 16.8s, up to max 30s
+        const backoffDelay = Math.min(30000, Math.round(5000 * Math.pow(1.5, Math.min(reconnectAttempts - 1, 4))));
+        console.log(`[WS] Scheduling reconnect attempt #${reconnectAttempts} in ${Math.round(backoffDelay / 1000)}s`);
+
+        reconnectTimer = setTimeout(() => {
+            if (!isFyersConnected && activeAccessToken) {
+                console.log("[WS] Backoff reconnect triggered.");
+                startLiveWebSocket();
+            }
+        }, backoffDelay);
+    });
+    
+    wsInstance.connect();
+}
+
+let subQueue = [];
+let isProcessingSubQueue = false;
+
+async function processSubQueue() {
+    if (isProcessingSubQueue || !wsInstance || !isFyersConnected) return;
+    isProcessingSubQueue = true;
+    try {
+        while (subQueue.length > 0) {
+            if (!wsInstance) break;
+            const chunk = subQueue.splice(0, 25);
+            wsInstance.subscribe(chunk);
+            await new Promise(r => setTimeout(r, 300)); // Limit rate while batching
+        }
+    } catch (e) {
+        console.error("Error processing Fyers sub queue:", e);
+    }
+    isProcessingSubQueue = false;
+}
+
+function addSubscriptionBatch(symbols) {
+    if (Array.isArray(symbols)) symbols = symbols.map(s => typeof s === 'object' && s !== null ? s.symbol : s).filter(Boolean);
+    if (!Array.isArray(symbols) || symbols.length === 0) return;
+    
+    const now = Date.now();
+    symbols.forEach(item => {
+        let s = typeof item === 'string' ? item : item?.symbol;
+        if (!s || typeof s !== 'string') return;
+        if (s.endsWith('-MF')) { mfSubscriptions.add(s); return; }
+        if (isExpiredContract(s)) return;
+        
+        // FIX: Update symbolLastSeen so GC doesn't kill manually subscribed symbols.
+        // Previously only handlePingSubscriptions updated symbolLastSeen, so symbols added
+        // via watchlist/order/position 'subscribe' event got GC'd after 30s silently.
+        symbolLastSeen.set(s, now);
+        clientViewerLastSeen.set(s, now);
+        
+        const alreadySubscribed = clientSubscriptions.has(s);
+        clientSubscriptions.add(s);
+        const fSym = toFyersSymbol(s);
+        if (fSym) {
+            if (!alreadySubscribed && !subQueue.includes(fSym)) {
+                subQueue.push(fSym);
+            }
+            if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+            if (!globalFyersToRequested[fSym].includes(s)) globalFyersToRequested[fSym].push(s);
+        }
+    });
+    
+    if (wsInstance && isFyersConnected && subQueue.length > 0) {
+        processSubQueue();
+    }
+    
+    // Start GC if not already running
+    if (!gcInterval) {
+        gcInterval = setInterval(garbageCollectSubscriptions, 30000);
+    }
+}
+
+function handlePingSubscriptions(symbols) {
+    if (!Array.isArray(symbols)) return;
+    
+    const now = Date.now();
+    const newSymbols = [];
+    
+    symbols.forEach(s => {
+        if (!s || typeof s !== 'string' || s.endsWith('-MF') || isExpiredContract(s)) return;
+        
+        symbolLastSeen.set(s, now);
+        clientViewerLastSeen.set(s, now);
+        
+        if (!clientSubscriptions.has(s)) {
+            clientSubscriptions.add(s);
+            newSymbols.push(s);
+        }
+    });
+    
+    // Subscribe to new symbols that we aren't already tracking
+    if (newSymbols.length > 0) {
+        newSymbols.forEach(s => {
+            const fSym = toFyersSymbol(s);
+            if (fSym) {
+                if (!subQueue.includes(fSym)) subQueue.push(fSym);
+                if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+                if (!globalFyersToRequested[fSym].includes(s)) globalFyersToRequested[fSym].push(s);
+            }
+        });
+        
+        if (wsInstance && isFyersConnected && subQueue.length > 0) {
+            processSubQueue();
+        }
+    }
+    
+    // Start GC if not running
+    if (!gcInterval) {
+        gcInterval = setInterval(garbageCollectSubscriptions, 30000); // Check every 30 seconds
+    }
+}
+
+async function garbageCollectSubscriptions() {
+    if (!wsInstance || !isFyersConnected) return;
+    
+    const now = Date.now();
+    const staleFyersSymbols = [];
+    
+    // --- ANTI-GC FOR ESSENTIAL SYMBOLS ---
+    // Prevent garbage collection for open orders, positions, and indices
+    // Active user watchlists are automatically protected by ping_subscriptions from client
+    try {
+        const db = require('../database/db');
+        const protectSymbol = (sym) => {
+            if (sym && !sym.endsWith('-MF')) {
+                symbolLastSeen.set(sym, now); // Prevent GC
+                if (!clientSubscriptions.has(sym)) {
+                    clientSubscriptions.add(sym);
+                    const fSym = toFyersSymbol(sym);
+                    if (fSym) {
+                        if (!subQueue.includes(fSym)) subQueue.push(fSym);
+                        if (!globalFyersToRequested[fSym]) globalFyersToRequested[fSym] = [];
+                        if (!globalFyersToRequested[fSym].includes(sym)) globalFyersToRequested[fSym].push(sym);
+                    }
+                }
+            }
+        };
+        
+        // 1. Protect Indices
+        ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX', 'NSE:FINNIFTY-INDEX', 'NSE:MIDCPNIFTY-INDEX', 'NSE:NIFTYNXT50-INDEX', 'BSE:SENSEX-INDEX', 'BSE:BANKEX-INDEX'].forEach(protectSymbol);
+        
+        // 2. Protect Pending Orders & Resting Volume Orders
+        try {
+            const triggerEngine = require('./triggerEngine');
+            if (triggerEngine && triggerEngine.activeTriggerSymbols && triggerEngine.activeTriggerSymbols.size > 0) {
+                triggerEngine.activeTriggerSymbols.forEach(protectSymbol);
+            }
+            const volumeMatchingEngine = require('./volumeMatchingEngine');
+            if (volumeMatchingEngine && typeof volumeMatchingEngine.getActiveSymbols === 'function') {
+                volumeMatchingEngine.getActiveSymbols().forEach(protectSymbol);
+            }
+            const ordRows = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING']).distinct('symbol').catch(()=>[]);
+            ordRows.forEach(r => protectSymbol(r.symbol));
+        } catch (_) {}
+            
+        // 3. Protect Open Positions
+        const posRows = await db('positions').where('quantity', '!=', 0).distinct('symbol').catch(()=>[]);
+        posRows.forEach(r => protectSymbol(r.symbol));
+
+        if (wsInstance && isFyersConnected && subQueue.length > 0) {
+            processSubQueue();
+        }
+    } catch(e) {}
+    // ----------------------------------
+
+    for (const [symbol, lastSeen] of symbolLastSeen.entries()) {
+        // If a symbol hasn't been pinged in 60 seconds by ANY user, unsubscribe it
+        if (now - lastSeen > 60000) {
+            clientSubscriptions.delete(symbol);
+            symbolLastSeen.delete(symbol);
+            clientViewerLastSeen.delete(symbol);
+            
+            const fSym = toFyersSymbol(symbol);
+            if (fSym) {
+                if (globalFyersToRequested[fSym]) {
+                    globalFyersToRequested[fSym] = globalFyersToRequested[fSym].filter(item => item !== symbol);
+                    if (globalFyersToRequested[fSym].length === 0) {
+                        delete globalFyersToRequested[fSym];
+                        staleFyersSymbols.push(fSym);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (staleFyersSymbols.length > 0) {
+        console.log(`[GC] Unsubscribing ${staleFyersSymbols.length} stale symbols from Fyers...`);
+        try {
+            wsInstance.unsubscribe(staleFyersSymbols);
+        } catch(e) {}
+    }
+}
+
+// ─── API FETCH FUNCTIONS ────────────────────────────────────────────────────
+
+// Helper for HTTP fallback
+async function fetchBatchLTPs(symbols) {
+    if (!Array.isArray(symbols) || symbols.length === 0) return {};
+    
+    const isMfSymbol = s => typeof s === 'string' && (s.endsWith('-MF') || /^\d{5,6}$/.test(s) || ['EDEL', 'MIRA', 'NIPP', 'EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(s));
+    const validSymbols = symbols.filter(s => typeof s === 'string' && s.length > 0 && !isMfSymbol(s) && !isExpiredContract(s));
+    const mfSymbols = symbols.filter(isMfSymbol);
+    
+    const mfResults = {};
+    if (mfSymbols.length > 0) {
+        const LEGACY_MF_MAP = {
+            'EDEL-MF': '118615',
+            'MIRA-MF': '118825',
+            'NIPP-MF': '118778',
+            'EDEL': '118615',
+            'MIRA': '118825',
+            'NIPP': '118778'
+        };
+        const axios = require('axios');
+        for (const sym of mfSymbols) {
+            try {
+                const rawCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+                const mfCode = LEGACY_MF_MAP[sym] || LEGACY_MF_MAP[rawCode] || rawCode;
+                const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
+                if (res.data && res.data.data && res.data.data.length > 0) {
+                    const nav = parseFloat(res.data.data[0].nav);
+                    if (!isNaN(nav)) {
+                        mfResults[sym] = { symbol: sym, ltp: nav, ch: 0, chp: 0, vol: 0, timestamp: Date.now() };
+                        if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
+                        sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...mfResults[sym] };
+                    }
+                }
+            } catch (e) {
+                console.error(`Failed to fetch MF data for ${sym}:`, e.message);
+            }
+        }
+    }
+    
+    if (validSymbols.length === 0) return mfResults;
+
+    const fyersToRequested = {};
+    const fyersSymbols = validSymbols.map(s => {
+        const fSym = toFyersSymbol(s);
+        if (fSym) {
+            if (!fyersToRequested[fSym]) fyersToRequested[fSym] = [];
+            if (!fyersToRequested[fSym].includes(s)) fyersToRequested[fSym].push(s);
+            
+            if (!globalFyersToRequested[fSym]) {
+                globalFyersToRequested[fSym] = [];
+                if (!subQueue.includes(fSym)) subQueue.push(fSym);
+            }
+            if (!globalFyersToRequested[fSym].includes(s)) {
+                globalFyersToRequested[fSym].push(s);
+            }
+            
+            return fSym;
+        }
+        return null;
+    }).filter(Boolean);
+    
+    if (!activeAccessToken || fyersSymbols.length === 0) {
+        return validSymbols.reduce((acc, sym) => {
+            if (sharedPriceCache[sym]) acc[sym] = sharedPriceCache[sym];
+            return acc;
+        }, mfResults);
+    }
+
+    try {
+        const results = {};
+        
+        const chunkSize = 50;
+        for (let i = 0; i < fyersSymbols.length; i += chunkSize) {
+            const chunk = fyersSymbols.slice(i, i + chunkSize);
+            
+            try {
+                const response = await fyers.getQuotes(chunk);
+                
+                const processQuotesResponse = (res) => {
+                    if (res && res.s === 'ok' && res.d) {
+                        res.d.forEach(item => {
+                            if (item.v && (item.v.lp !== undefined || item.v.prev_close_price !== undefined || item.v.close_price !== undefined)) {
+                                let syms = fyersToRequested[item.n];
+                                if (!syms || syms.length === 0) {
+                                    const mapped = fromFyersSymbol(item.n);
+                                    if (mapped) syms = [mapped];
+                                }
+                                
+                                if (syms && syms.length > 0) {
+                                    syms.forEach(uniqueSymbol => {
+                                        const close = Number(item.v.prev_close_price) || Number(item.v.close_price) || null;
+                                        const ltp = Number(item.v.lp) || close || 0;
+                                        let change = Number(item.v.ch) || 0;
+                                        let pct = Number(item.v.chp) || 0;
+                                        if ((!change || change === 0) && close && close > 0 && ltp > 0 && ltp !== close) {
+                                            change = ltp - close;
+                                            pct = (change / close) * 100;
+                                        }
+                                        const priceObj = {
+                                            symbol: uniqueSymbol,
+                                            timestamp: Date.now(),
+                                            ltp: ltp,
+                                            open: Number(item.v.open_price) || null,
+                                            high: Number(item.v.high_price) || null,
+                                            low: Number(item.v.low_price) || null,
+                                            close: close,
+                                            volume: Number(item.v.volume) || 0,
+                                            change: change,
+                                            pct: pct,
+                                            upper_circuit: Number(item.v.upper_ckt) || Number(item.v.upper_circuit) || null,
+                                            lower_circuit: Number(item.v.lower_ckt) || Number(item.v.lower_circuit) || null
+                                        };
+                                        results[uniqueSymbol] = priceObj;
+                                        sharedPriceCache[uniqueSymbol] = priceObj;
+                                        if (uniqueSymbol.includes(':')) {
+                                            const raw = uniqueSymbol.split(':')[1];
+                                            results[raw] = priceObj;
+                                            sharedPriceCache[raw] = priceObj;
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                };
+
+                if (response && response.s === 'ok') {
+                    processQuotesResponse(response);
+                } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
+                    if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
+                        lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+                        isFyersConnected = false;
+                    }
+                    if (response.code !== -15 && response.code !== -17) {
+                        // Fast parallel retry with strict 1.5s timeout cap (eliminates the 28-second stall)
+                        const validChunk = chunk.filter(fSym => !isExpiredContract(fSym));
+                        const retryPromises = validChunk.map(fSym => 
+                            fyers.getQuotes([fSym]).then(indRes => {
+                                if (indRes && indRes.s === 'ok') processQuotesResponse(indRes);
+                            }).catch(() => {})
+                        );
+                        await Promise.race([
+                            Promise.allSettled(retryPromises),
+                            new Promise(resolve => setTimeout(resolve, 1500))
+                        ]);
+                    }
+                }
+            } catch(chunkErr) {
+                if (chunkErr && (chunkErr.code === -15 || chunkErr.code === -17 || (chunkErr.message && (chunkErr.message.toLowerCase().includes('token') || chunkErr.message.toLowerCase().includes('authenticate'))))) {
+                    lastDataSocketError = `Token Expired: ${chunkErr.message || 'Invalid or expired token'}`;
+                    isFyersConnected = false;
+                }
+            }
+        }
+        
+        return { ...results, ...mfResults };
+    } catch(e) {
+        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+            lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
+            isFyersConnected = false;
+        }
+        console.error("Fyers fetchBatchLTPs error:", e);
+    }
+    return mfResults;
+}
+
+// Fyers interval mapping
+const INTERVAL_MAP = {
+    'ONE_MINUTE': '1',
+    'THREE_MINUTE': '3',
+    'FIVE_MINUTE': '5',
+    'TEN_MINUTE': '10',
+    'FIFTEEN_MINUTE': '15',
+    'THIRTY_MINUTE': '30',
+    'ONE_HOUR': '60',
+    'ONE_DAY': '1D'
+};
+
+const { generalClient } = require('./redisClient');
+
+async function fetchCandleData(symbol, interval = 'ONE_DAY') {
+    if (!activeAccessToken || !symbol) return [];
+    
+    const fSym = toFyersSymbol(symbol);
+    if (!fSym) return [];
+
+    const res = INTERVAL_MAP[interval] || '1D';
+    
+    // Check Redis cache first
+    const cacheKey = `chart:${fSym}:${res}`;
+    try {
+        const cached = await generalClient.get(cacheKey);
+        if (cached) {
+            return JSON.parse(cached);
+        }
+    } catch (err) {
+        console.error("Redis get error in fetchCandleData", err);
+    }
+    
+    // Fyers expects range in yyyy-mm-dd
+    const formatDate = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    let range_to = new Date();
+    let range_from = new Date();
+    
+    // 30 days for intraday, 1 year for daily
+    if (res === '1D') {
+        range_from.setFullYear(range_from.getFullYear() - 1);
+    } else {
+        range_from.setDate(range_from.getDate() - 30);
+    }
+
+    try {
+        const fetchPromise = fyers.getHistory({
+            symbol: fSym,
+            resolution: res,
+            date_format: 1,
+            range_from: formatDate(range_from),
+            range_to: formatDate(range_to),
+            cont_flag: 1
+        });
+        
+        // 10 second timeout to prevent hanging the route
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Fyers API Timeout')), 10000));
+        
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (response && response.s === 'ok' && response.candles) {
+            const formattedCandles = response.candles.map(c => ({
+                time: c[0] + 19800,
+                open: c[1],
+                high: c[2],
+                low: c[3],
+                close: c[4],
+                volume: c[5]
+            }));
+            
+            // Save to Redis for 60 seconds (1 minute caching)
+            try {
+                await generalClient.setEx(cacheKey, 60, JSON.stringify(formattedCandles));
+            } catch (err) {
+                console.error("Redis set error in fetchCandleData", err);
+            }
+            
+            return formattedCandles;
+        } else if (response && (response.s === 'error' || response.code === -15 || response.code === -17)) {
+            if (response.code === -15 || response.code === -17 || (response.message && (response.message.toLowerCase().includes('token') || response.message.toLowerCase().includes('authenticate')))) {
+                lastDataSocketError = `Token Expired: ${response.message || 'Invalid or expired token'}`;
+                isFyersConnected = false;
+            }
+        }
+    } catch (e) {
+        if (e && (e.code === -15 || e.code === -17 || (e.message && (e.message.toLowerCase().includes('token') || e.message.toLowerCase().includes('authenticate'))))) {
+            lastDataSocketError = `Token Expired: ${e.message || 'Invalid or expired token'}`;
+            isFyersConnected = false;
+        }
+        console.error("Fyers fetchCandleData error:", e);
+    }
+    return [];
+}
+
+function setPriceCache(pc) { sharedPriceCache = pc; }
+function registerTokens() {}
+function addSubscription(symbol) { addSubscriptionBatch([symbol]); }
+function subscribeToDepth(symbol) { 
+    if (!wsInstance || !isFyersConnected) return;
+    const fSym = toFyersSymbol(symbol);
+    if (fSym) {
+        try { wsInstance.subscribe([fSym], "DepthUpdate"); } catch (e) { console.error(e); }
+    }
+}
+function unsubscribeFromDepth(symbol) {
+    if (!wsInstance || !isFyersConnected) return;
+    const fSym = toFyersSymbol(symbol);
+    if (fSym) {
+        try { wsInstance.subscribe([fSym], "SymbolUpdate"); } catch (e) { console.error(e); }
+    }
+}
+
+function reloadFyersToken() {
+    console.log("Redis Event: Fyers token updated! Forcing PM2 restart to clear DataSocket cache in 3s...");
+    // fyers-api-v3 caches the DataSocket singleton. The only reliable way to force 
+    // it to use the new token is to exit the process and let PM2 restart it.
+    // Delaying by 3 seconds ensures the user's redirect request completes without a 502 Bad Gateway.
+    setTimeout(() => {
+        process.exit(0);
+    }, 3000);
+}
+
+function getPriceFromCache() {
+    return sharedPriceCache || {};
+}
+
+function getFyersStatus() {
+    const expiredByJwt = isTokenExpired(activeAccessToken);
+    const isTokenExpiredError = expiredByJwt || (lastDataSocketError && (
+        lastDataSocketError.toLowerCase().includes('expired') || 
+        lastDataSocketError.toLowerCase().includes('valid token') ||
+        lastDataSocketError.toLowerCase().includes('authenticate') ||
+        lastDataSocketError.toLowerCase().includes('failed to decode jwt')
+    ));
+    const hasValidToken = !!activeAccessToken && !isTokenExpiredError;
+    const recentTick = (Date.now() - lastTickTime) < 15000;
+    const jwtPayload = decodeFyersJwt(activeAccessToken);
+    const tokenExpiryDate = jwtPayload && jwtPayload.exp ? new Date(jwtPayload.exp * 1000).toISOString() : null;
+
+    return {
+        isMasterNode,
+        isFyersConnected: isMasterNode ? (isFyersConnected && hasValidToken) : (isFyersConnected || recentTick),
+        hasAccessToken: hasValidToken,
+        tokenExpired: !!isTokenExpiredError,
+        tokenExpiryDate,
+        wsInstanceExists: !!wsInstance,
+        lastDataSocketError: lastDataSocketError,
+        subscriptions: Array.from(clientSubscriptions),
+        lastTickTime: new Date(lastTickTime).toISOString(),
+        secondsSinceLastTick: (Date.now() - lastTickTime) / 1000,
+        fyersToRequestedMap: globalFyersToRequested
+    };
+}
+
+function updateWorkerTickTime() {
+    lastTickTime = Date.now();
+}
+
+module.exports = {
+    updateWorkerTickTime,
+    getPriceFromCache,
+    setPriceCache,
+    registerTokens,
+    addSubscription,
+    subscribeToDepth,
+    unsubscribeFromDepth,
+    initFyers,
+    reloadFyersToken,
+    getFyersAuthURL,
+    verifyFyersAuth,
+    fetchBatchLTPs,
+    fetchCandleData,
+    addSubscriptionBatch,
+    handlePingSubscriptions,
+    getFyersStatus,
+    isAnyTradingSessionOpen,
+    toFyersSymbol,
+    fromFyersSymbol,
+    purgeExpiredSubscriptions,
+    isExpiredContract
+};
+
+// Background task to poll mutual fund NAVs from mfapi.in
+setInterval(async () => {
+    if (typeof mfSubscriptions === 'undefined' || mfSubscriptions.size === 0) return;
+    const axios = require('axios');
+    const updates = {};
+    const LEGACY_MF_MAP = {
+        'EDEL-MF': '118615',
+        'MIRA-MF': '118825',
+        'NIPP-MF': '118778',
+        'EDEL': '118615',
+        'MIRA': '118825',
+        'NIPP': '118778'
+    };
+    for (const sym of mfSubscriptions) {
+        try {
+            const rawCode = sym.replace('-MF', '').replace('BSE:', '').replace('NSE:', '');
+            const mfCode = LEGACY_MF_MAP[sym] || LEGACY_MF_MAP[rawCode] || rawCode;
+            const res = await axios.get(`https://api.mfapi.in/mf/${mfCode}`);
+            if (res.data && res.data.data && res.data.data.length > 0) {
+                const nav = parseFloat(res.data.data[0].nav);
+                if (!isNaN(nav)) {
+                    updates[sym] = { ltp: nav, ch: 0, chp: 0, vol: 0, ts: Date.now() };
+                    if (!sharedPriceCache[sym]) sharedPriceCache[sym] = {};
+                    sharedPriceCache[sym] = { ...sharedPriceCache[sym], ...updates[sym] };
+                }
+            }
+        } catch (e) {
+            console.error(`Failed to fetch MF data for ${sym}:`, e.message);
+        }
+    }
+    if (Object.keys(updates).length > 0 && typeof isMasterNode !== 'undefined' && isMasterNode && typeof global_io !== 'undefined' && global_io) {
+        global_io.emit('price_update', updates);
+    } else if (Object.keys(updates).length > 0 && typeof isMasterNode !== 'undefined' && !isMasterNode) {
+        try { 
+            const { pubClient } = require('./redisClient');
+            pubClient.publish('fyers_ws_tick', JSON.stringify(updates)); 
+        } catch (e) {}
+    }
+}, 43200000); // Poll every 12 hours (Mutual Funds update NAV daily)

@@ -1,16 +1,23 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useStore, socket } from '../store';
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 import { X } from 'lucide-react';
 
 export default function DOMLadderModal() {
-  const { 
-    domLadderModal, closeDomLadderModal, marketDepthData, prices, 
-    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal
-  } = useStore();
-
+  const domLadderModal = useStore(state => state.domLadderModal);
   const symbol = domLadderModal.symbol;
-  const basicData = prices[symbol] || {};
-  const lotsize = domLadderModal.lotsize || basicData.lotsize || 1;
+  const basicData = useStore(state => symbol ? state.prices[symbol] : null) || {};
+  const marketDepthData = useStore(state => state.marketDepthData);
+  const oneClickMode = useStore(state => state.oneClickMode);
+  const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
+  const { closeDomLadderModal, placeOrder, openOrderModal } = useStore.getState();
+
+  const lotsize = (domLadderModal.lotsize && Number(domLadderModal.lotsize) > 1) 
+    ? Number(domLadderModal.lotsize) 
+    : (basicData.lotsize && Number(basicData.lotsize) > 1) 
+      ? Number(basicData.lotsize) 
+      : getInstantLotsize(symbol);
   
   const [centerPrice, setCenterPrice] = useState(0);
   const scrollRef = useRef(null);
@@ -33,6 +40,12 @@ export default function DOMLadderModal() {
 
   const ltp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? parseFloat(marketDepthData.ltp) : parseFloat(basicData.ltp);
 
+  // Reset centerPrice and scroll state when symbol changes or modal closes/opens
+  useEffect(() => {
+    setCenterPrice(0);
+    setHasScrolled(false);
+  }, [symbol, domLadderModal.isOpen]);
+
   // Set the initial center price when we first get a reference price
   useEffect(() => {
     if (domLadderModal.isOpen && refPrice > 0 && centerPrice === 0) {
@@ -40,14 +53,42 @@ export default function DOMLadderModal() {
     }
   }, [domLadderModal.isOpen, refPrice, centerPrice]);
 
-  if (!domLadderModal.isOpen || !symbol) return null;
-
   // Use real data from store, fallback to empty array
-  const rawBids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  const rawAsks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  const rawBids = (domLadderModal.isOpen && marketDepthData?.symbol === symbol) ? marketDepthData.bids : [];
+  const rawAsks = (domLadderModal.isOpen && marketDepthData?.symbol === symbol) ? marketDepthData.asks : [];
 
-  const bids = rawBids.map(b => ({ ...b, qty: Math.round(b.qty / lotsize) }));
-  const asks = rawAsks.map(a => ({ ...a, qty: Math.round(a.qty / lotsize) }));
+  const bids = rawBids || [];
+  const asks = rawAsks || [];
+
+  const bidsMap = useMemo(() => {
+    const map = new Map();
+    bids.forEach(b => {
+      const p = parseFloat(b.price);
+      if (!isNaN(p)) map.set(p.toFixed(2), b);
+    });
+    return map;
+  }, [bids]);
+
+  const asksMap = useMemo(() => {
+    const map = new Map();
+    asks.forEach(a => {
+      const p = parseFloat(a.price);
+      if (!isNaN(p)) map.set(p.toFixed(2), a);
+    });
+    return map;
+  }, [asks]);
+
+  useEffect(() => {
+    if (domLadderModal.isOpen && scrollRef.current && centerPrice > 0 && !hasScrolled) {
+      const container = scrollRef.current;
+      const rowHeight = 32;
+      const centerIndex = 200;
+      container.scrollTop = (centerIndex * rowHeight) - (container.clientHeight / 2);
+      setHasScrolled(true);
+    }
+  }, [domLadderModal.isOpen, centerPrice, hasScrolled]);
+
+  if (!domLadderModal.isOpen || !symbol) return null;
 
   // Determine tick size based on exchange/symbol
   let tickSize = 0.05;
@@ -90,15 +131,14 @@ export default function DOMLadderModal() {
       placeOrder(payload);
     } else {
       closeDomLadderModal();
-      // Need to pre-fill the order modal with this limit price.
-      openOrderModal(symbol, side, lotsize);
+      openOrderModal(symbol, side, lotsize, 'INT', false, 0, parseFloat(price));
     }
   };
 
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
+      background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
     }}>
       <div style={{
@@ -130,13 +170,13 @@ export default function DOMLadderModal() {
            ) : (
              ladderRows.map((price, i) => {
                const isLTP = price.toFixed(2) === (ltp || 0).toFixed(2);
-               const bid = bids.find(b => parseFloat(b.price).toFixed(2) === price.toFixed(2));
-               const ask = asks.find(a => parseFloat(a.price).toFixed(2) === price.toFixed(2));
+               const bid = bidsMap.get(price.toFixed(2));
+               const ask = asksMap.get(price.toFixed(2));
                
                return (
                  <div key={i} style={{ 
                    display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', 
-                   background: isLTP ? 'rgba(255,255,255,0.1)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
+                   background: isLTP ? 'var(--border-color)' : (i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'),
                    fontSize: '13px', fontWeight: isLTP ? 'bold' : '500', height: '32px'
                  }}>
                    
@@ -208,3 +248,5 @@ export default function DOMLadderModal() {
     </div>
   );
 }
+
+

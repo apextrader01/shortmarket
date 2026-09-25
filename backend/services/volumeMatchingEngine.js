@@ -1,0 +1,1391 @@
+const db = require('../database/db');
+const LedgerService = require('./ledgerService');
+const { calculateTaxes, isDerivativeContract } = require('./taxCalculator');
+
+function normalizeSymbol(sym) {
+  if (!sym || typeof sym !== 'string') return '';
+  const upper = sym.toUpperCase().trim();
+  let exchange = 'NSE';
+  let ticker = upper;
+  if (upper.includes(':')) {
+    const parts = upper.split(':');
+    exchange = parts[0];
+    ticker = parts.slice(1).join(':');
+  }
+  const cleanTicker = ticker.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+  return `${exchange}:${cleanTicker}`;
+}
+
+function getCachedPrice(priceCache, symbol) {
+  if (!priceCache || !symbol) return {};
+  if (priceCache[symbol]) return priceCache[symbol];
+  
+  const upper = symbol.toUpperCase().trim();
+  const hasEx = upper.includes(':');
+  const ex = hasEx ? upper.split(':')[0] : '';
+  const raw = hasEx ? upper.split(':')[1] : upper;
+  const clean = raw.replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '');
+
+  if (ex === 'NSE') {
+    if (priceCache[`NSE:${raw}`]) return priceCache[`NSE:${raw}`];
+    if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
+    if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
+  } else if (ex === 'BSE') {
+    if (priceCache[`BSE:${raw}`]) return priceCache[`BSE:${raw}`];
+    if (priceCache[`BSE:${clean}-A`]) return priceCache[`BSE:${clean}-A`];
+    if (priceCache[`BSE:${clean}-B`]) return priceCache[`BSE:${clean}-B`];
+    if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  } else if (ex === 'MCX') {
+    if (priceCache[`MCX:${raw}`]) return priceCache[`MCX:${raw}`];
+    if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
+  }
+
+  // Fallback if exchange not matched or symbol had no prefix
+  if (priceCache[raw]) return priceCache[raw];
+  if (priceCache[clean]) return priceCache[clean];
+  if (priceCache[`NSE:${clean}`]) return priceCache[`NSE:${clean}`];
+  if (priceCache[`NSE:${clean}-EQ`]) return priceCache[`NSE:${clean}-EQ`];
+  if (priceCache[`BSE:${clean}`]) return priceCache[`BSE:${clean}`];
+  if (priceCache[`MCX:${clean}`]) return priceCache[`MCX:${clean}`];
+  return {};
+}
+
+class VolumeMatchingEngine {
+  constructor() {
+    this.priceCache = {};
+    this.io = null;
+    // symbol -> Array of active order objects (FIFO queue)
+    this.symbolQueues = new Map();
+    // orderId -> active order object
+    this.activeOrders = new Map();
+    // symbol -> last cumulative volume recorded from ticks
+    this.lastSymbolVolume = new Map();
+    // Prevent overlapping tick processing for same symbol
+    this.processingSymbols = new Set();
+    console.log('📊 Volume & Market Depth Matching Engine initialized.');
+  }
+
+  init(priceCacheRef, ioInstance) {
+    this.priceCache = priceCacheRef || {};
+    this.io = ioInstance || null;
+    this.loadPendingVolumeOrders();
+  }
+
+  setSocketIo(ioInstance) {
+    this.io = ioInstance;
+  }
+
+  /**
+   * Load any PARTIAL_FILLED or PENDING market orders from DB on server startup or cluster sync.
+   */
+  async loadPendingVolumeOrders() {
+    try {
+      const pending = await db('orders')
+        .whereIn('status', ['PARTIAL_FILLED', 'PARTIALLY_FILLED'])
+        .orWhere(builder => {
+          builder.whereIn('status', ['PENDING', 'OPEN']).where({ type: 'MARKET' });
+        });
+
+      const symbolsToSubscribe = new Set();
+      for (const ord of pending) {
+        this.enqueueOrder(ord);
+        if (ord.symbol) symbolsToSubscribe.add(ord.symbol);
+      }
+
+      // Ensure Fyers WebSocket actively subscribes to all resting volume order symbols
+      if (symbolsToSubscribe.size > 0) {
+        try {
+          const { addSubscriptionBatch } = require('./fyers');
+          if (addSubscriptionBatch) addSubscriptionBatch(Array.from(symbolsToSubscribe));
+        } catch (e) {}
+      }
+
+      if (pending.length > 0) {
+        console.log(`📊 Loaded ${pending.length} resting volume-matching orders into queue.`);
+      }
+    } catch (err) {
+      console.warn('VolumeMatchingEngine.loadPendingVolumeOrders error:', err.message);
+    }
+  }
+
+  getActiveSymbols() {
+    const symbols = [];
+    for (const [normSym, q] of this.symbolQueues.entries()) {
+      if (q && q.length > 0) {
+        q.forEach(ord => {
+          if (ord.symbol && !symbols.includes(ord.symbol)) symbols.push(ord.symbol);
+        });
+      }
+    }
+    return symbols;
+  }
+
+  enqueueOrder(order) {
+    if (!order || !order.id || !order.symbol) return;
+    const sym = order.symbol;
+    const normSym = normalizeSymbol(sym);
+    const ordObj = {
+      id: order.id,
+      user_id: order.user_id,
+      symbol: order.symbol,
+      norm_symbol: normSym,
+      order_variety: order.order_variety || 'REGULAR',
+      type: order.type,
+      side: order.side,
+      quantity: Number(order.quantity),
+      filled_quantity: Number(order.filled_quantity || 0),
+      pending_quantity: order.pending_quantity !== undefined && order.pending_quantity !== null
+        ? Number(order.pending_quantity)
+        : Number(order.quantity) - Number(order.filled_quantity || 0),
+      average_price: order.average_price ? Number(order.average_price) : null,
+      price: order.price ? Number(order.price) : null,
+      product_type: order.product_type,
+      margin: Number(order.margin || 0),
+      taxes: Number(order.taxes || 0),
+      status: order.status || 'PENDING',
+      sl_price: order.sl_price,
+      tgt_price: order.tgt_price,
+      trail_amount: order.trail_amount,
+      parent_order_id: order.parent_order_id,
+      slice_group_id: order.slice_group_id || null,
+      slice_index: order.slice_index ? Number(order.slice_index) : null,
+      slice_total: order.slice_total ? Number(order.slice_total) : null,
+      remarks: order.remarks || '',
+      is_exit: Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks))),
+      created_at: order.created_at || new Date(),
+      _lastFillTime: null  // Allow immediate heartbeat fill on enqueue
+    };
+
+    this.activeOrders.set(ordObj.id.toString(), ordObj);
+
+    if (!this.symbolQueues.has(normSym)) {
+      this.symbolQueues.set(normSym, []);
+    }
+    const queue = this.symbolQueues.get(normSym);
+    const existingIdx = queue.findIndex(o => o.id === ordObj.id);
+    if (existingIdx !== -1) {
+      queue[existingIdx] = ordObj;
+    } else {
+      queue.push(ordObj);
+    }
+  }
+
+  dequeueOrder(orderId, symbol) {
+    if (!orderId) return;
+    const ord = this.activeOrders.get(orderId.toString());
+    const targetSym = symbol || ord?.symbol;
+    this.activeOrders.delete(orderId.toString());
+    if (targetSym) {
+      const normSym = normalizeSymbol(targetSym);
+      if (this.symbolQueues.has(normSym)) {
+        const queue = this.symbolQueues.get(normSym);
+        const filtered = queue.filter(o => o.id.toString() !== orderId.toString());
+        if (filtered.length === 0) {
+          this.symbolQueues.delete(normSym);
+          // Retain this.lastSymbolVolume so sequential orders maintain continuous volume tracking
+        } else {
+          this.symbolQueues.set(normSym, filtered);
+        }
+      }
+    }
+  }
+
+  /**
+   * Submit an order for volume & depth matching.
+   * Step 1: Immediately fill whatever is available in Level-2 Order Book Depth.
+   * Step 2: If quantity remains, put the rest in the tick-by-tick volume queue.
+   */
+  async submitOrder(order, baseLtp) {
+    this.enqueueOrder(order);
+    const ordObj = this.activeOrders.get(order.id.toString());
+    if (!ordObj) return;
+
+    // Ensure valid live price before checking marketability or execution
+    if (!baseLtp || baseLtp <= 0) return;
+
+    // Check if limit order is currently unmarketable
+    if (ordObj.type === 'LIMIT' && ordObj.price) {
+      const limitPrice = Number(ordObj.price);
+      if (ordObj.side === 'BUY' && baseLtp > limitPrice) {
+        // Market is above buy limit, wait for incoming ticks at or below limit
+        return;
+      }
+      if (ordObj.side === 'SELL' && baseLtp < limitPrice) {
+        // Market is below sell limit, wait for incoming ticks at or above limit
+        return;
+      }
+    }
+
+    // Call Auction (CAS) 09:08 AM opening equilibrium match fills 100% of matched orders at baseLtp
+    if (ordObj.order_variety === 'CAS') {
+      if (baseLtp && baseLtp > 0 && ordObj.pending_quantity > 0) {
+        await this.processSliceFill(ordObj, ordObj.pending_quantity, baseLtp);
+      }
+      return;
+    }
+
+    const cached = getCachedPrice(this.priceCache, ordObj.symbol);
+    const depth = cached.asks && cached.bids ? cached : (cached.depth || {});
+    const book = ordObj.side === 'BUY' ? (depth.asks || []) : (depth.bids || []);
+
+    const { isDerivativeContract, isCommodityContract, resolveSingleLotSize } = require('./instrumentsCache');
+    const lotsize = resolveSingleLotSize(ordObj.symbol);
+    const totalOrderQty = Number(ordObj.pending_quantity || ordObj.quantity || 0);
+
+    // Realistic Level-2 market depth matching:
+    // Orders match against real bids/asks currently resting on the exchange order book.
+    // There is NO artificial capping: order fills whatever real quantity is available in depth.
+    let depthCap = ordObj.pending_quantity;
+
+    let depthFilled = 0;
+    let totalDepthCost = 0;
+
+    // Check if Level-2 market depth exists (only if depthCap > 0)
+    if (depthCap > 0 && Array.isArray(book) && book.length > 0) {
+      let remainingToFill = depthCap;
+
+      for (const level of book) {
+        const levelPrice = Number(level.price);
+        const levelQty = Number(level.qty || level.quantity || level.volume || 0);
+
+        if (levelPrice > 0 && levelQty > 0) {
+          // Verify level conforms to limit order boundary
+          if (ordObj.type === 'LIMIT' && ordObj.price) {
+            const limitPrice = Number(ordObj.price);
+            if (ordObj.side === 'BUY' && levelPrice > limitPrice) break;
+            if (ordObj.side === 'SELL' && levelPrice < limitPrice) break;
+          }
+
+          let fillQty = Math.min(remainingToFill, levelQty);
+          if (lotsize > 1) {
+            fillQty = Math.floor(fillQty / lotsize) * lotsize;
+          }
+          if (fillQty > 0) {
+            depthFilled += fillQty;
+            totalDepthCost += (fillQty * levelPrice);
+            remainingToFill -= fillQty;
+          }
+          if (remainingToFill <= 0) break;
+        }
+      }
+    }
+
+    if (depthFilled > 0) {
+      const sliceAvgPrice = Number((totalDepthCost / depthFilled).toFixed(2));
+      await this.processSliceFill(ordObj, depthFilled, sliceAvgPrice);
+    }
+
+    // Notice: Any remaining ordObj.pending_quantity stays queued in this.symbolQueues.
+    // We NEVER fill remaining quantity out of thin air! It strictly waits for real exchange
+    // trade volume ticks in onTick to ensure realistic volume matching across all segments.
+    // (Checked: ordObj.type === 'MARKET' || ordObj.isMarket)
+
+    // Automatically dequeue order if completely executed
+    if (ordObj.pending_quantity <= 0) {
+      this.dequeueOrder(ordObj.id, ordObj.symbol);
+    } else {
+      // If order has resting pending quantity: ensure Fyers WebSocket is subscribed to it
+      try {
+        const { addSubscriptionBatch } = require('./fyers');
+        if (addSubscriptionBatch) addSubscriptionBatch([ordObj.symbol]);
+      } catch (e) {}
+
+      // Notify other cluster nodes (specifically Master) via Redis pub/sub
+      try {
+        const { pubClient } = require('./redisClient');
+        if (pubClient && pubClient.isReady) {
+          pubClient.publish('reload_volume_orders', JSON.stringify({ orderId: ordObj.id, symbol: ordObj.symbol })).catch(() => {});
+          pubClient.publish('fyers_subscribe', JSON.stringify([ordObj.symbol])).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    // Sync back to caller's order reference if provided
+    if (order) {
+      order.filled_quantity = ordObj.filled_quantity;
+      order.pending_quantity = ordObj.pending_quantity;
+      order.average_price = ordObj.average_price;
+      order.status = ordObj.status;
+      order.taxes = ordObj.taxes;
+    }
+
+    // Initialize last volume tracker for this symbol from live cache to guarantee fresh baseline
+    const liveVol = Number(cached.volume || cached.vol_traded_today || cached.vol || cached.v || 0);
+    if (liveVol > 0) {
+      const normSym = normalizeSymbol(ordObj.symbol);
+      this.lastSymbolVolume.set(normSym, liveVol);
+    }
+  }
+
+  /**
+   * Retrieve active order by ID
+   */
+  getOrder(orderId) {
+    return this.activeOrders.get(orderId?.toString());
+  }
+
+  /**
+   * Called on every live WebSocket tick from Fyers.
+   */
+  async onTick(symbol, tick) {
+    if (!symbol || !tick) return;
+    const normSym = normalizeSymbol(symbol);
+    const queue = this.symbolQueues.get(normSym);
+    if (!queue || queue.length === 0) {
+      const v = Number(tick.volume || tick.vol_traded_today || tick.vol || tick.v || 0);
+      if (v > 0) {
+        this.lastSymbolVolume.set(normSym, v);
+      }
+      return;
+    }
+
+    if (this.processingSymbols.has(normSym)) return;
+    this.processingSymbols.add(normSym);
+
+    try {
+      const currentVol = Number(tick.volume || tick.vol_traded_today || tick.vol || tick.v || 0);
+      let deltaVol = 0;
+
+      if (currentVol > 0) {
+        if (!this.lastSymbolVolume.has(normSym)) {
+          // Initialize baseline volume without triggering a false multi-lakh trade spike
+          this.lastSymbolVolume.set(normSym, currentVol);
+        } else {
+          const prevVol = this.lastSymbolVolume.get(normSym) || currentVol;
+          if (currentVol > prevVol) {
+            // Real exchange volume delta: NO artificial capping.
+            // If 2 Lakh executed in the real world, deltaVol is 2 Lakh.
+            deltaVol = currentVol - prevVol;
+            this.lastSymbolVolume.set(normSym, currentVol);
+          }
+        }
+      }
+
+      const ltp = Number(tick.ltp || 0);
+      if (ltp <= 0) return;
+
+      const now = Date.now();
+
+      // ALL instruments (cash equities, derivatives, commodities) must wait for real exchange volume.
+      // Never fabricate fake volume — if deltaVol is 0, the order stays pending until real trades happen.
+      if (deltaVol <= 0) return; // Strictly wait for real exchange volume for ALL instruments
+
+      // Distribute available tick volume to active orders in FIFO order per side.
+      // Every trade on the exchange has BOTH a buyer and a seller:
+      // When ΔV shares execute on the exchange, ΔV was bought and ΔV was sold.
+      // BUY orders match against exchange sell liquidity (availableBuyVol),
+      // and SELL orders match against exchange buy liquidity (availableSellVol).
+      let availableBuyVol = deltaVol;
+      let availableSellVol = deltaVol;
+      const snapshotQueue = [...queue];
+
+      for (let i = 0; i < snapshotQueue.length; i++) {
+        const order = snapshotQueue[i];
+        if (!order || !this.activeOrders.has(order.id.toString()) || order.pending_quantity <= 0) continue;
+
+        const isBuy = order.side === 'BUY';
+        let availableVol = isBuy ? availableBuyVol : availableSellVol;
+        if (availableVol <= 0) continue;
+
+        // Check limit price constraint for limit orders
+        if (order.type === 'LIMIT' && order.price) {
+          const limitPrice = Number(order.price);
+          if (isBuy && ltp > limitPrice) continue;
+          if (!isBuy && ltp < limitPrice) continue;
+        }
+
+        // Determine lot size for contract compliance
+        const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const { getLotSizes, resolveSingleLotSize, isCommodityContract } = require('./instrumentsCache');
+        const lotsize = resolveSingleLotSize(order.symbol);
+        const isCommodity = isCommodityContract(order.symbol);
+
+        let fillQty = 0;
+        let consumedVol = 0;
+
+        if (lotsize > 1) {
+          // On MCX commodities and exchange derivative feeds, volume is disseminated in
+          // Number of Contracts (Lots), NOT raw underlying units (e.g. 1 lot, 4 lots).
+          // Convert contract delta into underlying order units (e.g. 4 lots * 10 = 40 barrels).
+          const isContractVol = isCommodity || availableVol < lotsize;
+          const availableUnits = isContractVol ? (availableVol * lotsize) : availableVol;
+
+          const rawCap = Math.min(order.pending_quantity, availableUnits);
+          fillQty = Math.floor(rawCap / lotsize) * lotsize;
+          if (fillQty === 0 && order.pending_quantity < lotsize && availableUnits >= order.pending_quantity) {
+            fillQty = order.pending_quantity;
+          }
+
+          if (fillQty > 0) {
+            consumedVol = isContractVol ? Math.ceil(fillQty / lotsize) : fillQty;
+          }
+        } else {
+          // Equities (lot = 1): NO artificial capping.
+          // Orders match real volume 1:1 against whatever volume executed on the real exchange.
+          fillQty = Math.min(order.pending_quantity, availableVol);
+          consumedVol = fillQty;
+        }
+
+        if (fillQty > 0) {
+          order._lastFillTime = now;
+          if (isBuy) {
+            availableBuyVol -= consumedVol;
+          } else {
+            availableSellVol -= consumedVol;
+          }
+          await this.processSliceFill(order, fillQty, ltp);
+          if (order.pending_quantity <= 0) {
+            this.dequeueOrder(order.id, order.symbol);
+          }
+        }
+
+        if (availableBuyVol <= 0 && availableSellVol <= 0) break;
+      }
+    } catch (err) {
+      console.error(`VolumeMatchingEngine onTick error for ${symbol}:`, err.message);
+    } finally {
+      this.processingSymbols.delete(normSym);
+    }
+  }
+
+  /**
+   * Atomically process a slice fill for an order in the database.
+   */
+  async processSliceFill(order, sliceQty, slicePrice) {
+    if (!order || sliceQty <= 0 || slicePrice <= 0) return;
+
+    try {
+      await db.transaction(async (trx) => {
+        // Lock user to prevent balance / position race conditions
+        await trx.raw('SELECT pg_advisory_xact_lock(?)', [order.user_id]);
+
+        const currentOrder = await trx('orders').where({ id: order.id }).forUpdate().first();
+        if (!currentOrder || currentOrder.status === 'CANCELLED' || currentOrder.status === 'EXECUTED') {
+          this.dequeueOrder(order.id, order.symbol);
+          return;
+        }
+
+        const isMF = String(order.symbol).endsWith('-MF') || String(order.symbol).includes('MUTUALFUND');
+        const roundQty = (q) => isMF ? Number(Number(q).toFixed(4)) : Math.round(Number(q));
+        const sliceQtyClean = roundQty(sliceQty);
+
+        const prevFilled = roundQty(Number(currentOrder.filled_quantity || 0));
+        const prevAvg = Math.abs(Number(currentOrder.average_price || slicePrice));
+        const totalQty = roundQty(Number(currentOrder.quantity));
+
+        const newFilled = Math.min(totalQty, roundQty(prevFilled + sliceQtyClean));
+        const newPending = Math.max(0, roundQty(totalQty - newFilled));
+        const newAvgPrice = prevFilled > 0
+          ? Number((((prevFilled * prevAvg) + (sliceQtyClean * slicePrice)) / newFilled).toFixed(2))
+          : slicePrice;
+
+        const isComplete = newPending <= 0;
+        const newStatus = isComplete ? 'EXECUTED' : 'PARTIAL_FILLED';
+
+        // Order-level cumulative taxes (capped at standard broker rates e.g. max ₹20 per order)
+        const totalOrderTaxesObj = calculateTaxes(
+          order.symbol,
+          order.product_type,
+          order.side,
+          newFilled,
+          newAvgPrice
+        );
+        const accumulatedTaxes = Math.round((Number(totalOrderTaxesObj.totalTaxes || 0) + Number.EPSILON) * 100) / 100;
+        const previouslyDebited = Number(currentOrder.taxes || 0);
+        const incrementalTaxes = Math.max(0, Math.round((accumulatedTaxes - previouslyDebited + Number.EPSILON) * 100) / 100);
+
+        if (incrementalTaxes > 0) {
+          const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+          await trx('users').where({ id: order.user_id }).update({
+            balance: Math.round((Number(user.balance) - incrementalTaxes + Number.EPSILON) * 100) / 100
+          });
+        }
+
+        // Safe definition of proportional slice margin accessible across all branches
+        const sliceMargin = totalQty > 0 ? (sliceQtyClean / totalQty) * Number(order.margin || 0) : Number(order.margin || 0);
+
+        // 1. Update Order record
+        await trx('orders').where({ id: order.id }).update({
+          filled_quantity: newFilled,
+          pending_quantity: newPending,
+          average_price: newAvgPrice,
+          price: isComplete ? newAvgPrice : (currentOrder.price || newAvgPrice),
+          taxes: accumulatedTaxes,
+          status: newStatus,
+          updated_at: new Date()
+        });
+
+        // 1.1 Consolidated Ledger Recording:
+        // Sliced orders belonging to a slice_group_id are consolidated into ONE single ledger entry
+        // once all sibling slices in the group complete or cancel. Standalone orders write on completion.
+        let sliceGroupId = currentOrder.slice_group_id || order.slice_group_id;
+        if (!sliceGroupId && currentOrder.remarks && currentOrder.remarks.includes('[slice_')) {
+          const match = currentOrder.remarks.match(/\[(slice_[^\]]+)\]/);
+          if (match) sliceGroupId = match[1];
+        }
+
+        if (sliceGroupId) {
+          const groupOrders = await trx('orders')
+            .where({ user_id: order.user_id, slice_group_id: sliceGroupId })
+            .select('id', 'status', 'filled_quantity', 'taxes', 'quantity');
+
+          const allCompletedOrCancelled = groupOrders.length > 0 && groupOrders.every(o => o.status === 'EXECUTED' || o.status === 'CANCELLED');
+
+          if (allCompletedOrCancelled) {
+            let totalGroupFilled = 0;
+            let totalGroupTaxes = 0;
+            let totalGroupSlicesExecuted = 0;
+
+            for (const o of groupOrders) {
+              totalGroupFilled += Number(o.filled_quantity || 0);
+              totalGroupTaxes += Number(o.taxes || 0);
+              if (o.status === 'EXECUTED') totalGroupSlicesExecuted++;
+            }
+            totalGroupTaxes = Math.round((totalGroupTaxes + Number.EPSILON) * 100) / 100;
+
+            const existingLedger = await trx('ledger')
+              .where({ user_id: order.user_id, type: 'TAXES' })
+              .where('description', 'like', `%[${sliceGroupId}]%`)
+              .first();
+
+            if (!existingLedger && totalGroupTaxes > 0) {
+              await trx('ledger').insert({
+                user_id: order.user_id,
+                amount: -totalGroupTaxes,
+                type: 'TAXES',
+                description: `Taxes & Brokerage for ${order.side} ${totalGroupFilled} ${order.symbol} (${totalGroupSlicesExecuted} Slices) [${sliceGroupId}]`
+              });
+            }
+          }
+        } else {
+          // Write consolidated ledger entry ONLY when standalone order reaches EXECUTED
+          if (isComplete && accumulatedTaxes > 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: -accumulatedTaxes,
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${newFilled} ${order.symbol} (Order #${order.id})`
+            });
+          }
+        }
+
+        // 2. Incremental Position Update
+        const cleanSym = order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+        const isIntradayProduct = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+        const isDeliveryProduct = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
+        const existingPos = await trx('positions')
+          .where({ user_id: order.user_id })
+          .where(builder => {
+            if (isIntradayProduct) {
+              builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+            } else if (isDeliveryProduct) {
+              builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+            } else {
+              builder.where({ product_type: order.product_type });
+            }
+          })
+          .where(b => {
+            b.where({ symbol: order.symbol })
+              .orWhere({ symbol: cleanSym })
+              .orWhere({ symbol: `NSE:${cleanSym}` })
+              .orWhere({ symbol: `BSE:${cleanSym}` })
+              .orWhere({ symbol: `MCX:${cleanSym}` });
+          })
+          .whereNot({ quantity: 0 })
+          .first();
+
+        // Ensure Postgres decimal strings are converted to numbers to prevent string concatenation bugs (e.g. "-1.0000" + 1 = "-1.00001")
+        if (existingPos) {
+          existingPos.quantity = roundQty(Number(existingPos.quantity));
+          existingPos.average_price = Math.abs(Number(existingPos.average_price));
+          existingPos.margin = Number(existingPos.margin || 0);
+          existingPos.closed_quantity = roundQty(Number(existingPos.closed_quantity || 0));
+          existingPos.realized_pnl = Number(existingPos.realized_pnl || 0);
+        }
+
+        const isClosing = existingPos && (
+          (existingPos.quantity > 0 && order.side === 'SELL') ||
+          (existingPos.quantity < 0 && order.side === 'BUY')
+        );
+
+        if (isClosing) {
+          const absPosQty = roundQty(Math.abs(existingPos.quantity));
+          const closeQty = Math.min(sliceQtyClean, absPosQty);
+          const leftoverQty = roundQty(sliceQtyClean - closeQty);
+          let realizedPnl = 0;
+
+          if (existingPos.quantity > 0) {
+            realizedPnl = (slicePrice - existingPos.average_price) * closeQty;
+          } else {
+            realizedPnl = (existingPos.average_price - slicePrice) * closeQty;
+          }
+          realizedPnl = Math.round((realizedPnl + Number.EPSILON) * 100) / 100;
+
+          const propClosed = absPosQty > 0 ? (closeQty / absPosQty) : 1;
+          const marginRefund = Math.round((existingPos.margin * propClosed) * 100) / 100;
+
+          const newPosQty = roundQty(existingPos.quantity > 0 ? (existingPos.quantity - closeQty) : (existingPos.quantity + closeQty));
+          const isFullyClosed = newPosQty === 0 || absPosQty <= closeQty;
+
+          if (isFullyClosed) {
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: 0,
+              closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
+              exit_price: slicePrice,
+              realized_pnl: existingPos.realized_pnl + realizedPnl,
+              margin: 0,
+              updated_at: new Date()
+            });
+
+            // Cancel dangling linked pending and trigger orders (SL/Target child legs or linked brackets)
+            const cleanSym = order.symbol && order.symbol.includes(':') ? order.symbol.split(':')[1] : order.symbol;
+            const isIntOrder = (order.product_type === 'INT' || order.product_type === 'MIS' || order.product_type === 'BO' || order.product_type === 'CO');
+            const isDelOrder = (order.product_type === 'CNC' || order.product_type === 'DELIVERY' || order.product_type === 'DEL');
+
+            const danglingOrders = await trx('orders')
+              .where({ user_id: order.user_id })
+              .where(builder => {
+                if (isIntOrder) builder.whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
+                else if (isDelOrder) builder.whereIn('product_type', ['DEL', 'CNC', 'DELIVERY']);
+                else builder.where({ product_type: order.product_type });
+              })
+              .where(builder => {
+                builder.where({ symbol: order.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+              })
+              .where(builder => {
+                builder.where('status', 'PENDING_TRIGGER')
+                       .orWhereNotNull('parent_order_id');
+              })
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+            for (const dangler of danglingOrders) {
+              await trx('orders').where({ id: dangler.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+              const refundMargin = parseFloat(dangler.margin) || 0;
+              if (refundMargin > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + refundMargin + Number.EPSILON) * 100) / 100 });
+                  let sliceGroupId = dangler.slice_group_id;
+                  if (!sliceGroupId && dangler.remarks && dangler.remarks.includes('[slice_')) {
+                    const match = dangler.remarks.match(/\[(slice_[^\]]+)\]/);
+                    if (match) sliceGroupId = match[1];
+                  }
+
+                  if (sliceGroupId) {
+                    const existingRelease = await trx('ledger')
+                      .where({ user_id: order.user_id, type: 'MARGIN_RELEASE' })
+                      .where('description', 'like', `%[${sliceGroupId}]%`)
+                      .first();
+
+                    if (existingRelease) {
+                      const updatedAmount = Math.round((Number(existingRelease.amount) + refundMargin + Number.EPSILON) * 100) / 100;
+                      await trx('ledger').where({ id: existingRelease.id }).update({
+                        amount: updatedAmount,
+                        description: `Margin released for cancelled orders ${dangler.symbol} [${sliceGroupId}]`
+                      });
+                    } else {
+                      await trx('ledger').insert({
+                        user_id: order.user_id,
+                        amount: refundMargin,
+                        type: 'MARGIN_RELEASE',
+                        description: `Margin released for cancelled orders ${dangler.symbol} [${sliceGroupId}]`
+                      });
+                    }
+                  } else {
+                    await trx('ledger').insert({
+                      user_id: order.user_id,
+                      amount: refundMargin,
+                      type: 'MARGIN_RELEASE',
+                      description: `Margin released for cancelled dangling order ${dangler.symbol}`
+                    });
+                  }
+                }
+              }
+              const triggerEngine = require('./triggerEngine');
+              triggerEngine.removeOrderFromMemory(dangler.id, dangler.symbol);
+              this.dequeueOrder(dangler.id, dangler.symbol);
+            }
+
+            // Position Reversal: If order slice quantity exceeds closed position, open reverse position
+            if (leftoverQty > 0) {
+              const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+              if (isExitOrder) {
+                // For EXIT orders (Exit All, Position Exit Button), user intent is ONLY to close.
+                // Do NOT open an unwanted reverse position. Cancel remainder & refund any margin.
+                console.log(`[SAFEGUARD] Exit order ${order.id} closed position completely. Suppressing reversal on leftover ${leftoverQty} ${order.symbol}.`);
+                const excessRefund = totalQty > 0 ? Math.round(((leftoverQty / totalQty) * Number(order.margin || 0) + Number.EPSILON) * 100) / 100 : 0;
+                if (excessRefund > 0) {
+                  const user = await trx('users').where({ id: order.user_id }).first();
+                  if (user) {
+                    await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+
+                    let sliceGroupId = order.slice_group_id;
+                    if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+                      const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+                      if (match) sliceGroupId = match[1];
+                    }
+
+                    if (sliceGroupId) {
+                      const existingRelease = await trx('ledger')
+                        .where({ user_id: order.user_id, type: 'MARGIN_RELEASE' })
+                        .where('description', 'like', `%[${sliceGroupId}]%`)
+                        .first();
+
+                      if (existingRelease) {
+                        const updatedAmount = Math.round((Number(existingRelease.amount) + excessRefund + Number.EPSILON) * 100) / 100;
+                        await trx('ledger').where({ id: existingRelease.id }).update({
+                          amount: updatedAmount,
+                          description: `Excess margin refunded on exit order ${order.symbol} [${sliceGroupId}]`
+                        });
+                      } else {
+                        await trx('ledger').insert({
+                          user_id: order.user_id,
+                          amount: excessRefund,
+                          type: 'MARGIN_RELEASE',
+                          description: `Excess margin refunded on exit order ${order.symbol} [${sliceGroupId}]`
+                        });
+                      }
+                    } else {
+                      await trx('ledger').insert({
+                        user_id: order.user_id,
+                        amount: excessRefund,
+                        type: 'MARGIN_RELEASE',
+                        description: `Excess margin refunded on exit order ${order.symbol}`
+                      });
+                    }
+                  }
+                }
+
+                // If this exit order closed the position completely, cancel any remaining pending quantity on this order
+                newPending = 0;
+                newStatus = newFilled >= totalQty ? 'EXECUTED' : 'CANCELLED';
+                order.pending_quantity = 0;
+                order.status = newStatus;
+                this.dequeueOrder(order.id, order.symbol);
+              } else {
+                const revSide = order.side === 'BUY' ? 1 : -1;
+                const revPosQty = revSide * leftoverQty;
+                const { calculateRequiredMargin } = require('./marginEngine');
+                const calcMargin = calculateRequiredMargin(order.symbol, order.product_type, order.side, leftoverQty, slicePrice);
+                const revMargin = calcMargin > 0 ? calcMargin : (totalQty > 0 ? (leftoverQty / totalQty) * Number(order.margin || 0) : 0);
+
+                const orderMarginBlocked = Number(order.margin || 0);
+                const marginDelta = revMargin - orderMarginBlocked;
+                if (marginDelta > 0) {
+                  await trx('users').where({ id: order.user_id }).decrement('balance', marginDelta);
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: -marginDelta,
+                    type: 'MARGIN_BLOCK',
+                    description: `Margin blocked for reversed position ${revPosQty} ${order.symbol}`
+                  });
+                } else if (marginDelta < 0) {
+                  const excessRefund = Math.round((Math.abs(marginDelta) + Number.EPSILON) * 100) / 100;
+                  await trx('users').where({ id: order.user_id }).increment('balance', excessRefund);
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: excessRefund,
+                    type: 'MARGIN_RELEASE',
+                    description: `Excess margin refunded on reversal ${revPosQty} ${order.symbol}`
+                  });
+                }
+
+                await trx('positions').insert({
+                  user_id: order.user_id,
+                  symbol: order.symbol,
+                  quantity: revPosQty,
+                  average_price: slicePrice,
+                  product_type: existingPos.product_type || order.product_type || 'INT',
+                  margin: revMargin,
+                  created_at: new Date(),
+                  updated_at: new Date()
+                });
+              }
+            }
+          } else {
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: newPosQty,
+              closed_quantity: roundQty(existingPos.closed_quantity + closeQty),
+              realized_pnl: existingPos.realized_pnl + realizedPnl,
+              margin: Math.max(0, existingPos.margin - marginRefund),
+              updated_at: new Date()
+            });
+          }
+
+          // Persist realized_pnl on the closing order
+          if (realizedPnl !== 0) {
+            await trx('orders').where({ id: order.id }).update({
+              realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl])
+            });
+          }
+
+          // Balance & Ledger updates
+          const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+          const netCredit = marginRefund + realizedPnl;
+          if (user) {
+            await trx('users').where({ id: order.user_id }).update({
+              balance: Math.round((Number(user.balance) + netCredit + Number.EPSILON) * 100) / 100
+            });
+          }
+
+          if (marginRefund > 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: marginRefund,
+              type: 'MARGIN_RELEASE',
+              description: `Margin released for partial close: ${closeQty} ${order.symbol}`
+            });
+          }
+
+          if (realizedPnl !== 0) {
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: realizedPnl,
+              type: 'REALIZED_PNL',
+              description: `Realized P&L on ${closeQty} ${order.symbol}`
+            });
+          }
+
+          // Synchronize / decrement holdings table if an entry exists for this user and symbol to prevent ghost holdings
+          const holdingRecord = await trx('holdings')
+            .where({ user_id: order.user_id })
+            .where(b => {
+              b.where({ symbol: order.symbol })
+                .orWhere({ symbol: cleanSym })
+                .orWhere({ symbol: `NSE:${cleanSym}` })
+                .orWhere({ symbol: `BSE:${cleanSym}` })
+                .orWhere({ symbol: `MCX:${cleanSym}` });
+            })
+            .first();
+
+          if (holdingRecord) {
+            const currentHQty = roundQty(Number(holdingRecord.quantity || 0));
+            const newHQty = roundQty(currentHQty - closeQty);
+            if (newHQty <= 0) {
+              await trx('holdings').where({ id: holdingRecord.id }).del();
+            } else {
+              await trx('holdings').where({ id: holdingRecord.id }).update({ quantity: newHQty, updated_at: new Date() });
+            }
+          }
+        } else if (order.side === 'SELL' && (order.product_type === 'DEL' || order.product_type === 'CNC' || order.product_type === 'DELIVERY')) {
+          // Offsetting overnight delivery shares from holdings table
+          const holding = await trx('holdings')
+            .where({ user_id: order.user_id })
+            .where(b => {
+              b.where({ symbol: order.symbol })
+                .orWhere({ symbol: cleanSym })
+                .orWhere({ symbol: `NSE:${cleanSym}` })
+                .orWhere({ symbol: `BSE:${cleanSym}` })
+                .orWhere({ symbol: `MCX:${cleanSym}` });
+            })
+            .first();
+
+          if (holding && Number(holding.quantity) > 0) {
+            const hQty = roundQty(Number(holding.quantity));
+            const hAvg = Math.abs(Number(holding.average_price || slicePrice));
+            const closeQty = Math.min(sliceQtyClean, hQty);
+            const newHQty = roundQty(hQty - closeQty);
+
+            if (newHQty <= 0) {
+              await trx('holdings').where({ id: holding.id }).del();
+            } else {
+              await trx('holdings').where({ id: holding.id }).update({ quantity: newHQty });
+            }
+
+            const realizedPnl = Math.round(((slicePrice - hAvg) * closeQty + Number.EPSILON) * 100) / 100;
+            const grossProceeds = Math.round((slicePrice * closeQty) * 100) / 100;
+
+            // Record or consolidate closed position for today to avoid duplicate fragmented rows
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            const existingClosedPos = await trx('positions')
+              .where({ user_id: order.user_id, symbol: order.symbol, quantity: 0 })
+              .where('updated_at', '>=', todayStart)
+              .first();
+
+            if (existingClosedPos) {
+              const prevClosedQty = roundQty(Number(existingClosedPos.closed_quantity || 0));
+              const prevExitPrice = Number(existingClosedPos.exit_price || slicePrice);
+              const newTotalClosed = roundQty(prevClosedQty + closeQty);
+              const newAvgExitPrice = newTotalClosed > 0
+                ? Number((((prevClosedQty * prevExitPrice) + (closeQty * slicePrice)) / newTotalClosed).toFixed(2))
+                : slicePrice;
+
+              await trx('positions').where({ id: existingClosedPos.id }).update({
+                closed_quantity: newTotalClosed,
+                exit_price: newAvgExitPrice,
+                realized_pnl: Number(existingClosedPos.realized_pnl || 0) + realizedPnl,
+                updated_at: new Date()
+              });
+            } else {
+              await trx('positions').insert({
+                user_id: order.user_id,
+                symbol: order.symbol,
+                quantity: 0,
+                closed_quantity: closeQty,
+                average_price: hAvg,
+                exit_price: slicePrice,
+                realized_pnl: realizedPnl,
+                product_type: order.product_type || 'DEL',
+                created_at: new Date(),
+                updated_at: new Date()
+              });
+            }
+
+            // Persist realized_pnl on the delivery holding sale order
+            if (realizedPnl !== 0) {
+              await trx('orders').where({ id: order.id }).update({
+                realized_pnl: trx.raw('COALESCE(realized_pnl, 0) + ?', [realizedPnl])
+              });
+            }
+
+            // Credit net sale proceeds to user balance
+            const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+            if (user) {
+              await trx('users').where({ id: order.user_id }).update({
+                balance: Math.round((Number(user.balance) + grossProceeds + Number.EPSILON) * 100) / 100
+              });
+            }
+
+            await trx('ledger').insert({
+              user_id: order.user_id,
+              amount: grossProceeds,
+              type: 'CREDIT',
+              description: `Delivery Holding Sale: ${closeQty} ${order.symbol} @ ₹${slicePrice}`
+            });
+          } else {
+            const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+            if (isExitOrder) {
+              console.warn(`[SAFEGUARD] Blocked exit order ${order.id} (${order.symbol}) from opening negative DEL position since holding is already closed.`);
+              order.status = 'CANCELLED';
+              this.dequeueOrder(order.id, order.symbol);
+              return;
+            }
+            const isDeriv = isDerivativeContract(order.symbol);
+            if (!isDeriv) {
+              console.warn(`[SAFEGUARD] Blocked negative DEL cash equity position for user ${order.user_id}, symbol ${order.symbol}`);
+              return;
+            }
+            const initialPosQty = -sliceQtyClean;
+            await trx('positions').insert({
+              user_id: order.user_id,
+              symbol: order.symbol,
+              quantity: initialPosQty,
+              average_price: slicePrice,
+              product_type: order.product_type || 'INT',
+              margin: sliceMargin,
+              created_at: new Date(),
+              updated_at: new Date()
+            });
+          }
+        } else {
+          // Opening or adding to position
+          if (existingPos) {
+            const prevPosQty = roundQty(Number(existingPos.quantity));
+            const prevPosAvg = Math.abs(Number(existingPos.average_price));
+            const addQty = order.side === 'BUY' ? sliceQtyClean : -sliceQtyClean;
+            const newPosQty = roundQty(prevPosQty + addQty);
+            const newPosAvg = Number((((Math.abs(prevPosQty) * prevPosAvg) + (sliceQtyClean * slicePrice)) / Math.abs(newPosQty)).toFixed(2));
+
+            await trx('positions').where({ id: existingPos.id }).update({
+              quantity: newPosQty,
+              average_price: newPosAvg,
+              margin: Number(existingPos.margin || 0) + sliceMargin,
+              updated_at: new Date()
+            });
+          } else {
+            const isExitOrder = Boolean(order.is_exit || (order.remarks && /exit|square-off|close/i.test(order.remarks)));
+            if (isExitOrder) {
+              console.warn(`[SAFEGUARD] Blocked exit order ${order.id} (${order.symbol}) from opening a new position since position is already closed.`);
+              const totalOrdQty = Number(order.quantity || 0);
+              const filledOrdQty = Number(currentOrder.filled_quantity || 0);
+              const unexecutedQty = Math.max(0, totalOrdQty - filledOrdQty);
+              const excessRefund = totalOrdQty > 0 ? Math.round(((unexecutedQty / totalOrdQty) * Number(order.margin || 0) + Number.EPSILON) * 100) / 100 : 0;
+              if (excessRefund > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).update({
+                    balance: Math.round((Number(user.balance) + excessRefund + Number.EPSILON) * 100) / 100
+                  });
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: excessRefund,
+                    type: 'MARGIN_RELEASE',
+                    description: `Refund for excess exit order: ${unexecutedQty} ${order.symbol}`
+                  });
+                }
+              }
+
+              // Persist CANCELLED status to database so the order leaves Open Orders immediately
+              await trx('orders').where({ id: order.id }).update({
+                status: 'CANCELLED',
+                pending_quantity: 0,
+                updated_at: new Date()
+              });
+
+              order.status = 'CANCELLED';
+              order.pending_quantity = 0;
+              this.dequeueOrder(order.id, order.symbol);
+              return;
+            }
+
+            const initialPosQty = order.side === 'BUY' ? sliceQtyClean : -sliceQtyClean;
+            await trx('positions').insert({
+              user_id: order.user_id,
+              symbol: order.symbol,
+              quantity: initialPosQty,
+              average_price: slicePrice,
+              product_type: order.product_type || 'INT',
+              margin: sliceMargin,
+              created_at: new Date(),
+              updated_at: new Date()
+            });
+          }
+        }
+
+        // Update in-memory state
+        order.filled_quantity = newFilled;
+        order.pending_quantity = newPending;
+        order.average_price = newAvgPrice;
+        order.taxes = accumulatedTaxes;
+        order.status = newStatus;
+
+        if (isComplete) {
+          this.dequeueOrder(order.id, order.symbol);
+
+          // 3. Bracket Order (CO/BO) Leg Generation upon completion
+          const hasSL = (currentOrder.sl_price && Number(currentOrder.sl_price) > 0) || (order.sl_price && Number(order.sl_price) > 0);
+          const hasTgt = (currentOrder.tgt_price && Number(currentOrder.tgt_price) > 0) || (order.tgt_price && Number(order.tgt_price) > 0);
+
+          if (hasSL || hasTgt || order.product_type === 'BO' || order.product_type === 'CO') {
+            const { spawnBracketOrders } = require('./orderExecutor');
+            await spawnBracketOrders(trx, {
+              ...currentOrder,
+              ...order,
+              price: newAvgPrice,
+              quantity: newFilled
+            }, newFilled);
+          }
+
+          // 4. OCO (One Cancels Other) Logic for BO/CO child legs
+          const parentOrdId = currentOrder.parent_order_id || order.parent_order_id;
+          const linkedOrdId = currentOrder.linked_order_id || order.linked_order_id;
+          if (parentOrdId || linkedOrdId) {
+            const siblingQuery = trx('orders')
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+              .whereNot({ id: order.id })
+              .forUpdate();
+
+            if (parentOrdId && linkedOrdId) {
+              siblingQuery.where(b => b.where({ parent_order_id: parentOrdId }).orWhere({ id: linkedOrdId }));
+            } else if (parentOrdId) {
+              siblingQuery.where({ parent_order_id: parentOrdId });
+            } else {
+              siblingQuery.where({ id: linkedOrdId });
+            }
+
+            const siblings = await siblingQuery;
+            const triggerEngine = require('./triggerEngine');
+            for (const sibling of siblings) {
+              await trx('orders').where({ id: sibling.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+              const sibMargin = parseFloat(sibling.margin) || 0;
+              if (sibMargin > 0) {
+                const user = await trx('users').where({ id: order.user_id }).forUpdate().first();
+                if (user) {
+                  await trx('users').where({ id: order.user_id }).update({ balance: Math.round((Number(user.balance) + sibMargin + Number.EPSILON) * 100) / 100 });
+                  await trx('ledger').insert({
+                    user_id: order.user_id,
+                    amount: sibMargin,
+                    type: 'MARGIN_RELEASE',
+                    description: `Margin released for cancelled OCO sibling order ${sibling.symbol}`
+                  });
+                }
+              }
+              triggerEngine.removeOrderFromMemory(sibling.id, sibling.symbol);
+              this.dequeueOrder(sibling.id, sibling.symbol);
+            }
+          }
+        }
+
+        // Broadcast real-time partial fill to user socket
+        if (this.io) {
+          this.io.emit('order_slice_filled', {
+            orderId: order.id,
+            userId: order.user_id,
+            symbol: order.symbol,
+            sliceQty,
+            slicePrice,
+            filledQty: newFilled,
+            pendingQty: newPending,
+            avgPrice: newAvgPrice,
+            taxes: accumulatedTaxes,
+            status: newStatus
+          });
+          if (order.user_id) {
+            this.io.to(order.user_id.toString()).emit('sync_user_data', { userId: order.user_id });
+          }
+        }
+      });
+    } catch (err) {
+      console.error(`Error processing slice fill for order ${order.id}:`, err.message);
+    }
+  }
+
+  /**
+   * Update resting order in-memory if quantity or price is modified via API.
+   */
+  updateOrder(orderId, updates) {
+    if (!orderId) return;
+    const ordObj = this.activeOrders.get(orderId.toString());
+    if (ordObj && updates) {
+      if (updates.quantity !== undefined) ordObj.quantity = Number(updates.quantity);
+      if (updates.pending_quantity !== undefined) ordObj.pending_quantity = Number(updates.pending_quantity);
+      if (updates.price !== undefined) ordObj.price = updates.price ? Number(updates.price) : null;
+      if (updates.margin !== undefined) ordObj.margin = Number(updates.margin);
+      if (updates.status !== undefined) ordObj.status = updates.status;
+      if (ordObj.pending_quantity <= 0 || ordObj.status === 'CANCELLED' || ordObj.status === 'EXECUTED') {
+        this.dequeueOrder(orderId, ordObj.symbol);
+      }
+    }
+  }
+
+  /**
+   * Cancel the remaining unfilled portion of a PARTIAL_FILLED order.
+   */
+  async cancelPartialOrder(orderId, userId) {
+    let refundAmount = 0;
+
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [userId]);
+
+      const order = await trx('orders').where({ id: orderId, user_id: userId }).forUpdate().first();
+      if (!order) throw new Error('Order not found');
+      if (order.status !== 'PARTIAL_FILLED' && order.status !== 'PARTIALLY_FILLED' && order.status !== 'PENDING' && order.status !== 'OPEN') {
+        throw new Error(`Cannot cancel order in status ${order.status}`);
+      }
+
+      const totalQty = Number(order.quantity);
+      const pendingQty = Number(order.pending_quantity || (totalQty - Number(order.filled_quantity || 0)));
+      const totalMargin = Number(order.margin || 0);
+
+      // Pro-rata refund for the unfilled portion
+      if (totalQty > 0 && pendingQty > 0 && totalMargin > 0) {
+        refundAmount = Math.round(((pendingQty / totalQty) * totalMargin) * 100) / 100;
+      }
+
+      await trx('orders').where({ id: orderId }).update({
+        status: 'CANCELLED',
+        remarks: `Partially filled: ${order.filled_quantity || 0} executed, ${pendingQty} cancelled`,
+        updated_at: new Date()
+      });
+
+      // Consolidated ledger recording for executed slices in slice group upon cancellation
+      let sliceGroupId = order.slice_group_id;
+      if (!sliceGroupId && order.remarks && order.remarks.includes('[slice_')) {
+        const match = order.remarks.match(/\[(slice_[^\]]+)\]/);
+        if (match) sliceGroupId = match[1];
+      }
+
+      if (sliceGroupId) {
+        const groupOrders = await trx('orders')
+          .where({ user_id: userId, slice_group_id: sliceGroupId })
+          .select('id', 'status', 'filled_quantity', 'taxes', 'quantity');
+
+        const allCompletedOrCancelled = groupOrders.length > 0 && groupOrders.every(o => {
+          const s = o.id === order.id ? 'CANCELLED' : o.status;
+          return s === 'EXECUTED' || s === 'CANCELLED';
+        });
+
+        if (allCompletedOrCancelled) {
+          let totalGroupFilled = 0;
+          let totalGroupTaxes = 0;
+          let totalGroupSlicesExecuted = 0;
+
+          for (const o of groupOrders) {
+            totalGroupFilled += Number(o.filled_quantity || 0);
+            totalGroupTaxes += Number(o.taxes || 0);
+            if (o.status === 'EXECUTED' || (o.id === order.id && Number(order.filled_quantity || 0) > 0)) totalGroupSlicesExecuted++;
+          }
+          totalGroupTaxes = Math.round((totalGroupTaxes + Number.EPSILON) * 100) / 100;
+
+          const existingLedger = await trx('ledger')
+            .where({ user_id: userId, type: 'TAXES' })
+            .where('description', 'like', `%[${sliceGroupId}]%`)
+            .first();
+
+          if (!existingLedger && totalGroupTaxes > 0) {
+            await trx('ledger').insert({
+              user_id: userId,
+              amount: -totalGroupTaxes,
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${totalGroupFilled} ${order.symbol} (${totalGroupSlicesExecuted} Slices) [${sliceGroupId}]`
+            });
+          }
+        }
+      } else {
+        const prevFilled = Number(order.filled_quantity || 0);
+        if (prevFilled > 0 && Number(order.taxes) > 0) {
+          const existingLedger = await trx('ledger')
+            .where({ user_id: userId, type: 'TAXES' })
+            .where('description', 'like', `%Order #${order.id}%`)
+            .first();
+          if (!existingLedger) {
+            await trx('ledger').insert({
+              user_id: userId,
+              amount: -Number(order.taxes),
+              type: 'TAXES',
+              description: `Taxes & Brokerage for ${order.side} ${prevFilled} ${order.symbol} (Order #${order.id})`
+            });
+          }
+        }
+      }
+
+      // If partially filled BO/CO is cancelled, spawn protection legs for the filled portion
+      const prevFilled = Number(order.filled_quantity || 0);
+      if (prevFilled > 0) {
+        const hasSL = order.sl_price && Number(order.sl_price) > 0;
+        const hasTgt = order.tgt_price && Number(order.tgt_price) > 0;
+        if (hasSL || hasTgt || order.product_type === 'BO' || order.product_type === 'CO') {
+          const existingChild = await trx('orders').where({ parent_order_id: order.id }).first();
+          if (!existingChild) {
+            const { spawnBracketOrders } = require('./orderExecutor');
+            await spawnBracketOrders(trx, {
+              ...order,
+              price: order.average_price,
+              quantity: prevFilled
+            }, prevFilled);
+          }
+        }
+      }
+
+      if (refundAmount > 0) {
+        const user = await trx('users').where({ id: userId }).first();
+        await trx('users').where({ id: userId }).update({
+          balance: Math.round((Number(user.balance) + refundAmount) * 100) / 100
+        });
+
+        await trx('ledger').insert({
+          user_id: userId,
+          amount: refundAmount,
+          type: 'MARGIN_RELEASE',
+          description: `Refund for unfilled portion of cancelled order: ${pendingQty} ${order.symbol}`
+        });
+      }
+    });
+
+    this.dequeueOrder(orderId);
+    if (this.io) {
+      this.io.emit('sync_user_data', { userId });
+    }
+
+    try {
+      const { pubClient } = require('./redisClient');
+      if (pubClient && pubClient.isReady) {
+        pubClient.publish('reload_volume_orders', JSON.stringify({ cancelledOrderId: orderId })).catch(() => {});
+      }
+    } catch (e) {}
+
+    return { success: true, refundAmount };
+  }
+
+  /**
+   * Background fallback pacing heartbeat running on Master node.
+   * ONLY fills derivatives/commodities orders — and ONLY when real exchange volume exists.
+   * Cash equity orders are NEVER filled by heartbeat — they wait for real exchange volume ticks only.
+   * Derivatives/commodities are also gated by real volume: if the exchange shows zero or no new
+   * traded volume, the order stays PENDING. This prevents filling phantom orders in illiquid contracts.
+   */
+  startPacingHeartbeat() {
+    if (this._heartbeatInterval) return;
+
+    this._heartbeatInterval = setInterval(async () => {
+      try {
+        if (this.symbolQueues.size === 0) return;
+        const now = Date.now();
+        const { isDerivativeContract, isCommodityContract } = require('./instrumentsCache');
+
+        for (const [normSym, queue] of this.symbolQueues.entries()) {
+          if (!queue || queue.length === 0) continue;
+          const cached = getCachedPrice(this.priceCache, normSym) || {};
+          const ltp = Number(cached.ltp || 0);
+          if (ltp <= 0) continue;
+
+          // ── VOLUME GATE: Use SHARED volume tracker (same as onTick) to prevent double-counting ──
+          const currentVol = Number(cached.volume || 0);
+          if (currentVol <= 0) continue; // No volume at all — do NOT fill
+
+          const prevVol = this.lastSymbolVolume.get(normSym) || 0;
+          if (prevVol === 0) {
+            // First time seeing this symbol — set baseline, don't fill yet
+            this.lastSymbolVolume.set(normSym, currentVol);
+            continue;
+          }
+
+          let volDelta = currentVol - prevVol;
+          if (volDelta <= 0) continue; // No new real exchange volume — do NOT fill
+
+          // Update shared tracker so onTick doesn't double-count this volume
+          this.lastSymbolVolume.set(normSym, currentVol);
+
+          for (const order of [...queue]) {
+            if (volDelta <= 0) break;
+            if (!order || order.pending_quantity <= 0) continue;
+
+            // CRITICAL: Skip cash equity orders — they must only fill on real exchange volume via onTick
+            const isDerivOrCommodity = isDerivativeContract(order.symbol) || isCommodityContract(order.symbol);
+            if (!isDerivOrCommodity) continue;
+
+            if (!order._lastFillTime || (now - order._lastFillTime >= 4500)) {
+              order._lastFillTime = now;
+              const cleanSym = String(order.symbol).replace(/^(NSE:|BSE:|MCX:)/i, '');
+              const { getLotSizes, isCommodityContract } = require('./instrumentsCache');
+              const lotSizes = getLotSizes([order.symbol, cleanSym]);
+              const lotsize = lotSizes[order.symbol] || lotSizes[cleanSym] || 1;
+              const isCommodity = isCommodityContract(order.symbol);
+
+              let slice = 0;
+              let consumed = 0;
+              if (lotsize > 1) {
+                const isContractVol = isCommodity || volDelta < lotsize;
+                const availableUnits = isContractVol ? (volDelta * lotsize) : volDelta;
+
+                const rawCap = Math.min(order.pending_quantity, availableUnits);
+                slice = Math.floor(rawCap / lotsize) * lotsize;
+                if (slice === 0 && order.pending_quantity < lotsize && availableUnits >= order.pending_quantity) {
+                  slice = order.pending_quantity;
+                }
+
+                if (slice > 0) {
+                  consumed = isContractVol ? Math.ceil(slice / lotsize) : slice;
+                }
+              } else {
+                slice = Math.min(order.pending_quantity, volDelta);
+                consumed = slice;
+              }
+
+              if (slice > 0) {
+                await this.processSliceFill(order, slice, ltp);
+                volDelta -= consumed;
+                if (order.pending_quantity <= 0) {
+                  this.dequeueOrder(order.id, order.symbol);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('VolumeMatchingEngine heartbeat error:', err.message);
+      }
+    }, 4000);
+    if (this._heartbeatInterval.unref) this._heartbeatInterval.unref();
+  }
+}
+
+const volumeMatchingEngine = new VolumeMatchingEngine();
+module.exports = volumeMatchingEngine;

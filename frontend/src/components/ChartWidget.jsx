@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import { SMA, EMA, RSI, MACD } from 'technicalindicators';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import StockDetails from './StockDetails';
 
@@ -38,15 +39,11 @@ export default function ChartWidget() {
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
 
-  const {
-    selectedSymbol, prices, candleData,
-    isLoadingCandles, candleError,
-    chartInterval, setChartInterval, loadCandleData,
-    openOrderModal
-  } = useStore();
+  const { selectedSymbol, candleData, isLoadingCandles, candleError, chartInterval, setChartInterval, loadCandleData, openOrderModal, theme } = useStore(useShallow(state => ({ selectedSymbol: state.selectedSymbol, candleData: state.candleData, isLoadingCandles: state.isLoadingCandles, candleError: state.candleError, chartInterval: state.chartInterval, setChartInterval: state.setChartInterval, loadCandleData: state.loadCandleData, openOrderModal: state.openOrderModal, theme: state.theme })));
 
-  const price   = prices[selectedSymbol];
+  const price   = useStore(state => state.prices[state.selectedSymbol]);
   const candles = candleData[selectedSymbol] || [];
+  const isLight = theme === 'light';
 
   // ── Build chart instance ────────────────────────────────────────────────────
   const buildChart = useCallback(() => {
@@ -76,25 +73,25 @@ export default function ChartWidget() {
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: 'solid', color: 'transparent' },
-        textColor: '#94A3B8',
+        textColor: isLight ? '#475569' : '#94A3B8',
         fontSize: 11,
         fontFamily: "'Inter', 'Roboto', sans-serif",
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,0.04)' },
-        horzLines: { color: 'rgba(255,255,255,0.04)' },
+        vertLines: { color: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)' },
+        horzLines: { color: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)' },
       },
       crosshair: {
         mode: 1,
-        vertLine: { color: '#334155', width: 1, style: 1, labelBackgroundColor: '#1E293B' },
-        horzLine: { color: '#334155', width: 1, style: 1, labelBackgroundColor: '#1E293B' },
+        vertLine: { color: isLight ? '#94a3b8' : '#334155', width: 1, style: 1, labelBackgroundColor: isLight ? '#334155' : '#1E293B' },
+        horzLine: { color: isLight ? '#94a3b8' : '#334155', width: 1, style: 1, labelBackgroundColor: isLight ? '#334155' : '#1E293B' },
       },
       rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.07)',
+        borderColor: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)',
         scaleMargins: { top: 0.05, bottom: mainBottom + 0.05 },
       },
       timeScale: {
-        borderColor: 'rgba(255,255,255,0.07)',
+        borderColor: isLight ? '#e2e8f0' : 'rgba(255,255,255,0.07)',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -107,9 +104,12 @@ export default function ChartWidget() {
 
     // Candlestick
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a', downColor: '#ef5350',
-      borderUpColor: '#26a69a', borderDownColor: '#ef5350',
-      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+      upColor: isLight ? '#089981' : '#26a69a',
+      downColor: isLight ? '#f23645' : '#ef5350',
+      borderUpColor: isLight ? '#089981' : '#26a69a',
+      borderDownColor: isLight ? '#f23645' : '#ef5350',
+      wickUpColor: isLight ? '#089981' : '#26a69a',
+      wickDownColor: isLight ? '#f23645' : '#ef5350',
     });
 
     // Volume histogram on main scale
@@ -187,6 +187,15 @@ export default function ChartWidget() {
         try { chartRef.current.remove(); } catch (_) {}
         chartRef.current = null;
       }
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
+      liveLineRef.current = null;
+      smaSeriesRef.current = null;
+      emaSeriesRef.current = null;
+      rsiSeriesRef.current = null;
+      macdSeriesRef.current = null;
+      macdSignalSeriesRef.current = null;
+      macdHistSeriesRef.current = null;
     };
   }, [selectedSymbol, chartInterval, showSMA, showEMA, showRSI, showMACD]);
 
@@ -288,7 +297,7 @@ export default function ChartWidget() {
 
       chartRef.current?.timeScale().fitContent();
     } catch (e) { console.error(e) }
-  }, [candles, showSMA, showEMA, showRSI, showMACD]);
+  }, [candles, showSMA, showEMA, showRSI, showMACD, theme]);
 
   // Live tick update
   useEffect(() => {
@@ -297,7 +306,7 @@ export default function ChartWidget() {
       const t = price.timestamp ? Math.floor(new Date(price.timestamp).getTime() / 1000) : 0;
       if (t > 0) liveLineRef.current.update({ time: t + 19800, value: price.ltp });
     } catch (_) {}
-  }, [prices, selectedSymbol]);
+  }, [price, selectedSymbol]);
 
   const isUp   = (price?.pct ?? 0) >= 0;
   const pct    = price?.pct    != null ? Number(price.pct).toFixed(2)    : null;
@@ -305,23 +314,23 @@ export default function ChartWidget() {
   const tfLabel = TIMEFRAMES.find(t => t.value === chartInterval)?.label ?? chartInterval;
 
   return (
-    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="glass-panel" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {/* ── Header Row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', gap: '12px' }}>
         <div style={{ minWidth: 0 }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '0.5px', marginBottom: '3px', color: 'var(--text-primary)' }}>
             {selectedSymbol.replace('-', ' (')} {selectedSymbol.includes('-') ? ')' : ''}
           </h3>
           {price ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '21px', fontWeight: '700', color: isUp ? '#26a69a' : '#ef5350' }}>
+              <span style={{ fontSize: '21px', fontWeight: '700', color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)' }}>
                 ₹{price.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
               {pct !== null && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: '3px',
-                  background: isUp ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,80,0.15)',
-                  color: isUp ? '#26a69a' : '#ef5350',
+                  background: isUp ? 'rgba(22, 163, 74, 0.12)' : 'rgba(220, 38, 38, 0.12)',
+                  color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)',
                   padding: '2px 7px', borderRadius: '5px', fontSize: '12px', fontWeight: '600'
                 }}>
                   {isUp ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
@@ -330,12 +339,12 @@ export default function ChartWidget() {
               )}
             </div>
           ) : (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Loading price…</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontStyle: 'italic' }}>No live price</div>
           )}
         </div>
 
         {/* Timeframes */}
-        <div style={{ display: 'flex', gap: '2px', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-hover)', padding: '3px', borderRadius: '8px', flexShrink: 0, border: '1px solid var(--border-color)' }}>
           {TIMEFRAMES.map(tf => {
             const active = chartInterval === tf.value;
             return (
@@ -344,10 +353,10 @@ export default function ChartWidget() {
                 onClick={() => setChartInterval(tf.value)}
                 disabled={isLoadingCandles}
                 style={{
-                  background: active ? 'rgba(96,165,250,0.18)' : 'transparent',
-                  color:      active ? '#60A5FA' : '#64748B',
-                  border:     active ? '1px solid rgba(96,165,250,0.35)' : '1px solid transparent',
-                  borderRadius: '5px', padding: '3px 7px',
+                  background: active ? 'var(--color-blue)' : 'transparent',
+                  color:      active ? '#ffffff' : 'var(--text-secondary)',
+                  border:     'none',
+                  borderRadius: '5px', padding: '4px 8px',
                   fontSize: '11px', fontWeight: '700', cursor: isLoadingCandles ? 'default' : 'pointer',
                   transition: 'all 0.15s',
                 }}
@@ -387,14 +396,14 @@ export default function ChartWidget() {
       )}
 
       {/* ── Chart area ── */}
-      <div style={{ position: 'relative', width: '100%', flex: 1, minHeight: '300px' }}>
+      <div style={{ position: 'relative', width: '100%', flex: '0 0 60vh', minHeight: '400px' }}>
         <div ref={chartContainerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />
 
         {/* Quick Order Buttons Overlay */}
         {price && !isLoadingCandles && (
           <div style={{ position: 'absolute', top: '12px', left: '0px', zIndex: 5, display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'SELL', prices[selectedSymbol]?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'SELL', price?.lotsize || 1)}
               style={{
                 background: '#F0533C', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -410,7 +419,7 @@ export default function ChartWidget() {
             </button>
             <span style={{ fontSize: '10px', color: '#64748B', fontWeight: '600' }}>0.00</span>
             <button 
-              onClick={() => openOrderModal(selectedSymbol, 'BUY', prices[selectedSymbol]?.lotsize || 1)}
+              onClick={() => openOrderModal(selectedSymbol, 'BUY', price?.lotsize || 1)}
               style={{
                 background: '#0FB384', color: '#fff', border: 'none', borderRadius: '4px',
                 padding: '3px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -431,7 +440,7 @@ export default function ChartWidget() {
         {isLoadingCandles && (
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'rgba(10,15,28,0.72)', backdropFilter: 'blur(3px)',
+            background: 'rgba(10,15,28,0.85)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center', gap: '8px', zIndex: 10,
           }}>
@@ -481,17 +490,13 @@ function IndicatorButton({ label, active, onClick, color }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        background: active ? `${color}20` : 'transparent',
-        color: active ? color : '#64748B',
-        border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
-        borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 'bold',
-        cursor: 'pointer', transition: 'all 0.2s'
-      }}
+      className={`chart-tool-pill ${active ? 'active' : ''}`}
+      style={{ '--pill-color': color }}
     >
-      {active && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />}
+      {active && <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />}
       {label}
     </button>
   );
 }
+
+

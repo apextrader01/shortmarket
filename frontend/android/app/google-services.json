@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "942129499307",
+    "project_id": "skandx-1020f",
+    "storage_bucket": "skandx-1020f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942129499307:android:a2c54b127e32c406d992bd",
+        "android_client_info": {
+          "package_name": "com.skandx.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBc_mR872wmE9jhfjobSHODqA5OlTHrK1I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

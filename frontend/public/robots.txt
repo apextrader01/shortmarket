@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /adminpanel
+Disallow: /api/
+
+Sitemap: https://skandx.in/sitemap.xml

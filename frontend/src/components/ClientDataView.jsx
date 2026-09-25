@@ -1,19 +1,275 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useStore } from '../store';
-import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2 } from 'lucide-react';
+import { subscribeUserToPush, unsubscribeUserFromPush, triggerTestPushNotification, getPushSubscriptionStatus } from '../services/pushManager';
+import { Bell, CheckCircle, ShieldAlert, Tag } from 'lucide-react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
+import { useStore, API } from '../store';
+import { useShallow } from 'zustand/react/shallow';
+import { LogOut, FileText, PieChart, BarChart2, PlusCircle, CreditCard, Gift, Users, Star, Settings, Keyboard, Info, HelpCircle, Upload, Loader2, X, Fingerprint, Shield, ShieldCheck, KeyRound, Wallet, ArrowDownToLine, Send } from 'lucide-react';
+const ReferralsView = lazy(() => import('./ReferralsView'));
+import SettingsView, { BiometricSettingsSection } from './SettingsView';
+import ResetPortfolioModal from './ResetPortfolioModal';
 // import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+// ✅ Defined OUTSIDE component - stable identity across renders, prevents remount flicker
+function Card({ title, desc, icon: Icon, color, onClick, badge }) {
+  return (
+    <div className="glass-panel hoverable" onClick={onClick} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: onClick ? 'pointer' : 'default', transition: 'all 0.2s', minHeight: '120px' }}>
+      {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'var(--bg-hover)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>{title}</div>
+        {desc && <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', flex: 1 }}>{desc}</div>}
+        {badge && <div style={{ marginTop: '12px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', width: 'fit-content', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', color: 'var(--text-secondary)', fontWeight: '600' }}>{badge}</div>}
+      </div>
+    </div>
+  );
+}
+
+
 
 
 
 export default function ClientDataView({ onDepositClick, setActiveTab }) {
-  const { user, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount } = useStore();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const { 
+    user, orders, logout, updateProfilePicture, theme, toggleTheme, setTheme, resetAccount, 
+    fontSize, setFontSize, accessibilityMode, setAccessibilityMode, oneClickMode, setOneClickMode,
+    telegramSettings, fetchTelegramSettings
+  } = useStore(useShallow(state => ({ 
+    user: state.user,
+    orders: state.orders, 
+    logout: state.logout, 
+    updateProfilePicture: state.updateProfilePicture, 
+    theme: state.theme, 
+    toggleTheme: state.toggleTheme, 
+    setTheme: state.setTheme, 
+    resetAccount: state.resetAccount,
+    fontSize: state.fontSize,
+    setFontSize: state.setFontSize,
+    accessibilityMode: state.accessibilityMode,
+    setAccessibilityMode: state.setAccessibilityMode,
+    oneClickMode: state.oneClickMode,
+    setOneClickMode: state.setOneClickMode,
+    telegramSettings: state.telegramSettings,
+    fetchTelegramSettings: state.fetchTelegramSettings
+  })));
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showReferrals, setShowReferrals] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  useEffect(() => {
+    fetchTelegramSettings?.();
+  }, [fetchTelegramSettings]);
+    // 🛡️ Risk Guardian State
+  const [isRiskActive, setIsRiskActive] = useState(() => !!(user && user.risk_guardian_active));
+  const [maxTrades, setMaxTrades] = useState(() => (user && user.max_daily_trades) || 4);
+  const [maxLoss, setMaxLoss] = useState(() => (user && user.max_daily_loss) || 5000);
+  const [isCustomTrades, setIsCustomTrades] = useState(() => (user?.max_daily_trades && ![2, 4, 10].includes(Number(user.max_daily_trades))));
+  const [isCustomLoss, setIsCustomLoss] = useState(() => (user?.max_daily_loss && ![2000, 5000, 10000].includes(Number(user.max_daily_loss))));
+  const [tradesSaved, setTradesSaved] = useState(false);
+  const [lossSaved, setLossSaved] = useState(false);
+  const [riskMsg, setRiskMsg] = useState('');
+
+  // Calculate today's discipline status
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayCompletedOrders = (orders || []).filter(o => (o.status === 'COMPLETED' || o.status === 'COMPLETE' || o.status === 'EXECUTED') && new Date(o.created_at) >= todayStart);
+  const todayTradesCount = todayCompletedOrders.length;
+  let todayNetPnL = 0;
+  todayCompletedOrders.forEach(o => {
+    if (o.realized_pnl !== null && o.realized_pnl !== undefined) {
+      todayNetPnL += parseFloat(o.realized_pnl);
+    }
+  });
+  const todayRealizedLoss = todayNetPnL < 0 ? Math.abs(todayNetPnL) : 0;
+  const isTradesLocked = isRiskActive && maxTrades && todayTradesCount >= Number(maxTrades);
+  const isLossLocked = isRiskActive && maxLoss && todayRealizedLoss >= Number(maxLoss);
+  const isLockedTonight = isTradesLocked || isLossLocked;
+
+  const handleSaveRiskGuardian = async (activeOverride, tradesOverride, lossOverride) => {
+    try {
+      const activeVal = activeOverride !== undefined ? activeOverride : isRiskActive;
+      const tradesVal = tradesOverride !== undefined ? tradesOverride : maxTrades;
+      const lossVal = lossOverride !== undefined ? lossOverride : maxLoss;
+      
+      setRiskMsg('Saving rules...');
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/user/risk-guardian`, {
+        credentials: 'include',
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          risk_guardian_active: activeVal,
+          max_daily_trades: tradesVal ? Number(tradesVal) : null,
+          max_daily_loss: lossVal ? Number(lossVal) : null
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRiskMsg('Rules Saved & Enforced! 🛡️');
+        setTradesSaved(true);
+        setLossSaved(true);
+        if (data.user) useStore.getState().fetchUserData();
+        setTimeout(() => { setRiskMsg(''); setTradesSaved(false); setLossSaved(false); }, 3000);
+      } else {
+        alert(data.error || 'Failed to save Risk Guardian');
+        setRiskMsg('');
+      }
+    } catch (e) {
+      alert('Error saving Risk Guardian: ' + e.message);
+      setRiskMsg('');
+    }
+  };
+  const [isPushEnabled, setIsPushEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('web_push_enabled') === 'false') return false;
+      const hasNativeToken = !!localStorage.getItem('fcm_device_token');
+      const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
+      const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';
+      return (hasWebPref && isGranted) || hasNativeToken;
+    }
+    return false;
+  });
+  const [pushStatusMsg, setPushStatusMsg] = useState(() => {
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('web_push_enabled') === 'false') return '';
+      const hasNativeToken = !!localStorage.getItem('fcm_device_token');
+      const hasWebPref = localStorage.getItem('web_push_enabled') === 'true';
+      const isGranted = typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted';
+      if ((hasWebPref && isGranted) || hasNativeToken) {
+        return 'Push Notifications Active! 🔔';
+      }
+    }
+    return '';
+  });
+  
+  useEffect(() => {
+    const token = localStorage.getItem('token') || (user && user.token);
+    getPushSubscriptionStatus(token).then((enabled) => {
+      setIsPushEnabled(enabled);
+      if (enabled) {
+        setPushStatusMsg('Push Notifications Active! 🔔');
+      } else {
+        setPushStatusMsg('');
+      }
+    });
+  }, [user]);
+
+  const handleTogglePush = async () => {
+    const token = localStorage.getItem('token') || (user && user.token);
+    if (isPushEnabled) {
+      // Turn OFF
+      setPushStatusMsg('Disabling push...');
+      await unsubscribeUserFromPush(token);
+      setIsPushEnabled(false);
+      setPushStatusMsg('Push Notifications Disabled');
+      setTimeout(() => setPushStatusMsg(''), 3000);
+    } else {
+      // Turn ON
+      try {
+        setPushStatusMsg('Activating push alerts...');
+        await subscribeUserToPush(token);
+        setIsPushEnabled(true);
+        setPushStatusMsg('Push Notifications Active! 🔔');
+        setTimeout(() => setPushStatusMsg(''), 4000);
+      } catch (err) {
+        alert('Notification Setup: ' + err.message);
+        setPushStatusMsg('');
+      }
+    }
+  };
+
+  const handleTestPush = async () => {
+    try {
+      const token = localStorage.getItem('token') || (user && user.token);
+      await triggerTestPushNotification(token);
+      setPushStatusMsg('Test alert sent! Check your notification center.');
+      setTimeout(() => setPushStatusMsg(''), 4000);
+    } catch (err) {
+      alert('Test push error: ' + err.message);
+    }
+  };
+
+  // 💰 Real Money Rewards & Withdrawal State
+  const [rewardStats, setRewardStats] = useState({ availableRewardBalance: 0, totalEarned: 0 });
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState({ type: '', text: '' });
+
+  const fetchRewardStats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${API}/api/referrals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json && json.success && json.stats) {
+        setRewardStats(json.stats);
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchRewardStats();
+  }, []);
+
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    if (!withdrawAmount || Number(withdrawAmount) <= 0) {
+      setWithdrawMsg({ type: 'error', text: 'Please enter a valid withdrawal amount.' });
+      return;
+    }
+    if (Number(withdrawAmount) > (rewardStats.availableRewardBalance || 0)) {
+      setWithdrawMsg({ type: 'error', text: `Amount exceeds available reward balance (₹${rewardStats.availableRewardBalance?.toFixed(2) || '0.00'})` });
+      return;
+    }
+    if (!user?.upi_id && (!user?.bank_account_no || !user?.bank_ifsc)) {
+      setWithdrawMsg({ type: 'error', text: 'Please add your UPI ID or Bank Details in Profile Settings first.' });
+      return;
+    }
+
+    setWithdrawLoading(true);
+    setWithdrawMsg({ type: '', text: '' });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/withdrawals/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount: parseFloat(withdrawAmount) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Withdrawal request failed');
+      setWithdrawMsg({ type: 'success', text: '✅ Real money withdrawal request submitted! Admin will credit your UPI/Bank.' });
+      setWithdrawAmount('');
+      fetchRewardStats();
+      setTimeout(() => {
+        setShowWithdrawModal(false);
+        setWithdrawMsg({ type: '', text: '' });
+      }, 2500);
+    } catch (err) {
+      setWithdrawMsg({ type: 'error', text: err.message || 'Withdrawal failed' });
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
 
   const handleResetAccount = async () => {
-    if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to ₹10,00,000. This cannot be undone.')) {
+    if (window.confirm('Are you absolutely sure you want to reset your account? This will permanently delete all your trades, positions, and reset your balance to Rs. 10,00,000. This cannot be undone.')) {
       const res = await resetAccount();
       if (!res.success) {
         alert('Failed to reset account: ' + (res.error || 'Unknown error'));
@@ -33,8 +289,8 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError('Image is too large. Please select a file smaller than 2MB.');
+    if (file.size > 7 * 1024 * 1024) {
+      setUploadError('Image is too large. Please select a file smaller than 7MB.');
       if (e.target) e.target.value = '';
       return;
     }
@@ -42,52 +298,92 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
     setIsUploading(true);
     setUploadError(null);
 
-      try {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64String = reader.result;
-          const res = await updateProfilePicture(base64String);
-          
-          if (!res.success) {
-            setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_SIZE = 512;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_SIZE) {
+                height = Math.round((height * MAX_SIZE) / width);
+                width = MAX_SIZE;
+              }
+            } else {
+              if (height > MAX_SIZE) {
+                width = Math.round((width * MAX_SIZE) / height);
+                height = MAX_SIZE;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to optimized JPEG at 85% quality (~30-60KB)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            const res = await updateProfilePicture(compressedBase64);
+
+            if (!res.success) {
+              setUploadError('Failed to save profile picture: ' + (res.error || 'Unknown error'));
+            }
+          } catch (err) {
+            setUploadError('Failed to process image: ' + (err.message || 'Unknown error'));
+          } finally {
+            setIsUploading(false);
+            if (e.target) e.target.value = '';
           }
-          
+        };
+
+        img.onerror = () => {
           setIsUploading(false);
+          setUploadError('Failed to load image for processing.');
           if (e.target) e.target.value = '';
         };
-        reader.onerror = () => {
-          setIsUploading(false);
-          setUploadError('Failed to read image file.');
-          if (e.target) e.target.value = '';
-        };
-        reader.readAsDataURL(file);
-      } catch (err) {
+
+        img.src = reader.result;
+      };
+
+      reader.onerror = () => {
         setIsUploading(false);
-        setUploadError(err.message || 'Failed to process image.');
+        setUploadError('Failed to read image file.');
         if (e.target) e.target.value = '';
-      }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setIsUploading(false);
+      setUploadError(err.message || 'Failed to process image.');
+      if (e.target) e.target.value = '';
+    }
   };
-
-  // Removed LedgerSection to outside
-
-
-
-  const Card = ({ title, desc, icon: Icon, color }) => (
-    <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '120px' }}>
-      {Icon && <div style={{ color: color || 'var(--color-blue)', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px', width: 'fit-content' }}><Icon size={20} /></div>}
-      <div>
-        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: '#E2E8F0' }}>{title}</div>
-        {desc && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>}
+  if (showProfile) {
+    return (
+      <div style={{ padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', animation: 'fadeIn 0.3s ease-out', width: '100%', boxSizing: 'border-box' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => setShowProfile(false)} 
+          style={{ marginBottom: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+        >
+          &larr; Back to Dashboard
+        </button>
+        <SettingsView />
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div style={{ flex: 1, padding: '32px', overflowY: 'auto', background: 'var(--bg-dark)' }}>
+    <div style={{ flex: 1, padding: isMobile ? '16px 12px 90px 12px' : '24px 28px 60px 28px', overflowY: 'auto', background: 'var(--bg-dark)', width: '100%', boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: '700' }}>My Account</h2>
-        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '12px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
+        <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-red)', cursor: 'pointer', fontSize: '11px', fontWeight: '700', padding: '8px 16px', border: '1px solid rgba(225,42,31,0.2)', borderRadius: '20px', background: 'rgba(225,42,31,0.05)' }}>
           <LogOut size={14} /> LOGOUT
         </div>
       </div>
@@ -108,14 +404,14 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             title="Upload Profile Picture"
           >
             {isUploading ? (
-              <Loader2 size={24} className="animate-spin" color="#FFF" />
+              <Loader2 size={24} className="animate-spin" color="var(--text-primary)" />
             ) : !user?.profile_picture_url ? (
               user?.username ? String(user.username).split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'HV'
             ) : null}
             
             {!isUploading && (
               <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '30%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <Upload size={12} color="#FFF" />
+                <Upload size={12} color="var(--text-primary)" />
               </div>
             )}
           </div>
@@ -129,221 +425,644 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
           />
 
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#FFF', marginBottom: '4px' }}>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>
               {user?.username || 'Hari Krishnan I Vijayan'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-              Client ID: {user?.id}
+              Client ID: {user?.client_id || user?.id}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--color-green-light)', fontWeight: '600', marginBottom: '4px' }}>
-              Available Margin: ₹{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Available Margin: &#8377;{Number(user?.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW PROFILE</div>
-            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)' }}>{uploadError}</div>}
+            <div style={{ marginTop: '6px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                onClick={() => setShowProfile(true)} 
+                className="btn btn-secondary"
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '5px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  borderColor: 'rgba(59, 130, 246, 0.35)',
+                  color: 'var(--color-blue-light)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Settings size={13} /> Profile & Settings &rarr;
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('security-2fa-section');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    setShowProfile(true);
+                  }
+                }} 
+                style={{ 
+                  fontSize: '11.5px', 
+                  fontWeight: '700', 
+                  padding: '5px 12px', 
+                  borderRadius: '6px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  background: user?.totp_enabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  border: user?.totp_enabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  color: user?.totp_enabled ? '#4ade80' : '#f59e0b',
+                  cursor: 'pointer'
+                }}
+              >
+                <ShieldCheck size={13} /> {user?.totp_enabled ? 'Google 2FA: Active ✅' : 'Google Authenticator (2FA) 🔑'}
+              </button>
+            </div>
+            {uploadError && <div style={{ fontSize: '10px', color: 'var(--color-red)', marginTop: '4px' }}>{uploadError}</div>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-          <Star size={14} /> Member since 2021
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '11px' }}>
+          <Star size={14} /> Member since {user?.created_at ? new Date(user.created_at).getFullYear() : '2024'}
         </div>
       </div>
 
       {/* Add Funds Banner */}
-      {/* Add Funds Banner */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '16px', marginBottom: '40px', borderLeft: '4px solid var(--color-blue)' }}>
+      <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px', marginBottom: '36px', borderLeft: '4px solid var(--color-blue)', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: '800', color: 'var(--color-blue-light)', flexShrink: 0 }}>
             ₹
           </div>
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Get ready to invest</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with Short Market</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Get ready to invest</div>
+            <div style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4' }}>Add funds to start your trading journey with SkandX</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
-          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#FFF', border: 'none', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', gap: '12px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '280px' }}>
+          <button onClick={onDepositClick} style={{ flex: 1, background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s' }}>
             DEPOSIT
           </button>
-          <button onClick={handleResetAccount} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button onClick={() => setShowResetModal(true)} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 20px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.15s' }}>
             RESET ACCOUNT
           </button>
         </div>
       </div>
 
 
+      {/* Real Money Withdrawal & Referral Rewards Card */}
+      <div className="glass-panel" style={{ 
+        padding: '20px 24px', 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column' : 'row', 
+        justifyContent: 'space-between', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        gap: '20px', 
+        marginBottom: '36px', 
+        borderLeft: '4px solid #10b981', 
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
+        width: '100%', 
+        boxSizing: 'border-box' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+          <div style={{ 
+            width: '48px', 
+            height: '48px', 
+            borderRadius: '12px', 
+            background: 'rgba(16, 185, 129, 0.18)', 
+            border: '1px solid rgba(16, 185, 129, 0.4)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            color: '#34d399', 
+            flexShrink: 0 
+          }}>
+            <Wallet size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: '#34d399', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                Real Cash Earnings
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Total Earned: <strong style={{ color: 'var(--text-primary)' }}>₹{Number(rewardStats?.totalEarned || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              </span>
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span>Available to Withdraw:</span>
+              <span style={{ color: '#10b981', fontSize: '20px', fontWeight: '900' }}>
+                ₹{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Cashout referral rewards, commissions & affiliate earnings directly to your UPI / Bank Account.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'auto' : '300px' }}>
+          <button 
+            onClick={() => { setShowWithdrawModal(true); setWithdrawMsg({ type: '', text: '' }); }}
+            style={{ 
+              flex: 1, 
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+              color: '#ffffff', 
+              border: 'none', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              fontSize: '12px', 
+              fontWeight: '800', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+              transition: 'all 0.15s' 
+            }}
+          >
+            <ArrowDownToLine size={15} /> WITHDRAW CASH 💸
+          </button>
+          <button 
+            onClick={() => setShowReferrals(true)} 
+            style={{ 
+              flex: 1, 
+              background: 'rgba(255, 255, 255, 0.05)', 
+              color: 'var(--text-primary)', 
+              border: '1px solid var(--border-color)', 
+              padding: '12px 18px', 
+              borderRadius: '8px', 
+              fontSize: '12px', 
+              fontWeight: '700', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px',
+              transition: 'background 0.15s' 
+            }}
+          >
+            <Gift size={15} color="#fbbf24" /> INVITE & EARN 🎁
+          </button>
+        </div>
+      </div>
+
       {/* Sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
         
         {/* Reports */}
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Reports</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Reports</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Funds / Ledger Passbook</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trades & Charges</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trades & Charges</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <FileText size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Statements</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Statements</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <PieChart size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Profit & Loss</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Profit & Loss</span>
               </div>
               <div onClick={() => setActiveTab('Reports')} className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                 <BarChart2 size={18} color="var(--color-blue-light)" />
-                <span style={{ fontSize: '14px', fontWeight: '600' }}>Trading Insights</span>
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Trading Insights</span>
               </div>
             </div>
           </div>
 
-        {/* Pledging & Pay Later */}
+        {/* Coming Features */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Pledging & Pay Later</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Card title="Pledge Holdings for Extra Margin" desc="Increase your trading balance" color="#EAB308" />
-            <Card title="MTF" desc="Buy upto 4 times quantity of equity stocks with just 0.041% interest per day" color="#A855F7" />
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.2)' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '8px', color: '#22C55E' }}>Transfer Stocks</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>Transferring stocks to any Demat account quickly and securely</div>
-              </div>
-            </div>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Coming Features</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <Card title="MTF (Margin Trading Facility)" desc="Buy upto 4 times quantity of equity stocks with just 0.045% interest per day" color="#A855F7" badge="Coming Soon" />
           </div>
         </div>
 
-        {/* Financial Incentives */}
+        {/* Subscription Plan */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Financial Incentives</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Card icon={Gift} title="Offers & Rewards" desc="Save more with special offers for you" color="#60A5FA" />
-            <Card icon={Users} title="Refer & Earn" desc="Refer a friend to join Short Market & get rewarded ₹500" color="#34D399" />
-            <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" />
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Subscription Plan</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <Card icon={Users} title="Refer & Earn" desc="Refer a friend & get 10% of their subscription" color="#34D399" onClick={() => setShowReferrals(true)} />
+            <Card icon={Star} title="Subscription Plans" desc="Curated plans to help you save on trading charges" color="#FBBF24" onClick={() => setActiveTab('Pricing')} />
+            <Card icon={FileText} title="Trade Diary & Analytics" desc="Audit your edge, track mistakes, and access the 30-Day Discipline Challenge" color="#3B82F6" onClick={() => setActiveTab('TradeDiary')} />
           </div>
         </div>
 
         {/* Quick Settings */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#E2E8F0' }}>Quick Settings</h3>
-            <span style={{ fontSize: '12px', color: 'var(--color-blue-light)', fontWeight: '600', cursor: 'pointer' }}>VIEW ALL &gt;</span>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>Quick Settings</h3>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Font Size</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
+          <div className="glass-panel" style={{ overflow: 'hidden', padding: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 600px), 1fr))', gap: '1px', background: 'var(--border-color)' }}>
+              
+              {/* Push & Trade Alerts (Web & Mobile) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Bell size={15} color={isPushEnabled ? 'var(--color-blue-light)' : 'var(--text-secondary)'} /> Push & Trade Alerts (Web & Mobile App)
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Receive real-time phone lock-screen and desktop alerts on order executions and triggers
+                  </div>
+                  {pushStatusMsg && (
+                    <div style={{ fontSize: '11px', color: isPushEnabled ? 'var(--color-green-light)' : '#f87171', marginTop: '4px', fontWeight: '600' }}>
+                      {pushStatusMsg}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {isPushEnabled && (
+                    <button 
+                      onClick={handleTestPush}
+                      style={{ padding: '6px 12px', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      Test Alert 🔔
+                    </button>
+                  )}
+                  {/* Modern Toggle Switch: Blue when ON, Gray when OFF */}
+                  <div 
+                    onClick={handleTogglePush} 
+                    title={isPushEnabled ? 'Click to Turn OFF' : 'Click to Turn ON'}
+                    style={{ 
+                      width: '40px', 
+                      height: '22px', 
+                      background: isPushEnabled ? 'var(--color-blue)' : 'var(--border-color)', 
+                      borderRadius: '11px', 
+                      position: 'relative', 
+                      cursor: 'pointer', 
+                      transition: 'background 0.2s',
+                      flexShrink: 0
+                    }}
+                  >
+                    <div 
+                      style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        background: isPushEnabled ? '#FFF' : 'var(--text-secondary)', 
+                        borderRadius: '50%', 
+                        position: 'absolute', 
+                        top: '2px', 
+                        left: isPushEnabled ? '20px' : '2px', 
+                        transition: 'left 0.2s' 
+                      }} 
+                    />
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '4px' }}>
-                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer' }}>Small</span>
-                <span style={{ fontSize: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', color: '#FFF' }}>Medium</span>
-                <span style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer' }}>Large</span>
+
+              {/* Telegram Live Trade Alerts (Zero Delay Bot) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Send size={15} color="#0088cc" /> Telegram Live Alerts & Notifications
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontWeight: '700',
+                      background: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)',
+                      color: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '#4ade80' : 'var(--text-secondary)',
+                      border: telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '1px solid rgba(34,197,94,0.35)' : '1px solid var(--border-color)'
+                    }}>
+                      {telegramSettings?.settings?.telegram_chat_id && telegramSettings?.settings?.telegram_alerts_enabled ? '🟢 Connected' : '⚪ Not Linked'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    {telegramSettings?.settings?.telegram_chat_id 
+                      ? `Linked to Chat ID: ${telegramSettings.settings.telegram_chat_id}. Instant order fills, target hits & stop-loss alerts active.`
+                      : 'Receive instant, zero-delay order fill, target hit & stop-loss notifications directly on your phone via Telegram.'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowProfile(true)}
+                    style={{
+                      padding: '7px 14px',
+                      background: 'linear-gradient(135deg, #0088cc 0%, #006699 100%)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '11.5px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(0, 136, 204, 0.3)'
+                    }}
+                  >
+                    <Send size={12} /> {telegramSettings?.settings?.telegram_chat_id ? 'Manage Telegram Settings' : 'Connect Telegram Bot 📲'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 🛡️ Risk Guardian (Capital & Trade Discipline) */}
+              <div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ minWidth: '200px', flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldAlert size={15} color={isRiskActive ? '#f59e0b' : 'var(--text-secondary)'} /> Risk Guardian (Discipline & Capital Protection)
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      Auto-squares off all open positions and locks trading if daily max loss or trade count is exceeded to protect your capital from runaway losses. Unlocks automatically next trading morning.
+                    </div>
+                    {riskMsg && <div style={{ fontSize: '11px', color: 'var(--color-green-light)', marginTop: '4px', fontWeight: '600' }}>{riskMsg}</div>}
+                  </div>
+                  <div 
+                    onClick={() => {
+                      const next = !isRiskActive;
+                      setIsRiskActive(next);
+                      handleSaveRiskGuardian(next, maxTrades, maxLoss);
+                    }} 
+                    title={isRiskActive ? 'Click to Disable' : 'Click to Enable'}
+                    style={{ 
+                      width: '40px', 
+                      height: '22px', 
+                      background: isRiskActive ? '#f59e0b' : 'var(--border-color)', 
+                      borderRadius: '11px', 
+                      position: 'relative', 
+                      cursor: 'pointer', 
+                      transition: 'background 0.2s',
+                      flexShrink: 0
+                    }}
+                  >
+                    <div 
+                      style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        background: isRiskActive ? '#FFF' : 'var(--text-secondary)', 
+                        borderRadius: '50%', 
+                        position: 'absolute', 
+                        top: '2px', 
+                        left: isRiskActive ? '20px' : '2px', 
+                        transition: 'left 0.2s' 
+                      }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Live Status Badge */}
+                {isRiskActive && (
+                  <div>
+                    {isLockedTonight ? (
+                      <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>🔒</span> Trading is LOCKED for tonight ({isTradesLocked ? `Hit ${maxTrades} trades limit` : `Hit ₹${Number(maxLoss).toLocaleString('en-IN')} max loss limit`}). Will unlock next morning.
+                      </div>
+                    ) : (
+                      <div style={{ padding: '8px 12px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '6px', color: 'var(--color-green-light)', fontSize: '11px', fontWeight: '600', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span>🛡️ Status: Active & Protecting Capital</span>
+                        <span>Today: {todayTradesCount} / {maxTrades || '∞'} Trades | Realized Loss: ₹{todayRealizedLoss.toFixed(2)} / ₹{maxLoss ? Number(maxLoss).toLocaleString('en-IN') : '∞'}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isRiskActive && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {/* Max Trades row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Trades Per Day:</span>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {[2, 4, 10].map(cnt => (
+                          <span 
+                            key={cnt}
+                            onClick={() => { 
+                              setIsCustomTrades(false);
+                              setMaxTrades(cnt); 
+                              handleSaveRiskGuardian(isRiskActive, cnt, maxLoss); 
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: (!isCustomTrades && Number(maxTrades) === cnt) ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: (!isCustomTrades && Number(maxTrades) === cnt) ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: (!isCustomTrades && Number(maxTrades) === cnt) ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
+                          >
+                            {cnt} Trades
+                          </span>
+                        ))}
+                        <span
+                          onClick={() => setIsCustomTrades(true)}
+                          style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: isCustomTrades ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-hover)', border: isCustomTrades ? '1px solid #f59e0b' : '1px solid var(--border-color)', color: isCustomTrades ? '#f59e0b' : 'var(--text-secondary)', fontWeight: '600' }}
+                        >
+                          Custom
+                        </span>
+                        {isCustomTrades && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={maxTrades}
+                              onChange={(e) => { setMaxTrades(e.target.value); setTradesSaved(false); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
+                              placeholder="Trades"
+                              style={{ width: '65px', background: 'var(--bg-hover)', border: '1px solid #f59e0b', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                            />
+                            <button
+                              onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
+                              style={{ padding: '4px 8px', background: tradesSaved ? 'var(--color-green-light)' : '#f59e0b', color: '#000', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
+                            >
+                              {tradesSaved ? '✓ Saved' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Max Loss row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Max Daily Loss Limit:</span>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {[2000, 5000, 10000].map(amt => (
+                          <span 
+                            key={amt}
+                            onClick={() => { 
+                              setIsCustomLoss(false);
+                              setMaxLoss(amt); 
+                              handleSaveRiskGuardian(isRiskActive, maxTrades, amt); 
+                            }}
+                            style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: (!isCustomLoss && Number(maxLoss) === amt) ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: (!isCustomLoss && Number(maxLoss) === amt) ? '1px solid #ef4444' : '1px solid var(--border-color)', color: (!isCustomLoss && Number(maxLoss) === amt) ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
+                          >
+                            ₹{amt.toLocaleString('en-IN')}
+                          </span>
+                        ))}
+                        <span
+                          onClick={() => setIsCustomLoss(true)}
+                          style={{ padding: '4px 10px', fontSize: '11px', cursor: 'pointer', borderRadius: '4px', background: isCustomLoss ? 'rgba(239, 68, 68, 0.2)' : 'var(--bg-hover)', border: isCustomLoss ? '1px solid #ef4444' : '1px solid var(--border-color)', color: isCustomLoss ? '#f87171' : 'var(--text-secondary)', fontWeight: '600' }}
+                        >
+                          Custom
+                        </span>
+                        {isCustomLoss && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                              type="number"
+                              min="100"
+                              step="500"
+                              value={maxLoss}
+                              onChange={(e) => { setMaxLoss(e.target.value); setLossSaved(false); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss); }}
+                              placeholder="₹ Max Loss"
+                              style={{ width: '85px', background: 'var(--bg-hover)', border: '1px solid #ef4444', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', outline: 'none' }}
+                            />
+                            <button
+                              onClick={() => handleSaveRiskGuardian(isRiskActive, maxTrades, maxLoss)}
+                              style={{ padding: '4px 8px', background: lossSaved ? 'var(--color-green-light)' : '#ef4444', color: lossSaved ? '#000' : '#fff', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
+                            >
+                              {lossSaved ? '✓ Saved' : 'Save'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+<div style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: 'var(--bg-panel)' }}>
+                <div style={{ minWidth: '200px', flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Font Size</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Customise your font size as per readability</div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <span onClick={() => setFontSize('small')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'small' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'small' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'small' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'small' ? '600' : '500' }}>Small</span>
+                <span onClick={() => setFontSize('medium')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'medium' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'medium' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'medium' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'medium' ? '600' : '500' }}>Medium</span>
+                <span onClick={() => setFontSize('large')} style={{ fontSize: '12px', padding: '6px 16px', cursor: 'pointer', background: fontSize === 'large' ? 'rgba(37, 99, 235, 0.1)' : 'transparent', border: fontSize === 'large' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', borderRadius: '4px', color: fontSize === 'large' ? 'var(--color-blue)' : 'var(--text-secondary)', fontWeight: fontSize === 'large' ? '600' : '500' }}>Large</span>
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Enable Accessibility Mode</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Enable Accessibility Mode</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turning this on will disable all shortcuts</div>
               </div>
-              <div style={{ width: '36px', height: '20px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', position: 'relative', cursor: 'pointer' }}>
-                <div style={{ width: '16px', height: '16px', background: 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: '2px' }} />
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Appearance Preference</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Choose your theme to look the best for your eyes</div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '4px' }}>
-                <span 
-                  onClick={() => setTheme('light')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'light' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'light' ? '#000' : 'var(--text-secondary)' }}
-                >
-                  Light
-                </span>
-                <span 
-                  onClick={() => setTheme('dark')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'dark' ? '#FFF' : 'var(--text-secondary)' }}
-                >
-                  Dark
-                </span>
-                <span 
-                  onClick={() => setTheme('system')} 
-                  style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer', background: theme === 'system' ? 'rgba(255,255,255,0.1)' : 'transparent', borderRadius: '4px', color: theme === 'system' ? '#FFF' : 'var(--text-secondary)' }}
-                >
-                  System
-                </span>
+              <div onClick={() => setAccessibilityMode(!accessibilityMode)} style={{ width: '36px', height: '20px', background: accessibilityMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
+                <div style={{ width: '16px', height: '16px', background: accessibilityMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: accessibilityMode ? '18px' : '2px', transition: 'left 0.2s' }} />
               </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Appearance Preference</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Choose your high-contrast trading theme</div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'oled', label: '🖤 OLED Black', bg: '#000000', border: '#333333', color: '#ffffff' },
+                  { id: 'midnight', label: '🌌 Midnight', bg: '#070c18', border: '#1e3a8a', color: '#ffffff' },
+                  { id: 'charcoal', label: '🪙 Charcoal', bg: '#121214', border: '#2a2a30', color: '#ffffff' },
+                  { id: 'dark', label: '🚀 Deep Space', bg: '#0B1121', border: '#1e293b', color: '#ffffff' },
+                  { id: 'light', label: '☀️ Light', bg: '#FFFFFF', border: '#cbd5e1', color: '#0f172a' }
+                ].map(t => {
+                  const isSel = theme === t.id;
+                  const isLightMode = theme === 'light';
+                  return (
+                    <span
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      style={{
+                        fontSize: '11.5px',
+                        padding: '6px 14px',
+                        cursor: 'pointer',
+                        background: isSel ? (isLightMode ? '#eff6ff' : 'rgba(59, 130, 246, 0.25)') : t.bg,
+                        border: isSel ? '1.5px solid var(--color-blue)' : `1px solid ${t.border}`,
+                        borderRadius: '6px',
+                        color: isSel ? 'var(--color-blue)' : t.color,
+                        fontWeight: isSel ? '700' : '500',
+                        boxShadow: isSel ? (isLightMode ? '0 0 0 2px rgba(37,99,235,0.15)' : '0 0 10px rgba(59, 130, 246, 0.3)') : 'none',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {t.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ minWidth: '200px', flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px' }}>Re-Confirm Order</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
+              </div>
+              <div onClick={() => setOneClickMode(!oneClickMode)} style={{ width: '36px', height: '20px', background: !oneClickMode ? 'var(--color-blue)' : 'var(--border-color)', borderRadius: '10px', position: 'relative', cursor: 'pointer', transition: 'background 0.2s' }}>
+                <div style={{ width: '16px', height: '16px', background: !oneClickMode ? '#FFF' : 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: !oneClickMode ? '18px' : '2px', transition: 'left 0.2s' }} />
+              </div>
+            </div>
+
+            {/* 🔐 Two-Factor Authentication & App Security */}
+            <div id="security-2fa-section" style={{ padding: isMobile ? '16px 12px' : '20px', display: 'flex', flexDirection: 'column', gap: '14px', background: 'var(--bg-panel)', gridColumn: isMobile ? '1' : '1 / -1' }}>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '4px' }}>Re-Confirm Order</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Turn this on if you want an order preview every time you place an order</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={16} color="var(--color-blue-light)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
+                </div>
               </div>
-              <div style={{ width: '36px', height: '20px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', position: 'relative', cursor: 'pointer' }}>
-                <div style={{ width: '16px', height: '16px', background: 'var(--text-secondary)', borderRadius: '50%', position: 'absolute', top: '2px', left: '2px' }} />
-              </div>
+              <BiometricSettingsSection user={user} />
             </div>
           </div>
+        </div>
         </div>
 
         {/* Account Settings */}
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: '#E2E8F0' }}>Account Settings & Other Info</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Subscription Plans</span>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-primary)' }}>Account Settings & Other Info</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: '16px' }}>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('Pricing')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Star size={16} color="var(--color-blue)" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Subscription Plans</span>
             </div>
             <div 
               className="glass-panel hoverable" 
               onClick={() => setShowHotkeysModal(true)}
               style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
             >
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Keyboard & Shortcut</span>
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Keyboard size={16} color="var(--color-blue)" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>Keyboard & Shortcut</span>
             </div>
-            <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>About Us</span>
+            <div className="glass-panel hoverable" onClick={() => setActiveTab('AboutUs')} style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+              <div style={{ background: 'var(--bg-hover)', padding: '8px', borderRadius: '4px' }}><Info size={16} color="var(--color-blue)" /></div>
+              <span style={{ fontSize: '13px', fontWeight: '600' }}>About Us</span>
             </div>
           </div>
         </div>
 
         {/* OneHelp */}
-        <div className="glass-panel hoverable" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
+        <div className="glass-panel hoverable" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', cursor: 'pointer' }}>
           <div>
             <div style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               OneHelp
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Your all-in-one place for help and support</div>
           </div>
-          <button style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: '#FFF', padding: '10px 20px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+          <button style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '10px 20px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
             KNOW MORE
           </button>
         </div>
       </div>
       
       {/* Floating Ask Angel / Support Button */}
-      <div className="support-fab" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: '#FFF', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
+      <div className="support-fab" style={{ position: 'fixed', bottom: isMobile ? '70px' : '30px', right: isMobile ? '16px' : '30px', display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '12px 20px', borderRadius: '30px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.4)', zIndex: 100 }}>
         <HelpCircle size={18} />
-        <span style={{ fontSize: '14px', fontWeight: '700' }}>Ask Support</span>
+        <span style={{ fontSize: '13px', fontWeight: '700' }}>Ask Support</span>
       </div>
       
       {/* Hotkeys Modal */}
       {showHotkeysModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '24px', position: 'relative' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '20px', position: 'relative' }}>
             <button 
               onClick={() => setShowHotkeysModal(false)}
               style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px' }}
@@ -356,18 +1075,289 @@ export default function ClientDataView({ onDepositClick, setActiveTab }) {
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Buy (Market)</span>
-                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Buy (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-blue)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + B</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '500' }}>Instant Sell (Market)</span>
-                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: '#FFF', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-hover)', padding: '12px 16px', borderRadius: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '500' }}>Instant Sell (Market)</span>
+                <span style={{ fontSize: '13px', background: 'var(--color-red)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 'bold' }}>Shift + S</span>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Real Money Withdrawal Modal */}
+      {showWithdrawModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ 
+            width: '100%', 
+            maxWidth: '460px', 
+            padding: '24px', 
+            position: 'relative', 
+            borderRadius: '16px',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <button 
+              onClick={() => { setShowWithdrawModal(false); setWithdrawMsg({ type: '', text: '' }); }}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '8px', borderRadius: '8px', color: '#10b981' }}>
+                <Wallet size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
+                  Real Money Cashout
+                </h3>
+                <div style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                  Direct Payout to UPI / Bank Account
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Withdraw your real cash referral commissions & rewards directly to your bank.
+            </p>
+
+            {/* Available Balance Box */}
+            <div style={{ 
+              background: 'rgba(16, 185, 129, 0.08)', 
+              border: '1px solid rgba(16, 185, 129, 0.25)', 
+              borderRadius: '10px', 
+              padding: '14px 16px', 
+              marginBottom: '20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>Available Cash Balance:</span>
+              <span style={{ fontSize: '18px', fontWeight: '900', color: '#10b981' }}>
+                ₹{Number(rewardStats?.availableRewardBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* Destination Payout Account */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                Payout Destination
+              </div>
+              {user?.upi_id || user?.bank_account_no ? (
+                <div style={{ 
+                  background: 'var(--bg-hover)', 
+                  border: '1px solid var(--border-color)', 
+                  borderRadius: '8px', 
+                  padding: '12px 14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    {user?.upi_id ? (
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        UPI ID: <span style={{ color: '#34d399' }}>{user.upi_id}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                        Bank A/C: <span style={{ color: '#34d399' }}>{user.bank_account_no}</span> ({user.bank_ifsc})
+                      </div>
+                    )}
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      Auto-credited upon approval
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    style={{ background: 'transparent', border: 'none', color: 'var(--color-blue-light)', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <div style={{ 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  border: '1px solid rgba(239, 68, 68, 0.3)', 
+                  borderRadius: '8px', 
+                  padding: '12px 14px' 
+                }}>
+                  <div style={{ fontSize: '12px', color: '#f87171', fontWeight: '600', marginBottom: '6px' }}>
+                    ⚠️ No Bank or UPI details found!
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                    Please add your UPI ID or Bank Account in Profile Settings to receive payouts.
+                  </div>
+                  <button 
+                    onClick={() => { setShowWithdrawModal(false); setShowProfile(true); }}
+                    style={{ 
+                      background: 'var(--color-blue)', 
+                      color: '#fff', 
+                      border: 'none', 
+                      padding: '6px 12px', 
+                      borderRadius: '6px', 
+                      fontSize: '11px', 
+                      fontWeight: '700', 
+                      cursor: 'pointer' 
+                    }}
+                  >
+                    Add Bank / UPI Details &rarr;
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Withdrawal Form */}
+            <form onSubmit={handleWithdrawSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Withdrawal Amount (₹)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', fontWeight: '700', color: 'var(--text-secondary)' }}>₹</span>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max={rewardStats?.availableRewardBalance || 0}
+                    step="any"
+                    placeholder="Enter amount"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px 12px 32px',
+                      background: 'var(--bg-hover)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      color: 'var(--text-primary)',
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                {/* Preset Fast Select Buttons */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  {[100, 500, 1000].map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setWithdrawAmount(String(val))}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      +₹{val}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(String(rewardStats?.availableRewardBalance || 0))}
+                    style={{
+                      padding: '4px 10px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      color: '#34d399',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              {withdrawMsg.text && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  marginBottom: '16px',
+                  background: withdrawMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  color: withdrawMsg.type === 'success' ? '#34d399' : '#f87171',
+                  border: `1px solid ${withdrawMsg.type === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                }}>
+                  {withdrawMsg.text}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'var(--bg-hover)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)}
+                  style={{
+                    flex: 2,
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: (withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)) ? 'not-allowed' : 'pointer',
+                    opacity: (withdrawLoading || !withdrawAmount || Number(withdrawAmount) <= 0 || Number(withdrawAmount) > (rewardStats?.availableRewardBalance || 0)) ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowDownToLine size={16} />}
+                  {withdrawLoading ? 'Processing...' : 'Request Cashout'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Referrals Full-Screen Overlay - no routing needed */}
+      {showReferrals && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--bg-dark)', zIndex: 200, overflowY: 'auto' }}>
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading referrals...</div>}>
+            <ReferralsView setActiveTab={() => setShowReferrals(false)} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Reset Portfolio Modal with Custom Amount up to 10 Crore */}
+      <ResetPortfolioModal 
+        isOpen={showResetModal} 
+        onClose={() => setShowResetModal(false)} 
+      />
 
     </div>
   );

@@ -47,10 +47,22 @@ systemctl enable postgresql
 
 DB_PASSWORD=$(openssl rand -hex 16)
 echo "🔑 Configuring PostgreSQL database and user..."
-sudo -u postgres psql -c "CREATE USER shortmarket_user WITH PASSWORD '$DB_PASSWORD';"
-sudo -u postgres psql -c "CREATE DATABASE shortmarket_staging OWNER shortmarket_user;"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE shortmarket_staging TO shortmarket_user;"
-echo "✅ Database 'shortmarket_staging' created successfully."
+sudo -u postgres psql <<EOF
+DO \$\$
+BEGIN
+   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'shortmarket_user') THEN
+      CREATE USER shortmarket_user WITH PASSWORD '$DB_PASSWORD';
+   ELSE
+      ALTER USER shortmarket_user WITH PASSWORD '$DB_PASSWORD';
+   END IF;
+END
+\$\$;
+SELECT 'CREATE DATABASE shortmarket_staging OWNER shortmarket_user'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'shortmarket_staging')\\gexec
+GRANT ALL PRIVILEGES ON DATABASE shortmarket_staging TO shortmarket_user;
+ALTER DATABASE shortmarket_staging OWNER TO shortmarket_user;
+EOF
+echo "✅ Database 'shortmarket_staging' configured successfully."
 
 # 5. Clone GitHub Repository
 echo "-------------------------------------------------------"

@@ -1,17 +1,21 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { X } from 'lucide-react';
 import { socket } from '../store'; // Import socket to emit subscribe events
+import { getInstantLotsize } from '../utils/lotsizeHelper';
 
 export default function MarketDepthModal() {
-  const { 
-    marketDepthModal, closeMarketDepthModal, marketDepthData, prices, 
-    oneClickMode, oneClickMultiplier, placeOrder, openOrderModal, orderModal
-  } = useStore();
-
+  const marketDepthModal = useStore(state => state.marketDepthModal);
   const symbol = marketDepthModal.symbol;
-  const basicData = prices[symbol] || {};
-  const lotSize = marketDepthModal.lotsize || basicData.lotsize || 1;
+  const basicData = useStore(state => symbol ? state.prices[symbol] : null) || {};
+  const marketDepthData = useStore(state => state.marketDepthData);
+  const oneClickMode = useStore(state => state.oneClickMode);
+  const oneClickMultiplier = useStore(state => state.oneClickMultiplier);
+  const orderModal = useStore(state => state.orderModal);
+  const { closeMarketDepthModal, placeOrder, openOrderModal } = useStore.getState();
+
+  const lotSize = (marketDepthModal.lotsize && Number(marketDepthModal.lotsize) > 1) ? Number(marketDepthModal.lotsize) : (basicData.lotsize && Number(basicData.lotsize) > 1) ? Number(basicData.lotsize) : getInstantLotsize(symbol);
 
   useEffect(() => {
     if (!marketDepthModal.isOpen || !symbol) return;
@@ -27,33 +31,16 @@ export default function MarketDepthModal() {
 
   if (!marketDepthModal.isOpen || !symbol) return null;
 
-  // Use real data from store, fallback to fake data if market is closed (empty arrays)
-  let bids = marketDepthData?.symbol === symbol ? marketDepthData.bids : [];
-  let asks = marketDepthData?.symbol === symbol ? marketDepthData.asks : [];
+  // Use real data from the price_snapshot (basicData) which includes market depth
+  let bids = basicData.bids || [];
+  let asks = basicData.asks || [];
 
-  if (bids.length === 0 && asks.length === 0) {
-    const ltp = basicData?.ltp || 100;
-    bids = [
-      { orders: 3, qty: 150, price: (ltp - 0.5).toFixed(2) },
-      { orders: 1, qty: 50, price: (ltp - 1.0).toFixed(2) },
-      { orders: 5, qty: 300, price: (ltp - 1.5).toFixed(2) },
-      { orders: 2, qty: 100, price: (ltp - 2.0).toFixed(2) },
-      { orders: 8, qty: 850, price: (ltp - 2.5).toFixed(2) }
-    ];
-    asks = [
-      { orders: 2, qty: 200, price: (ltp + 0.5).toFixed(2) },
-      { orders: 4, qty: 120, price: (ltp + 1.0).toFixed(2) },
-      { orders: 1, qty: 10, price: (ltp + 1.5).toFixed(2) },
-      { orders: 7, qty: 500, price: (ltp + 2.0).toFixed(2) },
-      { orders: 3, qty: 150, price: (ltp + 2.5).toFixed(2) }
-    ];
-  }
+  // Do not divide by lotSize, Fyers provides exact share quantity for bids/asks
+  const displayBids = bids.map(b => ({ ...b, qty: Math.round(b.qty) }));
+  const displayAsks = asks.map(a => ({ ...a, qty: Math.round(a.qty) }));
 
-  const displayBids = bids.map(b => ({ ...b, qty: Math.round(b.qty / lotSize) }));
-  const displayAsks = asks.map(a => ({ ...a, qty: Math.round(a.qty / lotSize) }));
-
-  const totalBidQty = (marketDepthData?.symbol === symbol && marketDepthData.totBuyQuan) ? Math.round(marketDepthData.totBuyQuan / lotSize) : displayBids.reduce((sum, b) => sum + (b.qty || 0), 0);
-  const totalAskQty = (marketDepthData?.symbol === symbol && marketDepthData.totSellQuan) ? Math.round(marketDepthData.totSellQuan / lotSize) : displayAsks.reduce((sum, a) => sum + (a.qty || 0), 0);
+  const totalBidQty = basicData.totBuyQuan ? Math.round(basicData.totBuyQuan) : displayBids.reduce((sum, b) => sum + (b.qty || 0), 0);
+  const totalAskQty = basicData.totSellQuan ? Math.round(basicData.totSellQuan) : displayAsks.reduce((sum, a) => sum + (a.qty || 0), 0);
   
   // Calculate width ratio for progress bars
   const totalVol = totalBidQty + totalAskQty;
@@ -63,8 +50,7 @@ export default function MarketDepthModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.6)',
-      backdropFilter: orderModal?.isOpen ? 'none' : 'blur(2px)',
+      background: orderModal?.isOpen ? 'none' : 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
       pointerEvents: orderModal?.isOpen ? 'none' : 'auto'
     }}>
@@ -168,10 +154,12 @@ export default function MarketDepthModal() {
               <span style={{ color: 'var(--text-secondary)' }}>Change</span>
               <span style={{ textAlign: 'right', fontWeight: '500', color: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) > (marketDepthData?.symbol === symbol ? marketDepthData.close : basicData.close) ? 'var(--color-blue)' : 'var(--color-red)' }}>
                 {(() => {
-                  const currentLtp = marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp;
-                  const currentClose = marketDepthData?.symbol === symbol && marketDepthData.close ? marketDepthData.close : basicData.close;
-                  if (currentLtp && currentClose) {
-                    return `${(currentLtp - currentClose).toFixed(2)} (${(((currentLtp - currentClose)/currentClose)*100).toFixed(2)}%)`;
+                  const currentLtp = Number(marketDepthData?.symbol === symbol && marketDepthData.ltp ? marketDepthData.ltp : basicData.ltp);
+                  const currentClose = Number(marketDepthData?.symbol === symbol && marketDepthData.close ? marketDepthData.close : basicData.close);
+                  if (currentLtp > 0 && currentClose > 0) {
+                    const diff = currentLtp - currentClose;
+                    const pct = (diff / currentClose) * 100;
+                    return `${diff.toFixed(2)} (${pct.toFixed(2)}%)`;
                   }
                   return '-';
                 })()}
@@ -216,7 +204,7 @@ export default function MarketDepthModal() {
                       symbol,
                       type: 'MARKET',
                       side: 'BUY',
-                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      quantity: lotSize * (oneClickMultiplier || 1),
                       price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
                       trigger_price: null,
                       sl_price: null,
@@ -227,7 +215,7 @@ export default function MarketDepthModal() {
                     placeOrder(payload);
                   } else {
                     closeMarketDepthModal();
-                    openOrderModal(symbol, 'BUY', marketDepthModal.lotsize || 1);
+                    openOrderModal(symbol, 'BUY', lotSize);
                   }
                 }}
                 className={`btn btn-primary ${oneClickMode ? 'one-click-active' : ''}`}
@@ -243,7 +231,7 @@ export default function MarketDepthModal() {
                       symbol,
                       type: 'MARKET',
                       side: 'SELL',
-                      quantity: marketDepthModal.lotsize ? (marketDepthModal.lotsize * (oneClickMultiplier || 1)) : (oneClickMultiplier || 1),
+                      quantity: lotSize * (oneClickMultiplier || 1),
                       price: (marketDepthData?.symbol === symbol ? marketDepthData.ltp : basicData.ltp) || 0,
                       trigger_price: null,
                       sl_price: null,
@@ -254,7 +242,7 @@ export default function MarketDepthModal() {
                     placeOrder(payload);
                   } else {
                     closeMarketDepthModal();
-                    openOrderModal(symbol, 'SELL', marketDepthModal.lotsize || 1);
+                    openOrderModal(symbol, 'SELL', lotSize);
                   }
                 }}
                 className={`btn btn-secondary ${oneClickMode ? 'one-click-active' : ''}`}
@@ -270,3 +258,5 @@ export default function MarketDepthModal() {
     </div>
   );
 }
+
+

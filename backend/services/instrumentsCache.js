@@ -1,0 +1,407 @@
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+let allInstruments = [];
+let lotSizeMap = {};
+let cachedAllStocks = [];
+let cachedAllStocksJson = '[]';
+let cachedAllStocksETag = '""';
+
+function flattenTree(node, results = []) {
+    if (!node || typeof node !== 'object') return results;
+    
+    if (node.symbol && node.token) {
+        results.push(node);
+        return results;
+    }
+    
+    for (const key in node) {
+        flattenTree(node[key], results);
+    }
+    return results;
+}
+
+function loadJSON(filename) {
+    try {
+        const filepath = path.join(__dirname, '..', 'database', filename);
+        if (fs.existsSync(filepath)) {
+            const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
+            return Array.isArray(data) ? data : flattenTree(data);
+        }
+    } catch (e) {
+        console.error(`Error loading ${filename}:`, e);
+    }
+    return [];
+}
+
+function initializeCache() {
+    console.log('Loading instruments into memory cache...');
+    const stocks = loadJSON('stocks.json');
+    const futures = loadJSON('futures.json');
+    const options = loadJSON('options.json');
+    
+    let rawInstruments = [...stocks, ...futures, ...options];
+
+    
+    // Filtering and Deduplication
+    const symbolMap = new Map();
+    
+    rawInstruments.forEach(item => {
+        item.search_string = `${item.symbol} ${item.name || ''} ${item.description || ''} ${item.exchange || ''}`.toLowerCase();
+        if (!item.unique_symbol) item.unique_symbol = item.symbol;
+        
+        // Filter out debt/bonds, debentures, government securities, etc.
+        if (item.exchange === 'NSE') {
+            // NSE Debt segments: N*, Y*, Z*, GS (Govt Sec), GB (Govt Bond), TB (Treasury Bill), SG (Sovereign Gold)
+            if (item.symbol.match(/-(N[A-Z0-9]|Y[A-Z0-9]|Z[A-Z0-9]|GS|GB|TB|SG)$/i)) return;
+        }
+        if (item.exchange === 'BSE') {
+            // BSE Debt segments: -F (Fixed Income/NCDs), -G (Govt Securities)
+            if (item.symbol.match(/-(F|G)$/i)) return;
+        }
+        if (!symbolMap.has(item.unique_symbol)) {
+            symbolMap.set(item.unique_symbol, item);
+        }
+    });
+    
+    let filteredInstruments = Array.from(symbolMap.values());
+    
+    allInstruments = filteredInstruments;
+    
+    // Pre-calculate lot sizes map for O(1) lookup
+    lotSizeMap = {};
+    allInstruments.forEach(item => {
+        lotSizeMap[item.symbol] = item.lotsize || 1;
+        lotSizeMap[item.unique_symbol] = item.lotsize || 1;
+    });
+
+    // Pre-calculate stocks array once for O(1) instantaneous response in getAllStocks()
+    cachedAllStocks = allInstruments
+        .filter(item => {
+            const clean = item.symbol.includes(':') ? item.symbol.split(':')[1] : item.symbol;
+            const isOpt = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean);
+            const isFut = /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+            const isNSE_BSE = item.exchange === 'NSE' || item.exchange === 'BSE';
+            return isNSE_BSE && !isOpt && !isFut;
+        })
+        .map(item => ({
+            symbol: item.symbol,
+            name: item.name,
+            exchange: item.exchange,
+            lotsize: item.lotsize || 1,
+            token: item.token || ''
+        }));
+    
+    cachedAllStocksJson = JSON.stringify(cachedAllStocks);
+    cachedAllStocksETag = `"${crypto.createHash('md5').update(cachedAllStocksJson).digest('hex')}"`;
+    
+    console.log(`Loaded ${allInstruments.length} instruments into memory after filtering duplicates.`);
+}
+
+// Initial load
+initializeCache();
+
+let diskLotsizeMap = null;
+let sortedDiskLotKeys = null;
+function getDiskLotsizeMap() {
+    if (!diskLotsizeMap) {
+        try {
+            const lotsPath = path.join(__dirname, '..', 'database', 'lotsizeMap.json');
+            if (fs.existsSync(lotsPath)) {
+                diskLotsizeMap = JSON.parse(fs.readFileSync(lotsPath, 'utf8'));
+                sortedDiskLotKeys = Object.keys(diskLotsizeMap).sort((a, b) => b.length - a.length);
+            } else {
+                diskLotsizeMap = {};
+                sortedDiskLotKeys = [];
+            }
+        } catch (e) {
+            diskLotsizeMap = {};
+            sortedDiskLotKeys = [];
+        }
+    }
+    return diskLotsizeMap;
+}
+
+function resolveSingleLotSize(sym) {
+    if (!sym) return 1;
+    const cleanSym = String(sym).replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const direct = lotSizeMap[sym] || lotSizeMap[cleanSym] || lotSizeMap['NSE:' + cleanSym] || lotSizeMap['BSE:' + cleanSym] || lotSizeMap['MCX:' + cleanSym];
+    if (direct && direct > 1) return direct;
+
+    // For actual derivatives and commodities, fall back to prefix match in lotsizeMap.json
+    if (isDerivativeContract(sym) || isCommodityContract(sym)) {
+        const diskMap = getDiskLotsizeMap();
+        if (diskMap[cleanSym]) return Math.max(1, Number(diskMap[cleanSym]) || 1);
+        if (sortedDiskLotKeys) {
+            for (const key of sortedDiskLotKeys) {
+                if (cleanSym.startsWith(key)) {
+                    return Math.max(1, Number(diskMap[key]) || 1);
+                }
+            }
+        }
+    }
+
+    return direct || 1;
+}
+
+function getLotSizes(symbols) {
+    if (!Array.isArray(symbols)) return {};
+    const result = {};
+    symbols.forEach(sym => {
+        if (!sym) return;
+        result[sym] = resolveSingleLotSize(sym);
+    });
+    return result;
+}
+
+function getAllStocks() {
+    // Return pre-calculated cache for O(1) instantaneous response without regex iteration
+    return cachedAllStocks;
+}
+
+function getAllStocksJson() {
+    return cachedAllStocksJson;
+}
+
+function getAllStocksETag() {
+    return cachedAllStocksETag;
+}
+
+function searchInstruments(query) {
+    if (!query || query.length < 2) return [];
+    
+    const queryParts = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const nowMs = Date.now();
+    const results = [];
+    
+    for (let i = 0; i < allInstruments.length; i++) {
+        const item = allInstruments[i];
+        const expMs = item.expiryTimestamp 
+            ? Number(item.expiryTimestamp) 
+            : (item.expiry_timestamp 
+                ? (Number(item.expiry_timestamp) > 1e11 ? Number(item.expiry_timestamp) : Number(item.expiry_timestamp) * 1000) 
+                : null);
+        if (expMs && expMs < nowMs) continue;
+        
+        let match = true;
+        for (let j = 0; j < queryParts.length; j++) {
+            if (!item.search_string.includes(queryParts[j])) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            results.push(item);
+            if (results.length >= 100) break; // ⚡ Stop once 100 matches are found to balance speed and relevance
+        }
+    }
+    return results;
+}
+
+// Watch for file changes so we can reload dynamically if updateOptionsMaster is run
+try {
+    const dbWatcher = fs.watch(path.join(__dirname, '..', 'database'), (eventType, filename) => {
+        if (filename && filename.endsWith('.json')) {
+            console.log(`Detected change in ${filename}, reloading instruments cache...`);
+            // Debounce reloading to avoid doing it multiple times during a bulk update
+            if (global.reloadCacheTimeout) clearTimeout(global.reloadCacheTimeout);
+            global.reloadCacheTimeout = setTimeout(() => initializeCache(), 5000);
+        }
+    });
+    if (dbWatcher && typeof dbWatcher.unref === 'function') {
+        dbWatcher.unref();
+    }
+} catch(e) {
+    console.warn("Could not watch database dir:", e.message);
+}
+
+const COMMODITIES_LIST = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+function isDerivativeContract(sym) {
+    if (!sym || typeof sym !== 'string') return false;
+    const clean = sym.includes(':') ? sym.split(':')[1] : sym;
+    return /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(clean) || /(?:\d+|[A-Z]{3}|[-_\s])FUT(?:[-_\s].*)?$/i.test(clean) || clean.endsWith('-FUT');
+}
+
+function isCommodityContract(sym) {
+    if (!sym || typeof sym !== 'string') return false;
+    if (sym.includes('MCX') || sym.includes('NCDEX')) return true;
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return COMMODITIES_LIST.some(c => clean.startsWith(c));
+}
+
+let cachedFnoSet = null;
+function isFnoEligibleStock(sym) {
+    if (!sym || typeof sym !== 'string') return false;
+    if (isDerivativeContract(sym) || isCommodityContract(sym)) return false;
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').replace(/-(EQ|A|B|T|X|XT|Z|P|M|SM|BE|BZ)$/i, '').toUpperCase().trim();
+    if (['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'NIFTYNXT50', 'NIFTYFPI'].includes(clean)) return false;
+    if (!cachedFnoSet) {
+        try {
+            const lotsPath = path.join(__dirname, '..', 'database', 'lotsizeMap.json');
+            if (fs.existsSync(lotsPath)) {
+                const raw = JSON.parse(fs.readFileSync(lotsPath, 'utf8'));
+                cachedFnoSet = new Set(Object.keys(raw));
+            } else {
+                cachedFnoSet = new Set();
+            }
+        } catch (e) {
+            cachedFnoSet = new Set();
+        }
+    }
+    return cachedFnoSet.has(clean);
+}
+
+function getAssetSubsegment(sym) {
+    if (!sym || typeof sym !== 'string') return 'NON_FNO_EQ';
+    const clean = sym.replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase().trim();
+    if (clean.endsWith('-MF') || clean.includes('MUTUALFUND')) return 'MUTUAL_FUND';
+    if (isCommodityContract(sym)) return 'COMMODITY';
+    if (isDerivativeContract(sym)) return 'DERIVATIVE';
+    if (isFnoEligibleStock(sym)) return 'FNO_EQ';
+    return 'NON_FNO_EQ';
+}
+
+function getLotSize(symbol) {
+    return resolveSingleLotSize(symbol);
+}
+
+const isMCXWinterSession = (d = new Date()) => {
+    const year = d.getFullYear();
+    const marchFirst = new Date(Date.UTC(year, 2, 1));
+    const marchFirstDay = marchFirst.getUTCDay();
+    const firstSunMarch = marchFirstDay === 0 ? 1 : (7 - marchFirstDay + 1);
+    const secondSunMarch = firstSunMarch + 7;
+    const dstStart = new Date(Date.UTC(year, 2, secondSunMarch, 7, 0, 0));
+
+    const novFirst = new Date(Date.UTC(year, 10, 1));
+    const novFirstDay = novFirst.getUTCDay();
+    const firstSunNov = novFirstDay === 0 ? 1 : (7 - novFirstDay + 1);
+    const dstEnd = new Date(Date.UTC(year, 10, firstSunNov, 6, 0, 0));
+
+    const isDstSummer = d >= dstStart && d < dstEnd;
+    return !isDstSummer;
+};
+
+/**
+ * Checks if position conversion is allowed for a symbol based on target product type and timing.
+ * Rule (Segment Timings):
+ * 1. Mutual fund units cannot be converted.
+ * 2. Markets must be open (disabled on weekends and outside market hours).
+ * 3. Converting Intraday to Delivery (INT -> DEL):
+ *    Allowed throughout all active trading hours up to market close (03:30 PM for Equities & F&O, 11:30 PM / 11:55 PM for MCX).
+ * 4. Converting Delivery to Intraday (DEL -> INT):
+ *    Blocked starting 1 minute before intraday cutoff (03:04 PM for F&O Equities, 03:14 PM for Cash Equities, 03:24 PM for F&O Derivatives, 10:49 PM / 11:29 PM for MCX Commodities).
+ */
+function checkPositionConversionAllowed(symbol, targetProductTypeOrDate = 'DEL', maybeDateObj = new Date()) {
+    if (!symbol) return { allowed: false, reason: 'Invalid instrument symbol.' };
+
+    let targetProductType = 'DEL';
+    let dateObj = new Date();
+
+    if (targetProductTypeOrDate instanceof Date) {
+        dateObj = targetProductTypeOrDate;
+        targetProductType = 'DEL';
+    } else if (typeof targetProductTypeOrDate === 'string') {
+        const upper = targetProductTypeOrDate.toUpperCase();
+        targetProductType = (upper === 'CNC' || upper === 'NRML') ? 'DEL' : (upper === 'MIS' ? 'INT' : upper);
+        if (maybeDateObj instanceof Date) {
+            dateObj = maybeDateObj;
+        }
+    }
+
+    const isTargetingIntraday = targetProductType === 'INT' || targetProductType === 'MIS';
+
+    const sub = getAssetSubsegment(symbol);
+    if (sub === 'MUTUAL_FUND') {
+        return { allowed: false, reason: 'Mutual fund units cannot be converted.' };
+    }
+
+    // Evaluate in Indian Standard Time (IST)
+    const istParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: 'numeric',
+        weekday: 'short',
+        hour12: false
+    }).formatToParts(dateObj);
+
+    const hours = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const minutes = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const weekday = istParts.find(p => p.type === 'weekday')?.value; // 'Sat', 'Sun', etc.
+    const currentMinutes = hours * 60 + minutes;
+
+    // Weekend Check
+    if (weekday === 'Sat' || weekday === 'Sun') {
+        return { allowed: false, reason: 'Position conversion is disabled on weekends when markets are closed.' };
+    }
+
+    if (sub === 'COMMODITY') {
+        const isWinter = isMCXWinterSession(dateObj);
+        // Summer: Market open 09:00 AM (540 mins) to 11:30 PM (1410 mins). Cutoff 10:50 PM. Blocked from 10:49 PM (1369 mins).
+        // Winter: Market open 09:00 AM (540 mins) to 11:55 PM (1435 mins). Cutoff 11:30 PM. Blocked from 11:29 PM (1409 mins).
+        const closeMins = isWinter ? (23 * 60 + 55) : (23 * 60 + 30);
+        const openMins = 9 * 60; // 09:00 AM
+        const blockMinsToInt = isWinter ? (23 * 60 + 29) : (22 * 60 + 49);
+        const blockLabel = isWinter ? '11:29 PM' : '10:49 PM';
+
+        if (currentMinutes < openMins || currentMinutes >= closeMins) {
+            return { allowed: false, reason: 'Position conversion for MCX Commodities is disabled when the commodity market is closed.' };
+        }
+        if (isTargetingIntraday && currentMinutes >= blockMinsToInt) {
+            return { allowed: false, reason: `Converting Delivery to Intraday for MCX Commodities is disabled starting at ${blockLabel} due to intraday cutoff.` };
+        }
+        return { allowed: true };
+    }
+
+    // For Equities and Derivatives (NSE / BSE): Market hours 09:15 AM (555 mins) to 03:30 PM (930 mins)
+    const openMins = 9 * 60 + 15; // 09:15 AM
+    const closeMins = 15 * 60 + 30; // 03:30 PM
+
+    if (currentMinutes < openMins || currentMinutes >= closeMins) {
+        return { allowed: false, reason: 'Position conversion is disabled outside trading hours (09:15 AM - 03:30 PM IST).' };
+    }
+
+    if (isTargetingIntraday) {
+        if (sub === 'DERIVATIVE') {
+            // Cutoff 03:25 PM. Blocked from 03:24 PM (924 mins)
+            const blockMinsToInt = 15 * 60 + 24;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for Futures & Options is disabled after 03:24 PM due to intraday cutoff.' };
+            }
+        } else if (sub === 'FNO_EQ') {
+            // Cutoff 03:05 PM. Blocked from 03:04 PM (904 mins)
+            const blockMinsToInt = 15 * 60 + 4;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for F&O Cash Equities is disabled after 03:04 PM due to intraday cutoff.' };
+            }
+        } else {
+            // NON_FNO_EQ (All other Cash Equities): Cutoff 03:15 PM. Blocked from 03:14 PM (914 mins)
+            const blockMinsToInt = 15 * 60 + 14;
+            if (currentMinutes >= blockMinsToInt) {
+                return { allowed: false, reason: 'Converting Delivery to Intraday for Cash Equities is disabled after 03:14 PM due to intraday cutoff.' };
+            }
+        }
+    }
+
+    // Intraday to Delivery (INT -> DEL) is permitted throughout all open market hours up to 03:30 PM IST!
+    return { allowed: true };
+}
+
+module.exports = {
+    initializeCache,
+    getLotSizes,
+    getLotSize,
+    getAllStocks,
+    getAllStocksJson,
+    getAllStocksETag,
+    searchInstruments,
+    isDerivativeContract,
+    isCommodityContract,
+    isFnoEligibleStock,
+    getAssetSubsegment,
+    isMCXWinterSession,
+    checkPositionConversionAllowed,
+    resolveSingleLotSize
+};

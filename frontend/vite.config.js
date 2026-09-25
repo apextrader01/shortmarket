@@ -7,12 +7,21 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // We must use injectManifest strategy to supply our own custom sw.js.
+      // Otherwise, VitePWA ignores our public/sw.js and generates its own
+      // which caches index.html and causes the blank screen!
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
+      injectRegister: null,
+      registerType: 'prompt', // don't auto-register
+      injectManifest: {
+        injectionPoint: undefined, // Don't try to inject precache manifest into our sw.js
+      },
       manifest: {
-        name: 'ShortMarket',
-        short_name: 'ShortMarket',
-        description: 'Advanced Paper Trading Platform',
+        name: 'SkandX',
+        short_name: 'SkandX',
+        description: 'Advanced Trading Platform',
         theme_color: '#0a0b0d',
         background_color: '#0a0b0d',
         display: 'standalone',
@@ -38,4 +47,31 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    emptyOutDir: false,
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      external: ['@capacitor/push-notifications'],
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('lightweight-charts') || id.includes('recharts') || id.includes('technicalindicators') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('socket.io-client') || id.includes('zustand') || id.includes('firebase')) {
+              return 'vendor-core';
+            }
+            return 'vendor-libs';
+          }
+        }
+      }
+    }
+  }
 })
+

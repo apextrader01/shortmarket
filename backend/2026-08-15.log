@@ -1,0 +1,2 @@
+{"level":"error","datetime":"2026-08-15T06:11:19.933Z","message":"getQuotes response","data":{"Error":{"s":"error","code":500,"message":{}},"inputs":{"symbols":"NSE:NIFTY2681824350CE,BSE:SENSEX2682678100CE"}},"functionName":"getQuotes"}
+{"level":"error","datetime":"2026-08-15T06:11:34.887Z","message":"getQuotes response","data":{"Error":{"message":"Please provide valid token","code":-15,"s":"error"},"inputs":["NSE:NIFTY2681824350CE","BSE:SENSEX2682678100CE"]},"functionName":"getQuotes"}

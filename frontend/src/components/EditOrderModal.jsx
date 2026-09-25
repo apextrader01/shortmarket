@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { X, Maximize2, Info } from 'lucide-react';
 
 export default function EditOrderModal() {
-  const { editOrderModal, closeEditOrderModal, user, updateOrder, prices } = useStore();
+  const editOrderModal = useStore(state => state.editOrderModal);
+  const user = useStore(state => state.user);
+  const { closeEditOrderModal, updateOrder } = useStore.getState();
   const order = editOrderModal.order;
   
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
+  const [triggerPrice, setTriggerPrice] = useState('');
   const [productType, setProductType] = useState('INT');
   const [slPrice, setSlPrice] = useState('');
   const [tgtPrice, setTgtPrice] = useState('');
+  const [isMarket, setIsMarket] = useState(false);
 
   const symbol = order ? order.symbol : null;
-  const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
-  const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
+  const priceData = useStore(state => symbol ? state.prices[symbol] : null);
+  const isUp = priceData ? priceData.pct >= 0 : true;
+  const livePrice = priceData ? priceData.ltp || 0 : 0;
 
   // Determine if BO or CO (handles both Parent Open Orders and Child Pending Legs)
   const isBOParent = order ? !!(order.sl_price && order.tgt_price) : false;
@@ -24,14 +30,24 @@ export default function EditOrderModal() {
   
   const isBO = isBOParent || isBOLeg;
   const isCO = isCOParent || isCOLeg;
+  const isPendingTrigger = order?.status === 'PENDING_TRIGGER';
 
   useEffect(() => {
     if (editOrderModal.isOpen && order) {
       setQuantity(order.quantity);
-      setPrice(order.price ? parseFloat(order.price).toFixed(2) : '');
-      if (order.productType) setProductType(order.productType);
+      const trg = order.trigger_price ?? order.triggerPrice;
+      const prc = order.price ?? order.limitPrice;
+      setTriggerPrice(trg ? parseFloat(trg).toFixed(2) : '');
+      if (isPendingTrigger) {
+        setPrice(order.type === 'SL-M' ? (trg ? parseFloat(trg).toFixed(2) : '') : (prc ? parseFloat(prc).toFixed(2) : (trg ? parseFloat(trg).toFixed(2) : '')));
+      } else {
+        setPrice(prc ? parseFloat(prc).toFixed(2) : '');
+      }
+      const prod = order.productType || order.product_type || 'INT';
+      setProductType(prod);
       setSlPrice(order.sl_price ? parseFloat(order.sl_price).toFixed(2) : '');
       setTgtPrice(order.tgt_price ? parseFloat(order.tgt_price).toFixed(2) : '');
+      setIsMarket(false);
     }
   }, [editOrderModal.isOpen, order]);
 
@@ -40,32 +56,71 @@ export default function EditOrderModal() {
   const balanceNum = Number(user?.balance) || 0;
   
   // Calculate margin difference
-  const oldMargin = order.quantity * parseFloat(order.price || 0);
-  const newMargin = quantity * (parseFloat(price) || 0);
-  const marginDifference = newMargin - oldMargin;
+  // Child legs (SL/Target of BO/CO) and pending trigger orders do not require additional margin
+  let marginDifference = 0;
+  if (!isPendingTrigger && !order.parent_order_id) {
+    const oldMargin = parseFloat(order.margin || 0);
+    const effectiveProductType = order.product_type || order.productType || 'INT';
+    const isDelSell = order.side === 'SELL' && (effectiveProductType === 'DEL' || effectiveProductType === 'CNC');
+    if (isDelSell || (oldMargin === 0 && Number(quantity) === Number(order.quantity))) {
+      marginDifference = 0;
+    } else {
+      const rawPrice = parseFloat(price) || livePrice || 0;
+      const contractValue = (Number(quantity) || 0) * rawPrice;
+      const cleanSym = String(order.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '').toUpperCase();
+      const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+      const isLeveraged = ['INT', 'INTRADAY', 'MIS', 'CO', 'BO'].includes(effectiveProductType);
+      let newMargin = contractValue;
+      if (isOption && order.side === 'BUY') {
+        newMargin = contractValue; // 100% upfront premium required for options buying
+      } else if (isLeveraged && !isOption) {
+        newMargin = contractValue * 0.20; // 5x leverage for cash intraday
+      }
+      marginDifference = newMargin - oldMargin;
+    }
+  }
   
   const isInsufficient = marginDifference > 0 && balanceNum < marginDifference;
   const isBuy = order.side === 'BUY';
 
   const handleUpdateOrder = async () => {
-    const success = await updateOrder(
-      order.id, 
-      quantity, 
-      parseFloat(price),
-      slPrice ? parseFloat(slPrice) : null,
-      tgtPrice ? parseFloat(tgtPrice) : null
-    );
-    if (success) {
+    const numQty = Number(quantity);
+    if (!numQty || numQty <= 0 || isNaN(numQty)) {
+      alert('Please enter a valid quantity greater than 0.');
+      return;
+    }
+
+    const finalPrice = isPendingTrigger && isMarket ? 0 : parseFloat(price);
+    const sl = slPrice ? parseFloat(slPrice) : null;
+    const tgt = tgtPrice ? parseFloat(tgtPrice) : null;
+    const marketFlag = isPendingTrigger ? isMarket : false;
+    const finalTriggerPrice = triggerPrice ? parseFloat(triggerPrice) : (isPendingTrigger ? (order.type === 'SL-M' ? finalPrice : parseFloat(price)) : null);
+
+    const requiresLimitPrice = !marketFlag && (order.type === 'LIMIT' || order.type === 'SL' || order.type === 'SL-L');
+    if (requiresLimitPrice && (isNaN(finalPrice) || finalPrice <= 0)) {
+      alert('Please enter a valid limit price greater than 0.');
+      return;
+    }
+
+    if (!marketFlag && isPendingTrigger && (isNaN(finalTriggerPrice) || !finalTriggerPrice || finalTriggerPrice <= 0)) {
+      alert('Please enter a valid trigger price greater than 0.');
+      return;
+    }
+
+    const res = await updateOrder(order.id, numQty, finalPrice, sl, tgt, marketFlag, finalTriggerPrice);
+
+    if (res && res.success) {
       closeEditOrderModal();
     } else {
-      alert("Failed to update order. Please check your balance.");
+      const err = (res && res.error) || useStore.getState().authError || "Failed to update order. Please check your balance or parameters.";
+      alert(err);
     }
   };
 
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
+      background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
@@ -95,83 +150,151 @@ export default function EditOrderModal() {
 
         {/* Form Body */}
         <div style={{ padding: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            
-            {/* Product Type */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
-              <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div onClick={() => setProductType('INT')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'INT' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'INT' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>INT</div>
-                {!(isBO || isCO) && (
-                  <div onClick={() => setProductType('DEL')} style={{ flex: 1, textAlign: 'center', padding: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', background: productType === 'DEL' ? 'rgba(34, 197, 94, 0.1)' : 'transparent', color: productType === 'DEL' ? 'var(--color-green-light)' : 'var(--text-primary)' }}>DEL</div>
-                )}
-              </div>
-            </div>
-
-            {/* Quantity */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
-              <input type="number" value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-            </div>
-
-            {/* Price */}
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
-              <input type="text" value={price} onChange={e => setPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-            </div>
-
-          </div>
-
-          {/* BO/CO Fields */}
-          {(isBO || isCO) && (
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: isBO ? '1fr 1fr' : '1fr', 
-              gap: '16px', 
-              marginBottom: '16px',
-              padding: '16px',
-              background: 'rgba(255,255,255,0.02)',
-              borderRadius: '8px',
-              border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
-            }}>
-              {/* SL Price */}
-              <div>
-                <div style={{ fontSize: '12px', color: 'var(--color-red-light)', marginBottom: '8px', fontWeight: '600' }}>
-                  Stop Loss Price
-                </div>
+          
+          {isPendingTrigger ? (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <input 
-                  type="text" 
-                  value={slPrice} 
-                  onChange={e => setSlPrice(e.target.value)} 
-                  style={{ 
-                    width: '100%', background: 'var(--bg-panel)', 
-                    border: '1px solid rgba(239, 68, 68, 0.3)', 
-                    padding: '8px 12px', borderRadius: '4px', 
-                    color: '#fff', fontSize: '14px', outline: 'none' 
-                  }} 
+                  type="checkbox" 
+                  id="marketCheck"
+                  checked={isMarket} 
+                  onChange={e => setIsMarket(e.target.checked)} 
+                  style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: 'var(--color-blue)' }} 
                 />
+                <label htmlFor="marketCheck" style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  Execute immediately at Market Price
+                </label>
               </div>
 
-              {/* Target Price (BO only) */}
-              {isBO && (
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-green-light)', marginBottom: '8px', fontWeight: '600' }}>
-                    Target Price
+              {!isMarket && (
+                <div style={{ display: 'grid', gridTemplateColumns: order.type === 'SL' ? '1fr 1fr' : '1fr', gap: '12px' }}>
+                  {order.type === 'SL' && (
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Limit Price</div>
+                      <input 
+                        type="text" 
+                        value={price} 
+                        onChange={e => setPrice(e.target.value)} 
+                        style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>Trigger Price</div>
+                    <input 
+                      type="text" 
+                      value={order.type === 'SL' ? triggerPrice : (triggerPrice || price)} 
+                      onChange={e => { 
+                        setTriggerPrice(e.target.value); 
+                        if (order.type !== 'SL') setPrice(e.target.value); 
+                      }} 
+                      style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '10px 12px', borderRadius: '4px', color: '#fff', fontSize: '15px', outline: 'none', fontWeight: '600' }} 
+                    />
                   </div>
-                  <input 
-                    type="text" 
-                    value={tgtPrice} 
-                    onChange={e => setTgtPrice(e.target.value)} 
-                    style={{ 
-                      width: '100%', background: 'var(--bg-panel)', 
-                      border: '1px solid rgba(34, 197, 94, 0.3)', 
-                      padding: '8px 12px', borderRadius: '4px', 
-                      color: '#fff', fontSize: '14px', outline: 'none' 
-                    }} 
-                  />
                 </div>
               )}
             </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                
+                {/* Product Type (Read-Only) */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Type</div>
+                  <div style={{ padding: '8px 12px', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '4px', textAlign: 'center', fontSize: '13px', fontWeight: '700', color: 'var(--color-blue-light)' }}>
+                    {order.product_type || order.productType || 'INT'}
+                  </div>
+                </div>
+
+                {/* Quantity */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quantity</div>
+                  <input type="number" min={1} max={10000000} value={quantity} onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') { setQuantity(''); return; }
+                    const n = parseInt(val, 10);
+                    if (!isNaN(n)) setQuantity(Math.min(10000000, Math.max(1, n)));
+                  }} onBlur={e => {
+                    const n = parseInt(e.target.value, 10);
+                    setQuantity(Math.min(10000000, Math.max(1, isNaN(n) ? 1 : n)));
+                  }} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                </div>
+
+                {/* Price */}
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Price</div>
+                  <input type="text" value={price} onChange={e => setPrice(e.target.value)} style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+                </div>
+
+              </div>
+
+              {/* Stop-Loss Trigger Price (if SL order) */}
+              {(order.type === 'SL' || order.type === 'SL-M' || order.trigger_price) && (
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--color-yellow)', marginBottom: '8px', fontWeight: '600' }}>
+                    Trigger Price
+                  </div>
+                  <input 
+                    type="text" 
+                    value={triggerPrice} 
+                    onChange={e => setTriggerPrice(e.target.value)} 
+                    style={{ width: '100%', background: 'var(--bg-panel)', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '8px 12px', borderRadius: '4px', color: '#fff', fontSize: '14px', outline: 'none' }} 
+                  />
+                </div>
+              )}
+
+              {/* BO/CO Fields */}
+              {(isBO || isCO) && (
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: isBO ? '1fr 1fr' : '1fr', 
+                  gap: '16px', 
+                  marginBottom: '16px',
+                  padding: '16px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '8px',
+                  border: `1px solid ${isBO ? 'rgba(245, 158, 11, 0.3)' : 'rgba(139, 92, 246, 0.3)'}`
+                }}>
+                  {/* SL Price */}
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-red-light)', marginBottom: '8px', fontWeight: '600' }}>
+                      Stop Loss Price
+                    </div>
+                    <input 
+                      type="text" 
+                      value={slPrice} 
+                      onChange={e => setSlPrice(e.target.value)} 
+                      style={{ 
+                        width: '100%', background: 'var(--bg-panel)', 
+                        border: '1px solid rgba(239, 68, 68, 0.3)', 
+                        padding: '8px 12px', borderRadius: '4px', 
+                        color: '#fff', fontSize: '14px', outline: 'none' 
+                      }} 
+                    />
+                  </div>
+
+                  {/* Target Price (BO only) */}
+                  {isBO && (
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-green-light)', marginBottom: '8px', fontWeight: '600' }}>
+                        Target Price
+                      </div>
+                      <input 
+                        type="text" 
+                        value={tgtPrice} 
+                        onChange={e => setTgtPrice(e.target.value)} 
+                        style={{ 
+                          width: '100%', background: 'var(--bg-panel)', 
+                          border: '1px solid rgba(34, 197, 94, 0.3)', 
+                          padding: '8px 12px', borderRadius: '4px', 
+                          color: '#fff', fontSize: '14px', outline: 'none' 
+                        }} 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           {/* Margin Alert (if insufficient) */}
@@ -184,7 +307,15 @@ export default function EditOrderModal() {
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To update, please add ₹{(marginDifference - balanceNum).toFixed(2)}</div>
                 </div>
               </div>
-              <button style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
+              <button 
+                onClick={() => {
+                  closeEditOrderModal();
+                  window.dispatchEvent(new CustomEvent('open-deposit-modal'));
+                }}
+                style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                ADD FUNDS
+              </button>
             </div>
           )}
 
@@ -192,14 +323,16 @@ export default function EditOrderModal() {
 
         {/* Footer */}
         <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Change</div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: marginDifference > 0 ? 'var(--color-red-light)' : 'var(--color-green-light)' }}>
-                {marginDifference > 0 ? '-' : '+'}₹{Math.abs(marginDifference).toFixed(2)}
+          {!isPendingTrigger && (
+            <div style={{ display: 'flex', gap: '24px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--color-blue)', marginBottom: '4px' }}>Margin Change</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: marginDifference > 0 ? 'var(--color-red-light)' : 'var(--color-green-light)' }}>
+                  {marginDifference > 0 ? '-' : '+'}₹{Math.abs(marginDifference).toFixed(2)}
+                </div>
               </div>
             </div>
-          </div>
+          )}
           <button 
             onClick={handleUpdateOrder}
             disabled={isInsufficient}
@@ -218,3 +351,5 @@ export default function EditOrderModal() {
     </div>
   );
 }
+
+

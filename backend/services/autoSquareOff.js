@@ -3,6 +3,17 @@ const db = require('../database/db').default || require('../database/db');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const LedgerService = require('./ledgerService');
+const triggerEngine = require('./triggerEngine');
+
+const COMMODITIES = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON', 'NICKEL'];
+
+const isCommoditySymbol = (symbol) => {
+    if (!symbol || typeof symbol !== 'string') return false;
+    if (symbol.includes('MCX') || symbol.includes('NCDEX')) return true;
+    const clean = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return COMMODITIES.some(c => clean.startsWith(c));
+};
 
 const MONTH_MAP = {
     'JAN': 0, 'FEB': 1, 'MAR': 2, 'APR': 3, 'MAY': 4, 'JUN': 5,
@@ -10,52 +21,253 @@ const MONTH_MAP = {
 };
 
 let _symbolToExpiryMap = null;
-function getSymbolToExpiryMap() {
-    if (_symbolToExpiryMap) return _symbolToExpiryMap;
-    _symbolToExpiryMap = {};
-    try {
-        const futData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8'));
-        Object.values(futData).flat().forEach(f => _symbolToExpiryMap[f.symbol] = f.expiry);
-        
-        const optData = JSON.parse(fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8'));
-        for (const name in optData) {
-            for (const expiry in optData[name]) {
-                for (const strike in optData[name][expiry]) {
-                    if (optData[name][expiry][strike].CE) _symbolToExpiryMap[optData[name][expiry][strike].CE.symbol] = expiry;
-                    if (optData[name][expiry][strike].PE) _symbolToExpiryMap[optData[name][expiry][strike].PE.symbol] = expiry;
+let _lastMapLoadTime = 0;
+let _isLoadingMap = false;
+
+function buildExpiryMapFromRaw(futRaw, optRaw) {
+    const newMap = {};
+    if (futRaw) {
+        try {
+            const futData = typeof futRaw === 'string' ? JSON.parse(futRaw) : futRaw;
+            Object.values(futData).flat().forEach(f => {
+                if (f && f.symbol && f.expiry) newMap[f.symbol] = f.expiry;
+            });
+        } catch (e) {}
+    }
+    if (optRaw) {
+        try {
+            const optData = typeof optRaw === 'string' ? JSON.parse(optRaw) : optRaw;
+            for (const name in optData) {
+                for (const expiry in optData[name]) {
+                    for (const strike in optData[name][expiry]) {
+                        const contract = optData[name][expiry][strike];
+                        if (contract && contract.CE && contract.CE.symbol) newMap[contract.CE.symbol] = expiry;
+                        if (contract && contract.PE && contract.PE.symbol) newMap[contract.PE.symbol] = expiry;
+                    }
                 }
             }
+        } catch (e) {}
+    }
+    return newMap;
+}
+
+function reloadSymbolToExpiryMapAsync() {
+    if (_isLoadingMap) return;
+    _isLoadingMap = true;
+    const futPath = path.join(__dirname, '../database/futures.json');
+    const optPath = path.join(__dirname, '../database/options.json');
+
+    Promise.all([
+        fs.promises.readFile(futPath, 'utf8').catch(() => null),
+        fs.promises.readFile(optPath, 'utf8').catch(() => null)
+    ]).then(([futRaw, optRaw]) => {
+        if (futRaw || optRaw) {
+            _symbolToExpiryMap = buildExpiryMapFromRaw(futRaw, optRaw);
+            _lastMapLoadTime = Date.now();
         }
+    }).catch(err => {
+        console.error("Error building symbolToExpiryMap async:", err.message);
+    }).finally(() => {
+        _isLoadingMap = false;
+    });
+}
+
+// Warm up map asynchronously on boot
+reloadSymbolToExpiryMapAsync();
+
+function getSymbolToExpiryMap() {
+    if (_symbolToExpiryMap) {
+        return _symbolToExpiryMap;
+    }
+    
+    // One-time fallback if called before first async load completes
+    try {
+        const futRaw = fs.readFileSync(path.join(__dirname, '../database/futures.json'), 'utf8');
+        const optRaw = fs.readFileSync(path.join(__dirname, '../database/options.json'), 'utf8');
+        _symbolToExpiryMap = buildExpiryMapFromRaw(futRaw, optRaw);
+        _lastMapLoadTime = Date.now();
     } catch (e) {
-        console.error("Error building symbolToExpiryMap", e.message);
+        console.error("Error building symbolToExpiryMap fallback:", e.message);
+        _symbolToExpiryMap = {};
     }
     return _symbolToExpiryMap;
 }
 
 function parseExpiryDate(symbol) {
+    if (!symbol) return null;
+    const cleanSym = symbol.replace(/^(NSE:|BSE:|MCX:)/i, '').trim();
+
+    // 1. Direct algorithmic regex parsing from symbol name:
+    // 1A. Weekly options format (e.g. SENSEX2691774300CE, BANKEX2691756000PE, NIFTY2691723450PE, BANKNIFTY2691751000CE)
+    const weeklyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/i);
+    if (weeklyMatch) {
+        const yr = 2000 + parseInt(weeklyMatch[2], 10);
+        const mChar = weeklyMatch[3].toUpperCase();
+        const monthCharMap = { '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7, '9': 8, 'O': 9, 'N': 10, 'D': 11 };
+        const m = monthCharMap[mChar];
+        const d = parseInt(weeklyMatch[4], 10);
+        if (m !== undefined && !isNaN(d)) {
+            return new Date(yr, m, d);
+        }
+    }
+
+    // 1B. Standard 2-digit month weekly format (e.g. SENSEX26091774300CE)
+    const weekly2DigitMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(0[1-9]|1[0-2])(\d{2})(\d+)(CE|PE)$/i);
+    if (weekly2DigitMatch) {
+        const yr = 2000 + parseInt(weekly2DigitMatch[2], 10);
+        const m = parseInt(weekly2DigitMatch[3], 10) - 1;
+        const d = parseInt(weekly2DigitMatch[4], 10);
+        return new Date(yr, m, d);
+    }
+
+    // 2. Dictionary lookup from options.json & futures.json
     const map = getSymbolToExpiryMap();
-    const expiryStr = map[symbol];
-    if (!expiryStr) return null;
-    
-    // expiryStr is like "28JUL2026"
-    const match = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
-    if (!match) return null;
-    
-    const day = parseInt(match[1], 10);
-    const monthStr = match[2].toUpperCase();
-    const year = parseInt(match[3], 10); 
-    
-    const month = MONTH_MAP[monthStr];
-    return new Date(year, month, day);
+    const expiryStr = map[symbol] || map[cleanSym] || map[`NSE:${cleanSym}`] || map[`BSE:${cleanSym}`] || map[`MCX:${cleanSym}`];
+    if (expiryStr) {
+        // Fyers expiryStr format is "YYYY-MM-DD"
+        const match = expiryStr.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+        if (match) {
+            const year = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) - 1; // 0-indexed month
+            const day = parseInt(match[3], 10);
+            return new Date(year, month, day);
+        }
+
+        // Fallback for legacy Angel One format "28JUL2026"
+        const matchLegacy = expiryStr.match(/^([0-9]{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([0-9]{4})$/i);
+        if (matchLegacy) {
+            const day = parseInt(matchLegacy[1], 10);
+            const monthStr = matchLegacy[2].toUpperCase();
+            const year = parseInt(matchLegacy[3], 10); 
+            const month = MONTH_MAP[monthStr];
+            return new Date(year, month, day);
+        }
+    }
+
+    // 3. Monthly contracts format for all NFO stocks & indices (e.g. RELIANCE26SEPFUT, TCS26OCT4100PE, SENSEX26OCTFUT, NIFTY26SEPFUT)
+    const monthlyMatch = cleanSym.match(/^([A-Z0-9]+?)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(?:(\d+)(CE|PE)|FUT)?$/i);
+    if (monthlyMatch) {
+        const yr = 2000 + parseInt(monthlyMatch[2], 10);
+        const mStr = monthlyMatch[3].toUpperCase();
+        const m = MONTH_MAP[mStr];
+        if (m !== undefined) {
+            const underlying = monthlyMatch[1].toUpperCase();
+            const isBseIndex = (underlying === 'SENSEX' || underlying === 'BANKEX');
+            const targetDayOfWeek = isBseIndex ? 5 : 4; // 5 = Friday for BSE, 4 = Thursday for NSE/MCX
+            const lastDay = new Date(yr, m + 1, 0);
+            let day = lastDay.getDate();
+            const dayOfWeek = lastDay.getDay();
+            const diff = (dayOfWeek >= targetDayOfWeek) ? (dayOfWeek - targetDayOfWeek) : (dayOfWeek + (7 - targetDayOfWeek));
+            day -= diff;
+            return new Date(yr, m, day);
+        }
+    }
+
+    return null;
 }
 
 function formatDate(date) {
     return `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
 }
 
+const ensureLivePrices = async (symbols) => {
+    try {
+        const { getPriceFromCache, fetchBatchLTPs } = require('./fyers');
+        const priceCache = getPriceFromCache ? getPriceFromCache() : {};
+        const missing = [...new Set(symbols)].filter(sym => !priceCache[sym]?.ltp);
+        
+        if (missing.length > 0 && fetchBatchLTPs) {
+            console.log(`[AutoSquareOff] Fetching live prices for ${missing.length} offline symbols via REST...`);
+            const fetchedQuotes = await fetchBatchLTPs(missing).catch(() => null);
+            if (fetchedQuotes && typeof fetchedQuotes === 'object') {
+                for (const [sym, data] of Object.entries(fetchedQuotes)) {
+                    if (data && data.ltp) {
+                        priceCache[sym] = { ltp: data.ltp };
+                    }
+                }
+            }
+        }
+        return priceCache;
+    } catch (e) {
+        console.error('[AutoSquareOff] ensureLivePrices error:', e.message);
+        return {};
+    }
+};
+
+async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-Off (RMS)', isRmsPenalty = true) {
+    const affectedUser = pos.user_id;
+    await db.transaction(async (trx) => {
+        await LedgerService.closePosition(trx, pos.user_id, pos.id, ltp, isRmsPenalty, customRemark);
+
+        // Cancel all PENDING_TRIGGER brackets for this user+symbol (only intraday types)
+        const cleanSym = (pos.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+        const triggers = await trx('orders')
+            .where({ user_id: pos.user_id, status: 'PENDING_TRIGGER' })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+            .where(builder => {
+                builder.where({ symbol: pos.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+            });
+        for (const t of triggers) {
+            const updated = await trx('orders')
+                .where({ id: t.id, status: 'PENDING_TRIGGER' })
+                .update({ status: 'CANCELLED', updated_at: new Date() });
+            if (updated > 0) {
+                if (parseFloat(t.margin) > 0) {
+                    await LedgerService.releaseMargin(trx, pos.user_id, t.margin, `Square-Off Cancelled: ${t.symbol}`);
+                }
+                triggerEngine.removeOrderFromMemory(t.id, t.symbol);
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                volumeMatchingEngine.dequeueOrder(t.id, t.symbol);
+            }
+        }
+
+        // Also cancel any remaining PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for this user+symbol (only intraday types)
+        const pendingOrders = await trx('orders')
+            .where({ user_id: pos.user_id })
+            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
+            .where(builder => {
+                builder.where({ symbol: pos.symbol })
+                       .orWhere({ symbol: cleanSym })
+                       .orWhere({ symbol: `NSE:${cleanSym}` })
+                       .orWhere({ symbol: `BSE:${cleanSym}` })
+                       .orWhere({ symbol: `MCX:${cleanSym}` });
+            });
+        for (const o of pendingOrders) {
+            const updated = await trx('orders')
+                .where({ id: o.id })
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
+                .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+            if (updated > 0) {
+                const totalQ = Number(o.quantity) || 1;
+                const pendingQ = (o.pending_quantity !== null && o.pending_quantity !== undefined)
+                    ? Number(o.pending_quantity)
+                    : ((o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(o.filled_quantity || 0)) : totalQ);
+                const refundMargin = totalQ > 0
+                    ? Math.round((Number(o.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
+                    : Math.round((Number(o.margin || 0) + Number.EPSILON) * 100) / 100;
+                if (refundMargin > 0) {
+                    await LedgerService.releaseMargin(trx, pos.user_id, refundMargin, `Square-Off Cancelled: ${o.symbol}`);
+                }
+                triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                volumeMatchingEngine.dequeueOrder(o.id, o.symbol);
+            }
+        }
+    });
+
+    if (triggerEngine && triggerEngine.io && affectedUser) {
+        triggerEngine.io.to(affectedUser.toString()).emit('sync_user_data');
+    }
+}
+
 async function runAutoSquareOff(exchangeFilter) {
     console.log(`\n=========================================`);
-    console.log(`🕒 Auto Square-Off Initiated for ${exchangeFilter}`);
+    console.log(`🚨 Auto Square-Off Initiated for ${exchangeFilter}`);
     console.log(`=========================================\n`);
 
     const now = new Date();
@@ -63,68 +275,52 @@ async function runAutoSquareOff(exchangeFilter) {
     const todayStr = formatDate(istTime);
 
     try {
-        const openPositions = await db('positions').whereRaw('quantity != closed_quantity');
+        const openPositions = await db('positions').whereNot({ quantity: 0 });
         
         console.log(`Found ${openPositions.length} open positions total. Checking for expiries...`);
-        let expiredCount = 0;
-        
-        // Generate a system token to bypass API auth
-        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
-        const port = process.env.PORT || 5000;
 
-        for (const pos of openPositions) {
-            const isMcx = pos.symbol.includes('MCX');
-            if (exchangeFilter === 'MCX' && !isMcx) continue;
-            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) continue;
-
+        const positionsToClose = openPositions.filter(pos => {
+            const isCom = isCommoditySymbol(pos.symbol);
+            if (exchangeFilter === 'MCX' && !isCom) return false;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isCom) return false;
+            
             const expiryDateObj = parseExpiryDate(pos.symbol);
-            if (!expiryDateObj) continue; 
-
+            if (!expiryDateObj) return false; 
             const expiryStr = formatDate(expiryDateObj);
+            return expiryStr === todayStr;
+        });
 
-            if (expiryStr === todayStr) {
-                console.log(`⚠️ Expiring Contract Detected: User ${pos.user_id} | ${pos.symbol}`);
-                expiredCount++;
-                
-                // Construct the market order payload to close the exact remaining quantity
-                const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
-                const side = pos.quantity > 0 ? 'SELL' : 'BUY';
+        console.log(`Filtered down to ${positionsToClose.length} expiring positions for ${exchangeFilter}.`);
 
-                const orderPayload = {
-                    symbol: pos.symbol,
-                    type: 'MARKET',
-                    side: side,
-                    quantity: remainingQty,
-                    product_type: pos.product_type,
-                    is_system_close: true // Optional flag if the backend wants to ignore margin blocks
-                };
+        let closedCount = 0;
+        const BATCH_SIZE = 50;
+
+        for (let i = 0; i < positionsToClose.length; i += BATCH_SIZE) {
+            const batch = positionsToClose.slice(i, i + BATCH_SIZE);
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
+
+            for (const pos of batch) {
+                const cachedLtp = priceCache[pos.symbol]?.ltp;
+                // For expiring derivatives, use live market LTP. If expired with no tick, settle at 0 (never refund purchase price).
+                const ltp = (cachedLtp !== undefined && cachedLtp !== null && !isNaN(Number(cachedLtp)))
+                    ? Math.max(0, Number(cachedLtp))
+                    : 0;
 
                 try {
-                    // We must generate a token FOR the specific user so the order endpoint works correctly
-                    const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
-                    
-                    const res = await fetch(`http://localhost:${port}/api/order`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${userToken}`
-                        },
-                        body: JSON.stringify(orderPayload)
-                    });
-                    
-                    const data = await res.json();
-                    if (data.success) {
-                        console.log(`✅ Auto-closed position for User ${pos.user_id} on ${pos.symbol}`);
-                    } else {
-                        console.error(`❌ API rejected auto-close for User ${pos.user_id} on ${pos.symbol}:`, data.error);
-                    }
+                    await squareOffPositionInProcess(pos, ltp, 'Contract Expiry Settlement', false);
+                    closedCount++;
+                    console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
                 } catch(e) {
-                    console.error(`❌ Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
                 }
+            }
+
+            if (i + BATCH_SIZE < positionsToClose.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
         
-        console.log(`✅ Auto Square-Off Complete. Closed ${expiredCount} positions.\n`);
+        console.log(`✅ Auto Square-Off Complete. Closed ${closedCount} positions.\n`);
     } catch (err) {
         console.error('❌ Auto Square-Off Error:', err);
     }
@@ -132,57 +328,55 @@ async function runAutoSquareOff(exchangeFilter) {
 
 async function runIntradaySquareOff(exchangeFilter) {
     console.log(`\n=========================================`);
-    console.log(`🕒 INTRADAY Square-Off Initiated for ${exchangeFilter}`);
+    console.log(`🚨 INTRADAY Square-Off Initiated for ${exchangeFilter}`);
     console.log(`=========================================\n`);
 
     try {
-        // Find open positions that are explicitly INT
         const openPositions = await db('positions')
-            .whereRaw('quantity != closed_quantity')
-            .andWhere({ product_type: 'INT' });
+            .whereNot({ quantity: 0 })
+            .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
         
-        console.log(`Found ${openPositions.length} open INTRADAY positions total.`);
+        console.log(`Found ${openPositions.length} open INTRADAY/BO/CO positions total.`);
+
+        const positionsToClose = openPositions.filter(pos => {
+            const isCom = isCommoditySymbol(pos.symbol);
+            if (exchangeFilter === 'MCX' && !isCom) return false;
+            if (exchangeFilter === 'NSE_NFO_BFO' && isCom) return false;
+            return true;
+        });
+
+        console.log(`Filtered down to ${positionsToClose.length} intraday positions for ${exchangeFilter}.`);
+
         let closedCount = 0;
-        
-        const systemToken = jwt.sign({ id: 0, is_system: true }, process.env.JWT_SECRET || 'secret');
-        const port = process.env.PORT || 5000;
+        const BATCH_SIZE = 50;
 
-        for (const pos of openPositions) {
-            const isMcx = pos.symbol.includes('MCX');
-            if (exchangeFilter === 'MCX' && !isMcx) continue;
-            if (exchangeFilter === 'NSE_NFO_BFO' && isMcx) continue;
+        for (let i = 0; i < positionsToClose.length; i += BATCH_SIZE) {
+            const batch = positionsToClose.slice(i, i + BATCH_SIZE);
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
 
-            console.log(`⚠️ Intraday Auto-Close Triggered: User ${pos.user_id} | ${pos.symbol}`);
-            closedCount++;
-            
-            const remainingQty = Math.abs(pos.quantity - pos.closed_quantity);
-            const side = pos.quantity > 0 ? 'SELL' : 'BUY';
-
-            const orderPayload = {
-                symbol: pos.symbol,
-                type: 'MARKET',
-                side: side,
-                quantity: remainingQty,
-                product_type: pos.product_type,
-                is_system_close: true
-            };
-
-            try {
-                const userToken = jwt.sign({ id: pos.user_id }, process.env.JWT_SECRET || 'secret');
-                const res = await fetch(`http://localhost:${port}/api/order`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userToken}`
-                    },
-                    body: JSON.stringify(orderPayload)
-                });
-                const data = await res.json();
-                if (data.success) {
-                    console.log(`✅ Auto-closed intraday position for User ${pos.user_id} on ${pos.symbol}`);
+            for (const pos of batch) {
+                let ltp = priceCache[pos.symbol]?.ltp;
+                if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
+                    ltp = Math.abs(Number(pos.average_price) || 0);
+                } else {
+                    ltp = Math.max(0, Number(ltp));
                 }
-            } catch(e) {
-                console.error(`❌ Failed to reach API for User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                if (ltp < 0) {
+                    console.warn(`[Auto-Close] Invalid price for ${pos.symbol}, skipping.`);
+                    continue;
+                }
+
+                try {
+                    await squareOffPositionInProcess(pos, ltp, 'Intraday Auto Square-Off (RMS)');
+                    closedCount++;
+                    console.log(`[Auto-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
+                } catch(e) {
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                }
+            }
+
+            if (i + BATCH_SIZE < positionsToClose.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         }
         console.log(`✅ Intraday Square-Off Complete. Closed ${closedCount} positions.\n`);
@@ -192,14 +386,31 @@ async function runIntradaySquareOff(exchangeFilter) {
 }
 
 async function runWatchlistCleanup() {
+    const lockKey = 'cron_watchlist_cleanup';
+    let connection = null;
+    let isLocked = false;
+
     console.log(`\n=========================================`);
-    console.log(`🧹 Midnight Watchlist Cleanup Initiated`);
+    console.log(`🧹 Watchlist Cleanup Initiated`);
     console.log(`=========================================\n`);
 
     try {
-        const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-        // Reset to midnight IST today
-        istTime.setHours(0, 0, 0, 0);
+        if (db.client && db.client.acquireConnection) {
+            connection = await db.client.acquireConnection();
+            const lockRes = await connection.query('SELECT pg_try_advisory_lock(hashtext($1)) as locked', [lockKey]).catch(() => null);
+            isLocked = Boolean(lockRes && lockRes.rows && lockRes.rows[0] && lockRes.rows[0].locked);
+            if (!isLocked) {
+                console.log('[Watchlist Cleanup] Already running on another cluster worker. Skipping.');
+                return;
+            }
+        }
+
+        const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const parts = formatter.formatToParts(new Date());
+        const yearPart = parts.find(p => p.type === 'year').value;
+        const monthPart = parts.find(p => p.type === 'month').value;
+        const dayPart = parts.find(p => p.type === 'day').value;
+        const istTime = new Date(`${yearPart}-${monthPart}-${dayPart}T00:00:00+05:30`);
 
         const users = await db('users').select('id', 'watchlists');
         let totalRemoved = 0;
@@ -224,7 +435,6 @@ async function runWatchlistCleanup() {
                     if (!expiryDateObj) return true; // Keep non-expiring assets
 
                     // If the expiry date is strictly before today's midnight, it is expired
-                    // E.g., if it expired yesterday, its midnight is < today's midnight
                     if (expiryDateObj.getTime() < istTime.getTime()) {
                         return false; // Remove it
                     }
@@ -245,19 +455,77 @@ async function runWatchlistCleanup() {
         console.log(`✅ Watchlist Cleanup Complete. Removed ${totalRemoved} expired contracts.\n`);
     } catch (err) {
         console.error('❌ Watchlist Cleanup Error:', err);
+    } finally {
+        if (connection) {
+            try {
+                if (isLocked) {
+                    await connection.query('SELECT pg_advisory_unlock(hashtext($1))', [lockKey]).catch(() => {});
+                }
+            } finally {
+                await db.client.releaseConnection(connection).catch(() => {});
+            }
+        }
     }
 }
 
 function startSquareOffJobs() {
-    // MIDNIGHT WATCHLIST CLEANUP (12:00 AM)
-    schedule.scheduleJob({ rule: '0 0 * * *', tz: 'Asia/Kolkata' }, () => {
-        runWatchlistCleanup();
-    });
-
-    // Run watchlist cleanup once immediately on startup to clear any stragglers missed while server was asleep
+    // Daily watchlist cleanup is scheduled at 8:37 AM IST in cronJobs.js.
+    // Run watchlist cleanup once immediately on startup to clear any stragglers
     runWatchlistCleanup();
 
-    console.log('✅ Watchlist Cleanup schedule initialized (Cleanup: 12:00am).');
+    console.log('✅ Watchlist daily cleanup schedule initialized (EOD square-offs unified under cronJobs.js).');
 }
 
-module.exports = { startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };
+
+async function runMasterSquareOff() {
+    console.log(`\n=========================================`);
+    console.log(`🚨 MASTER SQUARE-OFF INITIATED (ALL POSITIONS)`);
+    console.log(`=========================================\n`);
+
+    try {
+        const openPositions = await db('positions').whereNot({ quantity: 0 });
+        
+        console.log(`Found ${openPositions.length} open positions total.`);
+
+        let closedCount = 0;
+        const BATCH_SIZE = 50;
+
+        for (let i = 0; i < openPositions.length; i += BATCH_SIZE) {
+            const batch = openPositions.slice(i, i + BATCH_SIZE);
+            const priceCache = await ensureLivePrices(batch.map(p => p.symbol));
+
+            for (const pos of batch) {
+                let ltp = priceCache[pos.symbol]?.ltp;
+                if (ltp === undefined || ltp === null || isNaN(Number(ltp))) {
+                    ltp = Math.abs(Number(pos.average_price) || 0);
+                } else {
+                    ltp = Math.max(0, Number(ltp));
+                }
+                if (ltp < 0) {
+                    console.warn(`[Master-Close] Invalid price for ${pos.symbol}, skipping.`);
+                    continue;
+                }
+
+                try {
+                    await squareOffPositionInProcess(pos, ltp, 'Admin Master Square-Off (RMS)');
+                    closedCount++;
+                    console.log(`[Master-Close] User ${pos.user_id} on ${pos.symbol} @ ${ltp}`);
+                } catch (e) {
+                    console.error(`[Error] Failed to square off User ${pos.user_id} on ${pos.symbol}:`, e.message);
+                }
+            }
+
+            if (i + BATCH_SIZE < openPositions.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        console.log(`✅ Master Square-Off Complete. Closed ${closedCount} positions.\n`);
+        return { success: true, count: closedCount };
+    } catch (err) {
+        console.error('❌ Master Square-Off Error:', err);
+        throw err;
+    }
+}
+
+module.exports = { runMasterSquareOff, startSquareOffJobs, runAutoSquareOff, runIntradaySquareOff, parseExpiryDate, formatDate };

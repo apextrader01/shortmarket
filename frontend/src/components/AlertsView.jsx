@@ -29,7 +29,7 @@ export default function AlertsView() {
         
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button onClick={clearOldAlerts} className="btn" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-red-light)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-            Clear Old Alerts
+            Clear Triggered Alerts
           </button>
 
           {/* Ask for permission button if not granted */}
@@ -54,7 +54,7 @@ export default function AlertsView() {
             key={f}
             onClick={() => setFilter(f)}
             style={{
-              background: filter === f ? 'var(--color-blue)' : 'rgba(255,255,255,0.05)',
+              background: filter === f ? 'var(--color-blue)' : 'var(--bg-hover)',
               color: filter === f ? '#fff' : 'var(--text-secondary)',
               border: 'none', padding: '8px 16px', borderRadius: '6px',
               fontSize: '12px', fontWeight: 'bold', cursor: 'pointer'
@@ -124,3 +124,5 @@ export default function AlertsView() {
     </div>
   );
 }
+
+

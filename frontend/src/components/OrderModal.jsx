@@ -1,12 +1,31 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useState, useEffect } from 'react';
 import { useStore, API } from '../store';
-import { X, Maximize2, Info, RefreshCw, FileText, Plus } from 'lucide-react';
+import { X, Maximize2, Info, RefreshCw, FileText, Plus, Zap, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { getInstantLotsize, isDerivativeContract, isCommodityContract, isFnoEligibleStock, getAssetSubsegment } from '../utils/lotsizeHelper';
+import { getFreezeLimit, calculateOrderSlices, getOrderSlicesCount } from '../utils/freezeLimits';
+import { calculateOrderMargin, calculateMarginRequirement } from '../utils/marginCalculator';
+import { getTodayRealizedMetrics } from '../utils/pnlHelper';
 
 export default function OrderModal() {
-  const { orderModal, closeOrderModal, prices, user, restrictedStocks, openMarketDepthModal, marketDepthModal } = useStore();
+  const { orderModal, closeOrderModal, user, orders, restrictedStocks, openMarketDepthModal, marketDepthModal, marketStatus, marketCalendar, holdings, positions } = useStore(useShallow(state => ({ 
+    orderModal: state.orderModal, 
+    closeOrderModal: state.closeOrderModal, 
+    user: state.user, 
+    orders: state.orders,
+    restrictedStocks: state.restrictedStocks, 
+    openMarketDepthModal: state.openMarketDepthModal, 
+    marketDepthModal: state.marketDepthModal, 
+    marketStatus: state.marketStatus,
+    marketCalendar: state.marketCalendar,
+    holdings: state.holdings,
+    positions: state.positions
+  })));
+  const livePriceData = useStore(state => state.prices[orderModal?.symbol]);
   const [orderType, setOrderType] = useState('LIMIT'); // LIMIT, MARKET
   const [productType, setProductType] = useState('INT'); // INT, DEL
   const [tab, setTab] = useState('Regular'); // Regular, Stop Loss, GTT, SIP
+  const [isAmo, setIsAmo] = useState(false); // Regular, AMO
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
   const [slTrigger, setSlTrigger] = useState('');
@@ -22,32 +41,86 @@ export default function OrderModal() {
   const [estimatedTaxes, setEstimatedTaxes] = useState(null);
   const [isEstimating, setIsEstimating] = useState(false);
   const [showBreakup, setShowBreakup] = useState(false);
+  const [isPlacing, setIsPlacing] = useState(false);
 
   // Local side state (B/S)
   const [side, setSide] = useState('BUY');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const symbol = orderModal.symbol;
-  const livePrice = symbol ? prices[symbol]?.ltp || 0 : 0;
-  const isUp = symbol ? prices[symbol]?.pct >= 0 : true;
+  const livePrice = symbol ? livePriceData?.ltp || 0 : 0;
+  const isUp = symbol ? livePriceData?.pct >= 0 : true;
 
   // Initialize modal state when it opens
   useEffect(() => {
     if (orderModal.isOpen) {
       setSide(orderModal.type);
-      setPrice(livePrice ? livePrice.toFixed(2) : '');
-    }
-  }, [orderModal.isOpen, orderModal.symbol, orderModal.type, livePrice]);
+      const incomingProd = String(orderModal.productType || 'INT').toUpperCase();
+      const initialProd = (incomingProd === 'MIS' || incomingProd === 'INTRADAY') ? 'INT' : (incomingProd === 'CNC' || incomingProd === 'DELIVERY') ? 'DEL' : (orderModal.productType || 'INT');
+      setProductType(initialProd);
+      
+      const effectiveLotsize = (orderModal.lotsize && Number(orderModal.lotsize) > 1) 
+        ? Number(orderModal.lotsize) 
+        : getInstantLotsize(orderModal.symbol);
+      
+      if (effectiveLotsize > 1 && orderModal.lotsize !== effectiveLotsize) {
+        useStore.getState().setOrderModalLotsize(effectiveLotsize);
+      }
 
-  if (!orderModal.isOpen || !symbol) return null;
+      if (orderModal.totalExitQty) {
+          setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / effectiveLotsize)));
+      } else {
+          setQuantity(1);
+      }
+      
+      // Fetch initial price imperatively to avoid re-running on every live tick
+      if (orderModal.initialPrice && Number(orderModal.initialPrice) > 0) {
+        setPrice(Number(orderModal.initialPrice).toFixed(2));
+        setOrderType('LIMIT');
+      } else {
+        const currentLivePrice = useStore.getState().prices[orderModal.symbol]?.ltp || 0;
+        setPrice(currentLivePrice ? currentLivePrice.toFixed(2) : '');
+      }
+      
+      // Background sync lotsize if still 1 and looks like a derivative (contains numbers)
+      if (effectiveLotsize === 1 && /\d/.test(orderModal.symbol)) {
+        fetch(`${API}/api/stocks/lotsizes?symbols=${orderModal.symbol}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data[orderModal.symbol] && data[orderModal.symbol] > 1) {
+              const ls = data[orderModal.symbol];
+              useStore.getState().setOrderModalLotsize(ls);
+              if (orderModal.totalExitQty) {
+                  setQuantity(Math.max(1, Math.round(Math.abs(orderModal.totalExitQty) / ls)));
+              }
+            }
+          }).catch(console.error);
+      }
+    }
+  }, [orderModal.isOpen, orderModal.symbol, orderModal.type]);
 
   const balanceNum = Number(user?.balance) || 0;
-  const totalQuantity = quantity * (orderModal.lotsize || 1);
+  const freezeLimit = getFreezeLimit(symbol, orderModal.lotsize);
+  const maxAllowedQty = freezeLimit > 0 ? freezeLimit * 100 : 10000000;
+  const maxAllowedLots = (orderModal.lotsize && orderModal.lotsize > 1) ? Math.floor(maxAllowedQty / orderModal.lotsize) : maxAllowedQty;
   const isBuy = side === 'BUY';
-  const isOption = symbol.includes('CE') || symbol.includes('PE');
+  const cleanSym = symbol ? (symbol.includes(':') ? symbol.split(':')[1] : symbol) : '';
+  const isOption = /(?:\d+|[-_\s])(CE|PE)(?:[-_\s].*)?$/i.test(cleanSym);
+  const isMutualFund = cleanSym.endsWith('-MF') || ['EDEL-MF', 'MIRA-MF', 'NIPP-MF'].includes(cleanSym) || (/^\d{5,6}$/.test(cleanSym) && !symbol.startsWith('BSE:') && !symbol.startsWith('NSE:'));
+  const totalQuantity = isMutualFund ? (parseFloat(quantity) || 0) : Math.round((parseInt(quantity, 10) || 0) * (orderModal.lotsize || 1));
+  const isCappedBySlicing = totalQuantity > maxAllowedQty;
+  const effectiveQuantity = isCappedBySlicing ? maxAllowedQty : totalQuantity;
+  const slicesCount = getOrderSlicesCount(symbol, effectiveQuantity, orderModal.lotsize);
   
   // Fetch Estimated Charges
   useEffect(() => {
-    if (!symbol || !totalQuantity) return;
+    if (!symbol || !effectiveQuantity) return;
     const fetchEst = async () => {
        setIsEstimating(true);
        try {
@@ -57,7 +130,7 @@ export default function OrderModal() {
              return;
          }
          const token = useStore.getState().token;
-         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${totalQuantity}&price=${p}`, {
+         const res = await fetch(`${API}/api/estimate-charges?symbol=${symbol}&product_type=${productType}&side=${side}&quantity=${effectiveQuantity}&price=${p}`, {
             headers: { 'Authorization': `Bearer ${token}` }
          });
          const data = await res.json();
@@ -73,75 +146,433 @@ export default function OrderModal() {
     
     const timer = setTimeout(fetchEst, 400); // Debounce
     return () => clearTimeout(timer);
-  }, [symbol, productType, side, totalQuantity, price, orderType, livePrice]);
+  }, [symbol, effectiveQuantity, orderType, price, livePrice, productType, side]);
 
-  const leverageMultiplier = (productType === 'INT' && !isOption) ? 0.25 : 1.0; // 4x Leverage ONLY for Intraday Stocks
-  
-  let baseMargin = totalQuantity * (orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0));
-  
-  if (isOption && !isBuy) {
-    // Extract strike price robustly. Broker symbols often look like NIFTY30JUN2623900PE
-    // This regex looks for a 3-letter month and 2-digit year before the strike digits.
-    const cleanSymbol = symbol.split('-')[0];
-    let optionStrike = 0;
-    const robustMatch = cleanSymbol.match(/[A-Z]{3}\d{2}(\d+)(CE|PE)$/i);
-    if (robustMatch) {
-      optionStrike = parseFloat(robustMatch[1]);
-    } else {
-      const strikeMatch = cleanSymbol.match(/(\d+)(CE|PE)$/i);
-      if (strikeMatch) {
-         let rawStrikeStr = strikeMatch[1];
-         if (rawStrikeStr.length > 5) rawStrikeStr = rawStrikeStr.substring(rawStrikeStr.length - 5);
-         optionStrike = parseFloat(rawStrikeStr);
-      }
-    }
-    // Index vs Stock differentiation
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
-    
-    // 10% (10x leverage) for Index Options, 20% (5x leverage) for highly volatile Stock Options
-    const marginRate = isIndex ? 0.10 : 0.20; 
-    
-    if (optionStrike > 0) {
-      const grossMargin = optionStrike * totalQuantity * marginRate;
-      // Subtract the premium you collect from the buyer (baseMargin holds the premium value initially)
-      baseMargin = Math.max(grossMargin - baseMargin, 0); 
-    } else {
-      // Fallback
-      baseMargin = totalQuantity * (isIndex ? 4000 : 8000);
-    }
-  } else if (symbol.includes('FUT')) {
-    // Futures Margin Calculation (Symmetric for Buy and Sell)
-    const isIndex = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'MIDCPNIFTY'].some(idx => symbol.includes(idx));
-    const marginRate = isIndex ? 0.10 : 0.15; // 10% for Index Futures, 15% for Stock/Commodity Futures
-    baseMargin = baseMargin * marginRate;
-  }
+  const marginCalc = calculateOrderMargin({
+    symbol,
+    side,
+    quantity: effectiveQuantity,
+    price: orderType === 'MARKET' ? livePrice : (parseFloat(price) || 0),
+    productType,
+    lotsize: orderModal.lotsize || 1,
+    isOption
+  });
 
-  const requiredMargin = baseMargin * leverageMultiplier;
-  const isInsufficient = balanceNum < requiredMargin;
+  const matchingHolding = (holdings || []).find(h => {
+    const hClean = (h.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return hClean === cleanSym || h.symbol === symbol;
+  });
+  const matchingDelPos = (positions || []).find(p => {
+    const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    return (p.product_type === 'DEL' || p.product_type === 'CNC') && Number(p.quantity) > 0 && (pClean === cleanSym || p.symbol === symbol);
+  });
+  const availableHoldingQty = (matchingHolding ? Number(matchingHolding.quantity || 0) : 0) + (matchingDelPos ? Number(matchingDelPos.quantity || 0) : 0);
+  const isDelSellFromHoldings = side === 'SELL' && (productType === 'DEL' || productType === 'CNC') && !isDerivativeContract(symbol) && availableHoldingQty >= totalQuantity;
+
+  // Check if this order is closing/reducing an existing open position
+  const matchingOpenPos = (positions || []).find(p => {
+    const pClean = (p.symbol || '').replace(/^(NSE:|BSE:|MCX:)/i, '');
+    const symMatch = pClean === cleanSym || p.symbol === symbol;
+    if (!symMatch) return false;
+    const pQty = Number(p.quantity || 0);
+    if (pQty === 0) return false;
+    const isProductMatch = p.product_type === productType || 
+      (['DEL', 'CNC', 'DELIVERY'].includes(productType) && ['DEL', 'CNC', 'DELIVERY'].includes(p.product_type)) ||
+      (['INT', 'MIS'].includes(productType) && ['INT', 'MIS'].includes(p.product_type));
+    if (!isProductMatch) return false;
+    if (side === 'BUY' && pQty < 0) return true;
+    if (side === 'SELL' && pQty > 0) return true;
+    return false;
+  });
+  const openPosQty = matchingOpenPos ? Math.abs(Number(matchingOpenPos.quantity || 0)) : 0;
+  const isOpposingPositionExit = !!matchingOpenPos && totalQuantity <= openPosQty;
+
+  const isFuture = marginCalc.isFuture;
+  const explicitExitMax = Number(orderModal.totalExitQty || orderModal.exitQuantity || 0);
+  const isModalExplicitExit = Boolean(orderModal.isExit && side === orderModal.type && explicitExitMax > 0 && totalQuantity <= explicitExitMax);
+  const isTrueExit = isModalExplicitExit || isDelSellFromHoldings || isOpposingPositionExit;
+  const requiredMargin = isTrueExit ? 0 : marginCalc.requiredMargin;
+  const isInsufficient = !isTrueExit && balanceNum < requiredMargin;
+  const leverageText = isTrueExit 
+    ? (isDelSellFromHoldings ? 'Holding Exit' : (isOpposingPositionExit ? 'Position Square-Off' : 'Exit')) 
+    : marginCalc.leverageText;
 
   const isRestricted = restrictedStocks.includes(symbol);
+  const isCommodity = isCommodityContract(symbol);
+
+  const cleanU = String(cleanSym || symbol || '').toUpperCase();
+  const rawSymU = String(symbol || '').toUpperCase();
+  const isT2T = /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(cleanU) || /-(BE|BZ|T|Z|XT|SM|ST|P)$/i.test(rawSymU);
+  const upperCircuit = Number(livePriceData?.upper_circuit || livePriceData?.upper_ckt || 0);
+  const lowerCircuit = Number(livePriceData?.lower_circuit || livePriceData?.lower_ckt || 0);
+  const liveLtp = Number(livePriceData?.ltp || 0);
+  const isNearUpperCircuit = (upperCircuit > 0 && liveLtp >= upperCircuit * 0.995);
+  const isNearLowerCircuit = (lowerCircuit > 0 && liveLtp <= lowerCircuit * 1.005);
+  const isCircuitBlockedForSide = !isTrueExit && !isDerivativeContract(symbol) && !isCommodityContract(symbol) && (
+    (side === 'SELL' && isNearUpperCircuit) ||
+    (side === 'BUY' && isNearLowerCircuit)
+  );
+  const isIntradayRestricted = isT2T || isCircuitBlockedForSide;
+  const intradayBlockReason = isT2T 
+    ? 'Trade-to-Trade (T2T) stock: Intraday (MIS) is strictly prohibited by SEBI regulations. Delivery (CNC) only.'
+    : (isCircuitBlockedForSide ? (side === 'SELL' ? 'Stock at/near Upper Circuit: Shorting (MIS) blocked to prevent short-delivery risk.' : 'Stock at/near Lower Circuit: Buying (MIS) blocked due to exit lock risk.') : null);
+
+  useEffect(() => {
+    if (isIntradayRestricted && (productType === 'INT' || productType === 'MIS')) {
+      setProductType('DEL');
+    }
+  }, [isIntradayRestricted, productType]);
   
-  const isCommodity = ['CRUDEOIL', 'GOLD', 'SILVER', 'NATURALGAS', 'COPPER', 'ZINC', 'LEAD', 'ALUMINIUM', 'MENTHAOIL', 'COTTON'].some(c => symbol.startsWith(c));
-  
-  const isPastIntradayCutoff = () => {
-    if (isCommodity) return false;
-    const istTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+  const getMarketSession = () => {
+    const status = isCommodity ? (marketStatus?.commodity || 'AUTO') : (marketStatus?.equity || 'AUTO');
+    if (status === 'OPEN') return { open: true, mode: 'OPEN', session: 'OPEN' };
+    if (status === 'CLOSED') {
+      return { 
+        open: false, 
+        mode: 'CLOSED', 
+        session: 'ADMIN_CLOSED',
+        reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is currently marked as CLOSED / Holiday by Administrator.` 
+      };
+    }
+
+    // 1. Check Date-Specific Calendar Override
+    const now = new Date();
+    const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+    const y = istTime.getFullYear();
+    const m = String(istTime.getMonth() + 1).padStart(2, '0');
+    const d = String(istTime.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+    
+    const calRule = (marketCalendar || []).find(r => r.date === todayStr);
+    if (calRule) {
+      const segStatus = isCommodity ? calRule.commodity_status : calRule.equity_status;
+      const holidayReason = calRule.reason || (isCommodity ? 'MCX Commodity Market Holiday' : 'NSE/BSE Equity Market Holiday');
+      
+      if (segStatus === 'CLOSED') {
+        return {
+          open: false,
+          mode: 'CLOSED',
+          session: 'HOLIDAY',
+          reason: `${isCommodity ? 'MCX Commodity' : 'NSE/BSE Equity'} market is CLOSED today (${holidayReason}).`
+        };
+      }
+      
+      if (segStatus === 'OPEN') {
+        const startTimeStr = isCommodity ? (calRule.commodity_start_time || '09:00') : (calRule.equity_start_time || '09:15');
+        const endTimeStr = isCommodity ? (calRule.commodity_end_time || '23:30') : (calRule.equity_end_time || '15:30');
+        const [sH, sM] = startTimeStr.split(':').map(Number);
+        const [eH, eM] = endTimeStr.split(':').map(Number);
+        const curMins = istTime.getHours() * 60 + istTime.getMinutes();
+        const startMins = sH * 60 + (sM || 0);
+        const endMins = eH * 60 + (eM || 0);
+        
+        if (curMins < startMins || curMins >= endMins) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'SPECIAL_CLOSED',
+            reason: `Today's special session for ${isCommodity ? 'MCX' : 'NSE/BSE'} (${holidayReason}) is open only between ${startTimeStr} and ${endTimeStr} IST.`
+          };
+        }
+        return { open: true, mode: 'OPEN', session: 'SPECIAL_OPEN' };
+      }
+    }
+
+    // 2. AUTO mode: Check weekend & normal hours
+    const day = istTime.getDay(); // 0 = Sun, 6 = Sat
     const hours = istTime.getHours();
     const minutes = istTime.getMinutes();
-    return (hours > 15 || (hours === 15 && minutes >= 15));
+    const curMins = hours * 60 + minutes;
+
+    if (day === 0 || day === 6) {
+      return { 
+        open: false, 
+        mode: 'AUTO', 
+        session: 'WEEKEND', 
+        isAmoWindow: true, 
+        reason: 'Markets are closed on weekends (Saturday & Sunday). You can place After Market Orders (AMO) for Monday 09:15 AM.' 
+      };
+    }
+
+    const subsegment = getAssetSubsegment(symbol);
+    const isIntraday = (productType === 'INT' || productType === 'MIS' || isBO || isCO);
+    const isDelivery = (productType === 'DEL' || productType === 'CNC' || !productType);
+
+    // 3. Commodity Segment (MCX)
+    if (subsegment === 'COMMODITY' || isCommodity) {
+      if (hours < 9 || hours > 23 || (hours === 23 && minutes >= 30)) {
+        return { 
+          open: false, 
+          mode: 'AUTO', 
+          session: 'AMO', 
+          isAmoWindow: true, 
+          reason: 'MCX Commodity Market is closed. Orders placed now will queue as AMO for 09:00 AM market open.' 
+        };
+      }
+      if (isIntraday && (hours > 22 || (hours === 22 && minutes >= 50))) {
+        return { 
+          open: false, 
+          mode: 'AUTO', 
+          session: 'INTRADAY_CUTOFF', 
+          reason: 'Intraday (MIS/BO/CO) trading for MCX closes at 10:50 PM IST. Auto square-off executes between 10:50 PM and 11:00 PM.' 
+        };
+      }
+      return { open: true, mode: 'AUTO', session: 'NORMAL' };
+    }
+
+    // 4. Equity & Derivatives Timing Schedule
+
+    // 4A. AMO Window: 3:45 PM (15:45 / 945m) until 8:57 AM (537m)
+    if (curMins >= 945 || curMins < 537) {
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'AMO',
+        isAmoWindow: true,
+        reason: 'Equity & Derivatives markets are closed. The AMO window is active (03:45 PM - 08:57 AM). Orders will be executed at 09:15 AM market open.'
+      };
+    }
+
+    // 4B. Buffer between AMO and Pre-Market: 8:57 AM to 9:00 AM (537m - 540m)
+    if (curMins >= 537 && curMins < 540) {
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'PRE_MARKET_BUFFER',
+        reason: 'AMO window closed at 08:57 AM. Pre-Market order session opens at 09:00 AM IST.'
+      };
+    }
+
+    // 4C. Pre-Market Session: 9:00 AM to 9:15 AM (540m - 555m)
+    if (curMins >= 540 && curMins < 555) {
+      if (subsegment === 'DERIVATIVE') {
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'BEFORE_OPEN',
+          reason: 'Pre-market session is for Cash Equities only. Futures & Options trading begins at 09:15 AM IST.'
+        };
+      }
+      if (curMins < 548) {
+        if (isIntraday) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'PRE_MARKET_INTRADAY_BLOCKED',
+            reason: 'Intraday (MIS/BO/CO) orders are not allowed during the Pre-Market session (09:00 AM - 09:08 AM). Only Delivery orders are permitted.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'PRE_MARKET', isCas: true };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'PRE_MARKET_FREEZE',
+        reason: 'Pre-Market order collection is closed (09:08 AM - 09:15 AM). Exchange is matching opening orders. Normal continuous trading begins at 09:15 AM.'
+      };
+    }
+
+    // 4D. Normal Trading & Cutoffs
+
+    // --- Segment 1: Equity Cash (F&O Eligible Stocks) e.g., RELIANCE, TCS ---
+    if (subsegment === 'FNO_EQ') {
+      // 1. Post-Market Session: 3:50 PM - 4:00 PM
+      if (curMins >= 950 && curMins < 960) {
+        if (isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'POST_MARKET',
+          reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
+        };
+      }
+
+      // 2. Closing Auction Session (CAS): 3:15 PM - 3:35 PM
+      if (curMins >= 915 && curMins < 935) {
+        if (curMins >= 920 && curMins <= 930 && isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'CLOSING_AUCTION', isCas: true };
+        }
+        if (isIntraday) {
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'CLOSING_AUCTION',
+            reason: 'Intraday orders are not allowed during Closing Auction Session (03:15 PM - 03:35 PM). Only Delivery orders are accepted between 03:20 PM and 03:30 PM.'
+          };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'CLOSING_AUCTION',
+          reason: 'F&O cash stocks enter Closing Auction Session (CAS) at 03:15 PM. Order entry into auction pool is open between 03:20 PM and 03:30 PM IST.'
+        };
+      }
+
+      // 3. Normal Continuous Trading (09:15 AM - 03:15 PM) with Intraday Cutoff (03:05 PM)
+      if (curMins < 915) {
+        if (isIntraday && curMins >= 905) { // 3:05 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for F&O cash stocks is 03:05 PM IST. Auto square-off executes between 03:05 PM and 03:10 PM.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Normal trading closed at 03:15 PM (CAS ended at 03:35 PM). Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
+      };
+    }
+
+    // --- Segment 2: Equity Cash (Non-F&O Stocks) ---
+    if (subsegment === 'NON_FNO_EQ') {
+      // 1. Post-Market Session: 3:50 PM - 4:00 PM
+      if (curMins >= 950 && curMins < 960) {
+        if (isDelivery) {
+          return { open: true, mode: 'AUTO', session: 'POST_MARKET', isPostMarket: true };
+        }
+        return {
+          open: false,
+          mode: 'AUTO',
+          session: 'POST_MARKET',
+          reason: 'Only Delivery orders can be placed during Post-Market session (03:50 PM - 04:00 PM).'
+        };
+      }
+
+      // 2. Normal Continuous Trading (09:15 AM - 03:30 PM) with Intraday Cutoff (03:15 PM)
+      if (curMins < 930) {
+        if (isIntraday && curMins >= 915) { // 3:15 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for Non-F&O cash stocks is 03:15 PM IST. Auto square-off executes between 03:15 PM and 03:20 PM.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Normal trading closed at 03:30 PM IST. Post-Market opens at 03:50 PM and AMO opens at 03:45 PM IST.'
+      };
+    }
+
+    // --- Segment 3: Futures & Options (Derivatives) ---
+    if (subsegment === 'DERIVATIVE') {
+      // Continuous trading until 3:40 PM
+      if (curMins < 940) {
+        if (isIntraday && curMins >= 925) { // 3:25 PM
+          return {
+            open: false,
+            mode: 'AUTO',
+            session: 'INTRADAY_CUTOFF',
+            reason: 'Intraday auto square-off cutoff for Futures & Options is 03:25 PM IST. Auto square-off executes between 03:25 PM and 03:30 PM.'
+          };
+        }
+        return { open: true, mode: 'AUTO', session: 'NORMAL' };
+      }
+      return {
+        open: false,
+        mode: 'AUTO',
+        session: 'SETTLEMENT',
+        reason: 'Futures & Options trading closed at 03:40 PM IST. After Market Orders (AMO) open at 03:45 PM IST.'
+      };
+    }
+
+    return { open: true, mode: 'AUTO', session: 'NORMAL' };
   };
 
-  const isTimeBlocked = isPastIntradayCutoff();
-  const isIntradayBlocked = (isRestricted || isTimeBlocked) && productType === 'INT';
+  const marketSession = getMarketSession();
+  const isTimeBlocked = marketSession.mode === 'AUTO' && !marketSession.open;
+  const isIntradayBlocked = (isRestricted || isTimeBlocked || marketSession.session === 'INTRADAY_CUTOFF' || marketSession.session === 'PRE_MARKET_INTRADAY_BLOCKED') && (productType === 'INT' || productType === 'MIS');
 
-  const handlePlaceOrder = async () => {
-    if (isIntradayBlocked) {
-       setShowIntradayBlockedPopup(true);
+  // Variety selection: default to Regular unless explicitly opened with variety 'AMO'
+  useEffect(() => {
+    if (orderModal.isOpen) {
+      if (orderModal.variety === 'AMO') {
+        setIsAmo(true);
+        setIsBO(false);
+        setIsCO(false);
+        setSlPrice('');
+        setTgtPrice('');
+      } else {
+        setIsAmo(false);
+      }
+    }
+  }, [orderModal.isOpen, orderModal.variety]);
+
+  const handlePlaceOrder = async (bypassCaution = false) => {
+    if (marketSession.mode === 'CLOSED') {
+      alert(marketSession.reason);
+      return;
+    }
+    if (isAmo && !marketSession.isAmoWindow) {
+      const amoTimingMsg = isCommodity
+        ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+        : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Normal market session is currently active.";
+      alert(amoTimingMsg);
+      return;
+    }
+    if (!isAmo && !marketSession.open) {
+      const hoursText = isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM";
+      const marketName = isCommodity ? "MCX Commodity Market" : "Market";
+      alert(`${marketName} is closed. Regular orders can only be placed during trading hours (${hoursText}). Please select AMO to place an After Market Order.`);
+      return;
+    }
+    if (isIntradayBlocked && !isAmo) {
+       alert(marketSession.reason || "Intraday trading is closed for this segment. Please place a Delivery order or an After Market Order (AMO).");
        return;
     }
-    if (isRestricted && !showCautionPopup) {
+    if (isRestricted && !bypassCaution && !showCautionPopup) {
        setShowCautionPopup(true);
        return;
+    }
+
+    if (isAmo && (isBO || isCO)) {
+      alert("Bracket Orders (BO) and Cover Orders (CO) are not allowed in After Market Orders (AMO). Please place a regular Limit or Market AMO order.");
+      return;
+    }
+
+    if (user && user.risk_guardian_active && !orderModal.isExit) {
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const todayOrders = (orders || []).filter(o => {
+        if (o.status !== 'COMPLETED' && o.status !== 'COMPLETE' && o.status !== 'EXECUTED') return false;
+        const oDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(o.created_at));
+        return oDate === todayIST;
+      });
+      const todayTradesCount = todayOrders.length;
+      const { todayRealizedPnl } = getTodayRealizedMetrics(positions, orders);
+      const maxTrades = Number(user.max_daily_trades) || 0;
+      const maxLoss = Number(user.max_daily_loss) || 0;
+      const isTradesLocked = maxTrades > 0 && todayTradesCount >= maxTrades;
+      const isLossLocked = maxLoss > 0 && todayRealizedPnl < 0 && Math.abs(todayRealizedPnl) >= maxLoss;
+      if (isTradesLocked || isLossLocked) {
+        alert(`🛡️ Risk Guardian Active: Trading is locked for today (${isTradesLocked ? `Max trades limit of ${maxTrades} reached` : `Daily loss limit of ₹${maxLoss.toLocaleString('en-IN')} reached`}). Only exit orders are allowed.`);
+        return;
+      }
+    }
+
+    if (!effectiveQuantity || effectiveQuantity <= 0 || isNaN(effectiveQuantity)) {
+      alert("Please enter a valid quantity greater than 0.");
+      return;
+    }
+    if (orderType === 'LIMIT' && (!price || parseFloat(price) <= 0 || isNaN(parseFloat(price)))) {
+      alert("Please enter a valid limit price greater than 0.");
+      return;
+    }
+    if (orderType === 'MARKET' && (!livePrice || livePrice <= 0) && !isAmo) {
+      alert("Market feed is connecting. Please wait a moment or place a Limit order.");
+      return;
     }
 
     // Validate Bracket Order (BO) and Cover Order (CO) formats
@@ -155,12 +586,12 @@ export default function OrderModal() {
       const parsedSL = slPrice ? parseFloat(slPrice) : 0;
       const parsedTgt = tgtPrice ? parseFloat(tgtPrice) : 0;
       
-      if (isCO && !parsedSL) {
-        alert("Please specify a Stop Loss price for your Cover Order (CO).");
+      if (isCO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL))) {
+        alert("Please specify a valid positive Stop Loss price for your Cover Order (CO).");
         return;
       }
-      if (isBO && (!parsedSL || !parsedTgt)) {
-        alert("Please specify both Stop Loss and Target prices for your Bracket Order (BO).");
+      if (isBO && (!parsedSL || parsedSL <= 0 || isNaN(parsedSL) || !parsedTgt || parsedTgt <= 0 || isNaN(parsedTgt))) {
+        alert("Please specify valid positive Stop Loss and Target prices for your Bracket Order (BO).");
         return;
       }
       
@@ -185,305 +616,803 @@ export default function OrderModal() {
       }
     }
 
+    const parsedTrail = parseFloat(trailingJump);
     let finalType = orderType;
     if (tab === 'Stop Loss') finalType = orderType === 'MARKET' ? 'SL-M' : 'SL-L';
-    if (tab === 'Trailing SL') finalType = 'TRAILING_STOP';
-    if (tab === 'GTT') finalType = 'GTT';
+    if (tab === 'Trailing SL' || parsedTrail > 0) {
+      finalType = 'TRAILING_STOP';
+    }
 
     const payload = {
       symbol,
       type: finalType,
       side,
-      quantity: totalQuantity,
+      quantity: effectiveQuantity,
       price: orderType === 'MARKET' ? livePrice : parseFloat(price),
-      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || tab === 'GTT') && slTrigger ? parseFloat(slTrigger) : null,
-      trail_amount: tab === 'Trailing SL' && trailingJump ? parseFloat(trailingJump) : null,
+      trigger_price: (tab === 'Stop Loss' || tab === 'Trailing SL' || parsedTrail > 0) && slTrigger ? parseFloat(slTrigger) : null,
+      trail_amount: parsedTrail > 0 ? parsedTrail : null,
       sl_price: (isCO || isBO) && slPrice ? parseFloat(slPrice) : null,
       tgt_price: isBO && tgtPrice ? parseFloat(tgtPrice) : null,
       margin: requiredMargin, // Backend will deduct this
-      product_type: isBO ? 'BO' : isCO ? 'CO' : productType
+      product_type: isBO ? 'BO' : isCO ? 'CO' : productType,
+      lotsize: orderModal.lotsize || 1,
+      order_variety: isAmo ? 'AMO' : 'REGULAR',
+      variety: isAmo ? 'AMO' : 'REGULAR',
+      is_amo: isAmo,
+      is_exit: Boolean(isTrueExit),
+      remarks: isTrueExit ? (isDelSellFromHoldings ? 'Exit Holding' : 'Exit Position') : undefined
     };
 
-    if (tab === 'Stop Loss' || tab === 'GTT') {
-      const triggerPayload = {
-        symbol,
-        type: tab === 'GTT' ? 'GTT' : 'SL',
-        side,
-        quantity: totalQuantity,
-        limitPrice: orderType === 'MARKET' ? null : parseFloat(price),
-        triggerPrice: parseFloat(slTrigger),
-        productType,
-        status: 'PENDING_TRIGGER'
-      };
-      useStore.getState().addPendingTrigger(triggerPayload);
-      closeOrderModal();
-      return;
-    }
-
-    const success = await useStore.getState().placeOrder(payload);
-    if (success) {
-      closeOrderModal();
-    } else {
-      const errorMsg = useStore.getState().authError || "Failed to place order. Please try again.";
-      alert(errorMsg);
+    try {
+      setIsPlacing(true);
+      const result = await useStore.getState().placeOrder(payload);
+      setIsPlacing(false);
+      if (result && result.success) {
+        closeOrderModal();
+        if (result.status === 'EXECUTED') {
+          alert("✅ Order Executed Successfully!");
+        } else if (result.status === 'AMO_PENDING') {
+          alert("🌙 " + (result.message || "After Market Order (AMO) Placed! Your order is queued for market open."));
+        } else if (result.status === 'PARTIAL_FILLED') {
+          alert("⚡ Order Partially Filled (Remaining quantity held in volume queue)");
+        } else if (result.status === 'PENDING_TRIGGER') {
+          alert("⏳ Trigger Order Placed (Pending Trigger)");
+        } else if (result.status === 'REJECTED') {
+          alert("❌ Order Rejected!");
+        } else {
+          alert("⏳ Order Placed (Pending)");
+        }
+      } else {
+        const errorMsg = (result && result.error) || useStore.getState().authError || "Failed to place order. Please try again.";
+        alert(errorMsg);
+      }
+    } catch (err) {
+      setIsPlacing(false);
+      alert("Error: " + (err.message || 'Failed to place order.'));
     }
   };
 
+  if (!orderModal.isOpen || !symbol) return null;
+
   return (
-    <div className="modal-backdrop" style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-    }}>
+    <div 
+      className="modal-backdrop" 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeOrderModal();
+      }}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+        background: 'rgba(0,0,0,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+      }}
+    >
       <div style={{
-        width: '520px', background: 'var(--bg-dark)', borderRadius: '8px', 
-        border: '1px solid var(--border-color)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-        overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        transform: marketDepthModal?.isOpen ? 'translateX(-260px)' : 'none',
-        transition: 'transform 0.3s ease-in-out'
+        width: isMobile ? '96vw' : '540px', 
+        maxWidth: isMobile ? '96vw' : '95vw',
+        background: 'var(--bg-panel)', 
+        borderRadius: isMobile ? '12px' : '10px', 
+        border: '1px solid var(--border-color)', 
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)',
+        overflow: 'hidden', 
+        display: 'flex', 
+        flexDirection: 'column',
+        transform: (marketDepthModal?.isOpen && !isMobile) ? 'translateX(-260px)' : 'none',
+        transition: 'transform 0.3s ease-in-out',
+        animation: 'fadeInScale 0.15s ease-out'
       }}>
         
-        {/* Header */}
-        <div style={{ background: isBuy ? 'rgba(34, 197, 94, 0.05)' : 'rgba(239, 68, 68, 0.05)', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {/* Fyers-Style Vibrant Header */}
+        <div style={{ 
+          background: isBuy ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'linear-gradient(135deg, #dc2626, #b91c1c)', 
+          padding: '14px 18px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          color: '#ffffff'
+        }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>{symbol.split('-')[0]}</h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                <input type="radio" checked readOnly style={{ accentColor: 'var(--color-blue)' }} />
-                <span>NSE <span style={{ color: isUp ? 'var(--color-green-light)' : 'var(--color-red-light)', fontWeight: '600' }}>{livePrice.toFixed(2)} {isUp ? '▲' : '▼'}</span></span>
-              </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#ffffff', letterSpacing: '0.3px' }}>
+                {isBuy ? 'Buy' : 'Sell'} {symbol.split('-')[0]}
+              </h2>
+              <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.2)', padding: '1px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}
+              </span>
+            </div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginTop: '3px', fontWeight: '500' }}>
+              {symbol?.startsWith('MCX:') ? 'MCX' : symbol?.startsWith('BSE:') ? 'BSE' : 'NSE'}: ₹{livePrice.toFixed(2)}
+              <span style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.85 }}>
+                {isUp ? '▲' : '▼'} {livePriceData?.pct !== undefined ? `${livePriceData.pct >= 0 ? '+' : ''}${livePriceData.pct.toFixed(2)}%` : ''}
+              </span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', background: 'var(--bg-panel)', borderRadius: '20px', overflow: 'hidden', padding: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* Smooth B / S Toggle */}
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '20px', padding: '2px', border: '1px solid rgba(255,255,255,0.2)' }}>
               <button 
+                type="button"
                 onClick={() => setSide('BUY')}
                 style={{ 
-                  background: isBuy ? 'var(--color-blue)' : 'transparent', color: isBuy ? '#fff' : 'var(--text-secondary)',
-                  border: 'none', borderRadius: '16px', width: '32px', height: '24px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                  background: isBuy ? '#ffffff' : 'transparent', 
+                  color: isBuy ? '#1d4ed8' : 'rgba(255,255,255,0.8)',
+                  border: 'none', 
+                  borderRadius: '16px', 
+                  width: '28px', 
+                  height: '22px', 
+                  fontSize: '11px', 
+                  fontWeight: '800', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}>B</button>
               <button 
+                type="button"
                 onClick={() => setSide('SELL')}
                 style={{ 
-                  background: !isBuy ? 'var(--color-red)' : 'transparent', color: !isBuy ? '#fff' : 'var(--text-secondary)',
-                  border: 'none', borderRadius: '16px', width: '32px', height: '24px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                  background: !isBuy ? '#ffffff' : 'transparent', 
+                  color: !isBuy ? '#b91c1c' : 'rgba(255,255,255,0.8)',
+                  border: 'none', 
+                  borderRadius: '16px', 
+                  width: '28px', 
+                  height: '22px', 
+                  fontSize: '11px', 
+                  fontWeight: '800', 
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}>S</button>
             </div>
-            <button style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><Maximize2 size={14} /></button>
-            <button onClick={closeOrderModal} style={{ background: 'var(--bg-panel)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={16} /></button>
+            <button 
+              type="button"
+              onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
+              title="Market Depth"
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+            >
+              <Maximize2 size={13} />
+            </button>
+            <button 
+              type="button"
+              onClick={closeOrderModal} 
+              title="Close"
+              style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ffffff' }}
+            >
+              <X size={15} />
+            </button>
           </div>
         </div>
 
-        {/* Intraday / Overnight Tabs */}
-        <div style={{ padding: '20px 20px 10px 20px' }}>
-          <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '4px', overflow: 'hidden', width: 'fit-content' }}>
-            <div 
-              onClick={() => setProductType('INT')} 
+        {/* Product Type & Order Variety Tabs */}
+        {!isTrueExit && (
+        <div style={{ padding: '14px 20px 0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--bg-panel)', flexWrap: 'wrap' }}>
+          {/* Product Type: Intraday vs Delivery */}
+          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (isIntradayRestricted) {
+                  alert(intradayBlockReason);
+                  return;
+                }
+                setProductType('INT');
+              }} 
               style={{ 
-                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                background: productType === 'INT' ? 'var(--color-blue)' : 'transparent',
-                color: productType === 'INT' ? '#fff' : 'var(--text-primary)',
-                fontSize: '13px', fontWeight: '500'
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                cursor: isIntradayRestricted ? 'not-allowed' : 'pointer',
+                opacity: isIntradayRestricted ? 0.45 : 1,
+                background: (productType === 'INT' || productType === 'MIS') ? '#2563eb' : 'transparent',
+                color: (productType === 'INT' || productType === 'MIS') ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
               }}
+              title={isIntradayRestricted ? intradayBlockReason : "Intraday (MIS) Order"}
             >
-              Intraday <Info size={12} style={{ opacity: 0.7 }} />
-            </div>
-            <div 
+              Intraday
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setProductType('DEL');
                 setIsCO(false);
                 setIsBO(false);
               }} 
               style={{ 
-                padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                background: productType === 'DEL' ? 'var(--color-blue)' : 'transparent',
-                color: productType === 'DEL' ? '#fff' : 'var(--text-primary)',
-                fontSize: '13px', fontWeight: '500'
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer',
+                background: productType === 'DEL' ? '#2563eb' : 'transparent',
+                color: productType === 'DEL' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
               }}
             >
-              Delivery <Info size={12} style={{ opacity: 0.7 }} />
-            </div>
+              {isOption || isFuture ? 'Overnight' : 'Delivery'}
+            </button>
+          </div>
+
+          {/* Order Variety: Regular vs AMO */}
+          <div style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '6px', padding: '3px', border: '1px solid var(--border-color)' }}>
+            <button
+              type="button"
+              onClick={() => setIsAmo(false)} 
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer',
+                background: !isAmo ? '#2563eb' : 'transparent',
+                color: !isAmo ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '600',
+                transition: 'all 0.15s ease'
+              }}
+              title={!marketSession.open ? `Market is closed. Regular orders can only be placed during trading hours (${isCommodity ? "09:00 AM - 11:30 PM" : "09:15 AM - 03:30 PM"})` : "Regular Order"}
+            >
+              Regular
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!marketSession.isAmoWindow) {
+                  const amoTimingMsg = isCommodity
+                    ? "After Market Orders (AMO) for MCX can only be placed between 11:30 PM and 08:57 AM. Regular market session is currently active."
+                    : "After Market Orders (AMO) can only be placed between 03:45 PM and 08:57 AM. Regular market session is currently active.";
+                  alert(amoTimingMsg);
+                  return;
+                }
+                setIsAmo(true);
+                setIsBO(false);
+                setIsCO(false);
+                setSlPrice('');
+                setTgtPrice('');
+              }} 
+              style={{ 
+                padding: '6px 14px', 
+                borderRadius: '4px',
+                border: 'none',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                cursor: !marketSession.isAmoWindow ? 'not-allowed' : 'pointer',
+                opacity: !marketSession.isAmoWindow ? 0.5 : 1,
+                background: isAmo ? '#f59e0b' : 'transparent',
+                color: isAmo ? '#000000' : 'var(--text-secondary)',
+                fontSize: '12.5px', fontWeight: '700',
+                transition: 'all 0.15s ease',
+                boxShadow: isAmo ? '0 0 10px rgba(245, 158, 11, 0.35)' : 'none'
+              }}
+              title={!marketSession.isAmoWindow ? (isCommodity ? "AMO for MCX is only open between 11:30 PM and 08:57 AM" : "AMO is only open between 03:45 PM and 08:57 AM") : "After Market Order (Queued for execution at market open)"}
+            >
+              🌙 AMO
+            </button>
           </div>
         </div>
+        )}
+
+        {/* Preventative Filter Warning Badge */}
+        {isIntradayRestricted && !isTrueExit && (
+          <div style={{ 
+            fontSize: '11.5px', 
+            color: '#f87171', 
+            background: 'rgba(239, 68, 68, 0.12)', 
+            border: '1px solid rgba(239, 68, 68, 0.3)', 
+            borderRadius: '6px', 
+            padding: '7px 11px', 
+            margin: '10px 20px 0 20px',
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px' 
+          }}>
+            <span>⚠️</span>
+            <span><strong>Intraday (MIS) Restricted:</strong> {intradayBlockReason}</span>
+          </div>
+        )}
 
         {/* Form Body */}
-        <div style={{ padding: '10px 20px 20px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: '500' }}>
-              {productType === 'INT' ? 'Intraday' : 'Delivery'} - {orderType === 'MARKET' ? 'Market' : 'Limit'}
+        <div style={{ padding: '14px 20px 18px 20px', background: 'var(--bg-panel)' }}>
+          {isAmo && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#fde68a', 
+              background: 'rgba(245, 158, 11, 0.12)', 
+              border: '1px solid rgba(245, 158, 11, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌙</span>
+              <span>
+                <strong>After Market Order (AMO):</strong> Window active (03:45 PM - 08:57 AM). Order will be safely queued and executed at market open ({isCommodity ? '09:00 AM' : '09:15 AM'}).
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'PRE_MARKET' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#93c5fd', 
+              background: 'rgba(59, 130, 246, 0.12)', 
+              border: '1px solid rgba(59, 130, 246, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌅</span>
+              <span>
+                <strong>Pre-Market Call Auction (09:00 AM - 09:08 AM):</strong> Cash equity delivery orders placed now will be matched at the discovered opening equilibrium price at 09:08 AM. Intraday orders are blocked.
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'CLOSING_AUCTION' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#c4b5fd', 
+              background: 'rgba(168, 85, 247, 0.12)', 
+              border: '1px solid rgba(168, 85, 247, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🏛️</span>
+              <span>
+                <strong>Closing Auction Session (3:15 PM - 3:35 PM):</strong> F&O cash stock auction pool. Order entry is active from 3:20 PM - 3:30 PM. Matching occurs at 3:30 PM - 3:35 PM.
+              </span>
+            </div>
+          )}
+
+          {marketSession.session === 'POST_MARKET' && (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#86efac', 
+              background: 'rgba(34, 197, 94, 0.12)', 
+              border: '1px solid rgba(34, 197, 94, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 11px', 
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>🌆</span>
+              <span>
+                <strong>Post-Market Session (3:50 PM - 4:00 PM):</strong> Delivery orders placed during this session execute at the exact finalized closing price.
+              </span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '600', letterSpacing: '0.2px' }}>
+              {(productType === 'INT' || productType === 'MIS') ? 'Intraday' : (isOption || isFuture ? 'Overnight' : 'CNC')} • {orderType === 'MARKET' ? 'Market Order' : 'Limit Order'} {isAmo ? '• 🌙 AMO' : ''}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          {/* 3-Column Inputs Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: isMobile ? '8px' : '14px', marginBottom: '12px' }}>
             {/* Qty */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)' }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: isMobile ? '10px' : '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Qty(Lot: {orderModal.lotsize || 1})</legend>
                 <input 
                   type="number" 
+                  step={1}
+                  min={1}
+                  max={10000000}
                   value={quantity} 
-                  onChange={e => setQuantity(Math.max(1, Number(e.target.value)))} 
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') { setQuantity(''); return; }
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num)) setQuantity(Math.min(10000000, Math.max(1, num)));
+                  }}
+                  onBlur={e => {
+                    const num = parseInt(e.target.value, 10);
+                    setQuantity(Math.min(10000000, Math.max(1, isNaN(num) ? 1 : num)));
+                  }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '6px 8px' : '8px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '13px' : '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              {orderModal.lotsize > 1 && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                  Total Qty: {quantity * orderModal.lotsize}
+              {orderModal.lotsize > 1 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
+                  <span style={{ color: isCappedBySlicing ? '#f59e0b' : 'var(--text-secondary)' }}>
+                    Total Qty: {((parseInt(quantity, 10) || 0) * orderModal.lotsize).toLocaleString('en-IN')}
+                  </span>
+                  {isCappedBySlicing && (
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(maxAllowedLots)}
+                      style={{
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                        color: '#f59e0b',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      title={`Click to set maximum allowable lots (${maxAllowedLots.toLocaleString('en-IN')})`}
+                    >
+                      Set Max: {maxAllowedLots.toLocaleString('en-IN')} Lots
+                    </button>
+                  )}
                 </div>
-              )}
+              ) : isCappedBySlicing ? (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px', paddingLeft: '2px', fontSize: '10.5px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(maxAllowedQty)}
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      color: '#f59e0b',
+                      borderRadius: '4px',
+                      padding: '1px 6px',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      cursor: 'pointer'
+                    }}
+                    title={`Click to set maximum allowable shares (${maxAllowedQty.toLocaleString('en-IN')})`}
+                  >
+                    Set Max: {maxAllowedQty.toLocaleString('en-IN')} Shares
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             {/* Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: orderType === 'MARKET' ? 0.5 : 1 }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Price(Tick: 0.05)</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: orderType === 'MARKET' ? 0.6 : 1 }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: isMobile ? '10px' : '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Price(Tick: 0.05)</legend>
                 <input 
                   type="text" 
-                  value={price} 
+                  value={orderType === 'MARKET' ? (livePrice ? livePrice.toFixed(2) : '0.00') : price} 
                   onChange={e => setPrice(e.target.value)} 
                   disabled={orderType === 'MARKET'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '6px 8px' : '8px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '13px' : '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={orderType === 'MARKET'} onChange={e => setOrderType(e.target.checked ? 'MARKET' : 'LIMIT')} style={{ accentColor: 'var(--color-blue)' }} /> 
-                Market price <Info size={12} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: isMobile ? '11px' : '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                <input type="checkbox" checked={orderType === 'MARKET'} onChange={e => setOrderType(e.target.checked ? 'MARKET' : 'LIMIT')} style={{ accentColor: '#2563eb' }} /> 
+                Market price
               </label>
             </div>
 
             {/* Trigger Price */}
             <div>
-              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: tab !== 'Stop Loss' ? 0.5 : 1, background: tab !== 'Stop Loss' ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Trigger Price</legend>
+              <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: tab !== 'Stop Loss' ? 0.5 : 1 }}>
+                <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: isMobile ? '10px' : '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trigger Price</legend>
                 <input 
                   type="text" 
+                  placeholder={tab !== 'Stop Loss' ? '—' : '0.00'}
                   value={slTrigger} 
                   onChange={e => setSlTrigger(e.target.value)}
                   disabled={tab !== 'Stop Loss'}
-                  style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
+                  style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '6px 8px' : '8px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '13px' : '14px', fontWeight: '600', outline: 'none' }} 
                 />
               </fieldset>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => setTab(e.target.checked ? 'Stop Loss' : 'Regular')} style={{ accentColor: 'var(--color-blue)' }} /> 
-                Trigger {side.toLowerCase()} <Info size={12} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: isMobile ? '11px' : '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                <input type="checkbox" checked={tab === 'Stop Loss'} onChange={e => { setTab(e.target.checked ? 'Stop Loss' : 'Regular'); if (!e.target.checked) setTrailingJump(''); }} style={{ accentColor: '#2563eb' }} /> 
+                Trigger {side.toLowerCase()}
               </label>
+              {tab === 'Stop Loss' && (
+                <div style={{ marginTop: '8px' }}>
+                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)' }}>
+                    <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: isMobile ? '9.5px' : '10.5px', color: 'var(--text-secondary)', fontWeight: '500' }}>Trailing Jump (Pts)</legend>
+                    <input 
+                      type="text" 
+                      placeholder="Optional (e.g. 1.0)"
+                      value={trailingJump} 
+                      onChange={e => setTrailingJump(e.target.value)}
+                      style={{ width: '100%', background: 'transparent', border: 'none', padding: isMobile ? '5px 8px' : '6px 10px', color: 'var(--text-primary)', fontSize: isMobile ? '12px' : '13px', fontWeight: '600', outline: 'none' }} 
+                    />
+                  </fieldset>
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            {productType === 'INT' && (
-              <>
-                <div style={{ gridColumn: '2' }}>
-                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !(isCO || isBO) ? 0.5 : 1, background: !(isCO || isBO) ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Stoploss</legend>
-                    <input 
-                      type="text" 
-                      value={slPrice}
-                      onChange={e => setSlPrice(e.target.value)}
-                      disabled={!(isCO || isBO)}
-                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                    />
-                  </fieldset>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                    CO <Info size={12} />
-                  </label>
-                </div>
+          {/* Intraday Stoploss & Take Profit (CO & BO) - Regular Market Hours Only */}
+          {(productType === 'INT' || productType === 'MIS') && !isAmo && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '12px' }}>
+              <div></div>
+              <div>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: !(isCO || isBO) ? 0.5 : 1 }}>
+                  <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Stoploss</legend>
+                  <input 
+                    type="text" 
+                    placeholder={!(isCO || isBO) ? '—' : '0.00'}
+                    value={slPrice}
+                    onChange={e => setSlPrice(e.target.value)}
+                    disabled={!(isCO || isBO)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  />
+                </fieldset>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                  <input type="checkbox" checked={isCO} onChange={e => { setIsCO(e.target.checked); if (e.target.checked) setIsBO(false); }} style={{ accentColor: '#2563eb' }} /> 
+                  CO (Cover Order)
+                </label>
+              </div>
 
-                <div style={{ gridColumn: '3' }}>
-                  <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '4px', opacity: !isBO ? 0.5 : 1, background: !isBO ? 'repeating-linear-gradient(-45deg, rgba(128,128,128,0.05), rgba(128,128,128,0.05) 10px, transparent 10px, transparent 20px)' : 'transparent' }}>
-                    <legend style={{ marginLeft: '12px', padding: '0 4px', fontSize: '12px', color: 'var(--text-secondary)' }}>Take Profit</legend>
-                    <input 
-                      type="text" 
-                      value={tgtPrice}
-                      onChange={e => setTgtPrice(e.target.value)}
-                      disabled={!isBO}
-                      style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }} 
-                    />
-                  </fieldset>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: 'var(--color-blue)' }} /> 
-                    BO <Info size={12} />
-                  </label>
-                </div>
-              </>
-            )}
-          </div>
+              <div>
+                <fieldset style={{ margin: 0, padding: 0, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', opacity: !isBO ? 0.5 : 1 }}>
+                  <legend style={{ marginLeft: '10px', padding: '0 4px', fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '500' }}>Take Profit</legend>
+                  <input 
+                    type="text" 
+                    placeholder={!isBO ? '—' : '0.00'}
+                    value={tgtPrice}
+                    onChange={e => setTgtPrice(e.target.value)}
+                    disabled={!isBO}
+                    style={{ width: '100%', background: 'transparent', border: 'none', padding: '8px 10px', color: 'var(--text-primary)', fontSize: '14px', fontWeight: '600', outline: 'none' }} 
+                  />
+                </fieldset>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', cursor: 'pointer', paddingLeft: '2px' }}>
+                  <input type="checkbox" checked={isBO} onChange={e => { setIsBO(e.target.checked); if (e.target.checked) setIsCO(false); }} style={{ accentColor: '#2563eb' }} /> 
+                  BO (Bracket Order)
+                </label>
+              </div>
+            </div>
+          )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '16px' }}>
+          {/* Slicing Notice Banner */}
+          {isCappedBySlicing ? (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#f59e0b', 
+              background: 'rgba(245, 158, 11, 0.12)', 
+              border: '1px solid rgba(245, 158, 11, 0.35)', 
+              borderRadius: '6px', 
+              padding: '8px 10px', 
+              marginTop: '8px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+              lineHeight: '1.4'
+            }}>
+              <AlertTriangle size={15} color="#f59e0b" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontWeight: '700' }}>
+                  Order Slicing Cap Reached (Max 100 Slices):
+                </div>
+                <div style={{ color: '#d1d5db', marginTop: '2px' }}>
+                  {orderModal.lotsize > 1 ? (
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Qty (${Number(quantity).toLocaleString('en-IN')} Lots) exceeds maximum allowed per order.`
+                  ) : (
+                    `Entered ${totalQuantity.toLocaleString('en-IN')} Shares exceeds maximum allowed per order.`
+                  )}
+                </div>
+                <div style={{ color: '#fbbf24', marginTop: '2px', fontWeight: '600' }}>
+                  {orderModal.lotsize > 1 ? (
+                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Qty (${maxAllowedLots.toLocaleString('en-IN')} Lots across 100 orders of ${freezeLimit.toLocaleString('en-IN')}). Remaining quantity must be placed in a separate order.`
+                  ) : (
+                    `⚡ Capped at ${maxAllowedQty.toLocaleString('en-IN')} Shares across 100 orders of ${freezeLimit.toLocaleString('en-IN')}. Remaining quantity must be placed in a separate order.`
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : totalQuantity > freezeLimit ? (
+            <div style={{ 
+              fontSize: '11.5px', 
+              color: '#93c5fd', 
+              background: 'rgba(59, 130, 246, 0.12)', 
+              border: '1px solid rgba(59, 130, 246, 0.3)', 
+              borderRadius: '6px', 
+              padding: '7px 10px', 
+              marginTop: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Zap size={14} color="#60a5fa" />
+              <span>
+                Order Slicing: <strong>{freezeLimit.toLocaleString('en-IN')} {orderModal.lotsize > 1 ? 'Qty' : 'Shares'}</strong> allowed per order; <strong>{slicesCount} {isBuy ? 'buy' : 'sell'} orders</strong> will be placed.
+              </span>
+            </div>
+          ) : null}
+
+          {/* Trailing Stop Loss (TSL) Jump Input */}
+          {(tab === 'Stop Loss' || isCO || isBO) && (
+            <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>
+                  📈 Trailing Stop Loss (TSL Jump)
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  SL auto-trails upward as LTP advances
+                </div>
+              </div>
+              <div style={{ width: '100px' }}>
+                <input 
+                  type="number" 
+                  step="0.5" 
+                  min="0.5" 
+                  placeholder="₹ Jump" 
+                  value={trailingJump} 
+                  onChange={e => setTrailingJump(e.target.value)} 
+                  style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }} 
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px' }}>
             <div 
-              onClick={() => {
-                openMarketDepthModal(symbol, orderModal.lotsize || 1);
-              }}
-              style={{ color: 'var(--color-blue)', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => openMarketDepthModal(symbol, orderModal.lotsize || 1)}
+              style={{ color: 'var(--color-blue)', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '500' }}
             >
-              Market Depth <Maximize2 size={12} />
+              Market Depth <Maximize2 size={11} />
             </div>
           </div>
         </div>
 
-          {/* Margin Alert (if insufficient) */}
-          {isInsufficient && (
-            <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '12px', borderRadius: '8px', marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'var(--color-yellow)', color: '#000', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>!</div>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#fef08a' }}>Insufficient margin!</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>To buy {quantity} Share, please add ₹{(requiredMargin - balanceNum).toFixed(2)}</div>
-                </div>
+        {/* Margin Alert (if insufficient) */}
+        {isInsufficient && (
+          <div style={{ background: 'rgba(234, 179, 8, 0.1)', borderTop: '1px solid rgba(234, 179, 8, 0.3)', borderBottom: '1px solid rgba(234, 179, 8, 0.3)', padding: '10px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ background: '#eab308', color: '#000', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>!</div>
+              <div>
+                <div style={{ fontWeight: '700', fontSize: '13px', color: '#d97706' }}>Insufficient margin!</div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>Please add ₹{(requiredMargin - balanceNum).toFixed(2)} to place this order.</div>
               </div>
-              <button style={{ background: 'var(--color-blue)', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '4px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
             </div>
-          )}
-        {/* Footer */}
-        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
-                <RefreshCw size={14} style={{ color: 'var(--text-secondary)' }} />
-                <span style={{ fontSize: '15px', fontWeight: '700' }}>Margin</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px' }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Required:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>₹{requiredMargin.toFixed(2)} ({productType === 'INT' && !isOption ? '4x' : '1x'})</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--text-secondary)', width: '60px' }}>Available:</span>
-                  <span style={{ color: 'var(--text-primary)' }}>₹{balanceNum.toFixed(2)}</span>
-                </div>
-              </div>
+            <button style={{ background: '#2563eb', color: 'white', border: 'none', padding: '5px 12px', borderRadius: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>ADD FUNDS</button>
+          </div>
+        )}
+
+        {/* Footer Bar */}
+        <div style={{
+          background: 'var(--bg-card)',
+          padding: isMobile ? '12px 14px 16px 14px' : '12px 18px',
+          borderTop: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? '10px' : '12px'
+        }}>
+          {/* Left Info Column */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: isMobile ? 'row' : 'column', 
+            justifyContent: isMobile ? 'space-between' : 'flex-start',
+            alignItems: isMobile ? 'center' : 'flex-start',
+            gap: isMobile ? '8px' : '3px', 
+            minWidth: isMobile ? 'auto' : '180px',
+            flexWrap: 'wrap'
+          }}>
+            {/* Margin Required Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: isMobile ? '11px' : '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Margin:</span>
+              <span style={{ fontSize: isMobile ? '12.5px' : '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                ₹{requiredMargin.toFixed(2)}
+              </span>
+              {leverageText && (
+                <span style={{
+                  fontSize: '9.5px',
+                  fontWeight: '700',
+                  color: 'var(--color-blue)',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '3px',
+                  padding: '1px 4px',
+                  lineHeight: '1.2'
+                }}>
+                  {leverageText}
+                </span>
+              )}
+            </div>
+
+            {/* Available Margin Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: isMobile ? '11px' : '11.5px', color: 'var(--text-secondary)' }}>Avail:</span>
+              <span style={{ fontSize: isMobile ? '11.5px' : '12px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                ₹{balanceNum.toFixed(2)}
+              </span>
             </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginLeft: '22px', marginTop: '4px' }}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
-                <Plus size={14} /> Add Funds
-              </button>
+            {/* Price Breakup Link */}
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: isMobile ? '0' : '1px' }}>
               <button 
+                type="button"
                 onClick={() => estimatedTaxes && setShowBreakup(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: '#3b82f6', fontSize: '13px', padding: 0, cursor: 'pointer' }}>
-                <FileText size={14} /> Price breakup
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-blue)',
+                  fontSize: '11px',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <FileText size={11} /> Price breakup
               </button>
             </div>
           </div>
           
-          <button 
-            onClick={handlePlaceOrder}
-            disabled={isInsufficient}
-            style={{ 
-              background: (isInsufficient) ? 'var(--bg-panel)' : (isBuy ? 'var(--color-green)' : 'var(--color-red)'), 
-              color: (isInsufficient) ? 'var(--text-secondary)' : '#fff', 
-              padding: '12px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px',
-              border: 'none', cursor: (isInsufficient) ? 'not-allowed' : 'pointer', transition: 'all 0.2s ease',
-              alignSelf: 'stretch',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            PLACE {isBuy ? 'BUY' : 'SELL'} ORDER
-          </button>
+          {/* Right Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto', flexShrink: 0 }}>
+            {!isTrueExit && (
+              <button 
+                type="button"
+                onClick={() => {
+                  useStore.getState().addToBasket({
+                    symbol,
+                    side,
+                    quantity: parseInt(quantity) || 1,
+                    lotsize: orderModal.lotsize || 1,
+                    orderType,
+                    price: orderType === 'MARKET' ? '' : price
+                  });
+                  closeOrderModal();
+                  useStore.getState().setBasketModalOpen(true);
+                }}
+                style={{
+                  background: 'var(--bg-panel)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--color-blue)',
+                  padding: isMobile ? '10px 12px' : '9px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  whiteSpace: 'nowrap',
+                  flex: isMobile ? 1 : 'none'
+                }}
+              >
+                <ShoppingBag size={13} /> Add to Basket
+              </button>
+            )}
+
+            <button 
+              type="button"
+              onClick={handlePlaceOrder}
+              disabled={isInsufficient || isPlacing}
+              style={{ 
+                background: (isInsufficient || isPlacing) ? '#334155' : (isBuy ? '#10b981' : '#ef4444'), 
+                color: (isInsufficient || isPlacing) ? '#94a3b8' : '#ffffff', 
+                padding: isMobile ? '10px 18px' : '9px 18px', 
+                borderRadius: '6px', 
+                fontSize: '13px', 
+                fontWeight: '800', 
+                letterSpacing: '0.3px',
+                border: 'none', 
+                cursor: (isInsufficient || isPlacing) ? 'not-allowed' : 'pointer', 
+                transition: 'all 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: isMobile ? '120px' : '120px',
+                flex: isMobile ? 2 : 'none',
+                whiteSpace: 'nowrap',
+                boxShadow: (isInsufficient || isPlacing) ? 'none' : (isBuy ? '0 0 12px rgba(16, 185, 129, 0.3)' : '0 0 12px rgba(239, 68, 68, 0.3)')
+              }}
+            >
+              {isPlacing ? 'PLACING...' : (
+                isTrueExit ? (
+                  `EXIT ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                ) : (
+                  `${side} ${effectiveQuantity.toLocaleString('en-IN')} ${orderModal.lotsize > 1 ? 'Qty' : 'Shares'} ${isCappedBySlicing ? '(Max 100 Slices)' : ''} ${isAmo ? '(AMO)' : ''}`
+                )
+              )}
+            </button>
+          </div>
         </div>
 
       </div>
@@ -518,14 +1447,14 @@ export default function OrderModal() {
                <p style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '20px' }}>Would you like to continue?</p>
                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button onClick={() => setShowCautionPopup(false)} style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>NO</button>
-                  <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
+                  <button onClick={() => { setShowCautionPopup(false); handlePlaceOrder(true); }} style={{ background: 'var(--color-red)', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>YES</button>
                </div>
             </div>
          </div>
       )}
 
       {/* Charges Breakup Modal */}
-      {showBreakup && estimatedTaxes && (
+      {showBreakup && estimatedTaxes && typeof estimatedTaxes === 'object' && (
          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
             <div style={{ background: 'var(--bg-panel)', borderRadius: '8px', width: '380px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', border: '1px solid var(--border-color)' }}>
                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
@@ -538,44 +1467,58 @@ export default function OrderModal() {
                
                <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                     <span>Brokerage</span>
-                     <span>₹{estimatedTaxes.brokerage.toFixed(2)}</span>
+                     <span>Brokerage {slicesCount > 1 ? `(${slicesCount} sliced orders)` : ''}</span>
+                     <span>₹{(Number(estimatedTaxes.brokerage) || 0).toFixed(2)}</span>
                   </div>
                   
                   <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>Others</div>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                      <span>Transaction (Exch. + Clearing)</span>
-                     <span>₹{estimatedTaxes.exchangeCharge.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.exchangeCharge) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
                      <span>CTT/STT</span>
-                     <span>₹{estimatedTaxes.stt.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.stt) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>GST</span>
-                     <span>₹{estimatedTaxes.gst.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>SEBI</span>
-                     <span>₹{estimatedTaxes.sebiCharge.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                     <span>Stamp duty</span>
-                     <span>₹{estimatedTaxes.stampDuty.toFixed(2)}</span>
-                  </div>
-                  {estimatedTaxes.dpCharge > 0 && (
-                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
-                        <span>DP Charge</span>
-                        <span>₹{estimatedTaxes.dpCharge.toFixed(2)}</span>
-                     </div>
-                  )}
+                      <span>CGST (9%)</span>
+                      <span>₹{(Number(estimatedTaxes.cgst !== undefined ? estimatedTaxes.cgst : (Number(estimatedTaxes.gst) / 2)) || 0).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>SGST (9%)</span>
+                      <span>₹{(Number(estimatedTaxes.sgst !== undefined ? estimatedTaxes.sgst : (Number(estimatedTaxes.gst) / 2)) || 0).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>SEBI</span>
+                      <span>₹{(Number(estimatedTaxes.sebiCharge) || 0).toFixed(2)}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                      <span>Stamp duty</span>
+                      <span>₹{(Number(estimatedTaxes.stampDuty) || 0).toFixed(2)}</span>
+                   </div>
+                   {Number(estimatedTaxes.dpCharge) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                         <span>DP Charge</span>
+                         <span>₹{(Number(estimatedTaxes.dpCharge) || 0).toFixed(2)}</span>
+                      </div>
+                   )}
+                   {isMutualFund && (
+                      <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.2)' }}>
+                         <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-blue-light)', marginBottom: '4px' }}>Mutual Fund Capital Gains Tax (STCG / LTCG):</div>
+                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                            • <strong>STCG (≤ 12 mos):</strong> 20% on profit<br />
+                            • <strong>LTCG (&gt; 12 mos):</strong> 12.5% on profit (first ₹1.25L/yr exempt)<br />
+                            • <strong>Debt Funds:</strong> 1% on profit
+                         </div>
+                      </div>
+                   )}
                </div>
                
                <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px' }}>
                      <span>Total</span>
-                     <span>₹{estimatedTaxes.totalTaxes.toFixed(2)}</span>
+                     <span>₹{(Number(estimatedTaxes.totalTaxes) || 0).toFixed(2)}</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                      *Actual charges may vary based on order execution. <span style={{ color: 'var(--color-blue)', cursor: 'pointer' }}>Learn more</span>
@@ -587,3 +1530,6 @@ export default function OrderModal() {
     </div>
   );
 }
+
+
+

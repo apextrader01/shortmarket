@@ -4,5 +4,12 @@ backend/database/shortmarket.db
 backend/database/shortmarket.db-journal
 backend/node_modules/
 frontend/node_modules/
-frontend/dist/
 .DS_Store
+
+backend/logs/
+frontend/dist/
+dist/
+*.bak
+*service-account.json
+backend/config/
+*.log

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, TrendingUp, Calendar, Info } from 'lucide-react';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import MutualFundChart from './MutualFundChart';
 
 export default function MutualFundModal({ fund, onClose }) {
@@ -8,24 +9,58 @@ export default function MutualFundModal({ fund, onClose }) {
   const [amount, setAmount] = useState('5000');
   const [sipDate, setSipDate] = useState('5'); // Day of month
 
-  const { user } = useStore();
+  const { user } = useStore(useShallow(state => ({ user: state.user })));
   const balanceNum = Number(user?.balance) || 0;
   const isInsufficient = tab === 'Lumpsum' && balanceNum < Number(amount);
 
-  const handleInvest = () => {
-      // In a real app, this would dispatch to backend. For now, just show a success alert and close.
+  const [investLoading, setInvestLoading] = useState(false);
+
+  const handleInvest = async () => {
+    if (isInsufficient) {
+      alert('Insufficient account balance for this transaction.');
+      return;
+    }
+    setInvestLoading(true);
+    try {
       if (tab === 'SIP') {
-          alert(`Success! Started a monthly SIP of ₹${amount} in ${fund.name} to be deducted on the ${sipDate}th of every month.`);
+        const createSip = useStore.getState().createSip;
+        if (createSip) {
+          const res = await createSip({
+            scheme_code: fund?.scheme_code || fund?.id,
+            scheme_name: fund?.name,
+            amount: Number(amount),
+            frequency: 'MONTHLY',
+            sip_day: Number(sipDate)
+          });
+          if (res?.success) {
+            alert(`SIP successfully registered for ${fund.name}!`);
+            onClose();
+            return;
+          }
+        }
       } else {
-          alert(`Success! Placed a one-time Lumpsum order of ₹${amount} in ${fund.name}.`);
+        const buyMf = useStore.getState().buyMutualFund;
+        if (buyMf) {
+          const res = await buyMf(fund?.scheme_code || fund?.id, Number(amount));
+          if (res?.success) {
+            alert(`Lumpsum order placed for ${fund.name}!`);
+            onClose();
+            return;
+          }
+        }
       }
       onClose();
+    } catch (err) {
+      alert(`Transaction failed: ${err.message}`);
+    } finally {
+      setInvestLoading(false);
+    }
   };
 
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+      background: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
     }}>
       <div style={{
@@ -43,7 +78,7 @@ export default function MutualFundModal({ fund, onClose }) {
                     <TrendingUp size={12} />
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{fund.amc} Mutual Fund</div>
-                <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
+                <div style={{ fontSize: '11px', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '12px', color: 'var(--text-secondary)' }}>{fund.category}</div>
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)' }}>{fund.name}</h2>
             <div style={{ display: 'flex', gap: '24px', fontSize: '13px' }}>
@@ -51,7 +86,7 @@ export default function MutualFundModal({ fund, onClose }) {
                 <div>3Y Return: <span style={{ color: 'var(--color-green-light)', fontWeight: '700', fontSize: '15px' }}>+{fund.return3y}%</span></div>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'var(--bg-hover)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s' }}><X size={18} /></button>
         </div>
 
         {/* Layout Split */}
@@ -90,7 +125,7 @@ export default function MutualFundModal({ fund, onClose }) {
               />
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                   {['1000', '5000', '10000'].map(val => (
-                      <button key={val} onClick={() => setAmount(val)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>+₹{val}</button>
+                      <button key={val} onClick={() => setAmount(val)} style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>+₹{val}</button>
                   ))}
               </div>
             </div>
@@ -152,3 +187,5 @@ export default function MutualFundModal({ fund, onClose }) {
     </div>
   );
 }
+
+

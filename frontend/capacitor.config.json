@@ -1,9 +1,10 @@
 {
-  "appId": "com.shortmarket.app",
-  "appName": "shortmarket",
+  "appId": "com.skandx.app",
+  "appName": "SkandX",
   "webDir": "dist",
   "server": {
-    "url": "https://shortmarket-production.up.railway.app",
-    "cleartext": true
+    "url": "https://www.skandx.in",
+    "cleartext": false,
+    "allowNavigation": ["api-hsm.fyers.in", "*.skandx.in", "skandx.in"]
   }
 }

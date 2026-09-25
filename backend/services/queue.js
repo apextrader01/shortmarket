@@ -1,5 +1,5 @@
 const { Queue, Worker, QueueEvents } = require('bullmq');
-const { pubClient } = require('./redis'); 
+const { pubClient } = require('./redisClient'); 
 
 const connection = {
     url: process.env.REDIS_URL || 'redis://127.0.0.1:6379'

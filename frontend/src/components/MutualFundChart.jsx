@@ -1,38 +1,44 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, AreaSeries } from 'lightweight-charts';
 import { useStore } from '../store';
+import { useShallow } from 'zustand/react/shallow';
 import { Loader2 } from 'lucide-react';
 
 export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
     const chartContainerRef = useRef();
-    const { fetchFundHistory, fundHistoryCache } = useStore();
+    const { fetchFundHistory, fundHistoryCache } = useStore(useShallow(state => ({ fetchFundHistory: state.fetchFundHistory, fundHistoryCache: state.fundHistoryCache })));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        let chart;
-        let lineSeries;
+        let isMounted = true;
+        let chart = null;
+        let lineSeries = null;
 
         const initChart = async () => {
             setLoading(true);
             try {
                 const data = await fetchFundHistory(schemeCode);
+                if (!isMounted) return;
+
                 if (!data || data.length === 0) {
                     setError('No historical data available');
                     setLoading(false);
                     return;
                 }
 
+                if (!chartContainerRef.current) return;
+
                 // Create chart
                 chart = createChart(chartContainerRef.current, {
                     layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#9ca3af' },
-                    grid: { vertLines: { color: 'rgba(255,255,255,0.05)' }, horzLines: { color: 'rgba(255,255,255,0.05)' } },
+                    grid: { vertLines: { color: 'var(--bg-hover)' }, horzLines: { color: 'var(--bg-hover)' } },
                     timeScale: { 
-                        borderColor: 'rgba(255,255,255,0.1)', 
+                        borderColor: 'var(--border-color)', 
                         timeVisible: true,
                         rightOffset: 12
                     },
-                    rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+                    rightPriceScale: { borderColor: 'var(--border-color)' },
                     crosshair: {
                         mode: 1,
                         vertLine: { color: 'rgba(255,255,255,0.4)', width: 1, style: 1 },
@@ -60,6 +66,7 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
 
                 setLoading(false);
             } catch (err) {
+                if (!isMounted) return;
                 setError(err.message);
                 setLoading(false);
             }
@@ -75,8 +82,12 @@ export default function MutualFundChart({ schemeCode, color = '#22c55e' }) {
         window.addEventListener('resize', handleResize);
 
         return () => {
+            isMounted = false;
             window.removeEventListener('resize', handleResize);
-            if (chart) chart.remove();
+            if (chart) {
+                try { chart.remove(); } catch (_) {}
+                chart = null;
+            }
         };
     }, [schemeCode, fetchFundHistory, color]);
 

@@ -4,18 +4,21 @@ import { X, Bell } from 'lucide-react';
 
 export default function AlertModal() {
   const symbol = useStore(state => state.alertModalSymbol);
-  const setAlertModalSymbol = useStore(state => state.setAlertModalSymbol);
-  const addAlert = useStore(state => state.addAlert);
-  const prices = useStore(state => state.prices);
+  const ltp = useStore(state => {
+    if (!symbol) return 0;
+    const clean = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+    const priceObj = state.prices[symbol] || state.prices[clean] || state.prices[`NSE:${clean}`] || state.prices[`BSE:${clean}`] || state.prices[`MCX:${clean}`];
+    return Number(priceObj?.ltp || 0);
+  });
+  const { setAlertModalSymbol, addAlert } = useStore.getState();
 
   const [condition, setCondition] = useState('ABOVE');
   const [targetPrice, setTargetPrice] = useState('');
 
-  const ltp = prices[symbol]?.ltp || 0;
-
   useEffect(() => {
     if (symbol) {
       setTargetPrice('');
+      setCondition('ABOVE');
     }
   }, [symbol]);
 
@@ -27,6 +30,17 @@ export default function AlertModal() {
       alert("Please enter a valid target price");
       return;
     }
+
+    if (ltp > 0) {
+      if (condition === 'ABOVE' && val <= ltp) {
+        alert(`Target price for 'ABOVE' alert must be greater than the current market price (₹${ltp.toFixed(2)})`);
+        return;
+      }
+      if (condition === 'BELOW' && val >= ltp) {
+        alert(`Target price for 'BELOW' alert must be less than the current market price (₹${ltp.toFixed(2)})`);
+        return;
+      }
+    }
     
     // Request notification permission if not granted
     if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
@@ -36,7 +50,8 @@ export default function AlertModal() {
     addAlert({
       symbol,
       condition,
-      targetPrice: val
+      targetPrice: val,
+      createdPrice: ltp > 0 ? ltp : undefined
     });
     setAlertModalSymbol(null);
   };
@@ -44,7 +59,7 @@ export default function AlertModal() {
   return (
     <div className="modal-backdrop" style={{
       position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
+      backgroundColor: 'rgba(15, 23, 42, 0.90)',
       zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center',
       padding: '20px'
     }}>
@@ -127,3 +142,5 @@ export default function AlertModal() {
     </div>
   );
 }
+
+

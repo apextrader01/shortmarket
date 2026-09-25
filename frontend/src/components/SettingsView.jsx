@@ -1,9 +1,163 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
+import { User, Lock, Mail, LogOut, Phone, CreditCard, Save, Zap, Fingerprint, Shield, KeyRound, Check, X, Smartphone, Clock, MapPin, Edit3, Loader2, Laptop, Monitor, Trash2, Globe, ShieldAlert, RefreshCw, AlertCircle, Volume2, VolumeX, Play, Bell, Send, MessageSquare, ExternalLink, ShieldCheck, Copy } from 'lucide-react';
+import {
+  isUserPinEnabled,
+  saveUserPin,
+  removeUserPin,
+  isBiometricsAvailable,
+  isBiometricsEnabled,
+  registerBiometrics,
+  setAppLocked,
+  AUTO_LOCK_OPTIONS,
+  getAutoLockDuration,
+  setAutoLockDuration
+} from '../utils/biometricAuth';
+import {
+  isSoundEnabled,
+  setSoundEnabled,
+  getSoundVolume,
+  setSoundVolume,
+  getSoundConfig,
+  setSoundConfig,
+  playTargetHitSound,
+  playStopLossHitSound,
+  playOrderExecutedSound,
+  playRiskAlertSound
+} from '../utils/soundManager';
 
 export default function SettingsView() {
-  const { user, updatePassword, logout, oneClickMode, setOneClickMode, oneClickMultiplier, setOneClickMultiplier } = useStore();
+  const { 
+    user, updatePassword, logout, oneClickMode, setOneClickMode, 
+    oneClickMultiplier, setOneClickMultiplier, updateBankDetails, updateUserDetails,
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
+    telegramSettings, telegramSettingsLoading, fetchTelegramSettings, saveTelegramSettings, sendTelegramTest
+  } = useStore(useShallow(state => ({ 
+    user: state.user, 
+    updatePassword: state.updatePassword, 
+    logout: state.logout, 
+    oneClickMode: state.oneClickMode, 
+    setOneClickMode: state.setOneClickMode, 
+    oneClickMultiplier: state.oneClickMultiplier, 
+    setOneClickMultiplier: state.setOneClickMultiplier, 
+    updateBankDetails: state.updateBankDetails,
+    updateUserDetails: state.updateUserDetails,
+    userSessions: state.userSessions,
+    userSessionsLoading: state.userSessionsLoading,
+    fetchUserSessions: state.fetchUserSessions,
+    revokeOtherSessions: state.revokeOtherSessions,
+    revokeSession: state.revokeSession,
+    telegramSettings: state.telegramSettings,
+    telegramSettingsLoading: state.telegramSettingsLoading,
+    fetchTelegramSettings: state.fetchTelegramSettings,
+    saveTelegramSettings: state.saveTelegramSettings,
+    sendTelegramTest: state.sendTelegramTest
+  })));
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+  const [soundActive, setSoundActive] = useState(() => isSoundEnabled());
+  const [soundVolume, setSoundVolumeState] = useState(() => Math.round(getSoundVolume() * 100));
+  const [soundConfig, setSoundConfigState] = useState(() => getSoundConfig());
+
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
+  const [telegramOrders, setTelegramOrders] = useState(true);
+  const [telegramTargets, setTelegramTargets] = useState(true);
+  const [telegramStoploss, setTelegramStoploss] = useState(true);
+  const [telegramRisk, setTelegramRisk] = useState(true);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramMsg, setTelegramMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    fetchTelegramSettings();
+  }, []);
+
+  useEffect(() => {
+    if (telegramSettings) {
+      setTelegramChatId(telegramSettings.telegram_chat_id || '');
+      setTelegramEnabled(!!telegramSettings.telegram_alerts_enabled);
+      setTelegramOrders(telegramSettings.telegram_alert_orders !== false);
+      setTelegramTargets(telegramSettings.telegram_alert_targets !== false);
+      setTelegramStoploss(telegramSettings.telegram_alert_stoploss !== false);
+      setTelegramRisk(telegramSettings.telegram_alert_risk !== false);
+    }
+  }, [telegramSettings]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    fetchUserSessions();
+  }, []);
+
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    phone: user?.phone || '',
+    pan_card: user?.pan_card || '',
+    address: user?.address || ''
+  });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        phone: user.phone || '',
+        pan_card: user.pan_card || '',
+        address: user.address || ''
+      });
+      setBankDetails({
+        upi_id: user.upi_id || '',
+        bank_account_no: user.bank_account_no || '',
+        bank_ifsc: user.bank_ifsc || ''
+      });
+    }
+  }, [user]);
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileMsg({ type: '', text: '' });
+    const res = await updateUserDetails(profileForm);
+    if (res.success) {
+      setProfileMsg({ type: 'success', text: 'Profile details updated successfully!' });
+      setIsEditingProfile(false);
+      setTimeout(() => setProfileMsg({ type: '', text: '' }), 3000);
+    } else {
+      setProfileMsg({ type: 'error', text: res.error || 'Failed to update profile details' });
+    }
+    setProfileLoading(false);
+  };
+
+  const [bankDetails, setBankDetails] = useState({
+    upi_id: user?.upi_id || '',
+    bank_account_no: user?.bank_account_no || '',
+    bank_ifsc: user?.bank_ifsc || ''
+  });
+  const [bankLoading, setBankLoading] = useState(false);
+  const [bankMsg, setBankMsg] = useState({ type: '', text: '' });
+
+  const handleBankSubmit = async (e) => {
+    e.preventDefault();
+    setBankLoading(true);
+    setBankMsg({ type: '', text: '' });
+    try {
+      await updateBankDetails(bankDetails);
+      setBankMsg({ type: 'success', text: 'Bank details updated successfully!' });
+      setTimeout(() => setBankMsg({ type: '', text: '' }), 3000);
+    } catch(err) {
+      setBankMsg({ type: 'error', text: err.message });
+    }
+    setBankLoading(false);
+  };
+
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,12 +184,12 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="settings-container" style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div className="settings-container" style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '32px', paddingBottom: isMobile ? '90px' : '40px' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '0' }}>
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '8px' }}>Account Settings</h2>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Manage your profile and security preferences</div>
+          <h2 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', marginBottom: '8px' }}>Account Settings</h2>
+          <div style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '13px' : '14px' }}>Manage your profile and security preferences</div>
         </div>
         <button 
           onClick={logout}
@@ -49,29 +203,146 @@ export default function SettingsView() {
       <div className="settings-grid">
         
         {/* Profile Card */}
-        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <User size={18} color="var(--color-blue)" /> Profile Information
-          </h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Username</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.username}</div>
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <User size={18} color="var(--color-blue)" /> Profile Information
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setIsEditingProfile(!isEditingProfile); setProfileMsg({ type: '', text: '' }); }}
+                style={{
+                  background: isEditingProfile ? 'var(--bg-hover)' : 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid var(--border-color)',
+                  color: isEditingProfile ? 'var(--text-secondary)' : 'var(--color-blue-light)',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'background 0.15s'
+                }}
+              >
+                <Edit3 size={13} /> {isEditingProfile ? 'Cancel' : 'Edit Details'}
+              </button>
             </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={12}/> Email Address</div>
-              <div style={{ fontSize: '14px', fontWeight: '500', wordBreak: 'break-all' }}>{user?.email}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={12}/> Phone Number</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.phone || 'Not provided'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={12}/> PAN Card</div>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.pan_card || 'Not provided'}</div>
-            </div>
+
+            {profileMsg.text && (
+              <div style={{ 
+                padding: '10px 14px', 
+                borderRadius: '6px', 
+                marginBottom: '16px', 
+                background: profileMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', 
+                color: profileMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', 
+                fontSize: '13px', 
+                border: `1px solid ${profileMsg.type === 'success' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}` 
+              }}>
+                {profileMsg.text}
+              </div>
+            )}
+
+            {!isEditingProfile ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Username</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.username}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={12}/> Email Address</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500', wordBreak: 'break-all' }}>{user?.email}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={12}/> Phone Number</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.phone || 'Not provided'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><CreditCard size={12}/> PAN Card</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{user?.pan_card || 'Not provided'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={12}/> Address</div>
+                  <div style={{ fontSize: '14px', fontWeight: '500', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{user?.address || 'Not provided'}</div>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    className="input"
+                    value={profileForm.phone}
+                    onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    placeholder="e.g. 9876543210"
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>PAN Card</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={profileForm.pan_card}
+                    onChange={e => setProfileForm({ ...profileForm, pan_card: e.target.value.toUpperCase() })}
+                    placeholder="e.g. ABCDE1234F"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Residential / Communication Address</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={profileForm.address}
+                    onChange={e => setProfileForm({ ...profileForm, address: e.target.value })}
+                    placeholder="Enter complete address (House No, Street, City, State, PIN Code)"
+                    style={{ resize: 'vertical', width: '100%', boxSizing: 'border-box', minHeight: '70px', fontFamily: 'inherit' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                  <button type="submit" className="btn btn-primary" disabled={profileLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {profileLoading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {profileLoading ? 'Saving...' : 'Save Profile Details'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditingProfile(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
+        </div>
+
+        {/* Bank Details Card (For Withdrawals) */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CreditCard size={18} color="var(--color-blue)" /> Bank & UPI Details (For Withdrawals)
+          </h3>
+          {bankMsg.text && (
+            <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', background: bankMsg.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: bankMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)', fontSize: '14px' }}>
+              {bankMsg.text}
+            </div>
+          )}
+          <form onSubmit={handleBankSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>UPI ID</label>
+              <input type="text" className="input" value={bankDetails.upi_id} onChange={e => setBankDetails({...bankDetails, upi_id: e.target.value})} placeholder="username@upi" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank Account Number</label>
+              <input type="text" className="input" value={bankDetails.bank_account_no} onChange={e => setBankDetails({...bankDetails, bank_account_no: e.target.value})} placeholder="Account Number" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Bank IFSC Code</label>
+              <input type="text" className="input" value={bankDetails.bank_ifsc} onChange={e => setBankDetails({...bankDetails, bank_ifsc: e.target.value})} placeholder="IFSC Code" />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={bankLoading}>
+              <Save size={16} /> {bankLoading ? 'Saving...' : 'Save Bank Details'}
+            </button>
+          </form>
         </div>
 
         {/* Security Card */}
@@ -126,59 +397,1429 @@ export default function SettingsView() {
           </form>
         </div>
 
-      </div>
-
-      {/* Trading Preferences Card */}
-      <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '24px' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Zap size={18} color="var(--color-yellow)" /> Trading Preferences
-        </h3>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="toggle-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px' }}>
+        {/* Audio Cues & Sound Engine Card */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '4px', color: oneClickMode ? 'var(--color-red)' : 'inherit' }}>One-Click Scalper Mode</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Bypass the order confirmation modal to execute market orders instantly. <strong style={{ color: 'var(--color-red)' }}>Use with extreme caution.</strong></div>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 size={20} color="var(--color-blue)" /> Audio Cues & Sound Engine (Only When Hit)
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                Synthesizes instant real-time sound effects when your orders execute, stop-loss triggers, or target prices are hit.
+              </p>
             </div>
-            <label className="toggle-switch">
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = !soundActive;
+                setSoundActive(next);
+                setSoundEnabled(next);
+                if (next) playOrderExecutedSound();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: soundActive ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                border: soundActive ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
+                color: soundActive ? '#4ade80' : '#ef4444',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              {soundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {soundActive ? 'Audio Enabled (Active)' : 'Audio Muted (Off)'}
+            </button>
+          </div>
+
+          {/* Master Volume Slider */}
+          <div style={{ marginTop: '16px', padding: '14px 18px', background: 'var(--bg-dark)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 size={16} color="var(--color-blue-light)" /> Master Audio Volume: {soundVolume}%
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Adjust synthesized chime and alert volume for order fills and triggers
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: isMobile ? '100%' : '240px' }}>
+              <VolumeX size={16} color="var(--text-secondary)" />
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={soundVolume} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  setSoundVolumeState(val);
+                  setSoundVolume(val / 100);
+                }}
+                style={{ flex: 1, accentColor: 'var(--color-blue)' }} 
+              />
+              <Volume2 size={16} color="var(--color-blue-light)" />
+            </div>
+          </div>
+
+          {/* Granular Sound Triggers */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '14px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
               <input 
                 type="checkbox" 
-                checked={oneClickMode}
-                onChange={(e) => setOneClickMode(e.target.checked)}
+                checked={soundConfig.targetHit} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('target', val);
+                  setSoundConfigState(prev => ({ ...prev, targetHit: val }));
+                }}
+                style={{ accentColor: '#4ade80' }}
               />
-              <span className="slider round"></span>
+              <span>🎯 Target Hit</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.stopLoss} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('sl', val);
+                  setSoundConfigState(prev => ({ ...prev, stopLoss: val }));
+                }}
+                style={{ accentColor: '#ef4444' }}
+              />
+              <span>🛑 Stop Loss</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.orderExecuted} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('exec', val);
+                  setSoundConfigState(prev => ({ ...prev, orderExecuted: val }));
+                }}
+                style={{ accentColor: 'var(--color-blue)' }}
+              />
+              <span>🔔 Order Fill</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '12px', color: '#fff' }}>
+              <input 
+                type="checkbox" 
+                checked={soundConfig.riskAlert} 
+                onChange={e => {
+                  const val = e.target.checked;
+                  setSoundConfig('risk', val);
+                  setSoundConfigState(prev => ({ ...prev, riskAlert: val }));
+                }}
+                style={{ accentColor: '#fbbf24' }}
+              />
+              <span>⚠️ Risk Limit</span>
             </label>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '8px', opacity: oneClickMode ? 1 : 0.5, pointerEvents: oneClickMode ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>Default Lot Multiplier</label>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-              Multiply the standard lot size by this value when using One-Click Mode. (e.g., 2x BankNifty = 30 Qty)
+          {/* Audio Test Buttons */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '14px' }}>
+            <button
+              type="button"
+              onClick={() => playTargetHitSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(34, 197, 94, 0.08)',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                color: '#4ade80',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🎯 Test Target Hit</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playStopLossHitSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🛑 Test Stop Loss Hit</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playOrderExecutedSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                color: 'var(--color-blue-light)',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>🔔 Test Order Executed</span>
+              <Play size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playRiskAlertSound()}
+              disabled={!soundActive}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                color: '#fbbf24',
+                fontSize: '12.5px',
+                fontWeight: '600',
+                cursor: soundActive ? 'pointer' : 'not-allowed',
+                opacity: soundActive ? 1 : 0.5
+              }}
+            >
+              <span>⚠️ Test Risk Guardian Alert</span>
+              <Play size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Telegram Live Trade & Risk Alerts Card */}
+        <div style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: 'rgba(0, 136, 204, 0.15)', color: '#0088cc', padding: '10px', borderRadius: '50%' }}>
+                <Send size={22} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff' }}>
+                  Telegram Live Trade & Risk Alerts
+                  <span style={{
+                    fontSize: '10.5px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: telegramEnabled && telegramChatId ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)',
+                    color: telegramEnabled && telegramChatId ? '#4ade80' : 'var(--text-secondary)',
+                    border: telegramEnabled && telegramChatId ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border-color)'
+                  }}>
+                    {telegramEnabled && telegramChatId ? '🟢 ACTIVE' : '⚪ NOT LINKED'}
+                  </span>
+                </h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Receive instant, zero-delay trade execution, target hit, stop-loss trigger, and risk limit alerts directly on your phone via Telegram.
+                </p>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {[1, 2, 5, 10, 20].map(mult => (
-                <button
-                  key={mult}
-                  onClick={() => setOneClickMultiplier(mult)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: oneClickMultiplier === mult ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                    background: oneClickMultiplier === mult ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
-                    color: oneClickMultiplier === mult ? 'var(--color-blue)' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    fontWeight: '600'
-                  }}
-                >
-                  {mult}x
-                </button>
-              ))}
-            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                const next = !telegramEnabled;
+                setTelegramEnabled(next);
+                setTelegramSaving(true);
+                const res = await saveTelegramSettings({
+                  telegram_chat_id: telegramChatId,
+                  telegram_alerts_enabled: next,
+                  telegram_alert_orders: telegramOrders,
+                  telegram_alert_targets: telegramTargets,
+                  telegram_alert_stoploss: telegramStoploss,
+                  telegram_alert_risk: telegramRisk
+                });
+                setTelegramSaving(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: next ? 'Telegram alerts enabled!' : 'Telegram alerts disabled.' });
+                  setTimeout(() => setTelegramMsg({ type: '', text: '' }), 3000);
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to update Telegram status' });
+                }
+              }}
+              disabled={telegramSaving}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                background: telegramEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                border: telegramEnabled ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.35)',
+                color: telegramEnabled ? '#4ade80' : '#ef4444',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer'
+              }}
+            >
+              {telegramEnabled ? <Check size={16} /> : <X size={16} />}
+              {telegramEnabled ? 'Telegram Alerts (ON)' : 'Telegram Alerts (OFF)'}
+            </button>
           </div>
 
+          {telegramMsg.text && (
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              fontSize: '12.5px',
+              fontWeight: '600',
+              marginBottom: '16px',
+              background: telegramMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${telegramMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              color: telegramMsg.type === 'success' ? '#4ade80' : '#ef4444'
+            }}>
+              {telegramMsg.text}
+            </div>
+          )}
+
+          {/* Telegram Bot Setup Step Guide */}
+          <div style={{
+            background: 'rgba(0, 136, 204, 0.05)',
+            border: '1px solid rgba(0, 136, 204, 0.2)',
+            borderRadius: '10px',
+            padding: '16px 20px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#38bdf8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📱 3 Simple Steps to Connect:</span>
+            </div>
+            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
+              <li>Open our official Telegram Bot: <a href={`https://t.me/${telegramSettings?.bot_username || 'SkandXAlerts_bot'}`} target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontWeight: '700', textDecoration: 'underline' }}>@{telegramSettings?.bot_username || 'SkandXAlerts_bot'} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /></a></li>
+              <li>Click <strong>Start</strong> (or send <code>/start</code>) in the chat. The bot will reply with your unique <strong>Chat ID</strong>.</li>
+              <li>Paste your <strong>Chat ID</strong> below, choose your alert preferences, and click <strong>Save & Connect</strong>.</li>
+            </ol>
+          </div>
+
+          {/* Chat ID Input & Test Button Form */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr auto auto', gap: '12px', alignItems: 'flex-end', marginBottom: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: '600' }}>
+                Telegram Chat ID
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                value={telegramChatId}
+                onChange={e => setTelegramChatId(e.target.value)}
+                placeholder="e.g. 1234567890"
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setTelegramSaving(true);
+                setTelegramMsg({ type: '', text: '' });
+                const res = await saveTelegramSettings({
+                  telegram_chat_id: telegramChatId,
+                  telegram_alerts_enabled: telegramEnabled,
+                  telegram_alert_orders: telegramOrders,
+                  telegram_alert_targets: telegramTargets,
+                  telegram_alert_stoploss: telegramStoploss,
+                  telegram_alert_risk: telegramRisk
+                });
+                setTelegramSaving(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: '✅ Telegram Chat ID saved successfully!' });
+                  setTimeout(() => setTelegramMsg({ type: '', text: '' }), 3500);
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to save Chat ID' });
+                }
+              }}
+              disabled={telegramSaving}
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {telegramSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save & Connect
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!telegramChatId) {
+                  setTelegramMsg({ type: 'error', text: 'Please enter your Telegram Chat ID first.' });
+                  return;
+                }
+                setTelegramTesting(true);
+                setTelegramMsg({ type: '', text: '' });
+                const res = await sendTelegramTest(telegramChatId);
+                setTelegramTesting(false);
+                if (res.success) {
+                  setTelegramMsg({ type: 'success', text: '🚀 Test alert sent! Please check your Telegram chat.' });
+                } else {
+                  setTelegramMsg({ type: 'error', text: res.error || 'Failed to send test message to Telegram.' });
+                }
+              }}
+              disabled={telegramTesting || !telegramChatId}
+              className="btn btn-secondary"
+              style={{ padding: '10px 18px', fontSize: '13px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              {telegramTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send Test Alert
+            </button>
+          </div>
+
+          {/* Granular Alert Preferences Toggles */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>
+              🔔 Active Alert Triggers:
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramOrders}
+                  onChange={e => setTelegramOrders(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚡ Order Executions</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant fill pings for Market & Limit</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramTargets}
+                  onChange={e => setTelegramTargets(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🎯 Target Hits</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Take-Profit reached with realized profit</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramStoploss}
+                  onChange={e => setTelegramStoploss(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>🛑 Stop-Loss Triggers</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Instant risk exit alerts</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', padding: '12px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={telegramRisk}
+                  onChange={e => setTelegramRisk(e.target.checked)}
+                  style={{ accentColor: 'var(--color-blue)', width: '16px', height: '16px' }}
+                />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>⚠️ Risk Guardian</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Daily loss / trade limit warnings</div>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
+
+        {/* Security, Two-Factor Authentication & App Unlock Card */}
+        <div id="security-2fa-section" style={{ background: 'var(--bg-panel)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', gridColumn: '1 / -1' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={20} color="var(--color-blue)" /> Two-Factor Authentication (Google 2FA) & Quick App Security
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Set up Google Authenticator (TOTP) 6-digit dynamic codes, 4-digit quick PIN, or Face ID / Fingerprint to secure your SkandX trading account.
+          </p>
+
+          <BiometricSettingsSection user={user} />
+        </div>
+
       </div>
+
+      
 
     </div>
   );
 }
+
+export function BiometricSettingsSection({ user }) {
+  const userId = user?.id || 'default';
+  const { 
+    userSessions, userSessionsLoading, fetchUserSessions, revokeOtherSessions, revokeSession,
+    fetchTotpSetup, enableTotp, disableTotp, totpLoading,
+    trustedDevices, trustedDevicesLoading, fetchTrustedDevices, revokeTrustedDevice
+  } = useStore(useShallow(state => ({ 
+    userSessions: state.userSessions || [],
+    userSessionsLoading: state.userSessionsLoading,
+    fetchUserSessions: state.fetchUserSessions,
+    revokeOtherSessions: state.revokeOtherSessions,
+    revokeSession: state.revokeSession,
+    fetchTotpSetup: state.fetchTotpSetup,
+    enableTotp: state.enableTotp,
+    disableTotp: state.disableTotp,
+    totpLoading: state.totpLoading,
+    trustedDevices: state.trustedDevices || [],
+    trustedDevicesLoading: state.trustedDevicesLoading,
+    fetchTrustedDevices: state.fetchTrustedDevices,
+    revokeTrustedDevice: state.revokeTrustedDevice
+  })));
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [sessionMsg, setSessionMsg] = useState({ type: '', text: '' });
+
+  // TOTP & 30-day Trusted Devices States
+  const [showTotpSetup, setShowTotpSetup] = useState(false);
+  const [totpSetupData, setTotpSetupData] = useState(null);
+  const [totpVerificationCode, setTotpVerificationCode] = useState('');
+  const [totpCopied, setTotpCopied] = useState(false);
+  const [showTotpDisable, setShowTotpDisable] = useState(false);
+  const [totpDisablePassword, setTotpDisablePassword] = useState('');
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (fetchUserSessions) {
+      fetchUserSessions();
+    }
+    if (fetchTrustedDevices) {
+      fetchTrustedDevices();
+    }
+  }, []);
+
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutesState] = useState(() => getAutoLockDuration(userId));
+  
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+  const [showPinSetup, setShowPinSetup] = useState(false);
+
+  useEffect(() => {
+    setPinEnabled(isUserPinEnabled(userId));
+    setBioEnabled(isBiometricsEnabled(userId));
+    isBiometricsAvailable().then(setBioAvailable);
+    setAutoLockMinutesState(getAutoLockDuration(userId));
+  }, [userId]);
+
+  const handleStartTotpSetup = async () => {
+    setStatusMsg({ type: '', text: '' });
+    const data = await fetchTotpSetup();
+    if (data && data.success) {
+      setTotpSetupData(data);
+      setShowTotpSetup(true);
+      setShowTotpDisable(false);
+    } else {
+      setStatusMsg({ type: 'error', text: data?.error || 'Failed to initialize Google Authenticator' });
+    }
+  };
+
+  const handleConfirmTotpEnable = async (e) => {
+    e.preventDefault();
+    if (!totpSetupData?.secret || !totpVerificationCode) return;
+    const res = await enableTotp(totpSetupData.secret, totpVerificationCode);
+    if (res && res.success) {
+      setShowTotpSetup(false);
+      setTotpSetupData(null);
+      setTotpVerificationCode('');
+      setStatusMsg({ type: 'success', text: '✅ Google Authenticator (TOTP) successfully activated!' });
+    } else {
+      setStatusMsg({ type: 'error', text: res?.error || 'Invalid 6-digit code. Please check app and try again.' });
+    }
+  };
+
+  const handleConfirmTotpDisable = async (e) => {
+    e.preventDefault();
+    if (!totpDisablePassword) return;
+    const res = await disableTotp(totpDisablePassword);
+    if (res && res.success) {
+      setShowTotpDisable(false);
+      setTotpDisablePassword('');
+      setStatusMsg({ type: 'success', text: 'Google Authenticator has been disabled.' });
+    } else {
+      setStatusMsg({ type: 'error', text: res?.error || 'Failed to disable 2FA. Incorrect password.' });
+    }
+  };
+
+  const handleSelectAutoLock = (val) => {
+    setAutoLockMinutesState(val);
+    setAutoLockDuration(val, userId);
+    const label = val === 0 ? 'Immediately on background' : val === -1 ? 'Disabled (Off)' : `${val} Minutes`;
+    setStatusMsg({ type: 'success', text: `⏱️ Auto-lock timer set to ${label}` });
+    setTimeout(() => setStatusMsg({ type: '', text: '' }), 3500);
+  };
+
+  const handleSavePin = async (e) => {
+    e.preventDefault();
+    setStatusMsg({ type: '', text: '' });
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setStatusMsg({ type: 'error', text: 'PIN must be exactly 4 numeric digits.' });
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setStatusMsg({ type: 'error', text: 'PIN confirmation does not match.' });
+      return;
+    }
+
+    try {
+      await saveUserPin(newPin, userId);
+      setPinEnabled(true);
+      setShowPinSetup(false);
+      setNewPin('');
+      setConfirmPin('');
+      setStatusMsg({ type: 'success', text: '✅ 4-Digit Security PIN configured successfully!' });
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: err.message || 'Failed to save PIN' });
+    }
+  };
+
+  const handleDisablePin = () => {
+    if (window.confirm('Disable PIN and Biometric unlock for this account?')) {
+      removeUserPin(userId);
+      setPinEnabled(false);
+      setBioEnabled(false);
+      setStatusMsg({ type: 'success', text: 'Quick unlock disabled.' });
+    }
+  };
+
+  const handleToggleBiometrics = async () => {
+    if (bioEnabled) {
+      removeUserPin(userId);
+      setBioEnabled(false);
+      setStatusMsg({ type: 'success', text: 'Biometrics disabled.' });
+      return;
+    }
+
+    if (!pinEnabled) {
+      setStatusMsg({ type: 'error', text: 'Please configure a 4-Digit PIN first as a fallback before enabling Biometrics.' });
+      return;
+    }
+
+    try {
+      const res = await registerBiometrics(userId, user?.username || 'Trader');
+      if (res) {
+        setBioEnabled(true);
+        setStatusMsg({ type: 'success', text: '✅ Face ID / Fingerprint enabled successfully!' });
+      }
+    } catch (err) {
+      const isBrowserLimitation = String(err.message || '').includes('browser') || String(err.message || '').includes('supported');
+      if (isBrowserLimitation) {
+        setStatusMsg({ 
+          type: 'error', 
+          text: '💡 Web biometrics requires Google Chrome / Safari. Your 4-Digit PIN is active and protects your account!' 
+        });
+      } else {
+        setStatusMsg({ type: 'error', text: 'Biometric setup: ' + (err.message || String(err)) });
+      }
+    }
+  };
+
+  const handleTestLock = () => {
+    setAppLocked(true);
+    window.location.reload();
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {statusMsg.text && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: '600',
+          background: statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+          color: statusMsg.type === 'success' ? 'var(--color-green-light)' : 'var(--color-red-light)',
+          border: `1px solid ${statusMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          {statusMsg.text}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+        {/* Google Authenticator (TOTP) Status Tile - Highlighted as Top Security Option */}
+        <div style={{
+          background: user?.totp_enabled ? 'rgba(34,197,94,0.04)' : 'rgba(59,130,246,0.05)',
+          border: user?.totp_enabled ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(59,130,246,0.4)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: user?.totp_enabled ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)', padding: '10px', borderRadius: '50%', color: user?.totp_enabled ? '#22c55e' : '#60a5fa' }}>
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Google Authenticator (2FA)</div>
+              <div style={{ fontSize: '11.5px', color: user?.totp_enabled ? '#22c55e' : '#f59e0b', fontWeight: '600', marginTop: '2px' }}>
+                {user?.totp_enabled ? '✅ Active (Dynamic 6-Digit App Code)' : '⚠️ Recommended (Scan QR & Save Key)'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {user?.totp_enabled ? (
+              <button
+                type="button"
+                onClick={() => setShowTotpDisable(true)}
+                style={{ width: '100%', padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Disable 2FA
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartTotpSetup}
+                disabled={totpLoading}
+                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                {totpLoading ? 'Loading QR Code...' : '⚡ Set Up Google Authenticator'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* PIN Status Tile */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: pinEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+              <KeyRound size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>4-Digit Quick PIN</div>
+              <div style={{ fontSize: '11.5px', color: pinEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                {pinEnabled ? '✅ Active & Protected' : '⚪ Not Set Up'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            {pinEnabled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowPinSetup(true)}
+                  style={{ flex: 1, padding: '8px 12px', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.35)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Change PIN
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDisablePin}
+                  style={{ padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Disable
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowPinSetup(true)}
+                style={{ width: '100%', padding: '9px 16px', background: 'var(--color-blue)', border: 'none', color: '#fff', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Set Up 4-Digit PIN
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Biometrics Status Tile */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          padding: '18px',
+          borderRadius: '10px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: bioEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)' }}>
+              <Fingerprint size={20} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Touch ID / Face ID</div>
+              <div style={{ fontSize: '11.5px', color: bioEnabled ? '#22c55e' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                {bioEnabled ? '✅ Biometrics Active' : (bioAvailable ? 'Supported on Device' : 'Tap below to link Biometrics')}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={handleToggleBiometrics}
+              disabled={!pinEnabled && !bioEnabled}
+              style={{
+                width: '100%',
+                padding: '9px 16px',
+                background: bioEnabled ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.15)',
+                border: bioEnabled ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(59,130,246,0.35)',
+                color: bioEnabled ? '#ef4444' : '#60a5fa',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '700',
+                cursor: (!pinEnabled && !bioEnabled) ? 'not-allowed' : 'pointer',
+                opacity: (!pinEnabled && !bioEnabled) ? 0.5 : 1
+              }}
+            >
+              {bioEnabled ? 'Disable Biometrics' : 'Enable Touch ID / Face ID'}
+            </button>
+          </div>
+        </div>
+
+        {/* Auto-Lock Inactivity Timer Card (Side-by-Side) */}
+        {pinEnabled && (
+          <div style={{
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            padding: '18px',
+            borderRadius: '10px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ background: autoLockMinutes > 0 ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.06)', padding: '10px', borderRadius: '50%', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)' }}>
+                <Clock size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Auto-Lock Timer</div>
+                <div style={{ fontSize: '11.5px', color: autoLockMinutes > 0 ? 'var(--color-blue-light)' : 'var(--text-secondary)', fontWeight: '600', marginTop: '2px' }}>
+                  {autoLockMinutes === 0 ? '⚡ Immediately on Background' : autoLockMinutes === -1 ? 'Off / Never' : `Locks after ${autoLockMinutes}m idle`}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+              {AUTO_LOCK_OPTIONS.map(opt => {
+                const isSel = autoLockMinutes === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleSelectAutoLock(opt.value)}
+                    style={{
+                      padding: '5px 8px',
+                      borderRadius: '5px',
+                      background: isSel ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.04)',
+                      border: isSel ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
+                      color: isSel ? 'var(--color-blue-light)' : 'var(--text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: isSel ? '700' : '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Google Authenticator Setup Card / Modal */}
+      {showTotpSetup && totpSetupData && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.85)', border: '1px solid var(--color-blue)', padding: '24px', borderRadius: '12px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h4 style={{ fontSize: '15px', fontWeight: '700', margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} color="var(--color-blue-light)" /> Set Up Google Authenticator (TOTP)
+            </h4>
+            <X size={18} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpSetup(false)} />
+          </div>
+
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '18px', lineHeight: '1.5' }}>
+            Scan this QR code with <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any TOTP app, then enter the 6-digit code below to activate.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'center' }}>
+            {(totpSetupData.qrCode || totpSetupData.otpauth_url) && (
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', flexShrink: 0 }}>
+                <img
+                  src={totpSetupData.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetupData.otpauth_url || '')}`}
+                  alt="TOTP QR Code"
+                  style={{ width: '160px', height: '160px', display: 'block' }}
+                />
+                <div style={{ textAlign: 'center', fontSize: '10px', color: '#334155', fontWeight: '700', marginTop: '6px' }}>
+                  Scan in Authenticator
+                </div>
+              </div>
+            )}
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Manual Secret Key (if camera scan is unavailable):
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={totpSetupData.secret}
+                    style={{ flex: 1, fontFamily: 'monospace', letterSpacing: '1px', fontSize: '13px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#38bdf8', padding: '8px 12px', borderRadius: '6px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(totpSetupData.secret);
+                      setTotpCopied(true);
+                      setTimeout(() => setTotpCopied(false), 2500);
+                    }}
+                    style={{ padding: '8px 14px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Copy size={13} /> {totpCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmTotpEnable} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Enter 6-Digit Code from App to Confirm:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={totpVerificationCode}
+                    onChange={e => setTotpVerificationCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="000000"
+                    style={{ width: '100%', boxSizing: 'border-box', letterSpacing: '6px', textAlign: 'center', fontSize: '18px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={totpLoading || totpVerificationCode.length !== 6}
+                  style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {totpLoading ? 'Verifying...' : 'Verify & Activate'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Authenticator Disable Modal */}
+      {showTotpDisable && (
+        <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#ef4444' }}>Disable Google Authenticator</h4>
+            <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowTotpDisable(false)} />
+          </div>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+            Enter your account password to confirm disabling Google Authenticator:
+          </p>
+          <form onSubmit={handleConfirmTotpDisable} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="password"
+              placeholder="Account Password"
+              value={totpDisablePassword}
+              onChange={e => setTotpDisablePassword(e.target.value)}
+              style={{ flex: 1, minWidth: '180px', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontSize: '13px' }}
+              required
+            />
+            <button
+              type="submit"
+              disabled={totpLoading}
+              style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              {totpLoading ? 'Disabling...' : 'Confirm Disable'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* PIN Setup Form Overlay / Modal */}
+      {showPinSetup && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--color-blue)', padding: '20px', borderRadius: '10px', marginTop: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0, color: '#fff' }}>Configure 4-Digit PIN</h4>
+            <X size={16} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowPinSetup(false)} />
+          </div>
+
+          <form onSubmit={handleSavePin} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>New 4-Digit PIN</label>
+              <input
+                type="password"
+                maxLength={4}
+                value={newPin}
+                onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                required
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11.5px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Confirm 4-Digit PIN</label>
+              <input
+                type="password"
+                maxLength={4}
+                value={confirmPin}
+                onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                style={{ width: '120px', letterSpacing: '4px', textAlign: 'center', fontSize: '16px', fontWeight: '700', background: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: '#fff', padding: '8px', borderRadius: '6px' }}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              style={{ background: 'var(--color-blue)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              Save PIN
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Auto-Lock / PIN Screen Test */}
+      {pinEnabled && (
+        <div style={{ display: 'flex', justifyContent: 'flex-start', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px' }}>
+          <button
+            type="button"
+            onClick={handleTestLock}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            <Lock size={14} /> Test Lock Screen Now
+          </button>
+        </div>
+      )}
+
+      {/* ─── Session & Device Security Manager ───────────────────────── */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
+              <ShieldAlert size={18} color="var(--color-blue)" /> Active Devices & Login Sessions
+            </h3>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              Review and manage all web, desktop, and mobile devices authorized to access your trading account.
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobile ? '100%' : 'auto' }}>
+            <button
+              type="button"
+              onClick={() => fetchUserSessions()}
+              disabled={userSessionsLoading}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+              title="Refresh sessions list"
+            >
+              <RefreshCw size={13} className={userSessionsLoading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+
+            {userSessions.filter(s => !s.is_current).length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to log out all other devices? They will need to sign in again.')) {
+                    setRevokingOthers(true);
+                    setSessionMsg({ type: '', text: '' });
+                    const res = await revokeOtherSessions();
+                    if (res.success) {
+                      setSessionMsg({ type: 'success', text: res.message || 'All other devices have been logged out.' });
+                      setTimeout(() => setSessionMsg({ type: '', text: '' }), 4000);
+                    } else {
+                      setSessionMsg({ type: 'error', text: res.error || 'Failed to revoke other sessions' });
+                    }
+                    setRevokingOthers(false);
+                  }
+                }}
+                disabled={revokingOthers}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#ef4444',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: revokingOthers ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {revokingOthers ? <Loader2 size={13} className="animate-spin" /> : <LogOut size={13} />}
+                Log Out All Other Devices
+              </button>
+            )}
+          </div>
+        </div>
+
+        {sessionMsg.text && (
+          <div style={{
+            padding: '10px 14px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${sessionMsg.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: sessionMsg.type === 'success' ? '#4ade80' : '#ef4444'
+          }}>
+            {sessionMsg.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
+            {sessionMsg.text}
+          </div>
+        )}
+
+        {/* Sessions List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {userSessionsLoading && userSessions.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+              Loading active sessions...
+            </div>
+          ) : userSessions.length === 0 ? (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '14px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ background: 'rgba(34, 197, 94, 0.15)', padding: '10px', borderRadius: '50%', color: '#22c55e' }}>
+                  <Monitor size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Current Device
+                    <span style={{ background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.4)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '800' }}>
+                      THIS DEVICE
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Active session
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            userSessions.map((session) => {
+              const isPhone = (session.device_model || '').toLowerCase().includes('phone') || (session.os_name || '').toLowerCase().includes('android') || (session.os_name || '').toLowerCase().includes('ios');
+              const isMac = (session.device_model || '').toLowerCase().includes('mac') || (session.os_name || '').toLowerCase().includes('mac');
+              
+              const formatRelativeTime = (dateStr) => {
+                if (!dateStr) return 'Recently active';
+                const diff = Date.now() - new Date(dateStr).getTime();
+                const mins = Math.floor(diff / 60000);
+                if (mins < 2) return 'Active now';
+                if (mins < 60) return `${mins}m ago`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}h ago`;
+                const days = Math.floor(hrs / 24);
+                return `${days}d ago`;
+              };
+
+              return (
+                <div
+                  key={session.id}
+                  style={{
+                    background: session.is_current ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255, 255, 255, 0.02)',
+                    border: session.is_current ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      background: session.is_current ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      padding: '10px',
+                      borderRadius: '50%',
+                      color: session.is_current ? 'var(--color-blue-light)' : 'var(--text-secondary)'
+                    }}>
+                      {isPhone ? <Smartphone size={20} /> : isMac ? <Laptop size={20} /> : <Monitor size={20} />}
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {session.device_model || 'Desktop / Browser'}
+                        {session.is_current && (
+                          <span style={{
+                            background: 'rgba(34, 197, 94, 0.18)',
+                            border: '1px solid rgba(34, 197, 94, 0.45)',
+                            color: '#4ade80',
+                            fontSize: '10px',
+                            padding: '2px 7px',
+                            borderRadius: '12px',
+                            fontWeight: '800',
+                            letterSpacing: '0.4px'
+                          }}>
+                            🟢 THIS DEVICE (Current)
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+                        <span>{session.os_name || 'OS'} · {session.browser_name || 'Browser'}</span>
+                        {(session.city || session.state) && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)' }}>
+                            <MapPin size={11} /> {[session.city, session.state].filter(Boolean).join(', ')}
+                          </span>
+                        )}
+                        {session.ip_address && (
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            • IP: {session.ip_address}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: isMobile ? '0' : 'auto' }}>
+                    <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                      <div style={{ fontSize: '11px', color: session.is_current ? '#4ade80' : 'var(--text-secondary)', fontWeight: '600' }}>
+                        {session.is_current ? 'Active now' : `Last active: ${formatRelativeTime(session.last_active_at)}`}
+                      </div>
+                    </div>
+
+                    {!session.is_current && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm(`Revoke session for ${session.device_model || 'this device'}?`)) {
+                            const res = await revokeSession(session.id);
+                            if (res.success) {
+                              setSessionMsg({ type: 'success', text: 'Device session revoked.' });
+                              setTimeout(() => setSessionMsg({ type: '', text: '' }), 3000);
+                            } else {
+                              setSessionMsg({ type: 'error', text: res.error || 'Failed to revoke session' });
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                        title="Log out this device"
+                      >
+                        <Trash2 size={12} /> Revoke
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Security Footnote */}
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '1px solid rgba(59, 130, 246, 0.15)',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          fontSize: '11.5px',
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>🛡️</span>
+          <span>
+            <strong>Security Recommendation:</strong> If you notice an unfamiliar device or location, immediately click <strong>Log Out All Other Devices</strong> and change your account password.
+          </span>
+        </div>
+      </div>
+
+      {/* ─── 30-Day Trusted Devices (Bypass Daily 2FA) ───────────────── */}
+      <div style={{
+        background: 'var(--bg-panel)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-color)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '18px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 4px 0', color: '#fff' }}>
+              <ShieldCheck size={18} color="var(--color-blue)" /> 30-Day Trusted Devices (Bypass Daily 2FA)
+            </h3>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+              These browsers & devices are authorized to bypass daily SMS/OTP challenges for 30 days.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => fetchTrustedDevices()}
+            disabled={trustedDevicesLoading}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 12px' }}
+            title="Refresh trusted devices"
+          >
+            <RefreshCw size={13} className={trustedDevicesLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {trustedDevicesLoading && trustedDevices.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              <Loader2 size={20} className="animate-spin" style={{ margin: '0 auto 8px auto' }} />
+              Loading trusted devices...
+            </div>
+          ) : trustedDevices.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              No trusted devices registered yet. Check <strong>"Trust this device for 30 days"</strong> during login to remember this device.
+            </div>
+          ) : (
+            trustedDevices.map((device) => {
+              const expiresDate = new Date(device.expires_at);
+              const daysRemaining = Math.max(0, Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+              return (
+                <div key={device.id} style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: 'rgba(59,130,246,0.15)', padding: '10px', borderRadius: '50%', color: 'var(--color-blue-light)' }}>
+                      <Laptop size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {device.device_name || `${device.browser_name || 'Browser'} on ${device.os_name || 'Device'}`}
+                        <span style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', fontSize: '10px', padding: '2px 7px', borderRadius: '12px', fontWeight: '700' }}>
+                          TRUSTED ({daysRemaining}d left)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        <span>IP: {device.ip_address || '—'}</span>
+                        <span>Last active: {device.last_used_at ? new Date(device.last_used_at).toLocaleDateString('en-GB') : '—'}</span>
+                        <span>Expires: {expiresDate.toLocaleDateString('en-GB')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Revoke trust for this device? You will need 2FA to log in on it next time.')) {
+                        const res = await revokeTrustedDevice(device.id);
+                        if (res && res.success) {
+                          setStatusMsg({ type: 'success', text: 'Device trust revoked successfully.' });
+                          setTimeout(() => setStatusMsg({ type: '', text: '' }), 3500);
+                        }
+                      }
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      color: '#ef4444',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={13} /> Revoke Trust
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+

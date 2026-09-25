@@ -1,0 +1,483 @@
+const db = require('../database/db');
+
+// Global System Configuration for Telegram Engine
+let systemConfig = {
+  global_enabled: true,
+  peak_protection_active: true,
+  peak_start_time: '09:15',
+  peak_end_time: '10:15',
+  peak_mode: 'BATCH_DELAY', // 'MUTE_DURING_PEAK' | 'BATCH_DELAY' | 'DIRECT_INSTANT'
+  batch_delay_seconds: 10,
+  bot_token: process.env.TELEGRAM_BOT_TOKEN || '7891234567:AAExamplePlaceholderTokenForSkandX',
+  bot_username: process.env.TELEGRAM_BOT_USERNAME || 'SkandXAlerts_bot'
+};
+
+// Queue for Non-Blocking Asynchronous Telegram Delivery
+const alertQueue = [];
+let isProcessingQueue = false;
+let stats = {
+  totalSentToday: 0,
+  lastSentAt: null,
+  peakDropsCount: 0
+};
+
+/**
+ * Check if current IST time falls in peak traffic hours (e.g. 09:15 to 10:15)
+ */
+function isPeakHourActive() {
+  if (!systemConfig.peak_protection_active) return false;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(new Date());
+    const istH = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const istM = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const curMins = istH * 60 + istM;
+
+    const [sH, sM] = (systemConfig.peak_start_time || '09:15').split(':').map(Number);
+    const [eH, eM] = (systemConfig.peak_end_time || '10:15').split(':').map(Number);
+    const startMins = (sH * 60) + (sM || 0);
+    const endMins = (eH * 60) + (eM || 0);
+
+    return curMins >= startMins && curMins < endMins;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Raw Telegram API call
+ */
+async function callTelegramApi(chatId, messageText, parseMode = 'HTML') {
+  if (!chatId || !messageText) return { success: false, error: 'Missing chatId or text' };
+
+  if (!systemConfig.bot_token || systemConfig.bot_token.includes('ExamplePlaceholder')) {
+    console.log(`[TelegramService] (Simulated / Dev mode) Message to ${chatId}:\n${messageText}`);
+    stats.totalSentToday++;
+    stats.lastSentAt = new Date().toISOString();
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${systemConfig.bot_token}/sendMessage`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: messageText,
+        parse_mode: parseMode,
+        disable_web_page_preview: true
+      })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      stats.totalSentToday++;
+      stats.lastSentAt = new Date().toISOString();
+      return { success: true, messageId: data.result?.message_id };
+    } else {
+      console.warn('[TelegramService] Telegram API response error:', data.description);
+      return { success: false, error: data.description };
+    }
+  } catch (err) {
+    console.error('[TelegramService] HTTP dispatch error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Background Queue Worker - Processes messages smoothly without blocking Node.js event loop
+ */
+function triggerQueue() {
+  if (isProcessingQueue || alertQueue.length === 0 || !systemConfig.global_enabled) return;
+  processQueue().catch(err => console.error('[TelegramService] Error in queue worker:', err));
+}
+
+/**
+ * Background Queue Worker - Processes messages smoothly without blocking Node.js event loop
+ */
+async function processQueue() {
+  if (isProcessingQueue || alertQueue.length === 0) return;
+  isProcessingQueue = true;
+
+  try {
+    while (alertQueue.length > 0) {
+      if (!systemConfig.global_enabled) {
+        alertQueue.length = 0; // Clear queue if disabled/paused by admin
+        break;
+      }
+
+      const item = alertQueue.shift();
+      const isPeak = isPeakHourActive();
+
+      if (isPeak && systemConfig.peak_mode === 'MUTE_DURING_PEAK') {
+        stats.peakDropsCount++;
+        continue; // Drop alert during peak to preserve 100% CPU
+      }
+
+      if (isPeak && systemConfig.peak_mode === 'BATCH_DELAY') {
+        const elapsed = (Date.now() - item.queuedAt) / 1000;
+        if (elapsed < (systemConfig.batch_delay_seconds || 10)) {
+          // Re-queue and wait delay
+          alertQueue.unshift(item);
+          setTimeout(triggerQueue, 1000);
+          break;
+        }
+      }
+
+      await callTelegramApi(item.chatId, item.text);
+      // Small 40ms pacing to stay under rate limits
+      await new Promise(r => setTimeout(r, 40));
+    }
+  } catch (err) {
+    console.error('[TelegramService] Error in queue worker:', err);
+  } finally {
+    isProcessingQueue = false;
+    if (alertQueue.length > 0 && systemConfig.global_enabled) {
+      setImmediate(triggerQueue);
+    }
+  }
+}
+
+// Fallback safety-net check once every 60s instead of 250ms (saves 345,600 timer wakes/day)
+setInterval(triggerQueue, 60000).unref();
+
+/**
+ * Send Telegram alert to user
+ */
+async function sendTelegramAlert(userId, alertType, payload = {}) {
+  if (!userId || !systemConfig.global_enabled) return;
+
+  try {
+    const user = await db('users').where({ id: userId }).first();
+    if (!user || !user.telegram_chat_id || !user.telegram_alerts_enabled) return;
+
+    if (alertType === 'ORDER' && user.telegram_alert_orders === false) return;
+    if (alertType === 'TARGET' && user.telegram_alert_targets === false) return;
+    if (alertType === 'STOPLOSS' && user.telegram_alert_stoploss === false) return;
+    if (alertType === 'RISK' && user.telegram_alert_risk === false) return;
+
+    const timeStr = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    let message = '';
+
+    switch (alertType) {
+      case 'ORDER': {
+        const sideEmoji = payload.side === 'BUY' ? '🟢 BUY' : '🔴 SELL';
+        message = `⚡ <b>SkandX · Order Executed</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
+          `<b>Side:</b> ${sideEmoji} | <b>Type:</b> ${payload.product_type || 'INT'}\n` +
+          `<b>Quantity:</b> ${payload.quantity} shares/lots\n` +
+          `<b>Price:</b> ₹${Number(payload.price || 0).toFixed(2)}\n` +
+          `<b>Status:</b> ✅ EXECUTED\n` +
+          `<b>Time:</b> ${timeStr} IST\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `<i>Trade safe · SkandX Platform</i>`;
+        break;
+      }
+
+      case 'TARGET': {
+        message = `🎯 <b>SkandX · Target Price Hit!</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
+          `<b>Target Hit Price:</b> ₹${Number(payload.exit_price || payload.price || 0).toFixed(2)}\n` +
+          (payload.pnl !== undefined ? `<b>Realized P&L:</b> 🟢 +₹${Number(payload.pnl).toFixed(2)}\n` : '') +
+          `<b>Quantity Exited:</b> ${payload.quantity || 'Full'}\n` +
+          `<b>Time:</b> ${timeStr} IST\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `🏆 <i>Great trade! Profits locked.</i>`;
+        break;
+      }
+
+      case 'STOPLOSS': {
+        message = `🛑 <b>SkandX · Stop-Loss Triggered</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `<b>Instrument:</b> <code>${payload.symbol || 'N/A'}</code>\n` +
+          `<b>Trigger Price:</b> ₹${Number(payload.exit_price || payload.price || 0).toFixed(2)}\n` +
+          (payload.pnl !== undefined ? `<b>Realized P&L:</b> 🔴 -₹${Math.abs(Number(payload.pnl)).toFixed(2)}\n` : '') +
+          `<b>Quantity Exited:</b> ${payload.quantity || 'Full'}\n` +
+          `<b>Time:</b> ${timeStr} IST\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `🛡️ <i>Capital protected by Stop-Loss rule.</i>`;
+        break;
+      }
+
+      case 'RISK': {
+        message = `⚠️ <b>SkandX · Risk Guardian Alert</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `<b>Alert Reason:</b> ${payload.reason || 'Daily risk threshold reached'}\n` +
+          (payload.details ? `<b>Details:</b> ${payload.details}\n` : '') +
+          `<b>Time:</b> ${timeStr} IST\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `🔒 <i>Trading is locked for today to preserve your capital. Take a break and review tomorrow!</i>`;
+        break;
+      }
+
+      default: {
+        message = `📢 <b>SkandX Alert</b>\n\n${payload.text || 'You have a new account update.'}\n\n<i>${timeStr} IST</i>`;
+      }
+    }
+
+    // Push into bounded non-blocking queue (capped at 1000 items)
+    if (alertQueue.length >= 1000) {
+      alertQueue.shift(); // Drop oldest message to prevent memory growth
+      stats.peakDropsCount++;
+    }
+    alertQueue.push({
+      chatId: user.telegram_chat_id,
+      text: message,
+      queuedAt: Date.now()
+    });
+    triggerQueue();
+
+  } catch (err) {
+    console.error('[TelegramService] Error queuing alert:', err.message);
+  }
+}
+
+/**
+ * Send an immediate verification test message (bypasses queue for instant feedback)
+ */
+async function sendTestAlert(chatId, username = 'Trader') {
+  const timeStr = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const testMessage = `🚀 <b>Telegram Alerts Connected!</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `Hello <b>${username}</b> 👋\n\n` +
+    `Your SkandX trading account is successfully linked to this Telegram channel.\n\n` +
+    `You will now receive instant notifications for:\n` +
+    `• ⚡ Live Order Executions\n` +
+    `• 🎯 Target / Take-Profit Hits\n` +
+    `• 🛑 Stop-Loss Triggers\n` +
+    `• ⚠️ Risk Guardian Daily Limits\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `<b>Status:</b> 🟢 Active & Ready\n` +
+    `<b>Connected At:</b> ${timeStr} IST`;
+
+  return await callTelegramApi(chatId, testMessage);
+}
+
+/**
+ * Admin: Broadcast a message to all users who have Telegram connected
+ */
+async function broadcastTelegramMessage(messageText) {
+  if (!messageText) return { success: false, error: 'Message text required' };
+  try {
+    const users = await db('users').whereNotNull('telegram_chat_id').where('telegram_alerts_enabled', true);
+    let count = 0;
+    for (const u of users) {
+      if (u.telegram_chat_id) {
+        alertQueue.push({
+          chatId: u.telegram_chat_id,
+          text: `📢 <b>SkandX Official Announcement</b>\n━━━━━━━━━━━━━━━━━━\n${messageText}`,
+          queuedAt: Date.now()
+        });
+        count++;
+      }
+    }
+    if (count > 0) {
+      triggerQueue();
+    }
+    return { success: true, queuedCount: count };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 2-Way Interactive Bot Command Processor (/pnl, /positions, /exitall, /start, /help)
+ */
+async function handleIncomingTelegramUpdate(update) {
+  const message = update.message || update.edited_message;
+  if (!message || !message.text) return { handled: false };
+
+  const chatId = String(message.chat.id);
+  const text = message.text.trim();
+  const command = text.split(' ')[0].toLowerCase();
+
+  const user = await db('users').where({ telegram_chat_id: chatId }).first();
+
+  if (command === '/start') {
+    const welcome = `<b>👋 Welcome to SkandX Trading Bot!</b>\n\n` +
+      `Your Telegram Chat ID: <code>${chatId}</code>\n\n` +
+      (user 
+        ? `✅ <b>Account Linked:</b> ${user.username} (${user.client_id || 'ID: ' + user.id})\n\n` +
+          `<b>Available Interactive Commands:</b>\n` +
+          `📊 <code>/pnl</code> - View today's live Realized P&L & Win Rate\n` +
+          `📈 <code>/positions</code> - View your current open positions\n` +
+          `🛑 <code>/exitall</code> - Emergency square-off all open positions\n` +
+          `ℹ️ <code>/help</code> - Show command list`
+        : `⚠️ <b>Not Linked Yet:</b> Copy your Chat ID (<code>${chatId}</code>) and paste it into <b>Settings → Telegram Alerts</b> in your SkandX app to link your account.`);
+    await callTelegramApi(chatId, welcome);
+    return { handled: true, command };
+  }
+
+  if (!user) {
+    await callTelegramApi(chatId, `⚠️ Your Telegram Chat ID (<code>${chatId}</code>) is not linked to any SkandX account.\n\nPlease link it in <b>Settings → Telegram Alerts</b> on your web platform.`);
+    return { handled: true, command };
+  }
+
+  if (command === '/pnl') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const completedOrders = await db('orders')
+      .where({ user_id: user.id })
+      .whereIn('status', ['COMPLETED', 'COMPLETE', 'EXECUTED'])
+      .where('created_at', '>=', today);
+
+    let realizedPnl = 0;
+    let winCount = 0;
+    completedOrders.forEach(o => {
+      const p = parseFloat(o.realized_pnl || 0);
+      realizedPnl += p;
+      if (p > 0) winCount++;
+    });
+
+    const winRate = completedOrders.length > 0 ? Math.round((winCount / completedOrders.length) * 100) : 0;
+    const pnlSymbol = realizedPnl >= 0 ? '🟢 +₹' : '🔴 -₹';
+
+    const reply = `<b>📊 Today's P&L Summary (${user.username})</b>\n\n` +
+      `💰 <b>Net Realized P&L:</b> ${pnlSymbol}${Math.abs(realizedPnl).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `🎯 <b>Completed Trades:</b> ${completedOrders.length}\n` +
+      `🏆 <b>Win Rate:</b> ${winRate}%\n` +
+      `💼 <b>Available Margin:</b> ₹${Number(user.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n` +
+      `🕒 <i>Updated: ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</i>`;
+
+    await callTelegramApi(chatId, reply);
+    return { handled: true, command };
+  }
+
+  if (command === '/positions') {
+    const positions = await db('positions')
+      .where({ user_id: user.id })
+      .whereNot({ quantity: 0 });
+
+    if (positions.length === 0) {
+      await callTelegramApi(chatId, `ℹ️ <b>Open Positions:</b> None\nYou have 0 active positions right now.`);
+      return { handled: true, command };
+    }
+
+    let posText = `<b>📈 Open Positions (${positions.length})</b>\n\n`;
+    positions.forEach((p, idx) => {
+      const side = Number(p.quantity) > 0 ? 'BUY 🟢' : 'SELL 🔴';
+      const cleanSym = p.symbol.includes(':') ? p.symbol.split(':')[1] : p.symbol;
+      posText += `${idx + 1}. <b>${cleanSym}</b> (${p.product_type || 'INT'})\n` +
+        `   • Side: ${side} | Qty: ${Math.abs(p.quantity)}\n` +
+        `   • Avg Price: ₹${Number(p.average_price || 0).toFixed(2)}\n\n`;
+    });
+    posText += `<i>Tip: Send <code>/exitall</code> to emergency square-off.</i>`;
+
+    await callTelegramApi(chatId, posText);
+    return { handled: true, command };
+  }
+
+  if (command === '/exitall') {
+    const LedgerService = require('./ledgerService');
+    const triggerEngine = require('./triggerEngine');
+    const { ensureLivePrices } = require('./positionsEngine');
+    let closedCount = 0;
+
+    await db.transaction(async (trx) => {
+      await trx.raw('SELECT pg_advisory_xact_lock(?)', [user.id]);
+
+      // 1. Cancel pending orders and release their margin
+      const pendingOrders = await trx('orders')
+        .where({ user_id: user.id })
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+
+      for (const ord of pendingOrders) {
+        await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
+        const marginRefund = parseFloat(ord.margin) || 0;
+        if (marginRefund > 0) {
+          const u = await trx('users').where({ id: user.id }).first();
+          if (u) {
+            await trx('users').where({ id: user.id }).update({ balance: Math.round((parseFloat(u.balance) + marginRefund + Number.EPSILON) * 100) / 100 });
+            await trx('ledger').insert({
+              user_id: user.id,
+              amount: marginRefund,
+              type: 'MARGIN_RELEASE',
+              description: `Margin released for cancelled order: ${ord.symbol}`
+            });
+          }
+        }
+        triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
+      }
+
+      // 2. Square off positions using live market LTP and LedgerService
+      const positions = await trx('positions')
+        .where({ user_id: user.id })
+        .whereNot({ quantity: 0 })
+        .forUpdate();
+
+      if (positions.length === 0) {
+        return;
+      }
+
+      const pCache = await ensureLivePrices(positions.map(p => p.symbol));
+
+      for (const pos of positions) {
+        const livePrice = (pCache && pCache[pos.symbol]?.ltp && Number(pCache[pos.symbol].ltp) > 0)
+          ? Number(pCache[pos.symbol].ltp)
+          : Number(pos.average_price || 0);
+
+        await LedgerService.closePosition(trx, user.id, pos.id, livePrice, false, 'Emergency Exit via Telegram /exitall');
+        closedCount++;
+      }
+    });
+
+    if (closedCount === 0) {
+      await callTelegramApi(chatId, `ℹ️ No open positions to exit.`);
+      return { handled: true, command };
+    }
+
+    await callTelegramApi(chatId, `🚨 <b>Emergency Square-Off Complete!</b>\n\nAll ${closedCount} active positions squared off at market LTP and pending orders cancelled.`);
+    return { handled: true, command };
+  }
+
+  if (command === '/help') {
+    const help = `<b>📱 SkandX Telegram Commands:</b>\n\n` +
+      `📊 <code>/pnl</code> - View today's Realized P&L, Win Rate, and Margin\n` +
+      `📈 <code>/positions</code> - View all active open positions\n` +
+      `🛑 <code>/exitall</code> - Emergency square off all positions\n` +
+      `🆔 <code>/start</code> - Display your Chat ID and connection status`;
+    await callTelegramApi(chatId, help);
+    return { handled: true, command };
+  }
+
+  return { handled: false };
+}
+
+function getSystemConfig() {
+  return {
+    ...systemConfig,
+    isPeakHourNow: isPeakHourActive(),
+    queueLength: alertQueue.length,
+    stats
+  };
+}
+
+function updateSystemConfig(newCfg) {
+  systemConfig = {
+    ...systemConfig,
+    ...newCfg
+  };
+  if (systemConfig.global_enabled) {
+    triggerQueue();
+  } else {
+    alertQueue.length = 0; // Paused/Stopped by Admin: flush pending queue
+  }
+  return getSystemConfig();
+}
+
+module.exports = {
+  sendTelegramAlert,
+  sendTestAlert,
+  broadcastTelegramMessage,
+  handleIncomingTelegramUpdate,
+  getSystemConfig,
+  updateSystemConfig
+};
