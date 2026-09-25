@@ -370,19 +370,28 @@ class VolumeMatchingEngine {
       // Never fabricate fake volume — if deltaVol is 0, the order stays pending until real trades happen.
       if (deltaVol <= 0) return; // Strictly wait for real exchange volume for ALL instruments
 
-      // Distribute available tick volume to active orders in FIFO order
-      let availableVol = deltaVol;
+      // Distribute available tick volume to active orders in FIFO order per side.
+      // Every trade on the exchange has BOTH a buyer and a seller:
+      // When ΔV shares execute on the exchange, ΔV was bought and ΔV was sold.
+      // BUY orders match against exchange sell liquidity (availableBuyVol),
+      // and SELL orders match against exchange buy liquidity (availableSellVol).
+      let availableBuyVol = deltaVol;
+      let availableSellVol = deltaVol;
       const snapshotQueue = [...queue];
 
       for (let i = 0; i < snapshotQueue.length; i++) {
         const order = snapshotQueue[i];
         if (!order || !this.activeOrders.has(order.id.toString()) || order.pending_quantity <= 0) continue;
 
+        const isBuy = order.side === 'BUY';
+        let availableVol = isBuy ? availableBuyVol : availableSellVol;
+        if (availableVol <= 0) continue;
+
         // Check limit price constraint for limit orders
         if (order.type === 'LIMIT' && order.price) {
           const limitPrice = Number(order.price);
-          if (order.side === 'BUY' && ltp > limitPrice) continue;
-          if (order.side === 'SELL' && ltp < limitPrice) continue;
+          if (isBuy && ltp > limitPrice) continue;
+          if (!isBuy && ltp < limitPrice) continue;
         }
 
         // Determine lot size for contract compliance
@@ -414,14 +423,18 @@ class VolumeMatchingEngine {
 
         if (fillQty > 0) {
           order._lastFillTime = now;
-          availableVol -= fillQty;
+          if (isBuy) {
+            availableBuyVol -= fillQty;
+          } else {
+            availableSellVol -= fillQty;
+          }
           await this.processSliceFill(order, fillQty, ltp);
           if (order.pending_quantity <= 0) {
             this.dequeueOrder(order.id, order.symbol);
           }
         }
 
-        if (availableVol <= 0) break;
+        if (availableBuyVol <= 0 && availableSellVol <= 0) break;
       }
     } catch (err) {
       console.error(`VolumeMatchingEngine onTick error for ${symbol}:`, err.message);
