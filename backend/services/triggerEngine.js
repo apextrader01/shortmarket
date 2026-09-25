@@ -35,7 +35,7 @@ class TriggerEngine {
      */
     async loadPendingOrders() {
         try {
-            const orders = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER']);
+            const orders = await db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
             
             // Clear existing triggers in Redis
             const { generalClient } = require('./redisClient');
@@ -666,6 +666,10 @@ class TriggerEngine {
                                 }
                             }
                             this.removeOrderFromMemory(dangler.id, dangler.symbol);
+                            try {
+                                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                                volumeMatchingEngine.dequeueOrder(dangler.id, dangler.symbol);
+                            } catch (e) {}
                         }
                     } else {
                         await trx('positions').where({ id: existingPos.id }).update({
@@ -699,6 +703,10 @@ class TriggerEngine {
                             if (updatedChildQty === 0) {
                                 await trx('orders').where({ id: child.id }).update({ status: 'CANCELLED', updated_at: new Date() });
                                 this.removeOrderFromMemory(child.id, child.symbol);
+                                try {
+                                    const volumeMatchingEngine = require('./volumeMatchingEngine');
+                                    volumeMatchingEngine.dequeueOrder(child.id, child.symbol);
+                                } catch (e) {}
                             } else {
                                 await trx('orders').where({ id: child.id }).update({ quantity: updatedChildQty, updated_at: new Date() });
                             }
@@ -885,6 +893,10 @@ class TriggerEngine {
                         }
                     }
                     await this.removeOrderFromMemory(sibling.id, sibling.symbol);
+                    try {
+                        const volumeMatchingEngine = require('./volumeMatchingEngine');
+                        volumeMatchingEngine.dequeueOrder(sibling.id, sibling.symbol);
+                    } catch (e) {}
                 }
             }
             

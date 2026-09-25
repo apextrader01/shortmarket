@@ -209,7 +209,7 @@ class MTMRiskManager {
                 // Delivery / CNC / Holdings orders remain intact.
                 const pendingOrders = await trx('orders')
                     .where({ user_id: userId })
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']) // ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']
                     .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
                 for (const ord of pendingOrders) {
@@ -217,7 +217,7 @@ class MTMRiskManager {
                     const totalQty = parseFloat(ord.quantity) || 1;
                     const pendingQty = (ord.pending_quantity !== null && ord.pending_quantity !== undefined)
                         ? parseFloat(ord.pending_quantity)
-                        : (ord.status === 'PARTIAL_FILLED' ? Math.max(0, totalQty - parseFloat(ord.filled_quantity || 0)) : totalQty);
+                        : ((ord.status === 'PARTIAL_FILLED' || ord.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQty - parseFloat(ord.filled_quantity || 0)) : totalQty);
                     const refund = totalQty > 0
                         ? Math.round(((pendingQty / totalQty) * totalMargin + Number.EPSILON) * 100) / 100
                         : totalMargin;

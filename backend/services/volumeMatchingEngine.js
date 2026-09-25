@@ -81,7 +81,7 @@ class VolumeMatchingEngine {
   async loadPendingVolumeOrders() {
     try {
       const pending = await db('orders')
-        .whereIn('status', ['PARTIAL_FILLED'])
+        .whereIn('status', ['PARTIAL_FILLED', 'PARTIALLY_FILLED'])
         .orWhere(builder => {
           builder.where({ status: 'PENDING', type: 'MARKET' });
         });
@@ -1126,7 +1126,7 @@ class VolumeMatchingEngine {
 
       const order = await trx('orders').where({ id: orderId, user_id: userId }).forUpdate().first();
       if (!order) throw new Error('Order not found');
-      if (order.status !== 'PARTIAL_FILLED' && order.status !== 'PENDING') {
+      if (order.status !== 'PARTIAL_FILLED' && order.status !== 'PARTIALLY_FILLED' && order.status !== 'PENDING' && order.status !== 'OPEN') {
         throw new Error(`Cannot cancel order in status ${order.status}`);
       }
 

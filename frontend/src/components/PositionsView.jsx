@@ -1020,7 +1020,8 @@ export default function PositionsView() {
                               onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                               title="Exit Position"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (pos.unencumberedQty === 0) {
                                   alert('This position is fully tied to BO/CO pending triggers. To exit, please cancel or modify the pending orders in the Orders tab.');
                                   return;
@@ -1039,7 +1040,7 @@ export default function PositionsView() {
                               <button
                                 type="button"
                                 title="Redeem Mutual Fund"
-                                onClick={() => handleMfAction(pos, 'REDEEM')}
+                                onClick={(e) => { e.stopPropagation(); handleMfAction(pos, 'REDEEM'); }}
                                 style={{
                                   background: 'rgba(168, 85, 247, 0.1)',
                                   border: '1px solid rgba(168, 85, 247, 0.3)',
@@ -1060,7 +1061,8 @@ export default function PositionsView() {
                                 onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-red-light)'}
                                 onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                                 title="Exit Holding"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const exitSide = isShort ? 'BUY' : 'SELL';
                                   const exitQty = Math.abs(rawQty || 1);
                                   useStore.getState().openOrderModal(pos.symbol, exitSide, pos.lotSize || pos.lotsize || 1, 'DEL', true, exitQty);

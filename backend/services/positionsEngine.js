@@ -123,7 +123,7 @@ class PositionsEngine {
             console.log(`[EOD SWEEP] Starting Phase 2 Sweep for ${market}...`);
             // Step A: Cancel PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for INT/BO/CO
             const pendingEntryOrders = await db('orders')
-                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
                 .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
 
             for (const order of pendingEntryOrders) {
@@ -132,12 +132,16 @@ class PositionsEngine {
                     await db.transaction(async (trx) => {
                         const updated = await trx('orders')
                             .where({ id: order.id })
-                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
+                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
                             .update({ status: 'CANCELLED', updated_at: new Date() });
 
                         if (updated > 0) {
-                            const refundMargin = (order.pending_quantity && order.quantity)
-                                ? Math.round((Number(order.margin || 0) * (Number(order.pending_quantity) / Number(order.quantity)) + Number.EPSILON) * 100) / 100
+                            const totalQ = Number(order.quantity) || 1;
+                            const pendingQ = (order.pending_quantity !== null && order.pending_quantity !== undefined)
+                                ? Number(order.pending_quantity)
+                                : ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(order.filled_quantity || 0)) : totalQ);
+                            const refundMargin = totalQ > 0
+                                ? Math.round((Number(order.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
                                 : Math.round((Number(order.margin || 0) + Number.EPSILON) * 100) / 100;
                             if (refundMargin > 0) {
                                 await LedgerService.releaseMargin(trx, order.user_id, refundMargin, `EOD sweep: margin refunded for ${order.symbol}`);
@@ -351,7 +355,7 @@ class PositionsEngine {
             // Find all active assets in Holdings, Positions, or Orders to evaluate for expiry settlement
             let posQuery = db('positions').whereNot({ quantity: 0 });
             let holdQuery = db('holdings').whereNot({ quantity: 0 });
-            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+            let orderQuery = db('orders').whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
             
             if (isCommodity) {
                 posQuery = posQuery.where('symbol', 'like', '%MCX%');
@@ -664,7 +668,7 @@ class PositionsEngine {
             await db.transaction(async (trx) => {
                 // 1. Fetch all Delivery positions with Qty > 0
                 let query = trx('positions')
-                    .whereIn('product_type', ['DEL', 'CNC'])
+                    .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
                     .where('quantity', '>', 0);
                     
                 // T+1 Migration ALWAYS migrates only positions opened before today (T+1 settlement rule)

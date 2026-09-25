@@ -228,7 +228,7 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
         // Also cancel any remaining PENDING, PARTIAL_FILLED, AMO_PENDING entry orders for this user+symbol (only intraday types)
         const pendingOrders = await trx('orders')
             .where({ user_id: pos.user_id })
-            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
+            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
             .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO'])
             .where(builder => {
                 builder.where({ symbol: pos.symbol })
@@ -240,11 +240,15 @@ async function squareOffPositionInProcess(pos, ltp, customRemark = 'Auto-Square-
         for (const o of pendingOrders) {
             const updated = await trx('orders')
                 .where({ id: o.id })
-                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'AMO_PENDING'])
-                .update({ status: 'CANCELLED', updated_at: new Date() });
+                .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'])
+                .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
             if (updated > 0) {
-                const refundMargin = (o.pending_quantity && o.quantity)
-                    ? Math.round((Number(o.margin || 0) * (Number(o.pending_quantity) / Number(o.quantity)) + Number.EPSILON) * 100) / 100
+                const totalQ = Number(o.quantity) || 1;
+                const pendingQ = (o.pending_quantity !== null && o.pending_quantity !== undefined)
+                    ? Number(o.pending_quantity)
+                    : ((o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(o.filled_quantity || 0)) : totalQ);
+                const refundMargin = totalQ > 0
+                    ? Math.round((Number(o.margin || 0) * (pendingQ / totalQ) + Number.EPSILON) * 100) / 100
                     : Math.round((Number(o.margin || 0) + Number.EPSILON) * 100) / 100;
                 if (refundMargin > 0) {
                     await LedgerService.releaseMargin(trx, pos.user_id, refundMargin, `Square-Off Cancelled: ${o.symbol}`);

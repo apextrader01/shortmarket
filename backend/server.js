@@ -2687,7 +2687,7 @@ app.post('/api/admin/user/:id/reset', authenticateToken, async (req, res) => {
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: targetUserId })
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
 
       // 1. Nullify self-referencing FK links to prevent FK constraint crashes
       await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
@@ -2761,7 +2761,7 @@ app.delete('/api/admin/user/:id', authenticateToken, async (req, res) => {
 
       ordersToClean = await trx('orders')
         .where({ user_id: targetUserId })
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
 
       // 1. Nullify self-referencing foreign keys first to prevent constraint violations
       await trx('orders').where({ user_id: targetUserId }).update({ linked_order_id: null, parent_order_id: null });
@@ -3585,7 +3585,7 @@ app.post('/api/user/reset', authenticateToken, async (req, res) => {
       // 0. Fetch pending orders to purge them from TriggerEngine memory & Redis
       pendingOrders = await trx('orders')
         .where({ user_id: req.user.id })
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
 
       // 1. Nullify self-referencing FK links first so the batch delete doesn't
       //    trip the orders.linked_order_id / parent_order_id constraints.
@@ -5500,7 +5500,7 @@ app.post('/api/order', authenticateToken, orderLimiter, async (req, res) => {
                   .where(builder => {
                     builder.where({ symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                   })
-                  .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+                  .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
               const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== undefined && o.pending_quantity !== null ? o.pending_quantity : o.quantity), 0);
               
               const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
@@ -6635,7 +6635,7 @@ app.post('/api/holdings/exit-all', authenticateToken, async (req, res) => {
       const pendingSellOrders = await trx('orders')
         .where({ user_id: req.user.id, side: 'SELL' })
         .whereIn('product_type', ['DEL', 'CNC', 'DELIVERY'])
-        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
+        .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']) // ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']
         .where(b => {
           b.whereIn('symbol', exitedSymbols).orWhereIn('symbol', cleanExited);
         });
@@ -7073,7 +7073,7 @@ app.post('/api/basket-order', authenticateToken, async (req, res) => {
               .where(builder => {
                 builder.where({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
               })
-              .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED']);
+              .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']); // .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
           const pendingSellQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== undefined && o.pending_quantity !== null ? o.pending_quantity : o.quantity), 0);
           
           const totalAvailable = parseFloat((holdingQty + posQty - pendingSellQty).toFixed(4));
@@ -7285,7 +7285,8 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
         throw Object.assign(new Error('Mutual Fund purchase orders cannot be cancelled once placed as per AMC guidelines.'), { statusCode: 400 });
       }
 
-      if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'PARTIAL_FILLED' && order.status !== 'AMO_PENDING')
+      const cancellableStatuses = ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN', 'AMO_PENDING'];
+      if (!cancellableStatuses.includes(order.status))
         throw Object.assign(new Error('Only pending, partially filled, or AMO orders can be cancelled'), { statusCode: 400 });
       
       // Update status
@@ -7451,7 +7452,7 @@ app.post('/api/order/:id/cancel', authenticateToken, async (req, res) => {
       const totalQty = parseFloat(order.quantity) || 1;
       const pendingQty = (order.pending_quantity !== null && order.pending_quantity !== undefined)
         ? parseFloat(order.pending_quantity)
-        : (order.status === 'PARTIAL_FILLED' ? Math.max(0, totalQty - parseFloat(order.filled_quantity || 0)) : totalQty);
+        : ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQty - parseFloat(order.filled_quantity || 0)) : totalQty);
 
       const refundAmount = totalQty > 0
         ? Math.round(((pendingQty / totalQty) * totalMargin + Number.EPSILON) * 100) / 100
@@ -7634,13 +7635,14 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
           await trx.raw('SELECT pg_advisory_xact_lock(?)', [req.user.id]);
           const order = await trx('orders').where({ id: req.params.id, user_id: req.user.id }).forUpdate().first();
           if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });
-          if (order.status !== 'PENDING' && order.status !== 'PENDING_TRIGGER' && order.status !== 'AMO_PENDING' && order.status !== 'PARTIAL_FILLED') {
+          const modifiableStatuses = ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'];
+          if (!modifiableStatuses.includes(order.status)) {
             throw Object.assign(new Error('Only PENDING, PENDING_TRIGGER, AMO_PENDING, or PARTIAL_FILLED orders can be modified'), { statusCode: 400 });
           }
 
           const filledQty = Number(order.filled_quantity || 0);
           const newQty = quantity !== undefined && quantity !== null ? Number(quantity) : Number(order.quantity);
-          if (order.status === 'PARTIAL_FILLED' && newQty < filledQty) {
+          if ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') && newQty < filledQty) {
             throw Object.assign(new Error(`Modified quantity (${newQty}) cannot be less than already filled quantity (${filledQty})`), { statusCode: 400 });
           }
           const newPendingQty = Math.max(0, newQty - filledQty);
@@ -7693,7 +7695,7 @@ app.put('/api/order/:id', authenticateToken, async (req, res) => {
                 .where(builder => {
                   builder.where({ symbol: order.symbol }).orWhere({ symbol: cleanSym }).orWhere({ symbol: `NSE:${cleanSym}` }).orWhere({ symbol: `BSE:${cleanSym}` }).orWhere({ symbol: `MCX:${cleanSym}` });
                 })
-                .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED'])
+                .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'AMO_PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
                 .whereNot({ id: order.id });
               const otherPendingQty = pendingOrders.reduce((sum, o) => sum + Number(o.pending_quantity !== null && o.pending_quantity !== undefined ? o.pending_quantity : o.quantity), 0);
 

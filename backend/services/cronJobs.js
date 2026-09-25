@@ -362,7 +362,7 @@ function initCronJobs(priceCache, triggerEngine) {
             const affectedUserIds = new Set();
             const ordersToCleanFromRedis = [];
             await db.transaction(async (trx) => {
-                const pendingOrders = await trx('orders').whereIn('status', ['PENDING']);
+                const pendingOrders = await trx('orders').whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']);
                 
                 for (const order of pendingOrders) {
                     const isCom = isCommoditySymbol(order.symbol);
@@ -383,14 +383,37 @@ function initCronJobs(priceCache, triggerEngine) {
                     }
                     
                     // Sweep pending intraday/BO/CO entry orders (or expiring derivative delivery orders) atomically
+                    const totalQ = Number(order.quantity) || 1;
+                    const filledQ = Number(order.filled_quantity) || 0;
+                    const pendingQ = (order.pending_quantity !== null && order.pending_quantity !== undefined)
+                        ? Number(order.pending_quantity)
+                        : ((order.status === 'PARTIAL_FILLED' || order.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - filledQ) : totalQ);
+                    const cancelFraction = totalQ > 0 ? (pendingQ / totalQ) : 1;
+                    const remainingMargin = Math.round((parseFloat(order.margin || 0) * cancelFraction + Number.EPSILON) * 100) / 100;
+
                     const updated = await trx('orders')
-                        .where({ id: order.id, status: 'PENDING' })
-                        .update({ status: 'CANCELLED', updated_at: new Date() });
+                        .where({ id: order.id })
+                        .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
+                        .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
 
                     if (updated > 0) {
                         affectedUserIds.add(order.user_id);
-                        if (parseFloat(order.margin) > 0) {
-                            await LedgerService.releaseMargin(trx, order.user_id, order.margin, `End of Day Sweep Cancelled: ${order.symbol}`);
+                        if (remainingMargin > 0) {
+                            await LedgerService.releaseMargin(trx, order.user_id, remainingMargin, `End of Day Sweep Cancelled: ${order.symbol}`);
+                        }
+                        if (filledQ > 0 && Number(order.taxes) > 0) {
+                            const existingTax = await trx('ledger')
+                                .where({ user_id: order.user_id, type: 'TAXES' })
+                                .where('description', 'like', `%Order #${order.id}%`)
+                                .first();
+                            if (!existingTax) {
+                                await trx('ledger').insert({
+                                    user_id: order.user_id,
+                                    amount: -Number(order.taxes),
+                                    type: 'TAXES',
+                                    description: `Taxes & Brokerage for ${order.side} ${filledQ} ${order.symbol} (Order #${order.id})`
+                                });
+                            }
                         }
                         ordersToCleanFromRedis.push({ id: order.id, symbol: order.symbol });
                         console.log(`[CRON] Phase 2: Cancelled pending ${order.product_type || 'DEL'} order ${order.id} for ${order.symbol}`);
@@ -430,8 +453,12 @@ function initCronJobs(priceCache, triggerEngine) {
             });
 
             // Clean up memory and Redis caches outside transaction
-            if (triggerEngine && ordersToCleanFromRedis.length > 0) {
-                await Promise.allSettled(ordersToCleanFromRedis.map(o => triggerEngine.removeOrderFromMemory(o.id, o.symbol)));
+            if (ordersToCleanFromRedis.length > 0) {
+                const volumeMatchingEngine = require('./volumeMatchingEngine');
+                for (const o of ordersToCleanFromRedis) {
+                    if (triggerEngine) triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+                    try { volumeMatchingEngine.dequeueOrder(o.id, o.symbol); } catch(e) {}
+                }
             }
 
             // ⚡ Real-Time Socket Sync: Instantly refresh orders and balances on affected client screens
@@ -597,7 +624,7 @@ function initCronJobs(priceCache, triggerEngine) {
                         // Also cancel any remaining PENDING or PARTIAL_FILLED orders for this user+symbol (all intraday types)
                         const pendingOrders = await trx('orders')
                             .where({ user_id: pos.user_id, symbol: pos.symbol })
-                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED'])
+                            .whereIn('status', ['PENDING', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN']) // .whereIn('status', ['PENDING', 'PARTIAL_FILLED'])
                             .whereIn('product_type', ['INT', 'MIS', 'BO', 'CO']);
                         for (const o of pendingOrders) {
                             const updated = await trx('orders')
@@ -605,7 +632,9 @@ function initCronJobs(priceCache, triggerEngine) {
                                 .update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
                             if (updated > 0) {
                                 const totalQ = Number(o.quantity) || 1;
-                                const pendingQ = (o.pending_quantity !== null && o.pending_quantity !== undefined) ? Number(o.pending_quantity) : totalQ;
+                                const pendingQ = (o.pending_quantity !== null && o.pending_quantity !== undefined)
+                                    ? Number(o.pending_quantity)
+                                    : ((o.status === 'PARTIAL_FILLED' || o.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - Number(o.filled_quantity || 0)) : totalQ);
                                 const cancelFraction = totalQ > 0 ? (pendingQ / totalQ) : 1;
                                 const remainingMarginToRefund = Math.round((parseFloat(o.margin || 0) * cancelFraction + Number.EPSILON) * 100) / 100;
                                 if (remainingMarginToRefund > 0) {
@@ -634,8 +663,12 @@ function initCronJobs(priceCache, triggerEngine) {
                 });
 
                 // Clean up memory and Redis caches outside transaction
-                if (triggerEngine && ordersToCleanFromRedis.length > 0) {
-                    await Promise.allSettled(ordersToCleanFromRedis.map(o => triggerEngine.removeOrderFromMemory(o.id, o.symbol)));
+                if (ordersToCleanFromRedis.length > 0) {
+                    const volumeMatchingEngine = require('./volumeMatchingEngine');
+                    for (const o of ordersToCleanFromRedis) {
+                        if (triggerEngine) triggerEngine.removeOrderFromMemory(o.id, o.symbol);
+                        try { volumeMatchingEngine.dequeueOrder(o.id, o.symbol); } catch(e) {}
+                    }
                 }
 
                 // ⚡ Real-Time Socket Sync: Instantly refresh positions, orders, and balance on affected user screens
@@ -790,7 +823,7 @@ function initCronJobs(priceCache, triggerEngine) {
 
             await db.transaction(async (trx) => {
                 const staleOrders = await trx('orders')
-                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER'])
+                    .whereIn('status', ['PENDING', 'PENDING_TRIGGER', 'PARTIAL_FILLED', 'PARTIALLY_FILLED', 'OPEN'])
                     .where(function() {
                         this.whereNot({ status: 'AMO_PENDING' }).andWhere(function() {
                             this.whereNull('order_variety').orWhereNot({ order_variety: 'AMO' });
@@ -799,14 +832,39 @@ function initCronJobs(priceCache, triggerEngine) {
 
                 const affectedUserIds = new Set();
                 for (const ord of staleOrders) {
-                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', updated_at: new Date() });
-                    if (parseFloat(ord.margin) > 0) {
-                        await LedgerService.releaseMargin(trx, ord.user_id, ord.margin, `Nightly 11:56 PM Order Cancellation: ${ord.symbol}`);
+                    await trx('orders').where({ id: ord.id }).update({ status: 'CANCELLED', pending_quantity: 0, updated_at: new Date() });
+                    const totalQ = Number(ord.quantity) || 1;
+                    const filledQ = Number(ord.filled_quantity) || 0;
+                    const pendingQ = (ord.pending_quantity !== null && ord.pending_quantity !== undefined)
+                        ? Number(ord.pending_quantity)
+                        : ((ord.status === 'PARTIAL_FILLED' || ord.status === 'PARTIALLY_FILLED') ? Math.max(0, totalQ - filledQ) : totalQ);
+                    const cancelFraction = totalQ > 0 ? (pendingQ / totalQ) : 1;
+                    const refundMargin = Math.round((parseFloat(ord.margin || 0) * cancelFraction + Number.EPSILON) * 100) / 100;
+                    if (refundMargin > 0) {
+                        await LedgerService.releaseMargin(trx, ord.user_id, refundMargin, `Nightly 11:56 PM Order Cancellation: ${ord.symbol}`);
+                    }
+                    if (filledQ > 0 && Number(ord.taxes) > 0) {
+                        const existingTax = await trx('ledger')
+                            .where({ user_id: ord.user_id, type: 'TAXES' })
+                            .where('description', 'like', `%Order #${ord.id}%`)
+                            .first();
+                        if (!existingTax) {
+                            await trx('ledger').insert({
+                                user_id: ord.user_id,
+                                amount: -Number(ord.taxes),
+                                type: 'TAXES',
+                                description: `Taxes & Brokerage for ${ord.side} ${filledQ} ${ord.symbol} (Order #${ord.id})`
+                            });
+                        }
                     }
                     affectedUserIds.add(ord.user_id);
                     if (triggerEngine) {
                         triggerEngine.removeOrderFromMemory(ord.id, ord.symbol);
                     }
+                    try {
+                        const volumeMatchingEngine = require('./volumeMatchingEngine');
+                        volumeMatchingEngine.dequeueOrder(ord.id, ord.symbol);
+                    } catch(e) {}
                 }
 
                 if (triggerEngine && triggerEngine.io && affectedUserIds.size > 0) {
