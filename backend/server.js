@@ -1078,7 +1078,6 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
           }
         });
       }
-    }
 
     // Device not trusted: prompt for 2FA and return available verification channels
     res.json({
