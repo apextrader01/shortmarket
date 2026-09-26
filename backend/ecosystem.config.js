@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'shortmarket-backend',
+      name: 'skandx-backend',
       script: './server.js',
       instances: 2, // 2 cluster workers for high-concurrency API & WS
       exec_mode: 'cluster',
