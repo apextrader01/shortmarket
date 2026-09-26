@@ -1011,7 +1011,8 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
     }
 
     const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
-    let isTrusted = isGoogleReviewTester;
+    // Standard password login: trust user immediately unless they explicitly enabled Google Authenticator (TOTP)
+    let isTrusted = isGoogleReviewTester || !Boolean(user.totp_enabled);
 
     // 🛡️ CHECK IF DEVICE IS TRUSTED (30-Day Device Trust / Remember Me)
     if (!isTrusted && trusted_device_token && typeof trusted_device_token === 'string' && trusted_device_token.length >= 32) {
