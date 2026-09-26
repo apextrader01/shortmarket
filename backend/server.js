@@ -1010,8 +1010,11 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
       return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
     }
 
+    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
+    let isTrusted = isGoogleReviewTester;
+
     // 🛡️ CHECK IF DEVICE IS TRUSTED (30-Day Device Trust / Remember Me)
-    if (trusted_device_token && typeof trusted_device_token === 'string' && trusted_device_token.length >= 32) {
+    if (!isTrusted && trusted_device_token && typeof trusted_device_token === 'string' && trusted_device_token.length >= 32) {
       const crypto = require('crypto');
       const deviceHash = crypto.createHash('sha256').update(trusted_device_token.trim()).digest('hex');
       const trusted = await db('trusted_devices')
@@ -1020,10 +1023,14 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
         .first();
 
       if (trusted) {
+        isTrusted = true;
         // Update last used timestamp & IP
         await db('trusted_devices').where({ id: trusted.id }).update({ last_used_at: new Date(), ip_address: clientIp }).catch(() => {});
+      }
+    }
 
-        const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
+    if (isTrusted) {
+      const { deviceModel, osName, browserName } = parseDeviceDetails(req.headers['user-agent']);
         const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '30d' });
         const tokenHash = hashToken(token);
         if (tokenHash) {
@@ -1106,6 +1113,14 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
       login_email_otp_expires: expires
     });
 
+    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
+    if (isGoogleReviewTester) {
+      return res.json({ 
+        success: true, 
+        message: `Verification code: 123456 (Google Play Demo Mode)`
+      });
+    }
+
     let emailSent = false;
     // 🚀 Dispatch verification via Firebase / Transactional Mail Service
     try {
@@ -1141,8 +1156,14 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
 
     const crypto = require('crypto');
 
+    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
+    const isTesterBypassOtp = isGoogleReviewTester && String(code).trim() === '123456';
+
+    if (isTesterBypassOtp) {
+      // 🛡️ Instant verification bypass for Google Play Store review team
+    }
     // Method 1: TOTP (Google Authenticator)
-    if (method === 'TOTP') {
+    else if (method === 'TOTP') {
       if (!user.totp_secret || !user.totp_enabled) {
         return res.status(400).json({ error: 'Google Authenticator is not enabled for this account' });
       }

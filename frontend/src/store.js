@@ -9,6 +9,14 @@ import { playTargetHitSound, playStopLossHitSound, playOrderExecutedSound, playR
 export let API = '';
 if (import.meta.env && import.meta.env.VITE_API_URL) {
   API = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+} else if (
+  typeof window !== 'undefined' &&
+  (window.Capacitor?.isNativePlatform() ||
+   window.location.protocol === 'capacitor:' ||
+   (window.location.hostname === 'localhost' && window.location.port !== '5173'))
+) {
+  // Standalone Android/iOS native mobile builds must talk to the production backend
+  API = 'https://www.skandx.in';
 }
 
 // Global HTTP Fetch Interceptor to support Token-based authentication and real IP propagation
