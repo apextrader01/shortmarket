@@ -1,4 +1,4 @@
--- SQLite Schema for Short Market Backend
+-- SQLite / PostgreSQL Schema for SkandX Backend
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

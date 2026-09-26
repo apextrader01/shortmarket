@@ -18,45 +18,49 @@ function getAudioContext() {
   return audioCtx;
 }
 
+function getSoundStorageItem(key) {
+  return localStorage.getItem(`skandx_sound_${key}`) ?? localStorage.getItem(`shortmarket_sound_${key}`);
+}
+
 export function isSoundEnabled() {
-  const saved = localStorage.getItem('shortmarket_sound_enabled');
+  const saved = getSoundStorageItem('enabled');
   return saved === null ? true : saved === 'true';
 }
 
 export function setSoundEnabled(enabled) {
-  localStorage.setItem('shortmarket_sound_enabled', String(enabled));
+  localStorage.setItem('skandx_sound_enabled', String(enabled));
 }
 
 export function getSoundVolume() {
-  const saved = localStorage.getItem('shortmarket_sound_volume');
+  const saved = getSoundStorageItem('volume');
   return saved !== null ? Math.max(0, Math.min(1, parseFloat(saved))) : 0.8;
 }
 
 export function setSoundVolume(volume) {
   const vol = Math.max(0, Math.min(1, parseFloat(volume) || 0));
-  localStorage.setItem('shortmarket_sound_volume', String(vol));
+  localStorage.setItem('skandx_sound_volume', String(vol));
 }
 
 export function getSoundConfig() {
   return {
     enabled: isSoundEnabled(),
     volume: getSoundVolume(),
-    targetHit: localStorage.getItem('shortmarket_sound_target') !== 'false',
-    stopLoss: localStorage.getItem('shortmarket_sound_sl') !== 'false',
-    orderExecuted: localStorage.getItem('shortmarket_sound_exec') !== 'false',
-    riskAlert: localStorage.getItem('shortmarket_sound_risk') !== 'false'
+    targetHit: getSoundStorageItem('target') !== 'false',
+    stopLoss: getSoundStorageItem('sl') !== 'false',
+    orderExecuted: getSoundStorageItem('exec') !== 'false',
+    riskAlert: getSoundStorageItem('risk') !== 'false'
   };
 }
 
 export function setSoundConfig(key, value) {
-  localStorage.setItem(`shortmarket_sound_${key}`, String(value));
+  localStorage.setItem(`skandx_sound_${key}`, String(value));
 }
 
 /**
  * 🎯 Target / Take-Profit Hit Sound (Bright, positive 2-tone chime)
  */
 export function playTargetHitSound() {
-  if (!isSoundEnabled() || localStorage.getItem('shortmarket_sound_target') === 'false') return;
+  if (!isSoundEnabled() || getSoundStorageItem('target') === 'false') return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -93,7 +97,7 @@ export function playTargetHitSound() {
  * 🛑 Stop-Loss Hit Sound (Warning alert tone)
  */
 export function playStopLossHitSound() {
-  if (!isSoundEnabled() || localStorage.getItem('shortmarket_sound_sl') === 'false') return;
+  if (!isSoundEnabled() || getSoundStorageItem('sl') === 'false') return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -122,7 +126,7 @@ export function playStopLossHitSound() {
  * 🔔 Order Executed Sound (Subtle crisp confirmation pop)
  */
 export function playOrderExecutedSound() {
-  if (!isSoundEnabled() || localStorage.getItem('shortmarket_sound_exec') === 'false') return;
+  if (!isSoundEnabled() || getSoundStorageItem('exec') === 'false') return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -151,7 +155,7 @@ export function playOrderExecutedSound() {
  * ⚠️ Risk Guardian Limit Sound
  */
 export function playRiskAlertSound() {
-  if (!isSoundEnabled() || localStorage.getItem('shortmarket_sound_risk') === 'false') return;
+  if (!isSoundEnabled() || getSoundStorageItem('risk') === 'false') return;
   try {
     const ctx = getAudioContext();
     if (!ctx) return;

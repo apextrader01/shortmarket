@@ -35,7 +35,7 @@ function runTest(suite, name, testFn) {
 }
 
 console.log('\n================================================================');
-console.log('🛡️ SHORTMARKET FULL-PLATFORM HEALTH & AUDIT VERIFICATION');
+console.log('🛡️ SKANDX FULL-PLATFORM HEALTH & AUDIT VERIFICATION');
 console.log('================================================================\n');
 
 // -------------------------------------------------------------
