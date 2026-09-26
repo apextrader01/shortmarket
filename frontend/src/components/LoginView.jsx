@@ -354,8 +354,9 @@ export default function LoginView() {
       <div className="login-visual-panel">
         <div className="login-visual-bg"></div>
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div className="logo-text-premium" style={{ marginBottom: 'auto' }}>
-            Skand<span>X</span>
+          <div className="logo-text-premium" style={{ marginBottom: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/pwa-192x192.png" alt="SkandX" style={{ width: '38px', height: '38px', borderRadius: '10px', boxShadow: '0 0 16px rgba(56, 189, 248, 0.45)' }} />
+            <span>Skand<span>X</span></span>
           </div>
           <div>
             <h1 style={{ fontSize: '48px', fontWeight: '800', lineHeight: '1.1', marginBottom: '16px', color: '#fff' }}>
@@ -371,8 +372,9 @@ export default function LoginView() {
       {/* Right Form Panel */}
       <div className="login-form-panel">
         <div className="mobile-only" style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '8px' }}>
-            Skand<span>X</span>
+          <div className="logo-text-premium" style={{ fontSize: '32px', marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
+            <img src="/pwa-192x192.png" alt="SkandX" style={{ width: '36px', height: '36px', borderRadius: '9px', boxShadow: '0 0 14px rgba(56, 189, 248, 0.45)' }} />
+            <span>Skand<span>X</span></span>
           </div>
         </div>
         

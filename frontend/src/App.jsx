@@ -557,7 +557,20 @@ function App() {
               {/* Left: title + index pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px' }}>
-                  <img src="/logo.png" alt="SkandX Logo" style={{ height: '30px', objectFit: 'contain', background: '#fff', borderRadius: '6px', padding: '2px 8px' }} onError={(e) => e.target.style.display = 'none'} />
+                  <div 
+                    onClick={() => setActiveTab('Markets')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '9px', cursor: 'pointer', userSelect: 'none' }}
+                    title="SkandX Trading Platform"
+                  >
+                    <img 
+                      src="/pwa-192x192.png" 
+                      alt="SkandX Logo" 
+                      style={{ width: '28px', height: '28px', borderRadius: '7px', boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)' }} 
+                    />
+                    <span style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', fontFamily: "'Outfit', sans-serif" }}>
+                      Skand<span style={{ background: 'linear-gradient(135deg, #38bdf8 0%, #34d399 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>X</span>
+                    </span>
+                  </div>
                 </div>
 
                 <TopIndexTicker />

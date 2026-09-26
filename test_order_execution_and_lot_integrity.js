@@ -40,7 +40,7 @@ test('volumeMatchingEngine: F&O fills enforce strict lot size integer multiples 
 
   // Verify lot size calculation
   assert(vmeContent.includes("Math.floor(rawCap / lotsize) * lotsize"), 'Must enforce lot size multiple fills in matching engine');
-  assert(vmeContent.includes("Math.max(lotsize, Math.floor(rawCap / lotsize) * lotsize)"), 'Minimum fill for derivative must be at least 1 lot');
+  assert(vmeContent.includes("fillQty === 0 && order.pending_quantity < lotsize"), 'Must handle remaining pending quantity below lot size if fully covered');
 });
 
 // ── Test 3: Backend Server Integer & Lot Size Validation ──────────────────

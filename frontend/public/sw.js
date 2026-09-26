@@ -23,8 +23,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'SkandX Trading';
   const options = {
     body: data.body || 'You have a new trade update.',
-    icon: data.icon || '/favicon.ico',
-    badge: data.badge || '/favicon.ico',
+    icon: data.icon || '/pwa-192x192.png',
+    badge: data.badge || '/favicon.png',
     vibrate: [200, 100, 200],
     tag: data.tag || data.data?.tag || ('skandx-alert-' + Date.now()),
     renotify: true,
