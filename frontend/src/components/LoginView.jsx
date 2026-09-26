@@ -485,107 +485,8 @@ export default function LoginView() {
                 🔒 Authenticating account: <strong>{email}</strong>
               </div>
 
-              {/* 2FA Method Selector */}
-              <div>
-                <label style={{ ...labelStyle, marginBottom: '8px' }}>Choose Verification Method:</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactorMethod('phone');
-                      useStore.setState({ authError: null });
-                      if (!confirmationResult && registeredPhone) triggerPhoneSms();
-                    }}
-                    style={{
-                      padding: '8px 4px',
-                      borderRadius: '6px',
-                      border: twoFactorMethod === 'phone' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      background: twoFactorMethod === 'phone' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                      color: twoFactorMethod === 'phone' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <span>📱</span> SMS OTP
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactorMethod('totp');
-                      useStore.setState({ authError: null });
-                    }}
-                    style={{
-                      padding: '8px 4px',
-                      borderRadius: '6px',
-                      border: twoFactorMethod === 'totp' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      background: twoFactorMethod === 'totp' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                      color: twoFactorMethod === 'totp' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <span>🔑</span> Authenticator
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactorMethod('email');
-                      useStore.setState({ authError: null });
-                      if (!emailOtpSent) triggerEmailOtp();
-                    }}
-                    style={{
-                      padding: '8px 4px',
-                      borderRadius: '6px',
-                      border: twoFactorMethod === 'email' ? '1px solid var(--color-blue)' : '1px solid var(--border-color)',
-                      background: twoFactorMethod === 'email' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-hover)',
-                      color: twoFactorMethod === 'email' ? 'var(--color-blue-light)' : 'var(--text-secondary)',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <span>✉️</span> Email OTP
-                  </button>
-                </div>
-              </div>
-
-              {/* Method 1: Phone SMS */}
-              {twoFactorMethod === 'phone' && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>
-                      6-Digit Phone OTP {registeredPhone ? `(..${registeredPhone.slice(-4)})` : ''}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => triggerPhoneSms()}
-                      style={{ background: 'none', border: 'none', color: 'var(--color-blue-light)', fontSize: '11.5px', cursor: 'pointer', fontWeight: '600' }}
-                    >
-                      {confirmationResult ? 'Resend SMS' : 'Send SMS Code'}
-                    </button>
-                  </div>
-                  <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
-                </div>
-              )}
-
-              {/* Method 2: Google Authenticator (TOTP) */}
-              {twoFactorMethod === 'totp' && (
+              {/* Dynamic 2FA Input (Google Authenticator or Email OTP) */}
+              {hasTotp ? (
                 <div>
                   <label style={labelStyle}>6-Digit Google Authenticator Code</label>
                   <input type="text" required maxLength="6" inputMode="numeric" pattern="[0-9]*" value={totpCode} onChange={(e) => setTotpCode(e.target.value)} className="premium-input" placeholder="000000" style={{ letterSpacing: '8px', fontSize: '24px', textAlign: 'center', fontWeight: 'bold' }} />
@@ -593,13 +494,10 @@ export default function LoginView() {
                     Open your Google Authenticator or Authy app and enter the 6-digit dynamic code.
                   </div>
                 </div>
-              )}
-
-              {/* Method 3: Email OTP */}
-              {twoFactorMethod === 'email' && (
+              ) : (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>6-Digit Email OTP</label>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>6-Digit Email Verification Code</label>
                     <button
                       type="button"
                       disabled={sendingEmailOtp}
@@ -703,7 +601,7 @@ export default function LoginView() {
           <button type="submit" disabled={loading} className="premium-btn" style={{ marginTop: '12px' }}>
             {loading ? 'PROCESSING...' : 
               (view === 'login' ? 'LOG IN' : 
-               view === 'login_otp' ? (twoFactorMethod === 'totp' ? 'VERIFY AUTHENTICATOR' : (twoFactorMethod === 'email' ? 'VERIFY EMAIL OTP' : 'VERIFY SMS OTP')) :
+               view === 'login_otp' ? (hasTotp ? 'VERIFY AUTHENTICATOR' : 'VERIFY CODE') :
                view === 'register' ? 'CREATE ACCOUNT' : 
                view === 'register_otp' ? 'VERIFY OTP' : 
                view === 'forgot' ? 'SEND RESET LINK' : 
