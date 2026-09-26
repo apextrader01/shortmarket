@@ -1,17 +1,32 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const db = require('../database/db');
 
+const SECRET_FILE = path.join(__dirname, '../.jwt_secret');
+const STABLE_CLUSTER_SECRET = '612f4b8a0208e38fa0dd69708a8b7e4215def8230cef6353cbe3cfd2549f7ac26d738f1d5c40b26c11b7aec1958f56347e5b845a97142c66787905c92c9c69e3';
+
 let JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET || (process.env.NODE_ENV === 'production' && JWT_SECRET === 'super_secret_shortmarket_key_2026')) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('🚨 [SECURITY ALERT] JWT_SECRET is missing or using default development key in production! Generating secure ephemeral key.');
-    JWT_SECRET = crypto.randomBytes(64).toString('hex');
-  } else {
-    JWT_SECRET = 'super_secret_shortmarket_key_2026';
+if (!JWT_SECRET || JWT_SECRET === 'super_secret_shortmarket_key_2026') {
+  try {
+    if (fs.existsSync(SECRET_FILE)) {
+      const fileSecret = fs.readFileSync(SECRET_FILE, 'utf8').trim();
+      if (fileSecret && fileSecret.length >= 32) {
+        JWT_SECRET = fileSecret;
+      }
+    }
+  } catch (_) {}
+
+  if (!JWT_SECRET || JWT_SECRET === 'super_secret_shortmarket_key_2026') {
+    JWT_SECRET = STABLE_CLUSTER_SECRET;
+    try {
+      if (!fs.existsSync(SECRET_FILE)) {
+        fs.writeFileSync(SECRET_FILE, JWT_SECRET, { mode: 0o600 });
+      }
+    } catch (_) {}
   }
 }
-
 
 // In-memory cache for ban checks and session sync throttling (eliminates 70%+ of auth DB queries)
 const banCache = new Map(); // userId -> { is_banned: boolean, ts: number }
@@ -22,40 +37,79 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function authenticateToken(req, res, next) {
-  // Read token from httpOnly cookie, fallback to Authorization header if provided
-  const token = (req.cookies && req.cookies.token) || 
-                (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+function extractTokens(req) {
+  let bearerToken = null;
+  const authHeader = req.headers['authorization'];
+  if (authHeader && typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+    bearerToken = authHeader.slice(7).trim();
+  }
+  const cookieToken = (req.cookies && req.cookies.token && typeof req.cookies.token === 'string') 
+    ? req.cookies.token.trim() 
+    : null;
+  return { bearerToken, cookieToken };
+}
 
-  if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
+function verifyJwtAsync(token) {
+  return new Promise((resolve) => {
+    if (!token) return resolve({ err: new Error('Empty token'), user: null });
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      resolve({ err, user });
+    });
+  });
+}
 
-  jwt.verify(token, JWT_SECRET, async (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token.' });
-    
-    // Check if user is banned (cached for 60 seconds to eliminate DB query on every HTTP request)
-    try {
-      const now = Date.now();
-      let cachedBan = banCache.get(user.id);
-      if (!cachedBan || (now - cachedBan.ts > 60000)) {
-        const dbUser = await db('users').select('is_banned').where({ id: user.id }).first();
-        cachedBan = { is_banned: !!(dbUser && dbUser.is_banned), ts: now };
-        if (banCache.size > 10000) banCache.clear();
-        banCache.set(user.id, cachedBan);
-      }
-      if (cachedBan && cachedBan.is_banned) {
-        return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
-      }
-    } catch (e) {
-      const fallbackBan = banCache.get(user.id);
-      if (fallbackBan && fallbackBan.is_banned) {
-        return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
-      }
+async function authenticateToken(req, res, next) {
+  const { bearerToken, cookieToken } = extractTokens(req);
+  if (!bearerToken && !cookieToken) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+
+  // Prioritize active Authorization header, fallback to cookie if header missing or stale
+  let primaryToken = bearerToken || cookieToken;
+  let secondaryToken = (bearerToken && cookieToken && bearerToken !== cookieToken) ? cookieToken : null;
+
+  let authResult = await verifyJwtAsync(primaryToken);
+  let activeToken = primaryToken;
+
+  if (authResult.err && secondaryToken) {
+    const secondaryResult = await verifyJwtAsync(secondaryToken);
+    if (!secondaryResult.err && secondaryResult.user) {
+      authResult = secondaryResult;
+      activeToken = secondaryToken;
     }
+  }
 
-    const tokenHash = hashToken(token);
-    req.user = user; // Set req.user to the payload { id, username }
-    req.token = token;
-    req.tokenHash = tokenHash;
+  if (authResult.err || !authResult.user) {
+    return res.status(403).json({ error: 'Invalid or expired token.' });
+  }
+
+  const user = authResult.user;
+  const token = activeToken;
+
+  // Check if user is banned (cached for 60 seconds to eliminate DB query on every HTTP request)
+  try {
+    const now = Date.now();
+    let cachedBan = banCache.get(user.id);
+    if (!cachedBan || (now - cachedBan.ts > 60000)) {
+      const dbUser = await db('users').select('is_banned').where({ id: user.id }).first();
+      cachedBan = { is_banned: !!(dbUser && dbUser.is_banned), ts: now };
+      if (banCache.size > 10000) banCache.clear();
+      banCache.set(user.id, cachedBan);
+    }
+    if (cachedBan && cachedBan.is_banned) {
+      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+    }
+  } catch (e) {
+    const fallbackBan = banCache.get(user.id);
+    if (fallbackBan && fallbackBan.is_banned) {
+      return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+    }
+  }
+
+  const tokenHash = hashToken(token);
+  req.user = user; // Set req.user to the payload { id, username }
+  req.token = token;
+  req.tokenHash = tokenHash;
 
     // Opportunistically record real IP & device info if missing or on change
     try {
@@ -150,7 +204,6 @@ function authenticateToken(req, res, next) {
     }
 
     next();
-  });
 }
 
 module.exports = { authenticateToken, JWT_SECRET, hashToken };

@@ -978,49 +978,55 @@ export const useStore = create(persist((set, get) => ({
 
         try {
           const bootRes = await fetch(`${API}/api/user/bootstrap`, { credentials: 'include', headers });
-          if (bootRes.status === 401 || bootRes.status === 403) {
-            authFailed = true;
-          } else if (bootRes.ok) {
+          if (bootRes.ok) {
             const data = await bootRes.json();
             user = data.user;
             positions = data.positions;
             orders = data.orders;
             holdData = data.holdings;
             sipsList = data.sips;
+          } else if (bootRes.status === 401 || bootRes.status === 403) {
+            authFailed = true;
           }
         } catch (_) {
           // Network or parsing error on bootstrap, will fallback below
         }
 
-        // Graceful Fallback to individual requests if bootstrap endpoint fails
-        if (!user && !authFailed) {
-          const [posRes, ordRes, userRes, holdRes, sipsRes] = await Promise.all([
-            fetch(`${API}/api/positions`, { credentials: 'include', headers }),
-            fetch(`${API}/api/orders`, { credentials: 'include', headers }),
-            fetch(`${API}/api/user`, { credentials: 'include', headers }),
-            fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
-            fetch(`${API}/api/sips`, { credentials: 'include', headers }),
-          ]);
-          const [pData, oData, uData, hData, sData] = await Promise.all([
-            posRes.json().catch(() => ({})), 
-            ordRes.json().catch(() => ({})), 
-            userRes.json().catch(() => ({})),
-            holdRes.json().catch(() => ({})),
-            sipsRes.json().catch(() => ({}))
-          ]);
-          if (userRes.status === 401 || userRes.status === 403 || uData?.error) {
-            authFailed = true;
-          } else {
-            positions = pData;
-            orders = oData;
-            user = uData;
-            holdData = hData;
-            sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
-          }
+        // Graceful Fallback to individual requests if bootstrap endpoint fails or returns error
+        if (!user) {
+          try {
+            const userRes = await fetch(`${API}/api/user`, { credentials: 'include', headers });
+            if (userRes.ok) {
+              const uData = await userRes.json();
+              if (uData && !uData.error && uData.id) {
+                user = uData;
+                authFailed = false; // Auth verified successfully via fallback!
+                const [posRes, ordRes, holdRes, sipsRes] = await Promise.all([
+                  fetch(`${API}/api/positions`, { credentials: 'include', headers }),
+                  fetch(`${API}/api/orders`, { credentials: 'include', headers }),
+                  fetch(`${API}/api/holdings`, { credentials: 'include', headers }),
+                  fetch(`${API}/api/sips`, { credentials: 'include', headers }),
+                ]);
+                const [pData, oData, hData, sData] = await Promise.all([
+                  posRes.json().catch(() => ([])), 
+                  ordRes.json().catch(() => ([])), 
+                  holdRes.json().catch(() => ([])),
+                  sipsRes.json().catch(() => ({}))
+                ]);
+                positions = pData;
+                orders = oData;
+                holdData = hData;
+                sipsList = (sData && sData.success && Array.isArray(sData.sips)) ? sData.sips : [];
+              }
+            } else if (userRes.status === 401 || userRes.status === 403) {
+              authFailed = true;
+            }
+          } catch (_) {}
         }
         
-        if (authFailed || user?.error) {
-          console.error("Auth failed during fetchUserData, logging out.", user?.error);
+        // Only trigger logout if both primary and fallback returned 401/403 AND we have no user in store
+        if (authFailed && !user && !get().user) {
+          console.error("Auth definitively failed during fetchUserData, logging out.");
           get().logout();
           return;
         }
