@@ -204,6 +204,8 @@ export default function LoginView() {
           setMessage('SMS service unavailable. Verification code dispatched to your email.');
           triggerEmailOtp();
         }
+      } else {
+        useStore.setState({ authError: res?.error || 'Invalid email or password. Please check your credentials.' });
       }
     } 
     else if (view === 'login_otp') {
