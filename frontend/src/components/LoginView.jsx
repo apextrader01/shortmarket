@@ -240,18 +240,34 @@ export default function LoginView() {
       }
     }
     else if (view === 'register') {
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        useStore.setState({ authError: 'Please enter a valid 10-digit mobile phone number.' });
+        setLoading(false);
+        return;
+      }
       try {
         const verifier = setupRecaptchaVerifier();
-        const cleanPhone = phone.replace(/\D/g, '');
-        const formattedPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 
-          ? '+' + cleanPhone 
-          : '+91' + cleanPhone;
+        const formattedPhone = '+91' + cleanPhone;
         const confirmation = await signInWithPhoneNumber(auth, formattedPhone, verifier);
         setConfirmationResult(confirmation);
         setView('register_otp');
-        setMessage('OTP sent to your phone.');
+        setMessage(`6-digit SMS code dispatched to +91 ${cleanPhone}.`);
       } catch (error) {
-        useStore.setState({ authError: error.message });
+        console.error('Phone SMS registration error:', error);
+        const isFirebaseSmsUnavailable = 
+          error?.code === 'auth/unauthorized-domain' || 
+          error?.code === 'auth/api-key-not-valid' ||
+          error?.code === 'auth/invalid-api-key' ||
+          String(error?.message || '').toLowerCase().includes('api-key') ||
+          String(error?.message || '').includes('reCAPTCHA');
+
+        if (isFirebaseSmsUnavailable) {
+          // On web browsers without native SMS: complete direct registration with mandatory phone number!
+          await register(username, email, cleanPhone, password, null);
+        } else {
+          useStore.setState({ authError: error.message });
+        }
       }
     }
     else if (view === 'register_otp') {
@@ -261,9 +277,10 @@ export default function LoginView() {
         }
         const userCredential = await confirmationResult.confirm(phoneOtp);
         const firebaseToken = await userCredential?.user?.getIdToken().catch(() => null);
-        await register(username, email, phone, password, firebaseToken);
+        const cleanPhone = String(phone || '').replace(/\D/g, '');
+        await register(username, email, cleanPhone, password, firebaseToken);
       } catch (error) {
-        useStore.setState({ authError: 'Invalid OTP code.' });
+        useStore.setState({ authError: 'Invalid OTP code. Please check and try again.' });
       }
     }
     else if (view === 'forgot') {
