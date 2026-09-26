@@ -1309,7 +1309,7 @@ export default function PortfolioView() {
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 20px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '130px', minWidth: '130px' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 24px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '150px', minWidth: '150px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1398,8 +1398,8 @@ export default function PortfolioView() {
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '9px 20px 9px 10px', textAlign: 'center', width: '130px', minWidth: '130px' }}>
-                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                            <td style={{ padding: '9px 24px 9px 10px', textAlign: 'center', width: '150px', minWidth: '150px' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
@@ -1414,6 +1414,7 @@ export default function PortfolioView() {
                                         fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
@@ -1431,6 +1432,7 @@ export default function PortfolioView() {
                                         fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
@@ -1451,6 +1453,7 @@ export default function PortfolioView() {
                                         fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
@@ -1473,6 +1476,7 @@ export default function PortfolioView() {
                                         fontSize: '10.5px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
