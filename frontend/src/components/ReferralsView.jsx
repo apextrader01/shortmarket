@@ -192,8 +192,8 @@ export default function ReferralsView({ setActiveTab }) {
                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>{new Date(ref.created_at).toLocaleDateString()}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '10px', background: ref.status === 'COMPLETED' ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', color: ref.status === 'COMPLETED' ? 'var(--color-green-light)' : 'var(--color-yellow)', fontWeight: '700' }}>
-                    {ref.status}
+                  <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '10px', background: String(ref.status).toUpperCase() === 'COMPLETED' ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', color: String(ref.status).toUpperCase() === 'COMPLETED' ? 'var(--color-green-light)' : 'var(--color-yellow)', fontWeight: '700' }}>
+                    {String(ref.status || 'PENDING').toUpperCase()}
                   </span>
                   <div style={{ fontSize: '13px', fontWeight: '800', color: '#34D399', marginTop: '4px' }}>
                     ₹{ref.reward_amount ? Number(ref.reward_amount).toFixed(2) : '0.00'}
@@ -224,8 +224,8 @@ export default function ReferralsView({ setActiveTab }) {
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{maskEmail(ref.email)}</div>
                     </td>
                     <td style={{ padding: '16px' }}>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: ref.status === 'COMPLETED' ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', color: ref.status === 'COMPLETED' ? 'var(--color-green-light)' : 'var(--color-yellow)', fontWeight: '600' }}>
-                        {ref.status}
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '12px', background: String(ref.status).toUpperCase() === 'COMPLETED' ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', color: String(ref.status).toUpperCase() === 'COMPLETED' ? 'var(--color-green-light)' : 'var(--color-yellow)', fontWeight: '600' }}>
+                        {String(ref.status || 'PENDING').toUpperCase()}
                       </span>
                     </td>
                     <td style={{ padding: '16px', color: 'var(--text-secondary)' }}>
