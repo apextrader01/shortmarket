@@ -1195,7 +1195,7 @@ export default function PortfolioView() {
             </div>
 
             {/* Holdings Table Content */}
-            <div style={{ overflowX: isMobile ? 'auto' : 'visible', overflowY: 'visible', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ overflowX: 'auto', overflowY: 'visible', WebkitOverflowScrolling: 'touch' }}>
               {isMobile ? (
                 /* 📱 High-Density Mobile Holdings List */
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1309,7 +1309,7 @@ export default function PortfolioView() {
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 28px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '170px', minWidth: '170px' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '125px', minWidth: '125px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1411,8 +1411,8 @@ export default function PortfolioView() {
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '9px 28px 9px 10px', textAlign: 'center', width: '170px', minWidth: '170px' }}>
-                              <div style={{ display: 'inline-flex', gap: '5px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '9px 10px', textAlign: 'center', width: '125px', minWidth: '125px' }}>
+                              <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
@@ -1422,7 +1422,7 @@ export default function PortfolioView() {
                                         background: 'rgba(168, 85, 247, 0.1)',
                                         color: '#a855f7',
                                         border: '1px solid rgba(168, 85, 247, 0.3)',
-                                        padding: '3px 6px',
+                                        padding: '3px 5px',
                                         borderRadius: '4px',
                                         fontSize: '10px',
                                         fontWeight: '700',
@@ -1440,7 +1440,7 @@ export default function PortfolioView() {
                                         background: 'rgba(255, 59, 48, 0.1)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '3px 6px',
+                                        padding: '3px 5px',
                                         borderRadius: '4px',
                                         fontSize: '10px',
                                         fontWeight: '700',
@@ -1461,9 +1461,9 @@ export default function PortfolioView() {
                                         background: 'rgba(0, 230, 118, 0.1)',
                                         color: '#00E676',
                                         border: '1px solid rgba(0, 230, 118, 0.3)',
-                                        padding: '3px 8px',
-                                        borderRadius: '5px',
-                                        fontSize: '10.5px',
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
@@ -1484,9 +1484,9 @@ export default function PortfolioView() {
                                         background: 'rgba(255, 59, 48, 0.1)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '3px 8px',
-                                        borderRadius: '5px',
-                                        fontSize: '10.5px',
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
                                         whiteSpace: 'nowrap',
