@@ -1309,7 +1309,7 @@ export default function PortfolioView() {
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Invested</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Current</th>
                       <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 10px', fontWeight: '600', textAlign: 'right', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap' }}>Total Return (P&L)</th>
-                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 24px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '165px', minWidth: '165px' }}>Actions</th>
+                      <th style={{ position: 'sticky', top: isMobile ? '44px' : '48px', zIndex: 35, background: '#0d1527', padding: '9px 28px 9px 10px', fontWeight: '600', textAlign: 'center', borderBottom: '1px solid var(--border-color)', whiteSpace: 'nowrap', width: '170px', minWidth: '170px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1339,8 +1339,21 @@ export default function PortfolioView() {
                               {pos.isMf ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ color: 'var(--text-primary)', fontSize: '13px' }}>{pos.displayName}</span>
-                                    <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                                    <span 
+                                      title={pos.displayName}
+                                      style={{ 
+                                        color: 'var(--text-primary)', 
+                                        fontSize: '13px', 
+                                        maxWidth: isMobile ? '180px' : '260px', 
+                                        overflow: 'hidden', 
+                                        textOverflow: 'ellipsis', 
+                                        whiteSpace: 'nowrap', 
+                                        display: 'inline-block' 
+                                      }}
+                                    >
+                                      {pos.displayName}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: '#a855f7', background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', padding: '2px 6px', borderRadius: '4px', fontWeight: '700', flexShrink: 0 }}>
                                       MUTUAL FUND
                                     </span>
                                   </div>
@@ -1398,8 +1411,8 @@ export default function PortfolioView() {
                                 {pos.isProfit ? '+' : ''}{pos.pnlPct.toFixed(2)}%
                               </div>
                             </td>
-                            <td style={{ padding: '9px 24px 9px 10px', textAlign: 'center', width: '165px', minWidth: '165px' }}>
-                              <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: '9px 28px 9px 10px', textAlign: 'center', width: '170px', minWidth: '170px' }}>
+                              <div style={{ display: 'inline-flex', gap: '5px', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap' }}>
                                 {pos.isMf ? (
                                   <>
                                     <button
@@ -1409,8 +1422,8 @@ export default function PortfolioView() {
                                         background: 'rgba(168, 85, 247, 0.1)',
                                         color: '#a855f7',
                                         border: '1px solid rgba(168, 85, 247, 0.3)',
-                                        padding: '3px 7px',
-                                        borderRadius: '5px',
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
                                         fontSize: '10px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
@@ -1418,7 +1431,7 @@ export default function PortfolioView() {
                                         transition: 'all 0.15s ease'
                                       }}
                                     >
-                                      + INVEST
+                                      INVEST
                                     </button>
                                     <button
                                       onClick={() => handleMfAction(pos, 'REDEEM')}
@@ -1427,8 +1440,8 @@ export default function PortfolioView() {
                                         background: 'rgba(255, 59, 48, 0.1)',
                                         color: '#FF3B30',
                                         border: '1px solid rgba(255, 59, 48, 0.3)',
-                                        padding: '3px 7px',
-                                        borderRadius: '5px',
+                                        padding: '3px 6px',
+                                        borderRadius: '4px',
                                         fontSize: '10px',
                                         fontWeight: '700',
                                         cursor: 'pointer',
