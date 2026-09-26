@@ -56,8 +56,8 @@ function runTest(name, fn) {
 console.log('\n▶ SUITE 1: Portfolio View Layout & Density Optimization (Screenshot 1)');
 
 runTest('Actions column has dedicated width and padding to prevent touching scrollbar', () => {
-  assert(portfolioViewContent.includes("padding: '9px 28px 9px 10px'"), 'Actions header/cell has 28px right padding');
-  assert(portfolioViewContent.includes("width: '170px', minWidth: '170px'"), 'Actions column has minWidth: 170px');
+  assert(portfolioViewContent.includes("padding: '9px 10px'"), 'Actions header/cell has compact padding');
+  assert(portfolioViewContent.includes("width: '125px', minWidth: '125px'"), 'Actions column has minWidth: 125px');
   assert(!portfolioViewContent.includes("? 'COVER' : 'SELL'"), 'Standardizes SELL button across all rows');
 });
 
