@@ -23,7 +23,7 @@ function assert(condition, testName, details = '') {
 }
 
 console.log('\n================================================================');
-console.log('🧪 SHORTMARKET 30-DEFECT REMEDIATION VERIFICATION SUITE');
+console.log('🧪 SKANDX 30-DEFECT REMEDIATION VERIFICATION SUITE');
 console.log('================================================================\n');
 
 // Load source files

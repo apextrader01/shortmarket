@@ -38,7 +38,7 @@ export function exportToExcel(data, columns, filename = 'export', title = 'Repor
   const rows = [];
 
   // Metadata headers
-  rows.push([escapeCSVValue('SHORT MARKET - ADMIN REPORT')].join(','));
+  rows.push([escapeCSVValue('SKANDX - ADMIN REPORT')].join(','));
   rows.push([escapeCSVValue(`Title: ${title}`)].join(','));
   rows.push([escapeCSVValue(`Generated At: ${generatedDate} IST`)].join(','));
   rows.push([escapeCSVValue(`Total Records: ${data.length}`)].join(','));
@@ -253,7 +253,7 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
 
   <div class="header">
     <div>
-      <div class="brand-title">SHORT MARKET</div>
+      <div class="brand-title">SKANDX</div>
       <div class="report-title">${title}</div>
       ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ''}
     </div>
@@ -273,7 +273,7 @@ export function exportToPDF(data, columns, filename = 'report', title = 'Admin R
   </table>
 
   <div class="footer">
-    <div>Short Market Trading Platform &copy; ${new Date().getFullYear()} - Confidential Admin Report</div>
+    <div>SkandX Algorithmic Trading Platform &copy; ${new Date().getFullYear()} - Confidential Admin Report</div>
   </div>
 
   <script>

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Automated High-Concurrency Deployment Script for ShortMarket (VM Instance)
+# Automated High-Concurrency Deployment Script for SkandX (VM Instance)
 # Run this from the root directory of the project.
 # ==============================================================================
 
@@ -50,7 +50,8 @@ node scripts/migrate_columns.js || node -e "const db = require('./database/db');
 
 # 5. Reload PM2 (Zero Downtime Restart)
 echo "🔄 Reloading PM2 Clusters (Zero Downtime)..."
-pm2 reload ecosystem.config.js --update-env
+pm2 delete shortmarket-backend 2>/dev/null || true
+pm2 reload ecosystem.config.js --update-env 2>/dev/null || pm2 start ecosystem.config.js
 
 echo "✅ Deployment Successful! Platform is running cleanly."
 cd ..

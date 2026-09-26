@@ -36,12 +36,13 @@ export default function TradingJournalView({ onBack, initialTab = 'JOURNAL', mod
   })));
 
   const userId = user?.id || 'default';
-  const storageKey = `shortmarket_journal_${userId}`;
+  const storageKey = `skandx_journal_${userId}`;
+  const legacyStorageKey = `shortmarket_journal_${userId}`;
 
   // Journal entries stored in localStorage: { [tradeId]: { strategy, emotion, notes, rating, updatedAt } }
   const [journalEntries, setJournalEntries] = useState(() => {
     try {
-      const saved = localStorage.getItem(storageKey);
+      const saved = localStorage.getItem(storageKey) || localStorage.getItem(legacyStorageKey);
       return saved ? JSON.parse(saved) : {};
     } catch (e) {
       return {};

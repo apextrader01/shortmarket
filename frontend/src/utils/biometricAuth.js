@@ -1,9 +1,14 @@
 // frontend/src/utils/biometricAuth.js
 // Client-side Biometric (Face ID / Fingerprint / WebAuthn) & 4-Digit Security PIN Engine
 
-const PIN_STORAGE_KEY_PREFIX = 'shortmarket_pin_hash_';
-const BIOMETRIC_CRED_KEY_PREFIX = 'shortmarket_bio_cred_';
-const LOCK_STATE_KEY = 'shortmarket_app_locked';
+const PIN_STORAGE_KEY_PREFIX = 'skandx_pin_hash_';
+const OLD_PIN_KEY_PREFIX = 'shortmarket_pin_hash_';
+
+const BIOMETRIC_CRED_KEY_PREFIX = 'skandx_bio_cred_';
+const OLD_BIOMETRIC_KEY_PREFIX = 'shortmarket_bio_cred_';
+
+const LOCK_STATE_KEY = 'skandx_app_locked';
+const OLD_LOCK_STATE_KEY = 'shortmarket_app_locked';
 
 // Base64URL helper utilities for binary WebAuthn credentials
 function bufferToBase64Url(buffer) {
@@ -36,6 +41,15 @@ function base64UrlToBuffer(base64Url) {
  */
 export async function hashPin(pin, userId = 'default') {
   const encoder = new TextEncoder();
+  const salt = `skandx_salt_${userId}_secure`;
+  const data = encoder.encode(`${pin}_${salt}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function legacyHashPin(pin, userId = 'default') {
+  const encoder = new TextEncoder();
   const salt = `short_edge_salt_${userId}_secure`;
   const data = encoder.encode(`${pin}_${salt}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -57,15 +71,31 @@ export async function saveUserPin(pin, userId = 'default') {
  * Check if PIN is configured for user
  */
 export function isUserPinEnabled(userId = 'default') {
-  return Boolean(localStorage.getItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`));
+  return Boolean(
+    localStorage.getItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`) ||
+    localStorage.getItem(`${OLD_PIN_KEY_PREFIX}${userId}`)
+  );
 }
 
 /**
  * Verify entered PIN against stored hash
  */
 export async function verifyUserPin(pin, userId = 'default') {
-  const storedHash = localStorage.getItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
-  if (!storedHash) return false;
+  let storedHash = localStorage.getItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
+  if (!storedHash) {
+    storedHash = localStorage.getItem(`${OLD_PIN_KEY_PREFIX}${userId}`);
+    if (storedHash) {
+      const oldEnteredHash = await legacyHashPin(pin, userId);
+      if (storedHash === oldEnteredHash) {
+        // Upgrade legacy hash seamlessly to new SkandX hash
+        await saveUserPin(pin, userId);
+        try { localStorage.removeItem(`${OLD_PIN_KEY_PREFIX}${userId}`); } catch (e) {}
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
   const enteredHash = await hashPin(pin, userId);
   return storedHash === enteredHash;
 }
@@ -75,8 +105,11 @@ export async function verifyUserPin(pin, userId = 'default') {
  */
 export function removeUserPin(userId = 'default') {
   localStorage.removeItem(`${PIN_STORAGE_KEY_PREFIX}${userId}`);
+  localStorage.removeItem(`${OLD_PIN_KEY_PREFIX}${userId}`);
   localStorage.removeItem(`${BIOMETRIC_CRED_KEY_PREFIX}${userId}`);
+  localStorage.removeItem(`${OLD_BIOMETRIC_KEY_PREFIX}${userId}`);
   sessionStorage.removeItem(LOCK_STATE_KEY);
+  sessionStorage.removeItem(OLD_LOCK_STATE_KEY);
 }
 
 /**
@@ -219,7 +252,7 @@ export async function verifyBiometrics(userId = 'default') {
  * Lock / Unlock Session Management
  */
 export function isAppLocked() {
-  return sessionStorage.getItem(LOCK_STATE_KEY) === 'true';
+  return sessionStorage.getItem(LOCK_STATE_KEY) === 'true' || sessionStorage.getItem(OLD_LOCK_STATE_KEY) === 'true';
 }
 
 export function setAppLocked(locked = true) {
@@ -227,10 +260,12 @@ export function setAppLocked(locked = true) {
     sessionStorage.setItem(LOCK_STATE_KEY, 'true');
   } else {
     sessionStorage.removeItem(LOCK_STATE_KEY);
+    sessionStorage.removeItem(OLD_LOCK_STATE_KEY);
   }
 }
 
-const AUTO_LOCK_STORAGE_KEY_PREFIX = 'shortmarket_autolock_minutes_';
+const AUTO_LOCK_STORAGE_KEY_PREFIX = 'skandx_autolock_minutes_';
+const OLD_AUTO_LOCK_KEY_PREFIX = 'shortmarket_autolock_minutes_';
 
 export const AUTO_LOCK_OPTIONS = [
   { value: 0, label: '⚡ Immediately' },
@@ -245,7 +280,7 @@ export const AUTO_LOCK_OPTIONS = [
 
 export function getAutoLockDuration(userId = 'default') {
   try {
-    const val = localStorage.getItem(`${AUTO_LOCK_STORAGE_KEY_PREFIX}${userId}`);
+    const val = localStorage.getItem(`${AUTO_LOCK_STORAGE_KEY_PREFIX}${userId}`) ?? localStorage.getItem(`${OLD_AUTO_LOCK_KEY_PREFIX}${userId}`);
     if (val !== null && val !== undefined) {
       return Number(val);
     }
@@ -255,5 +290,6 @@ export function getAutoLockDuration(userId = 'default') {
 
 export function setAutoLockDuration(durationMinutes, userId = 'default') {
   localStorage.setItem(`${AUTO_LOCK_STORAGE_KEY_PREFIX}${userId}`, String(durationMinutes));
+  window.dispatchEvent(new CustomEvent('skandx_autolock_changed', { detail: { duration: durationMinutes } }));
   window.dispatchEvent(new CustomEvent('shortmarket_autolock_changed', { detail: { duration: durationMinutes } }));
 }
