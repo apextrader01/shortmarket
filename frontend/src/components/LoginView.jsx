@@ -117,21 +117,10 @@ export default function LoginView() {
       setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
     } catch (error) {
       console.error('Phone SMS Error:', error);
-      const isCaptchaOrDomain = 
-        error?.code === 'auth/unauthorized-domain' || 
-        error?.code === 'auth/captcha-check-failed' || 
-        error?.code === 'auth/invalid-app-credential' ||
-        String(error?.message || '').includes('Hostname match not found') ||
-        String(error?.message || '').includes('reCAPTCHA');
-
-      if (isCaptchaOrDomain) {
-        useStore.setState({ authError: null });
-        setTwoFactorMethod('email');
-        setMessage('SMS unavailable on this mobile app/device. Verification code sent to your email.');
-        triggerEmailOtp();
-      } else {
-        useStore.setState({ authError: error.message || 'Failed to send 2FA security code.' });
-      }
+      useStore.setState({ authError: null });
+      setTwoFactorMethod('email');
+      setMessage('SMS verification is unavailable on this browser. A 6-digit verification code was sent to your email.');
+      triggerEmailOtp();
     } finally {
       setLoading(false);
     }
@@ -195,13 +184,10 @@ export default function LoginView() {
           setMessage(`2FA security code sent to registered number ending in ${cleanPhone.slice(-4)}.`);
         } catch (error) {
           console.error('Auto SMS error:', error);
-          if (error?.code === 'auth/unauthorized-domain') {
-            useStore.setState({ authError: 'Domain unauthorized in Firebase. Please add www.skandx.in to Firebase Authorized Domains.' });
-          }
-          // If SMS gateway fails or rate limits, gracefully offer Email OTP or Google Authenticator
+          useStore.setState({ authError: null });
           setTwoFactorMethod('email');
           setView('login_otp');
-          setMessage('SMS service unavailable. Verification code dispatched to your email.');
+          setMessage('SMS verification is unavailable on this browser. A 6-digit verification code was sent to your email.');
           triggerEmailOtp();
         }
       } else {
