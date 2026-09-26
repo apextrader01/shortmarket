@@ -999,9 +999,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
   try {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-
-    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
-    const valid = isGoogleReviewTester ? true : await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const clientIp = getClientIp(req);
@@ -1012,6 +1010,7 @@ app.post('/api/auth/pre-login', authLimiter, async (req, res) => {
       return res.status(403).json({ error: 'Your trading account has been suspended by administration.' });
     }
 
+    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
     let isTrusted = isGoogleReviewTester;
 
     // 🛡️ CHECK IF DEVICE IS TRUSTED (30-Day Device Trust / Remember Me)
@@ -1100,9 +1099,7 @@ app.post('/api/auth/send-login-email-otp', authLimiter, async (req, res) => {
   try {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-
-    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
-    const valid = isGoogleReviewTester ? true : await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const crypto = require('crypto');
@@ -1153,9 +1150,7 @@ app.post('/api/auth/verify-2fa', authLimiter, async (req, res) => {
   try {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
-
-    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
-    const valid = isGoogleReviewTester ? true : await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const crypto = require('crypto');
@@ -1366,8 +1361,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const user = await db('users').where({ email }).first();
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     
-    const isGoogleReviewTester = Boolean(user.email && (user.email.toLowerCase().trim() === 'appwebsitetester@gmail.com' || user.email.toLowerCase().trim() === 'demo@skandx.in'));
-    const valid = isGoogleReviewTester ? true : await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
 
     const clientIp = getClientIp(req);
