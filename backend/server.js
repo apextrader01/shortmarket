@@ -1747,6 +1747,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const user = await findUserByIdentifier(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
+    const normalizedEmail = user.email ? user.email.toLowerCase().trim() : String(email).toLowerCase().trim();
 
     const isFirebaseAction = (otp === 'FIREBASE_VERIFIED' || otp === 'FIREBASE_ACTION');
 
